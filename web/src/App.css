@@ -35,6 +35,8 @@ body {
 .app-header p {
   font-size: 1.1rem;
   opacity: 0.9;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
 /* Main content */
@@ -46,113 +48,182 @@ body {
   width: 100%;
 }
 
-/* Upload section */
-.upload-section {
+.card-container {
   display: flex;
   justify-content: center;
   align-items: center;
   min-height: 60vh;
 }
 
-.upload-card {
+.content-card {
   background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-  text-align: center;
-  max-width: 500px;
+  padding: 2.5rem;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
   width: 100%;
+  max-width: 600px;
 }
 
-.upload-card h2 {
+.content-card h2 {
+  text-align: center;
   margin-bottom: 1.5rem;
   color: #333;
   font-size: 1.8rem;
 }
 
-.file-input-container {
+.content-card h3 {
+  text-align: center;
   margin-bottom: 1.5rem;
+  color: #333;
+  font-size: 1.5rem;
+}
+
+.subtitle {
+  text-align: center;
+  color: #666;
+  margin-bottom: 2rem;
+  font-size: 1rem;
+}
+
+/* File upload */
+.file-upload-area {
+  margin-bottom: 2rem;
 }
 
 .file-input {
   display: none;
 }
 
-.file-input-label {
-  display: inline-block;
-  padding: 1rem 2rem;
+.file-upload-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
   background: #f8f9fa;
   border: 2px dashed #dee2e6;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
   color: #6c757d;
 }
 
-.file-input-label:hover {
+.file-upload-label:hover {
   background: #e9ecef;
   border-color: #667eea;
 }
 
+.upload-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.upload-text {
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: #333;
+}
+
+.upload-hint {
+  font-size: 0.9rem;
+  color: #6c757d;
+}
+
+/* Language selector */
+.language-selector {
+  margin: 2rem 0;
+  text-align: left;
+}
+
+.language-selector label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.language-select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  background-color: white;
+  cursor: pointer;
+}
+
+.language-select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
 /* Buttons */
-.upload-btn, .download-btn, .reset-btn {
-  padding: 0.75rem 1.5rem;
+.primary-btn, .secondary-btn {
+  padding: 0.875rem 1.75rem;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
   font-size: 1rem;
   font-weight: 500;
+  width: 100%;
+  margin-bottom: 1rem;
 }
 
-.upload-btn {
+.primary-btn {
   background: #667eea;
   color: white;
-  width: 100%;
 }
 
-.upload-btn:hover:not(:disabled) {
+.primary-btn:hover:not(:disabled) {
   background: #5a6fd8;
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
 }
 
-.upload-btn:disabled {
+.primary-btn:disabled {
   background: #ccc;
   cursor: not-allowed;
   transform: none;
 }
 
-.download-btn {
-  background: #28a745;
-  color: white;
-  margin-right: 1rem;
+.secondary-btn {
+  background: #f8f9fa;
+  color: #333;
+  border: 1px solid #ddd;
 }
 
-.download-btn:hover {
-  background: #218838;
-  transform: translateY(-2px);
-}
-
-.reset-btn {
-  background: #6c757d;
-  color: white;
-}
-
-.reset-btn:hover {
-  background: #5a6268;
+.secondary-btn:hover {
+  background: #e9ecef;
   transform: translateY(-2px);
 }
 
 /* Progress */
-.progress-container {
-  margin: 2rem 0;
+.processing-view {
+  text-align: center;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #667eea;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1.5rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .progress-bar {
   width: 100%;
-  height: 10px;
+  height: 12px;
   background: #e9ecef;
-  border-radius: 5px;
+  border-radius: 6px;
   overflow: hidden;
   margin: 1rem 0;
 }
@@ -160,48 +231,42 @@ body {
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #667eea, #764ba2);
-  border-radius: 5px;
+  border-radius: 6px;
   transition: width 0.3s ease;
 }
 
-/* Processing */
-.processing-card {
-  background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.processing-card h2 {
-  text-align: center;
-  margin-bottom: 1.5rem;
-  color: #333;
-}
-
-.current-step {
-  text-align: center;
-  font-size: 1.2rem;
+.progress-text {
+  font-size: 1rem;
+  color: #666;
   margin-bottom: 2rem;
-  color: #667eea;
-  font-weight: 500;
+}
+
+/* Steps */
+.steps-container {
+  margin-top: 2rem;
+  text-align: left;
+}
+
+.steps-container h4 {
+  margin-bottom: 1rem;
+  color: #333;
 }
 
 .steps-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1rem;
-  margin-bottom: 2rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
 }
 
 .step-item {
   display: flex;
   align-items: center;
-  padding: 1rem;
+  padding: 0.75rem;
   border-radius: 8px;
   background: #f8f9fa;
   transition: all 0.3s ease;
+  font-size: 0.9rem;
 }
 
 .step-item.completed {
@@ -231,10 +296,10 @@ body {
   100% { opacity: 1; }
 }
 
-.step-status {
-  font-size: 1.2rem;
+.step-icon {
+  font-size: 1rem;
   margin-right: 0.75rem;
-  min-width: 24px;
+  min-width: 20px;
   text-align: center;
 }
 
@@ -243,8 +308,8 @@ body {
   color: #333;
 }
 
-/* Error details */
-.error-details {
+/* Error section */
+.error-section {
   background: #f8d7da;
   border: 1px solid #f5c6cb;
   border-radius: 8px;
@@ -252,10 +317,14 @@ body {
   margin-top: 1rem;
 }
 
-.error-title {
-  font-weight: 600;
+.error-section h4 {
   color: #721c24;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.error-list {
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .error-item {
@@ -263,41 +332,68 @@ body {
   padding: 0.5rem;
   background: rgba(255, 255, 255, 0.5);
   border-radius: 4px;
+  font-size: 0.9rem;
 }
 
 .error-item strong {
   color: #721c24;
 }
 
-/* Completed */
-.completed-card {
-  background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+/* Completed view */
+.completed-view {
   text-align: center;
-  max-width: 600px;
-  margin: 0 auto;
 }
 
-.completed-card h2 {
-  margin-bottom: 1.5rem;
+.success-icon {
+  font-size: 4rem;
   color: #28a745;
+  margin-bottom: 1rem;
 }
 
-.video-container {
-  margin: 2rem 0;
+.success-message {
+  color: #666;
+  margin-bottom: 2rem;
+  line-height: 1.5;
+}
+
+.action-buttons {
+  margin-bottom: 2rem;
+}
+
+.action-buttons .primary-btn {
+  margin-bottom: 1rem;
+}
+
+.action-buttons .secondary-btn {
+  margin-bottom: 0;
+}
+
+.video-preview h4 {
+  margin-bottom: 1rem;
+  color: #333;
+}
+
+.video-preview .preview-video {
+  width: 100%;
   border-radius: 8px;
-  overflow: hidden;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
-.video-container video {
-  width: 100%;
-  height: auto;
-  display: block;
+/* Error view */
+.error-view {
+  text-align: center;
 }
 
+.error-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.error-message {
+  color: #666;
+  margin-bottom: 2rem;
+  line-height: 1.5;
+}
 
 /* Footer */
 .app-footer {
@@ -305,35 +401,6 @@ body {
   padding: 2rem 1rem;
   color: rgba(255, 255, 255, 0.7);
   font-size: 0.9rem;
-}
-
-/* Language selector */
-.language-selector {
-  margin: 20px 0;
-  text-align: left;
-}
-
-.language-selector label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 500;
-  color: #333;
-}
-
-.language-select {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 16px;
-  background-color: white;
-  cursor: pointer;
-}
-
-.language-select:focus {
-  outline: none;
-  border-color: #007bff;
-  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 }
 
 /* Responsive adjustments */
@@ -350,22 +417,38 @@ body {
     padding: 1rem;
   }
   
-  .upload-card, .processing-card, .completed-card {
+  .content-card {
     padding: 1.5rem;
   }
   
-  .features-grid {
+  .file-upload-label {
+    padding: 1.5rem;
+  }
+  
+  .steps-grid {
     grid-template-columns: 1fr;
-    gap: 1rem;
   }
   
-  .file-input-label {
+  .primary-btn, .secondary-btn {
     padding: 0.75rem 1.5rem;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-header {
+    padding: 1.5rem 1rem;
   }
   
-  .upload-btn, .download-btn, .reset-btn {
-    padding: 0.6rem 1.2rem;
-    font-size: 0.9rem;
+  .content-card {
+    padding: 1.25rem;
+  }
+  
+  .upload-text {
+    font-size: 1rem;
+  }
+  
+  .upload-hint {
+    font-size: 0.8rem;
   }
 }

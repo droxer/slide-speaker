@@ -1,4 +1,5 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks
+from fastapi import FastAPI, File, UploadFile, HTTPException, BackgroundTasks, Request
+import base64
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 import os
@@ -13,7 +14,7 @@ from loguru import logger
 
 from slidespeaker.state_manager import state_manager
 from slidespeaker.task_manager import task_manager
-from slidespeaker.orchestrator import run
+from slidespeaker.orchestrator import process_presentation
 
 load_dotenv()
 
@@ -39,43 +40,56 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 
 
 @app.post("/api/upload")
-async def upload_file(file: UploadFile = File(...), language: str = "english"):
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No file provided")
-    
-    file_ext = Path(file.filename).suffix.lower()
-    if file_ext not in ['.pdf', '.pptx', '.ppt']:
-        raise HTTPException(status_code=400, detail="Only PDF and PowerPoint files are supported")
-    
-    # Read file content and generate hash-based ID
-    content = await file.read()
-    file_hash = hashlib.sha256(content).hexdigest()
-    file_id = file_hash[:16]  # Use first 16 chars of hash
-    file_path = UPLOAD_DIR / f"{file_id}{file_ext}"
-    
-    # Write file to disk
-    async with aiofiles.open(file_path, 'wb') as out_file:
-        await out_file.write(content)
-    
-    # Create initial state
-    await state_manager.create_state(file_id, file_path, file_ext)
-    
-    # Submit task to task manager
-    task_id = task_manager.submit_task(
-        "process_presentation",
-        file_id=file_id,
-        file_path=str(file_path),
-        file_ext=file_ext,
-        language=language
-    )
-    
-    logger.info(f"File uploaded: {file_id}, type: {file_ext}, task submitted: {task_id}")
-    
-    return {
-        "file_id": file_id,
-        "task_id": task_id,
-        "message": "File uploaded successfully, processing started in background"
-    }
+async def upload_file(request: Request):
+    try:
+        # Parse JSON data from request body
+        body = await request.json()
+        filename = body.get('filename')
+        file_data = body.get('file_data')
+        language = body.get('language', 'english')
+        
+        if not filename or not file_data:
+            raise HTTPException(status_code=400, detail="Filename and file data are required")
+        
+        # Decode base64 file data
+        file_bytes = base64.b64decode(file_data)
+        
+        file_ext = Path(filename).suffix.lower()
+        if file_ext not in ['.pdf', '.pptx', '.ppt']:
+            raise HTTPException(status_code=400, detail="Only PDF and PowerPoint files are supported")
+        
+        # Generate hash-based ID
+        file_hash = hashlib.sha256(file_bytes).hexdigest()
+        file_id = file_hash[:16]  # Use first 16 chars of hash
+        file_path = UPLOAD_DIR / f"{file_id}{file_ext}"
+        
+        # Write file to disk
+        async with aiofiles.open(file_path, 'wb') as out_file:
+            await out_file.write(file_bytes)
+        
+        # Create initial state
+        await state_manager.create_state(file_id, file_path, file_ext)
+        
+        # Submit task to task manager
+        task_id = task_manager.submit_task(
+            "process_presentation",
+            file_id=file_id,
+            file_path=str(file_path),
+            file_ext=file_ext,
+            language=language
+        )
+        
+        logger.info(f"File uploaded: {file_id}, type: {file_ext}, task submitted: {task_id}")
+        
+        return {
+            "file_id": file_id,
+            "task_id": task_id,
+            "message": "File uploaded successfully, processing started in background"
+        }
+        
+    except Exception as e:
+        logger.error(f"Upload error: {e}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
 
 
 @app.get("/api/task/{task_id}")

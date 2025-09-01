@@ -33,28 +33,37 @@ class TTSService:
             "english": "alloy",
             "chinese": "onyx",
             "japanese": "nova",
-            "korean": "shimmer"
+            "korean": "shimmer",
+            "thai": "alloy"  # Using alloy as default voice for Thai
         }
         
         # Use language-specific voice if available, otherwise use default
         voice = voice or language_voices.get(language, "alloy")
         
         # Use appropriate model for better language support
-        model = "tts-1"  # Default model
-        if language in ["chinese", "japanese", "korean"]:
-            model = "tts-1-hd"  # Higher quality model for non-English languages
+        # Updated to use current available models
+        model = "tts-1"  # Default model for all languages
+        
+        # Ensure text is not empty
+        if not text or not text.strip():
+            raise ValueError("Text is empty or contains only whitespace")
         
         try:
             response = self.openai_client.audio.speech.create(
                 model=model,
                 voice=voice,
-                input=text,
+                input=text.strip(),
             )
             
+            # Use the correct method for the newer OpenAI library
             response.stream_to_file(output_path)
             
         except Exception as e:
             logger.error(f"OpenAI TTS error: {e}")
+            logger.error(f"Model: {model}, Voice: {voice}, Text length: {len(text.strip())}")
+            # Provide more context about the error
+            if "404" in str(e):
+                logger.error("OpenAI TTS 404 error - this might be due to an incorrect model name or API endpoint")
             raise
     
     async def _generate_elevenlabs_tts(self, text: str, output_path: Path, voice_id: Optional[str] = None):

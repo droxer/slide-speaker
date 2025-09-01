@@ -30,22 +30,30 @@ function App() {
     setUploading(true);
     setStatus('uploading');
     
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('language', language);
-    
     try {
-      const response = await axios.post('/api/upload', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
+      // Read file as array buffer for base64 encoding
+      const arrayBuffer = await file.arrayBuffer();
+      const base64File = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      
+      // Send as JSON
+      const response = await axios.post('/api/upload', 
+        {
+          filename: file.name,
+          file_data: base64File,
+          language: language
         },
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          setProgress(percentCompleted);
-        },
-      });
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            setProgress(percentCompleted);
+          },
+        }
+      );
       
       setFileId(response.data.file_id);
       setStatus('processing');
@@ -58,8 +66,6 @@ function App() {
       setStatus('idle');
     }
   };
-
-  // Remove the pollStatus function as we'll use useEffect instead
 
   const downloadVideo = () => {
     if (fileId) {
@@ -127,15 +133,15 @@ function App() {
 
   const formatStepName = (step) => {
     const stepNames = {
-      'extract_slides': 'Extracting Presentation Content',
-      'analyze_slide_images': 'Analyzing Visual Content',
-      'generate_scripts': 'Generating AI Narratives',
-      'review_scripts': 'Reviewing & Refining Scripts',
-      'generate_audio': 'Synthesizing Voice Audio',
-      'generate_avatar_videos': 'Creating AI Presenter Videos',
-      'convert_slides_to_images': 'Converting Slides to Images',
-      'compose_video': 'Composing Final Presentation',
-      'unknown': 'Initializing Process'
+      'extract_slides': 'Extracting Content',
+      'analyze_slide_images': 'Analyzing Visuals',
+      'generate_scripts': 'Generating Narratives',
+      'review_scripts': 'Reviewing Scripts',
+      'generate_audio': 'Creating Audio',
+      'generate_avatar_videos': 'Generating Avatars',
+      'convert_slides_to_images': 'Converting Slides',
+      'compose_video': 'Composing Video',
+      'unknown': 'Initializing'
     };
     return stepNames[step] || step;
   };
@@ -144,17 +150,18 @@ function App() {
     <div className="App">
       <header className="app-header">
         <h1>SlideSpeaker</h1>
-        <p>Transform your slides into engaging AI-powered presentations</p>
+        <p>Transform presentations into engaging AI-powered videos</p>
       </header>
 
       <main className="main-content">
-        <div className="upload-section">
-          <div className="upload-card">
-            <h2>Upload Your Slides</h2>
-            
+        <div className="card-container">
+          <div className="content-card">
             {status === 'idle' && (
-              <>
-                <div className="file-input-container">
+              <div className="upload-view">
+                <h2>Convert Your Presentation</h2>
+                <p className="subtitle">Upload a PDF or PowerPoint file to create an AI-powered video presentation</p>
+                
+                <div className="file-upload-area">
                   <input
                     type="file"
                     id="file-upload"
@@ -162,13 +169,19 @@ function App() {
                     onChange={handleFileChange}
                     className="file-input"
                   />
-                  <label htmlFor="file-upload" className="file-input-label">
-                    {file ? file.name : 'Choose PDF or PowerPoint file'}
+                  <label htmlFor="file-upload" className="file-upload-label">
+                    <div className="upload-icon">📁</div>
+                    <div className="upload-text">
+                      {file ? file.name : 'Choose a file'}
+                    </div>
+                    <div className="upload-hint">
+                      Supports PDF, PPTX, and PPT files
+                    </div>
                   </label>
                 </div>
                 
                 <div className="language-selector">
-                  <label htmlFor="language-select">Audio Language:</label>
+                  <label htmlFor="language-select">Audio Language</label>
                   <select 
                     id="language-select" 
                     value={language} 
@@ -176,60 +189,63 @@ function App() {
                     className="language-select"
                   >
                     <option value="english">English</option>
-                    <option value="chinese">Chinese (中文)</option>
-                    <option value="japanese">Japanese (日本語)</option>
-                    <option value="korean">Korean (한국어)</option>
+                    <option value="chinese">中文 (Chinese)</option>
+                    <option value="japanese">日本語 (Japanese)</option>
+                    <option value="korean">한국어 (Korean)</option>
+                    <option value="thai">ไทย (Thai)</option>
                   </select>
                 </div>
                 
                 {file && (
                   <button 
                     onClick={handleUpload} 
-                    className="upload-btn"
+                    className="primary-btn"
                     disabled={uploading}
                   >
-                    Start AI Processing
+                    Convert to Video
                   </button>
                 )}
-              </>
+              </div>
             )}
 
             {status === 'uploading' && (
-              <div className="progress-container">
-                <p>Uploading file... {progress}%</p>
+              <div className="processing-view">
+                <div className="spinner"></div>
+                <h3>Uploading File</h3>
                 <div className="progress-bar">
                   <div 
                     className="progress-fill" 
                     style={{ width: `${progress}%` }}
                   ></div>
                 </div>
+                <p className="progress-text">{progress}% Complete</p>
               </div>
             )}
 
             {status === 'processing' && (
-              <div className="processing-container">
-                <div className="loading-spinner"></div>
-                <p>AI is processing your presentation... {progress}%</p>
-                
+              <div className="processing-view">
+                <div className="spinner"></div>
+                <h3>Your Speaker is Getting Ready…</h3>
                 <div className="progress-bar">
                   <div 
                     className="progress-fill" 
                     style={{ width: `${progress}%` }}
                   ></div>
                 </div>
+                <p className="progress-text">{progress}% Complete</p>
                 
                 {processingDetails && (
-                  <div className="processing-details">
-                    
+                  <div className="steps-container">
+                    <h4>Processing Steps</h4>
                     <div className="steps-grid">
                       {['extract_slides', 'convert_slides_to_images', 'analyze_slide_images', 'generate_scripts', 'review_scripts', 'generate_audio', 'generate_avatar_videos', 'compose_video'].map((stepName) => {
                         const stepData = processingDetails.steps[stepName] || { status: 'pending' };
                         return (
                           <div key={stepName} className={`step-item ${stepData.status}`}>
-                            <span className="step-status">
+                            <span className="step-icon">
                               {stepData.status === 'completed' ? '✓' : 
-                               stepData.status === 'processing' ? '⏳' : 
-                               stepData.status === 'failed' ? '❌' : '◯'}
+                               stepData.status === 'processing' ? '●' : 
+                               stepData.status === 'failed' ? '✗' : '○'}
                             </span>
                             <span className="step-name">{formatStepName(stepName)}</span>
                           </div>
@@ -238,13 +254,15 @@ function App() {
                     </div>
                     
                     {processingDetails.errors && processingDetails.errors.length > 0 && (
-                      <div className="error-details">
-                        <p className="error-title">Errors encountered:</p>
-                        {processingDetails.errors.map((error, index) => (
-                          <div key={index} className="error-item">
-                            <strong>{formatStepName(error.step)}:</strong> {error.error}
-                          </div>
-                        ))}
+                      <div className="error-section">
+                        <h4>Errors Encountered</h4>
+                        <div className="error-list">
+                          {processingDetails.errors.map((error, index) => (
+                            <div key={index} className="error-item">
+                              <strong>{formatStepName(error.step)}:</strong> {error.error}
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -253,17 +271,22 @@ function App() {
             )}
 
             {status === 'completed' && (
-              <div className="completed-container">
+              <div className="completed-view">
                 <div className="success-icon">✓</div>
-                <p>Presentation ready!</p>
-                <button onClick={downloadVideo} className="download-btn">
-                  Download Video
-                </button>
-                <button onClick={resetForm} className="reset-btn">
-                  Create Another
-                </button>
+                <h3>Video Ready!</h3>
+                <p className="success-message">Your AI-powered presentation video has been generated successfully.</p>
+                
+                <div className="action-buttons">
+                  <button onClick={downloadVideo} className="primary-btn">
+                    Download Video
+                  </button>
+                  <button onClick={resetForm} className="secondary-btn">
+                    Convert Another
+                  </button>
+                </div>
                 
                 <div className="video-preview">
+                  <h4>Preview</h4>
                   <video 
                     ref={videoRef}
                     controls
@@ -275,18 +298,18 @@ function App() {
             )}
 
             {status === 'error' && (
-              <div className="error-container">
+              <div className="error-view">
                 <div className="error-icon">⚠️</div>
-                <p>Something went wrong. Please try again.</p>
-                <button onClick={resetForm} className="reset-btn">
+                <h3>Processing Failed</h3>
+                <p className="error-message">Something went wrong during processing. Please try again.</p>
+                <button onClick={resetForm} className="primary-btn">
                   Try Again
                 </button>
               </div>
             )}
           </div>
         </div>
-
-              </main>
+      </main>
 
       <footer className="app-footer">
         <p>Powered by SlideSpeaker AI Technology</p>

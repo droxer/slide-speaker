@@ -4,7 +4,7 @@ from typing import Dict, Any, Optional
 from pathlib import Path
 from loguru import logger
 from slidespeaker.state_manager import state_manager
-from slidespeaker.orchestrator import run
+from slidespeaker.orchestrator import process_presentation
 
 class TaskManager:
     def __init__(self):
@@ -86,7 +86,7 @@ class TaskManager:
         # Call the orchestrator processing function
         try:
             language = task.get("kwargs", {}).get("language", "english")
-            await run(file_id, Path(file_path), file_ext, language)
+            await process_presentation(file_id, Path(file_path), file_ext, language)
             task["result"] = {
                 "file_id": file_id,
                 "status": "completed"

@@ -16,7 +16,7 @@ avatar_service = UnifiedAvatarService()
 video_composer = VideoComposer()
 vision_service = VisionService()
 
-async def run(file_id: str, file_path: Path, file_ext: str, language: str = "english"):
+async def process_presentation(file_id: str, file_path: Path, file_ext: str, language: str = "english"):
     """State-aware processing that can resume from any step"""
     logger.info(f"Initiating AI presentation generation for file: {file_id}, format: {file_ext}")
     
@@ -122,24 +122,24 @@ async def _process_step(file_id: str, file_path: Path, file_ext: str, step_name:
         logger.info(f"Executing stage: {display_name}")
         
         if step_name == "extract_slides":
-            await _process_extract_slides(file_id, file_path, file_ext)
+            await extract_slides(file_id, file_path, file_ext)
         elif step_name == "analyze_slide_images":
-            await _process_analyze_slide_images(file_id)
+            await analyze_slide_images(file_id)
         elif step_name == "generate_scripts":
-            await _process_generate_scripts(file_id, language)
+            await generate_scripts(file_id, language)
         elif step_name == "review_scripts":
-            await _process_review_scripts(file_id, language)
+            await review_scripts(file_id, language)
         elif step_name == "generate_audio":
-            await _process_generate_audio(file_id, language)
+            await generate_audio(file_id, language)
         elif step_name == "generate_avatar_videos":
-            await _process_generate_avatar_videos(file_id)
+            await generate_avatar_videos(file_id)
         elif step_name == "convert_slides_to_images":
-            await _process_convert_slides_to_images(file_id, file_path, file_ext)
+            await convert_slides_to_images(file_id, file_path, file_ext)
         elif step_name == "compose_video":
-            await _process_compose_video(file_id, file_path)
+            await compose_video(file_id, file_path)
 
 
-async def _process_extract_slides(file_id: str, file_path: Path, file_ext: str):
+async def extract_slides(file_id: str, file_path: Path, file_ext: str):
     """Extract slides from the presentation file"""
     await state_manager.update_step_status(file_id, "extract_slides", "processing")
     logger.info(f"Extracting slides for file: {file_id}")
@@ -155,7 +155,7 @@ async def _process_extract_slides(file_id: str, file_path: Path, file_ext: str):
         logger.error(f"Failed to update extract_slides state for {file_id}")
 
 
-async def _process_analyze_slide_images(file_id: str):
+async def analyze_slide_images(file_id: str):
     """Analyze slide images using vision service"""
     await state_manager.update_step_status(file_id, "analyze_slide_images", "processing")
     state = await state_manager.get_state(file_id)
@@ -180,7 +180,7 @@ async def _process_analyze_slide_images(file_id: str):
     await state_manager.update_step_status(file_id, "analyze_slide_images", "completed", image_analyses)
 
 
-async def _process_generate_scripts(file_id: str, language: str = "english"):
+async def generate_scripts(file_id: str, language: str = "english"):
     """Generate scripts for each slide"""
     await state_manager.update_step_status(file_id, "generate_scripts", "processing")
     state = await state_manager.get_state(file_id)
@@ -217,7 +217,7 @@ async def _process_generate_scripts(file_id: str, language: str = "english"):
     await state_manager.update_step_status(file_id, "generate_scripts", "completed", scripts)
 
 
-async def _process_review_scripts(file_id: str, language: str = "english"):
+async def review_scripts(file_id: str, language: str = "english"):
     """Review and refine all generated scripts for consistency and smooth flow"""
     await state_manager.update_step_status(file_id, "review_scripts", "processing")
     state = await state_manager.get_state(file_id)
@@ -257,14 +257,16 @@ async def _review_and_refine_scripts(scripts: list, language: str = "english") -
         "english": "Review and refine the following presentation scripts to ensure consistency in tone, style, and smooth transitions between slides. Make sure the language flows naturally and maintains a professional yet engaging presentation style.",
         "chinese": "审查并优化以下演示文稿脚本，确保语调、风格一致，幻灯片之间过渡自然。确保语言流畅自然，保持专业而引人入胜的演示风格。",
         "japanese": "次のプレゼンテーションスクリプトをレビューし、トーン、スタイルの一貫性、スライド間のスムーズな移行を確保してください。言語が自然に流れ、専門的で魅力的なプレゼンテーションスタイルを維持していることを確認してください。",
-        "korean": "다음 프레젠테이션 스크립트를 검토하여 톤, 스타일의 일관성과 슬라이드 간의 원활한 전환을 보장하세요. 언어가 자연스럽게 흐르고 전문적이면서도 매력적인 프레젠테이션 스타일을 유지하는지 확인하세요."
+        "korean": "다음 프레젠테이션 스크립트를 검토하여 톤, 스타일의 일관성과 슬라이드 간의 원활한 전환을 보장하세요. 언어가 자연스럽게 흐르고 전문적이면서도 매력적인 프레젠테이션 스타일을 유지하는지 확인하세요.",
+        "thai": "ตรวจสอบและปรับปรุงสคริปต์การนำเสนอต่อไปนี้เพื่อให้มีความสอดคล้องกันในด้านน้ำเสียง สไตล์ และการเปลี่ยนผ่านที่ราบรื่นระหว่างสไลด์ ตรวจสอบให้แน่ใจว่าภาษาไหลไปอย่างเป็นธรรมชาติและรักษารูปแบบการนำเสนอที่เป็นมืออาชีพและน่าสนใจ"
     }
     
     system_prompts = {
         "english": "You are a professional presentation editor. Your task is to review and refine presentation scripts for consistency, flow, and quality while preserving the core content and message of each slide.",
         "chinese": "您是一位专业的演示文稿编辑。您的任务是审查和优化演示文稿脚本的一致性、流畅性和质量，同时保持每张幻灯片的核心内容和信息。",
         "japanese": "あなたはプロのプレゼンテーションエディターです。各スライドの核心的な内容とメッセージを維持しながら、プレゼンテーションスクリプトの一貫性、流れ、品質をレビューし、改善することがあなたの任務です。",
-        "korean": "귀하는 전문 프레젠테이션 편집자입니다. 각 슬라이드의 핵심 내용과 메시지를 유지하면서 프레젠테이션 스크립트의 일관성, 흐름, 품질을 검토하고 개선하는 것이 귀하의 임무입니다."
+        "korean": "귀하는 전문 프레젠테이션 편집자입니다. 각 슬라이드의 핵심 내용과 메시지를 유지하면서 프레젠테이션 스크립트의 일관성, 흐름, 품질을 검토하고 개선하는 것이 귀하의 임무입니다.",
+        "thai": "คุณเป็นผู้แก้ไขการนำเสนอระดับมืออาชีพ งานของคุณคือการตรวจสอบและปรับปรุงสคริปต์การนำเสนอให้มีความสอดคล้อง ไหลลื่น และมีคุณภาพ พร้อมทั้งรักษาเนื้อหาหลักและข้อความของแต่ละสไลด์ไว้"
     }
     
     try:
@@ -353,7 +355,7 @@ async def _review_and_refine_scripts(scripts: list, language: str = "english") -
         return scripts
 
 
-async def _process_generate_audio(file_id: str, language: str = "english"):
+async def generate_audio(file_id: str, language: str = "english"):
     await state_manager.update_step_status(file_id, "generate_audio", "processing")
     state = await state_manager.get_state(file_id)
     
@@ -374,12 +376,20 @@ async def _process_generate_audio(file_id: str, language: str = "english"):
         if script_data and "script" in script_data and script_data["script"]:
             audio_path = Path("output") / f"{file_id}_slide_{i+1}.mp3"
             try:
+                # Try OpenAI first
                 await tts_service.generate_speech(script_data["script"], audio_path, provider="openai", language=language)
                 audio_files.append(str(audio_path))
                 logger.info(f"Generated audio for slide {i+1}: {audio_path}")
             except Exception as e:
-                logger.error(f"Failed to generate audio for slide {i+1}: {e}")
-                raise
+                logger.error(f"Failed to generate audio with OpenAI for slide {i+1}: {e}")
+                # Try ElevenLabs as fallback
+                try:
+                    await tts_service.generate_speech(script_data["script"], audio_path, provider="elevenlabs", language=language)
+                    audio_files.append(str(audio_path))
+                    logger.info(f"Generated audio with ElevenLabs fallback for slide {i+1}: {audio_path}")
+                except Exception as fallback_e:
+                    logger.error(f"Fallback to ElevenLabs also failed for slide {i+1}: {fallback_e}")
+                    raise Exception(f"Failed to generate audio for slide {i+1} with both providers: {e}")
     
     await state_manager.update_step_status(file_id, "generate_audio", "completed", audio_files)
     
@@ -392,7 +402,7 @@ async def _process_generate_audio(file_id: str, language: str = "english"):
         logger.error(f"Failed to update generate_audio state for {file_id}")
 
 
-async def _process_generate_avatar_videos(file_id: str):
+async def generate_avatar_videos(file_id: str):
     """Generate avatar videos from scripts"""
     await state_manager.update_step_status(file_id, "generate_avatar_videos", "processing")
     state = await state_manager.get_state(file_id)
@@ -436,7 +446,7 @@ async def _process_generate_avatar_videos(file_id: str):
         logger.error(f"Failed to update generate_avatar_videos state for {file_id}")
 
 
-async def _process_convert_slides_to_images(file_id: str, file_path: Path, file_ext: str):
+async def convert_slides_to_images(file_id: str, file_path: Path, file_ext: str):
     """Convert slides to images"""
     await state_manager.update_step_status(file_id, "convert_slides_to_images", "processing")
     slide_images = []
@@ -461,7 +471,7 @@ async def _process_convert_slides_to_images(file_id: str, file_path: Path, file_
     await state_manager.update_step_status(file_id, "convert_slides_to_images", "completed", slide_images)
 
 
-async def _process_compose_video(file_id: str, file_path: Path):
+async def compose_video(file_id: str, file_path: Path):
     """Compose the final video from all components"""
     await state_manager.update_step_status(file_id, "compose_video", "processing")
     state = await state_manager.get_state(file_id)

@@ -27,6 +27,10 @@ class ScriptGenerator:
         if re.search(r'[\uac00-\ud7a3]', text):
             return "korean"
         
+        # Check for Thai characters
+        if re.search(r'[\u0e00-\u0e7f]', text):
+            return "thai"
+        
         # Default to English for Latin script and others
         return "english"
     
@@ -44,7 +48,8 @@ class ScriptGenerator:
             "english": "Create a natural, engaging presentation script in English based on the following slide content analysis.",
             "chinese": "根据以下幻灯片内容分析，创建一个自然、吸引人的中文演示脚本。",
             "japanese": "以下のスライド内容分析に基づいて、自然で魅力的な日本語のプレゼンテーションスクリプトを作成してください。",
-            "korean": "다음 슬라이드 내용 분석을 바탕으로 자연스럽고 매력적인 한국어 프레젠테이션 스크립트를 작성해 주세요."
+            "korean": "다음 슬라이드 내용 분석을 바탕으로 자연스럽고 매력적인 한국어 프레젠테이션 스크립트를 작성해 주세요.",
+            "thai": "สร้างสคริปต์การนำเสนอที่เป็นธรรมชาติและน่าสนใจเป็นภาษาไทยโดยอิงจากเนื้อหาสไลด์ดังกล่าว"
         }
         
         # Enhanced prompt with image analysis context
@@ -76,7 +81,8 @@ Visual Analysis Context:
             "english": "You are a professional presentation script writer. Create concise, engaging scripts for AI avatars based on slide content analysis.",
             "chinese": "你是一名专业的演示脚本撰写人。基于幻灯片内容分析为AI虚拟形象创建简洁、吸引人的中文脚本。",
             "japanese": "あなたはプロのプレゼンテーションスクリプトライターです。スライド内容分析に基づいてAIアバター用の簡潔で魅力的な日本語スクリプトを作成してください。",
-            "korean": "당신은 전문 프레젠테이션 스크립트 작가입니다. 슬라이드 내용 분석을 바탕으로 AI 아바타를 위한 간결하고 매력적인 한국어 스크립트를 작성해 주세요."
+            "korean": "당신은 전문 프레젠테이션 스크립트 작가입니다. 슬라이드 내용 분석을 바탕으로 AI 아바타를 위한 간결하고 매력적인 한국어 스크립트를 작성해 주세요。",
+            "thai": "คุณเป็นนักเขียนสคริปต์การนำเสนอระดับมืออาชีพ สร้างสคริปต์ที่กระชับและน่าสนใจสำหรับอวตาร AI โดยอิงจากเนื้อหาสไลด์"
         }
         
         try:
@@ -96,7 +102,8 @@ Visual Analysis Context:
                 "english": "Let me walk you through this important content.",
                 "chinese": "让我为您介绍这一重要内容。",
                 "japanese": "この重要な内容についてご説明します。",
-                "korean": "이 중요한 내용을 설명해 드리겠습니다."
+                "korean": "이 중요한 내용을 설명해 드리겠습니다.",
+                "thai": "ให้ผมพาคุณไปดูเนื้อหาที่สำคัญนี้"
             }
             
             return script if script else fallback_scripts.get(language, "Let me walk you through this important content.")
@@ -109,6 +116,7 @@ Visual Analysis Context:
                 "english": f"In this slide, we'll discuss: {fallback_content}...",
                 "chinese": f"在本幻灯片中，我们将讨论：{fallback_content[:50]}...",
                 "japanese": f"このスライドでは、{fallback_content[:50]}...について説明します",
-                "korean": f"이 슬라이드에서는 {fallback_content[:50]}...에 대해 논의하겠습니다"
+                "korean": f"이 슬라이드에서는 {fallback_content[:50]}...에 대해 논의하겠습니다",
+                "thai": f"ในสไลด์นี้ เราจะพูดถึง: {fallback_content[:50]}..."
             }
             return fallback_scripts.get(language, f"In this slide, we'll discuss: {fallback_content}...")

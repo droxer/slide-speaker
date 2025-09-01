@@ -4,7 +4,7 @@ SlideSpeaker is an AI-powered application that transforms PDF and PowerPoint pre
 
 ## Quick Start
 
-1. **Backend Setup**
+1. **API Setup**
    ```bash
    cd api
    uv sync
@@ -12,14 +12,14 @@ SlideSpeaker is an AI-powered application that transforms PDF and PowerPoint pre
    make dev
    ```
 
-2. **Frontend Setup**
+2. **Web Setup**
    ```bash
    cd web
    npm install
    npm start
    ```
 
-3. **Visit** `http://localhost:3000` to use the application
+3. **Visit** `http://localhost:3000` to use the application to test the API
 
 ## Documentation
 
