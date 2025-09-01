@@ -1,0 +1,89 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+api/build/
+api/dist/
+web/build/
+web/dist/
+
+# Upload and output directories
+api/uploads/
+api/output/
+web/uploads/
+web/output/
+
+# Database
+*.db
+*.sqlite
+
+# Redis
+dump.rdb
+appendonly.aof
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Coverage reports
+coverage/
+*.lcov
+
+# Runtime data
+.pid
+*.pid
+
+# Compiled binary addons
+*.node
+
+# Package manager
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+uv.lock
+
+# Virtual environments
+api/venv/
+api/.venv/
+.envrc
+.venv
+venv/

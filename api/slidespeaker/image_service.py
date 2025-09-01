@@ -1,0 +1,135 @@
+import os
+import asyncio
+import requests
+from pathlib import Path
+from typing import Optional
+from openai import OpenAI
+from dotenv import load_dotenv
+from loguru import logger
+
+load_dotenv()
+
+class ImageService:
+    def __init__(self):
+        self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    
+    async def generate_presentation_image(self, content: str, output_path: Path, 
+                                        style: str = "professional"):
+        """
+        Generate a presentation-style image using DALL-E based on slide content
+        """
+        try:
+            # Create a prompt for presentation image
+            prompt = self._create_image_prompt(content, style)
+            logger.info(f"Generating image with prompt: {prompt[:100]}...")
+            
+            # Generate image using DALL-E
+            response = self.openai_client.images.generate(
+                model="dall-e-3",
+                prompt=prompt,
+                size="1024x1024",
+                quality="standard",
+                n=1,
+            )
+            
+            # Download the image
+            image_url = response.data[0].url
+            await self._download_image(image_url, output_path)
+            
+            logger.info(f"Image generated successfully: {output_path}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"DALL-E image generation error: {e}")
+            raise
+    
+    def _create_image_prompt(self, content: str, style: str) -> str:
+        """Create a detailed prompt for presentation image generation"""
+        
+        style_prompts = {
+            "professional": "clean, modern, corporate presentation slide with subtle gradient background, "
+                          "minimalist design, professional typography, business aesthetic",
+            "creative": "creative, colorful presentation slide with abstract shapes, vibrant colors, "
+                       "modern design elements, inspirational aesthetic",
+            "academic": "academic presentation slide with clean layout, serif typography, "
+                       "research-oriented design, formal appearance",
+            "tech": "tech-focused presentation slide with futuristic elements, circuit board patterns, "
+                   "blue color scheme, modern technology aesthetic"
+        }
+        
+        base_style = style_prompts.get(style, style_prompts["professional"])
+        
+        prompt = f"""
+Create a presentation slide image that visually represents the following content:
+"{content}"
+
+Style: {base_style}
+
+Requirements:
+- 16:9 aspect ratio (will be cropped to 1024x1024)
+- No text on the image (purely visual)
+- Professional presentation style
+- Relevant imagery and metaphors for the content
+- Clean, modern design
+- Suitable for educational/business context
+"""
+        
+        return prompt.strip()
+    
+    async def _download_image(self, image_url: str, output_path: Path):
+        """Download image from URL"""
+        try:
+            response = requests.get(image_url, timeout=30)
+            response.raise_for_status()
+            
+            with open(output_path, 'wb') as f:
+                f.write(response.content)
+                
+        except Exception as e:
+            logger.error(f"Image download error: {e}")
+            raise
+    
+    async def generate_simple_background(self, output_path: Path, 
+                                       color: str = "#f0f4f8",
+                                       style: str = "gradient"):
+        """Generate a simple background image (fallback option)"""
+        try:
+            # For simple backgrounds, we can create programmatic images
+            # or use very simple DALL-E prompts
+            
+            if style == "gradient":
+                prompt = f"A smooth, subtle gradient background in {color}, professional presentation style, no text, clean design"
+            else:
+                prompt = f"A clean, solid {color} background for presentation slides, minimalist design"
+            
+            response = self.openai_client.images.generate(
+                model="dall-e-3",
+                prompt=prompt,
+                size="1024x1024",
+                quality="standard",
+                n=1,
+            )
+            
+            image_url = response.data[0].url
+            await self._download_image(image_url, output_path)
+            
+            logger.info(f"Background image generated: {output_path}")
+            
+        except Exception as e:
+            logger.error(f"Background generation error: {e}")
+            # Fallback: create a simple colored background programmatically
+            await self._create_fallback_background(output_path, color)
+    
+    async def _create_fallback_background(self, output_path: Path, color: str):
+        """Create a simple fallback background using PIL"""
+        try:
+            from PIL import Image, ImageDraw
+            
+            # Create a simple solid color image
+            img = Image.new('RGB', (1024, 1024), color)
+            img.save(output_path)
+            logger.info(f"Created fallback background: {output_path}")
+            
+        except ImportError:
+            logger.warning("PIL not available for fallback backgrounds")
+            raise Exception("Image generation requires PIL for fallback backgrounds")

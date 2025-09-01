@@ -1,0 +1,6 @@
+pyproject.toml
+slidespeaker_api.egg-info/PKG-INFO
+slidespeaker_api.egg-info/SOURCES.txt
+slidespeaker_api.egg-info/dependency_links.txt
+slidespeaker_api.egg-info/requires.txt
+slidespeaker_api.egg-info/top_level.txt

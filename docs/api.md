@@ -1,0 +1,107 @@
+# API Documentation
+
+## Base URL
+
+All API endpoints are relative to: `http://localhost:8000/api`
+
+## Endpoints
+
+### Upload Presentation
+
+```
+POST /api/upload
+```
+
+Upload a PDF or PowerPoint presentation for processing.
+
+**Request:**
+- Form data with `file` parameter containing the presentation file
+- Optional `language` parameter (default: "english")
+
+**Response:**
+```json
+{
+  "file_id": "string",
+  "task_id": "string",
+  "message": "File uploaded successfully, processing started in background"
+}
+```
+
+### Get Processing Progress
+
+```
+GET /api/progress/{file_id}
+```
+
+Get detailed progress information for a presentation processing task.
+
+**Response:**
+```json
+{
+  "status": "uploaded|processing|completed|failed|not_found",
+  "progress": 0-100,
+  "current_step": "string",
+  "steps": {
+    "extract_slides": {"status": "pending|processing|completed|failed", "data": null|object},
+    "convert_slides_to_images": {"status": "pending|processing|completed|failed", "data": null|object},
+    "analyze_slide_images": {"status": "pending|processing|completed|failed", "data": null|object},
+    "generate_scripts": {"status": "pending|processing|completed|failed", "data": null|object},
+    "review_scripts": {"status": "pending|processing|completed|failed", "data": null|object},
+    "generate_audio": {"status": "pending|processing|completed|failed", "data": null|object},
+    "generate_avatar_videos": {"status": "pending|processing|completed|failed", "data": null|object},
+    "compose_video": {"status": "pending|processing|completed|failed", "data": null|object}
+  },
+  "errors": [],
+  "created_at": "ISO timestamp",
+  "updated_at": "ISO timestamp"
+}
+```
+
+### Download Completed Video
+
+```
+GET /api/video/{file_id}
+```
+
+Download the completed video presentation.
+
+**Response:**
+- Video file (MP4 format) or 404 if not found
+
+### Get Task Status
+
+```
+GET /api/task/{task_id}
+```
+
+Get the status of a background processing task.
+
+**Response:**
+```json
+{
+  "task_id": "string",
+  "task_type": "string",
+  "status": "queued|processing|completed|failed",
+  "kwargs": {},
+  "result": null|object,
+  "error": null|string
+}
+```
+
+## Processing Steps
+
+1. **extract_slides** - Extract content from the presentation file
+2. **convert_slides_to_images** - Convert slides to image format
+3. **analyze_slide_images** - Analyze visual content using AI
+4. **generate_scripts** - Generate AI narratives for each slide
+5. **review_scripts** - Review and refine scripts for consistency
+6. **generate_audio** - Create text-to-speech audio files
+7. **generate_avatar_videos** - Generate AI avatar videos
+8. **compose_video** - Compose final video presentation
+
+## Error Handling
+
+The API provides detailed error information in the progress endpoint under the `errors` array. Each error includes:
+- `step`: The processing step where the error occurred
+- `error`: Description of the error
+- `timestamp`: When the error occurred
