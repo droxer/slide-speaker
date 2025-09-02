@@ -14,7 +14,6 @@ function App() {
   const [generateAvatar, setGenerateAvatar] = useState(true);
   const [generateSubtitles, setGenerateSubtitles] = useState(true);
   const [previewData, setPreviewData] = useState(null);
-  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const videoRef = useRef(null);
   
   const handleFileChange = (e) => {
@@ -246,43 +245,29 @@ function App() {
                   </div>
                 </div>
                 
-                <div className="advanced-options-toggle">
-                  <button 
-                    className="advanced-options-button"
-                    onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
-                    aria-label={showAdvancedOptions ? "Hide advanced options" : "Show advanced options"}
-                  >
-                    <span className="advanced-options-icon">
-                      {showAdvancedOptions ? '−' : '⋯'}
-                    </span>
-                  </button>
-                </div>
-                
-                {showAdvancedOptions && (
-                  <div className="options-section">
-                    <div className="option-group">
-                      <div className="option-item">
-                        <input
-                          type="checkbox"
-                          id="generate-avatar"
-                          checked={generateAvatar}
-                          onChange={(e) => setGenerateAvatar(e.target.checked)}
-                        />
-                        <label htmlFor="generate-avatar">AI Avatar Video</label>
-                      </div>
-                      
-                      <div className="option-item">
-                        <input
-                          type="checkbox"
-                          id="generate-subtitles"
-                          checked={generateSubtitles}
-                          onChange={(e) => setGenerateSubtitles(e.target.checked)}
-                        />
-                        <label htmlFor="generate-subtitles">Subtitles</label>
-                      </div>
+                <div className="options-section">
+                  <div className="option-group">
+                    <div className="option-item">
+                      <input
+                        type="checkbox"
+                        id="generate-avatar"
+                        checked={generateAvatar}
+                        onChange={(e) => setGenerateAvatar(e.target.checked)}
+                      />
+                      <label htmlFor="generate-avatar">AI Avatar Video</label>
+                    </div>
+                    
+                    <div className="option-item">
+                      <input
+                        type="checkbox"
+                        id="generate-subtitles"
+                        checked={generateSubtitles}
+                        onChange={(e) => setGenerateSubtitles(e.target.checked)}
+                      />
+                      <label htmlFor="generate-subtitles">Subtitles</label>
                     </div>
                   </div>
-                )}
+                </div>
                 
                 {file && (
                   <button 

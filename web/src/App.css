@@ -206,37 +206,6 @@ body {
   border-color: #cbd5e1;
 }
 
-/* Advanced options toggle */
-.advanced-options-toggle {
-  text-align: center;
-  margin: 1rem 0;
-}
-
-.advanced-options-button {
-  background: none;
-  border: none;
-  color: #4f46e5;
-  font-size: 1.2rem;
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 50%;
-  transition: all 0.2s ease;
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.advanced-options-button:hover {
-  background: #f1f5f9;
-  color: #4338ca;
-}
-
-.advanced-options-icon {
-  font-size: 1.2rem;
-  line-height: 1;
-}
 
 /* Options section */
 .options-section {
@@ -793,31 +762,4 @@ body {
     padding: 0.875rem;
   }
   
-  .advanced-options-toggle {
-    margin: 0.75rem 0;
-  }
-  
-  .advanced-options-button {
-    font-size: 1rem;
-    width: 36px;
-    height: 36px;
-    padding: 0.4rem;
-  }
-  
-  .advanced-options-icon {
-    font-size: 1.1rem;
-  }
-}
 
-@media (max-width: 480px) {
-  .advanced-options-button {
-    font-size: 0.9rem;
-    width: 32px;
-    height: 32px;
-    padding: 0.3rem;
-  }
-  
-  .advanced-options-icon {
-    font-size: 1rem;
-  }
-}
