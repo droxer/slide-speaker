@@ -10,6 +10,11 @@ function App() {
   const [progress, setProgress] = useState(0);
   const [processingDetails, setProcessingDetails] = useState(null);
   const [language, setLanguage] = useState('english');
+  const [subtitleLanguage, setSubtitleLanguage] = useState('english');
+  const [generateAvatar, setGenerateAvatar] = useState(true);
+  const [generateSubtitles, setGenerateSubtitles] = useState(true);
+  const [previewData, setPreviewData] = useState(null);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   const videoRef = useRef(null);
   
   const handleFileChange = (e) => {
@@ -40,7 +45,10 @@ function App() {
         {
           filename: file.name,
           file_data: base64File,
-          language: language
+          language: language,
+          subtitle_language: subtitleLanguage,
+          generate_avatar: generateAvatar,
+          generate_subtitles: generateSubtitles
         },
         {
           headers: {
@@ -69,7 +77,14 @@ function App() {
 
   const downloadVideo = () => {
     if (fileId) {
-      window.open(`/api/video/${fileId}`, '_blank');
+      // Create a temporary link element
+      const link = document.createElement('a');
+      link.href = `/api/video/${fileId}`;
+      link.download = `presentation_${fileId}.mp4`;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 
@@ -80,6 +95,10 @@ function App() {
     setUploading(false);
     setProgress(0);
     setProcessingDetails(null);
+    setSubtitleLanguage('english');
+    setGenerateAvatar(true);
+    setGenerateSubtitles(true);
+    setPreviewData(null);
     if (videoRef.current) {
       videoRef.current.src = '';
     }
@@ -99,6 +118,14 @@ function App() {
             setStatus('completed');
             setUploading(false);
             setProgress(100);
+            
+            // Fetch preview data
+            try {
+              const previewResponse = await axios.get(`/api/preview/${fileId}`);
+              setPreviewData(previewResponse.data);
+            } catch (previewError) {
+              console.error('Preview data fetch error:', previewError);
+            }
           } else if (response.data.status === 'processing' || response.data.status === 'uploaded') {
             setStatus('processing');
             setProgress(response.data.progress);
@@ -119,8 +146,8 @@ function App() {
       // Check status immediately
       checkStatus();
       
-      // Set up interval to check status every 2 seconds
-      intervalId = setInterval(checkStatus, 2000);
+      // Set up interval to check status every 10 seconds
+      intervalId = setInterval(checkStatus, 10000);
     }
     
     // Cleanup function to clear interval
@@ -149,8 +176,8 @@ function App() {
   return (
     <div className="App">
       <header className="app-header">
-        <h1>SlideSpeaker</h1>
-        <p>Transform presentations into engaging AI-powered videos</p>
+        <h1>SlideSpeaker AI</h1>
+        <p>Turn your slides into captivating AI-powered videos with natural voice narration and expressive avatars</p>
       </header>
 
       <main className="main-content">
@@ -158,8 +185,8 @@ function App() {
           <div className="content-card">
             {status === 'idle' && (
               <div className="upload-view">
-                <h2>Convert Your Presentation</h2>
-                <p className="subtitle">Upload a PDF or PowerPoint file to create an AI-powered video presentation</p>
+                <h2>Transform Your Slides Into AI Magic</h2>
+                <p className="subtitle">Upload your presentation and watch as AI brings it to life with natural voice narration and engaging avatars</p>
                 
                 <div className="file-upload-area">
                   <input
@@ -180,21 +207,82 @@ function App() {
                   </label>
                 </div>
                 
-                <div className="language-selector">
-                  <label htmlFor="language-select">Audio Language</label>
-                  <select 
-                    id="language-select" 
-                    value={language} 
-                    onChange={(e) => setLanguage(e.target.value)}
-                    className="language-select"
-                  >
-                    <option value="english">English</option>
-                    <option value="chinese">中文 (Chinese)</option>
-                    <option value="japanese">日本語 (Japanese)</option>
-                    <option value="korean">한국어 (Korean)</option>
-                    <option value="thai">ไทย (Thai)</option>
-                  </select>
+                <div className="language-section">
+                  <h3 className="language-section-title">Language Settings</h3>
+                  <div className="language-group">
+                    <div className="language-selector">
+                      <label htmlFor="language-select">Audio Language</label>
+                      <select 
+                        id="language-select" 
+                        value={language} 
+                        onChange={(e) => setLanguage(e.target.value)}
+                        className="language-select"
+                      >
+                        <option value="english">English</option>
+                        <option value="simplified_chinese">简体中文 (Simplified Chinese)</option>
+                        <option value="traditional_chinese">繁體中文 (Traditional Chinese)</option>
+                        <option value="japanese">日本語 (Japanese)</option>
+                        <option value="korean">한국어 (Korean)</option>
+                        <option value="thai">ไทย (Thai)</option>
+                      </select>
+                    </div>
+                    
+                    <div className="language-selector">
+                      <label htmlFor="subtitle-language-select">Subtitle Language</label>
+                      <select 
+                        id="subtitle-language-select" 
+                        value={subtitleLanguage} 
+                        onChange={(e) => setSubtitleLanguage(e.target.value)}
+                        className="language-select"
+                      >
+                        <option value="english">English</option>
+                        <option value="simplified_chinese">简体中文 (Simplified Chinese)</option>
+                        <option value="traditional_chinese">繁體中文 (Traditional Chinese)</option>
+                        <option value="japanese">日本語 (Japanese)</option>
+                        <option value="korean">한국어 (Korean)</option>
+                        <option value="thai">ไทย (Thai)</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
+                
+                <div className="advanced-options-toggle">
+                  <button 
+                    className="advanced-options-button"
+                    onClick={() => setShowAdvancedOptions(!showAdvancedOptions)}
+                    aria-label={showAdvancedOptions ? "Hide advanced options" : "Show advanced options"}
+                  >
+                    <span className="advanced-options-icon">
+                      {showAdvancedOptions ? '−' : '⋯'}
+                    </span>
+                  </button>
+                </div>
+                
+                {showAdvancedOptions && (
+                  <div className="options-section">
+                    <div className="option-group">
+                      <div className="option-item">
+                        <input
+                          type="checkbox"
+                          id="generate-avatar"
+                          checked={generateAvatar}
+                          onChange={(e) => setGenerateAvatar(e.target.checked)}
+                        />
+                        <label htmlFor="generate-avatar">AI Avatar Video</label>
+                      </div>
+                      
+                      <div className="option-item">
+                        <input
+                          type="checkbox"
+                          id="generate-subtitles"
+                          checked={generateSubtitles}
+                          onChange={(e) => setGenerateSubtitles(e.target.checked)}
+                        />
+                        <label htmlFor="generate-subtitles">Subtitles</label>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 {file && (
                   <button 
@@ -202,7 +290,7 @@ function App() {
                     className="primary-btn"
                     disabled={uploading}
                   >
-                    Convert to Video
+                    Transform to AI Magic
                   </button>
                 )}
               </div>
@@ -225,7 +313,7 @@ function App() {
             {status === 'processing' && (
               <div className="processing-view">
                 <div className="spinner"></div>
-                <h3>Your Speaker is Getting Ready…</h3>
+                <h3>Bringing Your Presentation to Life</h3>
                 <div className="progress-bar">
                   <div 
                     className="progress-fill" 
@@ -245,7 +333,8 @@ function App() {
                             <span className="step-icon">
                               {stepData.status === 'completed' ? '✓' : 
                                stepData.status === 'processing' ? '●' : 
-                               stepData.status === 'failed' ? '✗' : '○'}
+                               stepData.status === 'failed' ? '✗' : 
+                               stepData.status === 'skipped' ? '⊘' : '○'}
                             </span>
                             <span className="step-name">{formatStepName(stepName)}</span>
                           </div>
@@ -273,26 +362,82 @@ function App() {
             {status === 'completed' && (
               <div className="completed-view">
                 <div className="success-icon">✓</div>
-                <h3>Video Ready!</h3>
-                <p className="success-message">Your AI-powered presentation video has been generated successfully.</p>
+                <h3>Your AI Presentation is Ready!</h3>
+                <p className="success-message">Congratulations! Your presentation has been transformed into an engaging AI-powered video.</p>
+                
+                {previewData && previewData.preview_available && (
+                  <div className="preview-info">
+                    <h4>Video Information</h4>
+                    <ul>
+                      <li><strong>File Size:</strong> {(previewData.video.file_size / (1024 * 1024)).toFixed(2)} MB</li>
+                      <li><strong>Subtitles:</strong> {generateSubtitles && previewData.subtitles.srt_content ? 'Available' : generateSubtitles ? 'Not available' : 'Not generated (disabled)'}</li>
+                      <li><strong>AI Avatar:</strong> {generateAvatar ? 'Generated' : 'Not generated (disabled)'}</li>
+                    </ul>
+                  </div>
+                )}
                 
                 <div className="action-buttons">
-                  <button onClick={downloadVideo} className="primary-btn">
-                    Download Video
+                  <button onClick={() => window.open(`/api/preview-page/${fileId}`, '_blank')} className="primary-btn">
+                    Preview
                   </button>
+                  <button onClick={downloadVideo} className="secondary-btn">
+                    Save Your Masterpiece
+                  </button>
+                  {generateSubtitles && previewData && previewData.subtitles && (
+                    <>
+                      {previewData.subtitles.srt_content && (
+                        <button onClick={() => {
+                          // Create a temporary link element
+                          const link = document.createElement('a');
+                          link.href = `/api/subtitles/${fileId}/srt`;
+                          link.download = `presentation_${fileId}.srt`;
+                          link.target = '_blank';
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }} className="secondary-btn">
+                          Get SRT Captions
+                        </button>
+                      )}
+                      {previewData.subtitles.vtt_content && (
+                        <button onClick={() => {
+                          // Create a temporary link element
+                          const link = document.createElement('a');
+                          link.href = `/api/subtitles/${fileId}/vtt`;
+                          link.download = `presentation_${fileId}.vtt`;
+                          link.target = '_blank';
+                          document.body.appendChild(link);
+                          link.click();
+                          document.body.removeChild(link);
+                        }} className="secondary-btn">
+                          Get VTT Captions
+                        </button>
+                      )}
+                    </>
+                  )}
                   <button onClick={resetForm} className="secondary-btn">
-                    Convert Another
+                    Create Another Magic
                   </button>
                 </div>
                 
                 <div className="video-preview">
-                  <h4>Preview</h4>
+                  <h4>Quick Preview</h4>
+                  <p className="preview-note">Click the "Preview" button above for the full experience with all features</p>
                   <video 
                     ref={videoRef}
                     controls
                     src={`/api/video/${fileId}`}
                     className="preview-video"
                   />
+                  {generateSubtitles && previewData && previewData.subtitles && previewData.subtitles.vtt_url && (
+                    <track 
+                      kind="subtitles" 
+                      src={previewData.subtitles.vtt_url} 
+                      srcLang="en" 
+                      label="Subtitles" 
+                      default
+                    />
+                  )}
                 </div>
               </div>
             )}
@@ -301,7 +446,7 @@ function App() {
               <div className="error-view">
                 <div className="error-icon">⚠️</div>
                 <h3>Processing Failed</h3>
-                <p className="error-message">Something went wrong during processing. Please try again.</p>
+                <p className="error-message">Something went wrong during video generation. Please try again with a different file.</p>
                 <button onClick={resetForm} className="primary-btn">
                   Try Again
                 </button>
@@ -312,7 +457,7 @@ function App() {
       </main>
 
       <footer className="app-footer">
-        <p>Powered by SlideSpeaker AI Technology</p>
+        <p>Powered by SlideSpeaker AI • Where presentations meet AI magic</p>
       </footer>
     </div>
   );
