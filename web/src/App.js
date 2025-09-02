@@ -162,9 +162,9 @@ function App() {
     const stepNames = {
       'extract_slides': 'Extracting Content',
       'analyze_slide_images': 'Analyzing Visuals',
-      'generate_scripts': 'Generating Narratives',
+      'generate_scripts': 'Generating AI Narratives',
       'review_scripts': 'Reviewing Scripts',
-      'generate_audio': 'Creating Audio',
+      'generate_audio': 'Synthesizing Audio',
       'generate_avatar_videos': 'Generating Avatars',
       'convert_slides_to_images': 'Converting Slides',
       'compose_video': 'Composing Video',
