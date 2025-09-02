@@ -4,8 +4,35 @@ from pathlib import Path
 from typing import List
 from moviepy import VideoFileClip, ImageClip, AudioFileClip, concatenate_videoclips, CompositeVideoClip
 from moviepy.video.fx.Resize import Resize
+from moviepy.video.VideoClip import TextClip
 
 class VideoComposer:
+    
+    def _create_watermark(self, duration: float):
+        """Create a semi-transparent SlideSpeaker AI watermark"""
+        try:
+            watermark = TextClip(
+                "SlideSpeaker AI",
+                fontsize=20,
+                color='white',
+                font='Arial-Bold',
+                bg_color='rgba(0,0,0,0.4)',  # Semi-transparent black background
+                size=(200, 40),
+                method='caption'
+            )
+            
+            # Set position (bottom right corner with some margin)
+            watermark = watermark.with_position(('right', 'bottom')).with_duration(duration)
+            
+            # Add slight transparency to the watermark itself
+            watermark = watermark.with_effects([lambda clip: clip.with_opacity(0.7)])
+            
+            return watermark
+        except Exception as e:
+            print(f"Watermark creation error: {e}")
+            # Return None if watermark creation fails - don't break the video
+            return None
+    
     async def compose_video(self, slide_images: List[Path], avatar_videos: List[Path], 
                           audio_files: List[Path], output_path: Path):
         """
@@ -45,6 +72,11 @@ class VideoComposer:
                 # Concatenate all clips
                 final_clip = concatenate_videoclips(video_clips)
                 
+                # Add SlideSpeaker AI watermark
+                watermark = self._create_watermark(final_clip.duration)
+                if watermark:
+                    final_clip = CompositeVideoClip([final_clip, watermark])
+                
                 # Write final video
                 final_clip.write_videofile(
                     str(output_path),
@@ -76,18 +108,31 @@ class VideoComposer:
             try:
                 video_clips = []
                 
-                for slide_image, audio_file in zip(slide_images, audio_files):
-                    slide_clip = ImageClip(str(slide_image)).with_duration(AudioFileClip(str(audio_file)).duration)
-                    slide_clip = slide_clip.with_audio(AudioFileClip(str(audio_file)))
-                    video_clips.append(slide_clip)
+                # Handle case where audio_files might be empty
+                if audio_files:
+                    for slide_image, audio_file in zip(slide_images, audio_files):
+                        slide_clip = ImageClip(str(slide_image)).with_duration(AudioFileClip(str(audio_file)).duration)
+                        slide_clip = slide_clip.with_audio(AudioFileClip(str(audio_file)))
+                        video_clips.append(slide_clip)
+                else:
+                    # Create video clips without audio
+                    for slide_image in slide_images:
+                        # Default duration of 5 seconds per slide if no audio
+                        slide_clip = ImageClip(str(slide_image)).with_duration(5.0)
+                        video_clips.append(slide_clip)
                 
                 final_clip = concatenate_videoclips(video_clips)
+                
+                # Add SlideSpeaker AI watermark
+                watermark = self._create_watermark(final_clip.duration)
+                if watermark:
+                    final_clip = CompositeVideoClip([final_clip, watermark])
                 
                 final_clip.write_videofile(
                     str(output_path),
                     fps=24,
                     codec='libx264',
-                    audio_codec='aac',
+                    audio_codec='aac' if audio_files else None,  # No audio codec if no audio files
                     threads=4
                 )
                 
@@ -104,6 +149,47 @@ class VideoComposer:
         with ThreadPoolExecutor() as executor:
             await loop.run_in_executor(executor, _create_simple_video_sync)
     
+    async def create_images_only_video(self, slide_images: List[Path], output_path: Path):
+        """
+        Create a video with only images and no audio
+        """
+        def _create_images_only_video_sync():
+            try:
+                video_clips = []
+                
+                # Create video clips without audio (5 seconds per slide)
+                for slide_image in slide_images:
+                    slide_clip = ImageClip(str(slide_image)).with_duration(5.0)
+                    video_clips.append(slide_clip)
+                
+                final_clip = concatenate_videoclips(video_clips)
+                
+                # Add SlideSpeaker AI watermark
+                watermark = self._create_watermark(final_clip.duration)
+                if watermark:
+                    final_clip = CompositeVideoClip([final_clip, watermark])
+                
+                final_clip.write_videofile(
+                    str(output_path),
+                    fps=24,
+                    codec='libx264',
+                    audio_codec=None,  # No audio
+                    threads=4
+                )
+                
+                for clip in video_clips:
+                    clip.close()
+                final_clip.close()
+                
+            except Exception as e:
+                print(f"Images-only video composition error: {e}")
+                raise
+
+        # Run the CPU-intensive video composition in a separate thread
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            await loop.run_in_executor(executor, _create_images_only_video_sync)
+    
     async def create_slide_video(self, image_path: Path, audio_path: Path, output_path: Path):
         """
         Create a single slide video with image and audio
@@ -119,6 +205,11 @@ class VideoComposer:
                 
                 # Combine image and audio
                 video_clip = image_clip.with_audio(audio_clip)
+                
+                # Add SlideSpeaker AI watermark
+                watermark = self._create_watermark(video_clip.duration)
+                if watermark:
+                    video_clip = CompositeVideoClip([video_clip, watermark])
                 
                 # Write video
                 video_clip.write_videofile(

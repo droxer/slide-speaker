@@ -6,6 +6,8 @@ from slidespeaker.script_generator import ScriptGenerator
 from slidespeaker.tts_service import TTSService
 from slidespeaker.avatar_service_unified import UnifiedAvatarService
 from slidespeaker.video_composer import VideoComposer
+from slidespeaker.subtitle_generator import SubtitleGenerator
+from slidespeaker.video_previewer import VideoPreviewer
 from slidespeaker.state_manager import state_manager
 from slidespeaker.vision_service import VisionService
 
@@ -14,17 +16,42 @@ script_generator = ScriptGenerator()
 tts_service = TTSService()
 avatar_service = UnifiedAvatarService()
 video_composer = VideoComposer()
+subtitle_generator = SubtitleGenerator()
+video_previewer = VideoPreviewer()
 vision_service = VisionService()
 
-async def process_presentation(file_id: str, file_path: Path, file_ext: str, language: str = "english"):
+async def process_presentation(file_id: str, file_path: Path, file_ext: str, language: str = "english", 
+                             subtitle_language: str = None, generate_avatar: bool = True, 
+                             generate_subtitles: bool = True, task_id: str = None):
     """State-aware processing that can resume from any step"""
-    logger.info(f"Initiating AI presentation generation for file: {file_id}, format: {file_ext}")
+    # Don't default subtitle language to audio language - preserve user selection
+    # subtitle_language remains as provided (could be None)
     
+    logger.info(f"Initiating AI presentation generation for file: {file_id}, format: {file_ext}")
+    logger.info(f"Audio language: {language}, Subtitle language: {subtitle_language}")
+    logger.info(f"Generate avatar: {generate_avatar}, Generate subtitles: {generate_subtitles}")
+    
+    # Check if task has been cancelled before starting (if task_id provided)
+    if task_id:
+        task_status = await state_manager.get_state(f"task_{task_id}")
+        if task_status and task_status.get("status") == "cancelled":
+            logger.info(f"Task {task_id} was cancelled before processing started")
+            await state_manager.mark_failed(file_id)
+            return
+
+
     # Initialize state
     state = await state_manager.get_state(file_id)
     if not state:
-        await state_manager.create_state(file_id, file_path, file_ext)
+        await state_manager.create_state(file_id, file_path, file_ext, language, subtitle_language, generate_avatar, generate_subtitles)
         state = await state_manager.get_state(file_id)
+    else:
+        # Update existing state with new parameters (in case they've changed)
+        state["audio_language"] = language
+        state["subtitle_language"] = subtitle_language
+        state["generate_avatar"] = generate_avatar
+        state["generate_subtitles"] = generate_subtitles
+        await state_manager._save_state(file_id, state)
     
     # Log initial state
     if state:
@@ -35,13 +62,18 @@ async def process_presentation(file_id: str, file_path: Path, file_ext: str, lan
                 "convert_slides_to_images": "Converting slides to images",
                 "analyze_slide_images": "Analyzing visual content",
                 "generate_scripts": "Generating AI narratives",
+                "generate_subtitle_scripts": "Generating subtitle narratives",
                 "review_scripts": "Reviewing and refining scripts",
+                "review_subtitle_scripts": "Reviewing subtitle scripts",
                 "generate_audio": "Synthesizing voice audio",
                 "generate_avatar_videos": "Creating AI presenter videos",
                 "compose_video": "Composing final presentation"
             }
             display_name = step_display_names.get(step_name, step_name)
-            logger.info(f"Stage '{display_name}': {step_data['status']}")
+            status_text = step_data['status']
+            if status_text == "skipped":
+                status_text = "Skipped (disabled)"
+            logger.info(f"Stage '{display_name}': {status_text}")
     else:
         logger.info(f"No existing processing state found for {file_id}")
     
@@ -51,16 +83,40 @@ async def process_presentation(file_id: str, file_path: Path, file_ext: str, lan
         "convert_slides_to_images",
         "analyze_slide_images",
         "generate_scripts", 
-        "review_scripts",  # New step for script review
-        "generate_audio",
-        "generate_avatar_videos",
-        "compose_video"
+        "review_scripts"  # Review scripts for audio language
     ]
+    
+    # Add subtitle script generation steps only if languages are different
+    if language != subtitle_language:
+        steps_order.extend([
+            "generate_subtitle_scripts",
+            "review_subtitle_scripts"
+        ])
+    
+    # Continue with audio and video generation
+    steps_order.extend([
+        "generate_audio"
+    ])
+    
+    # Add avatar generation step only if enabled
+    if generate_avatar:
+        steps_order.append("generate_avatar_videos")
+    
+    # Always add compose video step
+    steps_order.append("compose_video")
     
     try:
         # Process each step in order, skipping completed ones
         for step_name in steps_order:
-            await _process_step(file_id, file_path, file_ext, step_name, language)
+            # Check for cancellation before processing each step
+            if task_id:
+                task_status = await state_manager.get_state(f"task_{task_id}")
+                if task_status and task_status.get("status") == "cancelled":
+                    logger.info(f"Task {task_id} was cancelled during processing")
+                    await state_manager.mark_failed(file_id)
+                    return
+                
+            await _process_step(file_id, file_path, file_ext, step_name, language, task_id=task_id)
         
     except Exception as e:
         logger.error(f"AI presentation generation failed for file {file_id}: {e}")
@@ -85,10 +141,26 @@ async def process_presentation(file_id: str, file_path: Path, file_ext: str, lan
         # Don't cleanup on error - allow retry from last successful step
 
 
-async def _process_step(file_id: str, file_path: Path, file_ext: str, step_name: str, language: str = "english"):
+async def _process_step(file_id: str, file_path: Path, file_ext: str, step_name: str, language: str = "english", task_id: str = None):
     """Process a single step in the presentation pipeline"""
+    # Check for cancellation before processing the step
+    if task_id:
+        task_status = await state_manager.get_state(f"task_{task_id}")
+        if task_status and task_status.get("status") == "cancelled":
+            logger.info(f"Task {task_id} was cancelled during step {step_name}")
+            await state_manager.mark_failed(file_id)
+            return
+        
     # Get fresh state
     state = await state_manager.get_state(file_id)
+    
+    # Get subtitle language from state
+    subtitle_language = None
+    if state and "subtitle_language" in state:
+        subtitle_language = state["subtitle_language"]
+    # Default to audio language if subtitle language not specified
+    if subtitle_language is None:
+        subtitle_language = language
     
     # Skip completed steps
     if state and state["steps"][step_name]["status"] == "completed":
@@ -97,7 +169,9 @@ async def _process_step(file_id: str, file_path: Path, file_ext: str, step_name:
             "convert_slides_to_images": "Converting slides to images",
             "analyze_slide_images": "Analyzing visual content",
             "generate_scripts": "Generating AI narratives",
+            "generate_subtitle_scripts": "Generating subtitle narratives",
             "review_scripts": "Reviewing and refining scripts",
+            "review_subtitle_scripts": "Reviewing subtitle scripts",
             "generate_audio": "Synthesizing voice audio",
             "generate_avatar_videos": "Creating AI presenter videos",
             "compose_video": "Composing final presentation"
@@ -113,7 +187,9 @@ async def _process_step(file_id: str, file_path: Path, file_ext: str, step_name:
             "convert_slides_to_images": "Converting slides to images",
             "analyze_slide_images": "Analyzing visual content",
             "generate_scripts": "Generating AI narratives",
+            "generate_subtitle_scripts": "Generating subtitle narratives",
             "review_scripts": "Reviewing and refining scripts",
+            "review_subtitle_scripts": "Reviewing subtitle scripts",
             "generate_audio": "Synthesizing voice audio",
             "generate_avatar_videos": "Creating AI presenter videos",
             "compose_video": "Composing final presentation"
@@ -127,8 +203,12 @@ async def _process_step(file_id: str, file_path: Path, file_ext: str, step_name:
             await analyze_slide_images(file_id)
         elif step_name == "generate_scripts":
             await generate_scripts(file_id, language)
+        elif step_name == "generate_subtitle_scripts":
+            await generate_scripts(file_id, subtitle_language, is_subtitle=True)
         elif step_name == "review_scripts":
             await review_scripts(file_id, language)
+        elif step_name == "review_subtitle_scripts":
+            await review_scripts(file_id, subtitle_language, is_subtitle=True)
         elif step_name == "generate_audio":
             await generate_audio(file_id, language)
         elif step_name == "generate_avatar_videos":
@@ -180,9 +260,10 @@ async def analyze_slide_images(file_id: str):
     await state_manager.update_step_status(file_id, "analyze_slide_images", "completed", image_analyses)
 
 
-async def generate_scripts(file_id: str, language: str = "english"):
+async def generate_scripts(file_id: str, language: str = "english", is_subtitle: bool = False):
     """Generate scripts for each slide"""
-    await state_manager.update_step_status(file_id, "generate_scripts", "processing")
+    step_name = "generate_subtitle_scripts" if is_subtitle else "generate_scripts"
+    await state_manager.update_step_status(file_id, step_name, "processing")
     state = await state_manager.get_state(file_id)
     
     # Comprehensive null checking for slides data
@@ -214,21 +295,23 @@ async def generate_scripts(file_id: str, language: str = "english"):
         script = await script_generator.generate_script(slide_content, image_analysis, language)
         scripts.append({"slide_number": i + 1, "script": script})
     
-    await state_manager.update_step_status(file_id, "generate_scripts", "completed", scripts)
+    await state_manager.update_step_status(file_id, step_name, "completed", scripts)
 
 
-async def review_scripts(file_id: str, language: str = "english"):
+async def review_scripts(file_id: str, language: str = "english", is_subtitle: bool = False):
     """Review and refine all generated scripts for consistency and smooth flow"""
-    await state_manager.update_step_status(file_id, "review_scripts", "processing")
+    step_name = "review_subtitle_scripts" if is_subtitle else "review_scripts"
+    await state_manager.update_step_status(file_id, step_name, "processing")
     state = await state_manager.get_state(file_id)
     
-    # Get generated scripts
+    # Get generated scripts from the appropriate step
+    source_step = "generate_subtitle_scripts" if is_subtitle else "generate_scripts"
     scripts = []
     if (state and 
         "steps" in state and 
-        "generate_scripts" in state["steps"] and 
-        state["steps"]["generate_scripts"]["data"] is not None):
-        scripts = state["steps"]["generate_scripts"]["data"]
+        source_step in state["steps"] and 
+        state["steps"][source_step]["data"] is not None):
+        scripts = state["steps"][source_step]["data"]
     
     if not scripts:
         raise ValueError("No scripts data available for review")
@@ -236,7 +319,7 @@ async def review_scripts(file_id: str, language: str = "english"):
     # Review and refine scripts for consistency
     reviewed_scripts = await _review_and_refine_scripts(scripts, language)
     
-    await state_manager.update_step_status(file_id, "review_scripts", "completed", reviewed_scripts)
+    await state_manager.update_step_status(file_id, step_name, "completed", reviewed_scripts)
 
 
 async def _review_and_refine_scripts(scripts: list, language: str = "english") -> list:
@@ -293,6 +376,7 @@ async def _review_and_refine_scripts(scripts: list, language: str = "english") -
         )
         
         reviewed_content = response.choices[0].message.content.strip()
+        logger.info(f"Script review response received: {reviewed_content}")
         
         # Parse the reviewed content back into structured format
         # This is a simple parsing approach - in production, you might want more robust parsing
@@ -331,22 +415,33 @@ async def _review_and_refine_scripts(scripts: list, language: str = "english") -
                 "script": '\n'.join(current_script).strip()
             })
         
-        # If parsing failed, fall back to original scripts with minor improvements
-        if not reviewed_scripts:
+        # If parsing failed or resulted in empty scripts, fall back to original scripts with minor improvements
+        if not reviewed_scripts or all(not script.get("script", "") for script in reviewed_scripts):
             # Simple fallback: just return original scripts
+            logger.info("Script review parsing failed or resulted in empty scripts, returning original scripts")
             return scripts
             
         # Merge with original structure preserving slide numbers
         final_scripts = []
         for i, original_script in enumerate(scripts):
             if i < len(reviewed_scripts):
-                final_scripts.append({
-                    "slide_number": original_script.get("slide_number", i + 1),
-                    "script": reviewed_scripts[i].get("script", original_script.get("script", ""))
-                })
+                # Make sure we have content, if not fall back to original
+                reviewed_script_content = reviewed_scripts[i].get("script", "")
+                if reviewed_script_content:
+                    final_scripts.append({
+                        "slide_number": original_script.get("slide_number", i + 1),
+                        "script": reviewed_script_content
+                    })
+                else:
+                    # If reviewed script is empty, use original
+                    final_scripts.append({
+                        "slide_number": original_script.get("slide_number", i + 1),
+                        "script": original_script.get("script", "")
+                    })
             else:
                 final_scripts.append(original_script)
         
+        logger.info(f"Final reviewed scripts: {final_scripts}")
         return final_scripts
         
     except Exception as e:
@@ -374,22 +469,28 @@ async def generate_audio(file_id: str, language: str = "english"):
     for i, script_data in enumerate(scripts):
         # Additional null check for individual script data
         if script_data and "script" in script_data and script_data["script"]:
-            audio_path = Path("output") / f"{file_id}_slide_{i+1}.mp3"
-            try:
-                # Try OpenAI first
-                await tts_service.generate_speech(script_data["script"], audio_path, provider="openai", language=language)
-                audio_files.append(str(audio_path))
-                logger.info(f"Generated audio for slide {i+1}: {audio_path}")
-            except Exception as e:
-                logger.error(f"Failed to generate audio with OpenAI for slide {i+1}: {e}")
-                # Try ElevenLabs as fallback
+            script_text = script_data["script"].strip()
+            if script_text:  # Only generate audio if script is not empty
+                audio_path = Path(__file__).parent.parent / "output" / f"{file_id}_slide_{i+1}.mp3"
                 try:
-                    await tts_service.generate_speech(script_data["script"], audio_path, provider="elevenlabs", language=language)
+                    # Try OpenAI first
+                    await tts_service.generate_speech(script_text, audio_path, provider="openai", language=language)
                     audio_files.append(str(audio_path))
-                    logger.info(f"Generated audio with ElevenLabs fallback for slide {i+1}: {audio_path}")
-                except Exception as fallback_e:
-                    logger.error(f"Fallback to ElevenLabs also failed for slide {i+1}: {fallback_e}")
-                    raise Exception(f"Failed to generate audio for slide {i+1} with both providers: {e}")
+                    logger.info(f"Generated audio for slide {i+1}: {audio_path}")
+                except Exception as e:
+                    logger.error(f"Failed to generate audio with OpenAI for slide {i+1}: {e}")
+                    # Try ElevenLabs as fallback
+                    try:
+                        await tts_service.generate_speech(script_text, audio_path, provider="elevenlabs", language=language)
+                        audio_files.append(str(audio_path))
+                        logger.info(f"Generated audio with ElevenLabs fallback for slide {i+1}: {audio_path}")
+                    except Exception as fallback_e:
+                        logger.error(f"Fallback to ElevenLabs also failed for slide {i+1}: {fallback_e}")
+                        raise Exception(f"Failed to generate audio for slide {i+1} with both providers: {e}")
+            else:
+                logger.warning(f"Skipping audio generation for slide {i+1} due to empty script")
+        else:
+            logger.warning(f"Skipping audio generation for slide {i+1} due to missing or empty script data")
     
     await state_manager.update_step_status(file_id, "generate_audio", "completed", audio_files)
     
@@ -407,6 +508,17 @@ async def generate_avatar_videos(file_id: str):
     await state_manager.update_step_status(file_id, "generate_avatar_videos", "processing")
     state = await state_manager.get_state(file_id)
     
+    # Check if avatar generation is enabled
+    generate_avatar = True
+    if state and "generate_avatar" in state:
+        generate_avatar = state["generate_avatar"]
+    
+    # If avatar generation is disabled, skip this step
+    if not generate_avatar:
+        logger.info("Avatar generation disabled, skipping avatar video generation")
+        await state_manager.update_step_status(file_id, "generate_avatar_videos", "completed", [])
+        return
+    
     # Comprehensive null checking for scripts data
     scripts = []
     if (state and 
@@ -419,10 +531,12 @@ async def generate_avatar_videos(file_id: str):
         raise ValueError("No scripts data available for avatar video generation")
     
     avatar_videos = []
+    failed_slides = []
+    
     for i, script_data in enumerate(scripts):
         # Additional null check for individual script data
         if script_data and "script" in script_data and script_data["script"]:
-            video_path = Path("output") / f"{file_id}_avatar_{i+1}.mp4"
+            video_path = Path(__file__).parent.parent / "output" / f"{file_id}_avatar_{i+1}.mp4"
             try:
                 await avatar_service.generate_avatar_video(
                     script_data["script"], video_path, 
@@ -433,7 +547,17 @@ async def generate_avatar_videos(file_id: str):
                 logger.info(f"Generated avatar video for slide {i+1}: {video_path}")
             except Exception as e:
                 logger.error(f"Failed to generate avatar video for slide {i+1}: {e}")
-                raise
+                failed_slides.append(i+1)
+                # Continue with other slides instead of failing completely
+                continue
+    
+    # If all slides failed, raise an error
+    if len(failed_slides) == len(scripts):
+        raise Exception(f"Failed to generate avatar videos for all slides: {failed_slides}")
+    
+    # Log partial failures
+    if failed_slides:
+        logger.warning(f"Failed to generate avatar videos for slides: {failed_slides}. Continuing with remaining slides.")
     
     await state_manager.update_step_status(file_id, "generate_avatar_videos", "completed", avatar_videos)
     
@@ -442,6 +566,8 @@ async def generate_avatar_videos(file_id: str):
     if updated_state and updated_state["steps"]["generate_avatar_videos"]["status"] == "completed":
         logger.info(f"Successfully updated generate_avatar_videos to completed for {file_id}")
         logger.info(f"Avatar videos: {avatar_videos}")
+        if failed_slides:
+            logger.info(f"Failed slides: {failed_slides}")
     else:
         logger.error(f"Failed to update generate_avatar_videos state for {file_id}")
 
@@ -464,7 +590,7 @@ async def convert_slides_to_images(file_id: str, file_path: Path, file_ext: str)
         raise ValueError("No slides data available for conversion to images")
     
     for i in range(len(slides)):
-        image_path = Path("output") / f"{file_id}_slide_{i+1}.png"
+        image_path = Path(__file__).parent.parent / "output" / f"{file_id}_slide_{i+1}.png"
         await slide_processor.convert_to_image(Path(file_path), file_ext, i, image_path)
         slide_images.append(str(image_path))
     
@@ -480,6 +606,7 @@ async def compose_video(file_id: str, file_path: Path):
     slide_images_data = []
     avatar_videos_data = []
     audio_files_data = []
+    scripts_data = []
     
     if (state and 
         "steps" in state and 
@@ -499,28 +626,132 @@ async def compose_video(file_id: str, file_path: Path):
         state["steps"]["generate_audio"]["data"] is not None):
         audio_files_data = state["steps"]["generate_audio"]["data"]
     
+    # Get scripts for subtitle generation
+    # Use subtitle-specific scripts if they exist (when languages differ), otherwise use regular scripts
+    scripts_data = []
+    if (state and "steps" in state):
+        # Check if subtitle scripts exist (languages are different)
+        if ("review_subtitle_scripts" in state["steps"] and 
+            state["steps"]["review_subtitle_scripts"]["data"] is not None):
+            scripts_data = state["steps"]["review_subtitle_scripts"]["data"]
+            logger.info("Using subtitle-specific scripts for subtitle generation")
+        # Fall back to regular scripts if subtitle scripts don't exist
+        elif ("review_scripts" in state["steps"] and 
+              state["steps"]["review_scripts"]["data"] is not None):
+            scripts_data = state["steps"]["review_scripts"]["data"]
+            logger.info("Using regular scripts for subtitle generation")
+    
+    # Get subtitle language and generation flag from state
+    subtitle_language = None
+    generate_subtitles = True
+    if state and "subtitle_language" in state:
+        subtitle_language = state["subtitle_language"]  # Preserve user selection
+    # Default to audio language if subtitle language not specified
+    if subtitle_language is None:
+        subtitle_language = language
+    if state and "generate_subtitles" in state:
+        generate_subtitles = state["generate_subtitles"]
+    
+    logger.info(f"Subtitle settings - Language: {subtitle_language}, Generate: {generate_subtitles}")
+    
     # Validate all required data exists
     if not slide_images_data:
         raise ValueError("No slide images data available for video composition")
-    if not audio_files_data:
-        raise ValueError("No audio files data available for video composition")
+    # Audio files are optional - we can create a video without them
     
     slide_images = [Path(p) for p in slide_images_data]
     audio_files = [Path(p) for p in audio_files_data]
     
-    final_video_path = Path("output") / f"{file_id}_final.mp4"
+    # Use absolute path to ensure consistency with main.py
+    final_video_path = Path(__file__).parent.parent / "output" / f"{file_id}_final.mp4"
     
-    # Use avatar videos if available, otherwise create simple video
-    if avatar_videos_data:
+    # Generate subtitles before composing video (if enabled)
+    if scripts_data and generate_subtitles:
+        try:
+            logger.info(f"Generating subtitles for {len(scripts_data)} scripts in language: {subtitle_language}")
+            logger.info(f"Final video path: {final_video_path}")
+            
+            # If we have no audio files, we need to provide estimated durations
+            if not audio_files_data:
+                logger.info("No audio files available, using estimated durations for subtitles")
+                # Create a list of dummy paths for estimated durations (5 seconds each)
+                # The subtitle generator will handle non-existent files by using default durations
+                estimated_audio_files = [Path(f"/tmp/dummy_audio_{i}.mp3") for i in range(len(scripts_data))]
+                srt_path, vtt_path = subtitle_generator.generate_subtitles(scripts_data, estimated_audio_files, final_video_path, subtitle_language)
+            else:
+                srt_path, vtt_path = subtitle_generator.generate_subtitles(scripts_data, audio_files, final_video_path, subtitle_language)
+            logger.info(f"Generated subtitles: {srt_path}, {vtt_path}")
+            
+            # Verify files were created
+            import os
+            if os.path.exists(srt_path):
+                srt_size = os.path.getsize(srt_path)
+                logger.info(f"SRT file created successfully: {srt_path}, size: {srt_size} bytes")
+                # Log first few lines for debugging
+                try:
+                    with open(srt_path, 'r', encoding='utf-8') as f:
+                        first_lines = f.read(500)
+                        logger.info(f"SRT file first 500 chars: {first_lines}")
+                except Exception as e:
+                    logger.error(f"Error reading SRT file: {e}")
+            else:
+                logger.error(f"SRT file not found: {srt_path}")
+                
+            if os.path.exists(vtt_path):
+                vtt_size = os.path.getsize(vtt_path)
+                logger.info(f"VTT file created successfully: {vtt_path}, size: {vtt_size} bytes")
+                # Log first few lines for debugging
+                try:
+                    with open(vtt_path, 'r', encoding='utf-8') as f:
+                        first_lines = f.read(500)
+                        logger.info(f"VTT file first 500 chars: {first_lines}")
+                except Exception as e:
+                    logger.error(f"Error reading VTT file: {e}")
+            else:
+                logger.error(f"VTT file not found: {vtt_path}")
+        except Exception as e:
+            logger.error(f"Failed to generate subtitles: {e}")
+            import traceback
+            logger.error(f"Subtitle generation traceback: {traceback.format_exc()}")
+            # If subtitles are required and generation fails, we should raise an exception
+            # to prevent continuing with the video composition
+            if generate_subtitles:
+                raise Exception(f"Failed to generate subtitles: {e}")
+    elif not generate_subtitles:
+        logger.info("Subtitle generation disabled, skipping subtitle generation")
+    
+    # Check if avatar generation was enabled and completed
+    avatar_generation_enabled = True
+    if state and "generate_avatar" in state:
+        avatar_generation_enabled = state["generate_avatar"]
+    
+    # Use avatar videos if available and enabled, otherwise create simple video
+    if avatar_videos_data and avatar_generation_enabled:
         logger.info("Avatar videos found, creating full presentation with avatars")
         avatar_videos = [Path(p) for p in avatar_videos_data]
         await video_composer.compose_video(slide_images, avatar_videos, audio_files, final_video_path)
     else:
-        logger.warning("No avatar videos available, creating simple presentation without avatars")
-        await video_composer.create_simple_video(slide_images, audio_files, final_video_path)
+        if avatar_generation_enabled:
+            logger.warning("No avatar videos available, creating simple presentation without avatars")
+        else:
+            logger.info("Avatar generation disabled, creating simple presentation without avatars")
+        
+        # Create video based on whether we have audio files or not
+        if audio_files_data:
+            await video_composer.create_simple_video(slide_images, audio_files, final_video_path)
+        else:
+            logger.info("No audio files available, creating images-only video")
+            await video_composer.create_images_only_video(slide_images, final_video_path)
     
     await state_manager.update_step_status(file_id, "compose_video", "completed", str(final_video_path))
     await state_manager.mark_completed(file_id)
+    
+    # Generate preview data
+    try:
+        preview_data = video_previewer.generate_preview_data(file_id, Path(__file__).parent.parent / "output", subtitle_language)
+        logger.info(f"Generated preview data: {preview_data}")
+    except Exception as e:
+        logger.error(f"Failed to generate preview data: {e}")
     
     # Cleanup temporary files
     temp_files = audio_files + slide_images

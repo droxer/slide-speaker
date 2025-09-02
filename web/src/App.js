@@ -6,14 +6,14 @@ function App() {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [fileId, setFileId] = useState(null);
+  const [taskId, setTaskId] = useState(null);
   const [status, setStatus] = useState('idle');
   const [progress, setProgress] = useState(0);
   const [processingDetails, setProcessingDetails] = useState(null);
   const [language, setLanguage] = useState('english');
   const [subtitleLanguage, setSubtitleLanguage] = useState('english');
-  const [generateAvatar, setGenerateAvatar] = useState(true);
-  const [generateSubtitles, setGenerateSubtitles] = useState(true);
-  const [previewData, setPreviewData] = useState(null);
+  const [generateAvatar, setGenerateAvatar] = useState(false);
+  const [generateSubtitles, setGenerateSubtitles] = useState(false);
   const videoRef = useRef(null);
   
   const handleFileChange = (e) => {
@@ -63,6 +63,7 @@ function App() {
       );
       
       setFileId(response.data.file_id);
+      setTaskId(response.data.task_id);
       setStatus('processing');
       setProgress(0);
       
@@ -71,6 +72,24 @@ function App() {
       alert('Upload failed. Please try again.');
       setUploading(false);
       setStatus('idle');
+    }
+  };
+
+  const handleStopProcessing = async () => {
+    if (!taskId) return;
+    
+    try {
+      const response = await axios.post(`/api/task/${taskId}/cancel`);
+      console.log('Stop processing response:', response.data);
+      alert('Processing has been stopped.');
+      setStatus('idle');
+      setUploading(false);
+      setProgress(0);
+      setProcessingDetails(null);
+      setTaskId(null);
+    } catch (error) {
+      console.error('Stop processing error:', error);
+      alert('Failed to stop processing. The task may have already completed or failed.');
     }
   };
 
@@ -84,20 +103,22 @@ function App() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+    } else {
+      alert('Video not available for download. Please try again.');
     }
   };
 
   const resetForm = () => {
     setFile(null);
     setFileId(null);
+    setTaskId(null);
     setStatus('idle');
     setUploading(false);
     setProgress(0);
     setProcessingDetails(null);
-    setSubtitleLanguage('english');
-    setGenerateAvatar(true);
-    setGenerateSubtitles(true);
-    setPreviewData(null);
+    // Keep the current subtitle language selection
+    setGenerateAvatar(false);
+    setGenerateSubtitles(false);
     if (videoRef.current) {
       videoRef.current.src = '';
     }
@@ -117,23 +138,20 @@ function App() {
             setStatus('completed');
             setUploading(false);
             setProgress(100);
+            setTaskId(null); // Clear task ID when completed
             
-            // Fetch preview data
-            try {
-              const previewResponse = await axios.get(`/api/preview/${fileId}`);
-              setPreviewData(previewResponse.data);
-            } catch (previewError) {
-              console.error('Preview data fetch error:', previewError);
-            }
+            // Preview data is no longer needed for client-side popup approach
           } else if (response.data.status === 'processing' || response.data.status === 'uploaded') {
             setStatus('processing');
             setProgress(response.data.progress);
           } else if (response.data.status === 'failed') {
             setStatus('error');
             setUploading(false);
+            setTaskId(null); // Clear task ID when failed
           } else {
             setStatus('error');
             setUploading(false);
+            setTaskId(null); // Clear task ID when error
           }
         } catch (error) {
           console.error('Status check error:', error);
@@ -157,12 +175,58 @@ function App() {
     };
   }, [status, fileId]);
 
+  // Add subtitle tracks when video is loaded
+  useEffect(() => {
+    if (status === 'completed' && generateSubtitles && videoRef.current) {
+      const addSubtitles = () => {
+        if (videoRef.current) {
+          // Remove existing tracks
+          const existingTracks = videoRef.current.querySelectorAll('track');
+          existingTracks.forEach(track => track.remove());
+          
+          // Add VTT subtitle track if subtitles are enabled
+          const track = document.createElement('track');
+          track.kind = 'subtitles';
+          track.src = `/api/subtitles/${fileId}/vtt`;
+          track.srcLang = subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 
+                         subtitleLanguage === 'traditional_chinese' ? 'zh-Hant' : 
+                         subtitleLanguage === 'japanese' ? 'ja' : 
+                         subtitleLanguage === 'korean' ? 'ko' : 
+                         subtitleLanguage === 'thai' ? 'th' : 'en';
+          track.label = 'Subtitles';
+          track.default = true;
+          
+          track.addEventListener('load', () => {
+            console.log('Subtitle track loaded successfully');
+            if (videoRef.current && videoRef.current.textTracks.length > 0) {
+              videoRef.current.textTracks[0].mode = 'showing';
+            }
+          });
+          
+          track.addEventListener('error', (e) => {
+            console.error('Subtitle track loading error:', e);
+          });
+          
+          videoRef.current.appendChild(track);
+        }
+      };
+      
+      if (videoRef.current.readyState >= 2) {
+        addSubtitles();
+      } else {
+        videoRef.current.addEventListener('loadeddata', addSubtitles, { once: true });
+      }
+    }
+  }, [status, generateSubtitles, subtitleLanguage, fileId]);
+
   const formatStepName = (step) => {
     const stepNames = {
       'extract_slides': 'Extracting Content',
       'analyze_slide_images': 'Analyzing Visuals',
-      'generate_scripts': 'Generating AI Narratives',
-      'review_scripts': 'Reviewing Scripts',
+      'generate_scripts': 'Creating Narratives',
+      'review_scripts': 'Refining Content',
+      'generate_subtitle_scripts': 'Creating Subtitle Narratives',
+      'review_subtitle_scripts': 'Refining Subtitles',
       'generate_audio': 'Synthesizing Audio',
       'generate_avatar_videos': 'Generating Avatars',
       'convert_slides_to_images': 'Converting Slides',
@@ -172,21 +236,56 @@ function App() {
     return stepNames[step] || step;
   };
 
+  const getLanguageDisplayName = (languageCode) => {
+    const languageNames = {
+      'english': 'English',
+      'simplified_chinese': '简体中文',
+      'traditional_chinese': '繁體中文',
+      'japanese': '日本語',
+      'korean': '한국어',
+      'thai': 'ไทย'
+    };
+    return languageNames[languageCode] || languageCode;
+  };
+
+  const getProcessingStatusMessage = () => {
+    if (!processingDetails) return 'Bringing Your Presentation to Life';
+    
+    const activeSteps = Object.entries(processingDetails.steps || {})
+      .filter(([_, step]) => step.status === 'processing');
+    
+    if (activeSteps.length > 0) {
+      const stepName = formatStepName(activeSteps[0][0]);
+      const statusMessages = {
+        'Extracting Content': 'Analyzing your presentation structure...',
+        'Analyzing Visuals': 'Examining slide visuals and content...',
+        'Creating Narratives': 'Crafting engaging AI narratives...',
+        'Refining Content': 'Polishing the script for perfect delivery...',
+        'Creating Subtitle Narratives': 'Generating subtitle translations...',
+        'Refining Subtitles': 'Perfecting subtitle timing and accuracy...',
+        'Synthesizing Audio': 'Creating natural voice narration...',
+        'Generating Avatars': 'Bringing AI presenters to life...',
+        'Converting Slides': 'Preparing slides for video composition...',
+        'Composing Video': 'Assembling your final masterpiece...'
+      };
+      return statusMessages[stepName] || `Working on: ${stepName}`;
+    }
+    
+    return 'Bringing Your Presentation to Life';
+  };
+
   return (
     <div className="App">
       <header className="app-header">
         <h1>SlideSpeaker AI</h1>
-        <p>Turn your slides into captivating AI-powered videos with natural voice narration and expressive avatars</p>
+        <p>Transform slides into AI-powered videos</p>
       </header>
 
       <main className="main-content">
         <div className="card-container">
-          <div className="content-card">
+          <div className={`content-card ${status === 'completed' ? 'wide' : ''}`}>
             {status === 'idle' && (
               <div className="upload-view">
-                <h2>Transform Your Slides Into AI Magic</h2>
-                <p className="subtitle">Upload your presentation and watch as AI brings it to life with natural voice narration and engaging avatars</p>
-                
                 <div className="file-upload-area">
                   <input
                     type="file"
@@ -254,7 +353,7 @@ function App() {
                         checked={generateAvatar}
                         onChange={(e) => setGenerateAvatar(e.target.checked)}
                       />
-                      <label htmlFor="generate-avatar">AI Avatar Video</label>
+                      <label htmlFor="generate-avatar">AI Avatar</label>
                     </div>
                     
                     <div className="option-item">
@@ -267,6 +366,11 @@ function App() {
                       <label htmlFor="generate-subtitles">Subtitles</label>
                     </div>
                   </div>
+                </div>
+                
+                {/* Subtle AI Disclaimer in Upload View */}
+                <div className="ai-notice-subtle">
+                  AI-generated content may contain inaccuracies. Review carefully.
                 </div>
                 
                 {file && (
@@ -284,34 +388,55 @@ function App() {
             {status === 'uploading' && (
               <div className="processing-view">
                 <div className="spinner"></div>
-                <h3>Uploading File</h3>
-                <div className="progress-bar">
-                  <div 
-                    className="progress-fill" 
-                    style={{ width: `${progress}%` }}
-                  ></div>
+                <h3>Uploading Your Presentation</h3>
+                <div className="progress-container">
+                  <div className="progress-bar">
+                    <div 
+                      className="progress-fill" 
+                      style={{ width: `${progress}%` }}
+                    ></div>
+                  </div>
+                  <p className="progress-text">{progress}% Uploaded</p>
+                  <p className="processing-status">
+                    Preparing your content for AI transformation...
+                  </p>
                 </div>
-                <p className="progress-text">{progress}% Complete</p>
               </div>
             )}
 
             {status === 'processing' && (
               <div className="processing-view">
                 <div className="spinner"></div>
-                <h3>Bringing Your Presentation to Life</h3>
-                <div className="progress-bar">
-                  <div 
-                    className="progress-fill" 
-                    style={{ width: `${progress}%` }}
-                  ></div>
+                <h3>{getProcessingStatusMessage()}</h3>
+                <div className="progress-container">
+                  <div className="progress-bar">
+                    <div 
+                      className="progress-fill" 
+                      style={{ width: `${progress}%` }}
+                    ></div>
+                  </div>
+                  {/* <p className="progress-text">{progress}% Complete</p>
+                  <p className="processing-status">
+                    {progress < 30 ? 'Initializing AI magic...' : 
+                     progress < 60 ? 'Transforming your content...' : 
+                     progress < 90 ? 'Finalizing your masterpiece...' : 
+                     'Almost there! Polishing details...'}
+                  </p> */}
                 </div>
-                <p className="progress-text">{progress}% Complete</p>
+                       
+                <button 
+                  onClick={handleStopProcessing} 
+                  className="stop-btn"
+                >
+                  Stop Processing
+                </button>
+         
                 
                 {processingDetails && (
                   <div className="steps-container">
                     <h4>Processing Steps</h4>
                     <div className="steps-grid">
-                      {['extract_slides', 'convert_slides_to_images', 'analyze_slide_images', 'generate_scripts', 'review_scripts', 'generate_audio', 'generate_avatar_videos', 'compose_video'].map((stepName) => {
+                      {['extract_slides', 'convert_slides_to_images', 'analyze_slide_images', 'generate_scripts', 'review_scripts', 'generate_subtitle_scripts', 'review_subtitle_scripts', 'generate_audio', 'generate_avatar_videos', 'compose_video'].map((stepName) => {
                         const stepData = processingDetails.steps[stepName] || { status: 'pending' };
                         return (
                           <div key={stepName} className={`step-item ${stepData.status}`}>
@@ -350,29 +475,50 @@ function App() {
                 <h3>Your AI Presentation is Ready!</h3>
                 <p className="success-message">Congratulations! Your presentation has been transformed into an engaging AI-powered video.</p>
                 
-                {previewData && previewData.preview_available && (
-                  <div className="preview-info">
-                    <h4>Video Information</h4>
-                    <ul>
-                      <li><strong>File Size:</strong> {(previewData.video.file_size / (1024 * 1024)).toFixed(2)} MB</li>
-                      <li><strong>Subtitles:</strong> {generateSubtitles && previewData.subtitles.srt_content ? 'Available' : generateSubtitles ? 'Not available' : 'Not generated (disabled)'}</li>
-                      <li><strong>AI Avatar:</strong> {generateAvatar ? 'Generated' : 'Not generated (disabled)'}</li>
-                    </ul>
+                <div className="preview-container">
+                  <div className="video-main">
+                    <div className="video-wrapper">
+                      <video 
+                        ref={videoRef}
+                        controls
+                        src={`/api/video/${fileId}`}
+                        className="preview-video-large"
+                      >
+                        {/* Video tracks will be added dynamically via useEffect */}
+                      </video>
+                    </div>
+                    <div className="preview-info-compact">
+                      <h4>Video Details</h4>
+                      <div className="info-grid">
+                        <div className="info-item">
+                          <span className="info-label">Audio Language:</span>
+                          <span className="info-value">{processingDetails.audio_language ? getLanguageDisplayName(processingDetails.audio_language) : 'English'}</span>
+                        </div>
+                        <div className="info-item">
+                          <span className="info-label">Subtitle Language:</span>
+                          <span className="info-value">{processingDetails.subtitle_language ? getLanguageDisplayName(processingDetails.subtitle_language) : 'English'}</span>
+                        </div>
+                        <div className="info-item">
+                          <span className="info-label">AI Avatar:</span>
+                          <span className="info-value">{generateAvatar ? '✓ Generated' : '✗ Disabled'}</span>
+                        </div>
+                        <div className="info-item">
+                          <span className="info-label">Subtitles:</span>
+                          <span className="info-value">{generateSubtitles ? '✓ Enabled' : '✗ Disabled'}</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                )}
+                </div>
                 
                 <div className="action-buttons">
-                  <button onClick={() => window.open(`/api/preview-page/${fileId}`, '_blank')} className="primary-btn">
-                    Preview
-                  </button>
-                  <button onClick={downloadVideo} className="secondary-btn">
+                  <button onClick={downloadVideo} className="primary-btn">
                     Save Your Masterpiece
                   </button>
-                  {generateSubtitles && previewData && previewData.subtitles && (
+                  {generateSubtitles && fileId && (
                     <>
-                      {previewData.subtitles.srt_content && (
-                        <button onClick={() => {
-                          // Create a temporary link element
+                      <button onClick={() => {
+                        if (fileId) {
                           const link = document.createElement('a');
                           link.href = `/api/subtitles/${fileId}/srt`;
                           link.download = `presentation_${fileId}.srt`;
@@ -380,13 +526,14 @@ function App() {
                           document.body.appendChild(link);
                           link.click();
                           document.body.removeChild(link);
-                        }} className="secondary-btn">
-                          Get SRT Captions
-                        </button>
-                      )}
-                      {previewData.subtitles.vtt_content && (
-                        <button onClick={() => {
-                          // Create a temporary link element
+                        } else {
+                          alert('Subtitles not available for download. Please try again.');
+                        }
+                      }} className="secondary-btn">
+                        Get SRT Captions
+                      </button>
+                      <button onClick={() => {
+                        if (fileId) {
                           const link = document.createElement('a');
                           link.href = `/api/subtitles/${fileId}/vtt`;
                           link.download = `presentation_${fileId}.vtt`;
@@ -394,35 +541,17 @@ function App() {
                           document.body.appendChild(link);
                           link.click();
                           document.body.removeChild(link);
-                        }} className="secondary-btn">
-                          Get VTT Captions
-                        </button>
-                      )}
+                        } else {
+                          alert('Subtitles not available for download. Please try again.');
+                        }
+                      }} className="secondary-btn">
+                        Get VTT Captions
+                      </button>
                     </>
                   )}
                   <button onClick={resetForm} className="secondary-btn">
                     Create Another Magic
                   </button>
-                </div>
-                
-                <div className="video-preview">
-                  <h4>Quick Preview</h4>
-                  <p className="preview-note">Click the "Preview" button above for the full experience with all features</p>
-                  <video 
-                    ref={videoRef}
-                    controls
-                    src={`/api/video/${fileId}`}
-                    className="preview-video"
-                  />
-                  {generateSubtitles && previewData && previewData.subtitles && previewData.subtitles.vtt_url && (
-                    <track 
-                      kind="subtitles" 
-                      src={previewData.subtitles.vtt_url} 
-                      srcLang="en" 
-                      label="Subtitles" 
-                      default
-                    />
-                  )}
                 </div>
               </div>
             )}

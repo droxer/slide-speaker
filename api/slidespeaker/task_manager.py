@@ -41,6 +41,49 @@ class TaskManager:
         """Get task status by ID"""
         return self.tasks.get(task_id)
     
+    def cancel_task(self, task_id: str) -> bool:
+        """Cancel a task if it's still queued or processing"""
+        task = self.tasks.get(task_id)
+        if not task:
+            return False
+            
+        # If task is queued, we can remove it from the queue
+        if task["status"] == "queued":
+            # Note: We can't easily remove from asyncio.Queue, but we can mark it as cancelled
+            task["status"] = "cancelled"
+            task["error"] = "Task was cancelled by user"
+            # Store cancellation status in state manager for the orchestrator to check
+            import asyncio
+            asyncio.create_task(self._store_task_cancellation(task_id))
+            logger.info(f"Task {task_id} cancelled while queued")
+            return True
+        elif task["status"] == "processing":
+            # For processing tasks, we mark as cancelled
+            # The actual processing function would need to check for cancellation
+            task["status"] = "cancelled"
+            task["error"] = "Task was cancelled by user"
+            # Store cancellation status in state manager for the orchestrator to check
+            import asyncio
+            asyncio.create_task(self._store_task_cancellation(task_id))
+            logger.info(f"Task {task_id} marked as cancelled during processing")
+            return True
+        else:
+            # Task is already completed or failed
+            return False
+    
+    async def _store_task_cancellation(self, task_id: str):
+        """Store task cancellation status in state manager"""
+        try:
+            from slidespeaker.state_manager import state_manager
+            cancellation_state = {
+                "task_id": task_id,
+                "status": "cancelled",
+                "cancelled_at": __import__('datetime').datetime.now().isoformat()
+            }
+            await state_manager._save_state(f"task_{task_id}", cancellation_state)
+        except Exception as e:
+            logger.error(f"Failed to store task cancellation status for {task_id}: {e}")
+    
     async def _worker(self):
         """Background worker to process tasks"""
         while True:
@@ -75,6 +118,7 @@ class TaskManager:
     
     async def _process_presentation(self, task: Dict[str, Any]):
         """Process presentation task"""
+        task_id = task.get("task_id")
         kwargs = task["kwargs"]
         file_id = kwargs.get("file_id")
         file_path = kwargs.get("file_path")
@@ -86,7 +130,10 @@ class TaskManager:
         # Call the orchestrator processing function
         try:
             language = task.get("kwargs", {}).get("language", "english")
-            await process_presentation(file_id, Path(file_path), file_ext, language)
+            subtitle_language = task.get("kwargs", {}).get("subtitle_language")
+            generate_avatar = task.get("kwargs", {}).get("generate_avatar", True)
+            generate_subtitles = task.get("kwargs", {}).get("generate_subtitles", True)
+            await process_presentation(file_id, Path(file_path), file_ext, language, subtitle_language, generate_avatar, generate_subtitles, task_id=task_id)
             task["result"] = {
                 "file_id": file_id,
                 "status": "completed"

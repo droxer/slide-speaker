@@ -23,24 +23,34 @@ class RedisStateManager:
     def _get_key(self, file_id: str) -> str:
         return f"ai_slider:state:{file_id}"
     
-    async def create_state(self, file_id: str, file_path: Path, file_ext: str) -> Dict[str, Any]:
+    async def create_state(self, file_id: str, file_path: Path, file_ext: str, audio_language: str = "english", 
+                         subtitle_language: str = None, generate_avatar: bool = True, generate_subtitles: bool = True) -> Dict[str, Any]:
         """Create initial state for a file processing"""
+        # Initialize steps - always include all possible steps but set status appropriately
+        steps = {
+            "extract_slides": {"status": "pending", "data": None},
+            "convert_slides_to_images": {"status": "pending", "data": None},
+            "analyze_slide_images": {"status": "pending", "data": None},
+            "generate_scripts": {"status": "pending", "data": None},
+            "generate_subtitle_scripts": {"status": "pending", "data": None},
+            "review_scripts": {"status": "pending", "data": None},
+            "review_subtitle_scripts": {"status": "pending", "data": None},
+            "generate_audio": {"status": "pending", "data": None},
+            "generate_avatar_videos": {"status": "pending" if generate_avatar else "skipped", "data": None},
+            "compose_video": {"status": "pending", "data": None}
+        }
+        
         state = {
             "file_id": file_id,
             "file_path": str(file_path),
             "file_ext": file_ext,
+            "audio_language": audio_language,
+            "subtitle_language": subtitle_language,
+            "generate_avatar": generate_avatar,
+            "generate_subtitles": generate_subtitles,
             "status": "uploaded",
             "current_step": "extract_slides",
-            "steps": {
-                "extract_slides": {"status": "pending", "data": None},
-                "convert_slides_to_images": {"status": "pending", "data": None},
-                "analyze_slide_images": {"status": "pending", "data": None},
-                "generate_scripts": {"status": "pending", "data": None},
-                "review_scripts": {"status": "pending", "data": None},
-                "generate_audio": {"status": "pending", "data": None},
-                "generate_avatar_videos": {"status": "pending", "data": None},
-                "compose_video": {"status": "pending", "data": None}
-            },
+            "steps": steps,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),
             "errors": []

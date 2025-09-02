@@ -91,3 +91,4 @@ Detailed documentation is available in the `docs/` directory:
 - [Development Guide](docs/development.md)
 - [API Documentation](docs/api.md)
 - [Architecture Overview](docs/architecture.md)
+- the generate_script in @api/slidespeaker/script_generator.py not handle traditional chinese and simpified chinese

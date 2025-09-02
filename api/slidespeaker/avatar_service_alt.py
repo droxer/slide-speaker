@@ -27,7 +27,7 @@ class AvatarServiceAlt:
                                  voice_id: Optional[str] = None,
                                  image_style: str = "professional"):
         """
-        Generate a video slide with DALL-E image and ElevenLabs audio
+        Generate a ai avatar video slide with DALL-E image and ElevenLabs audio
         """
         try:
             logger.info(f"Generating alternative avatar video for {len(script)} chars")

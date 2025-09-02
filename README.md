@@ -8,7 +8,7 @@ SlideSpeaker is an AI-powered application that transforms PDF and PowerPoint pre
    ```bash
    cd api
    uv sync
-   # Create .env with your API keys
+   # Create .env with your API keys (OpenAI, ElevenLabs, HeyGen)
    make dev
    ```
 
@@ -19,7 +19,7 @@ SlideSpeaker is an AI-powered application that transforms PDF and PowerPoint pre
    npm start
    ```
 
-3. **Visit** `http://localhost:3000` to use the application to test the API
+3. **Visit** `http://localhost:3000` to upload presentations and create AI-powered videos
 
 ## Documentation
 

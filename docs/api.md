@@ -15,8 +15,21 @@ POST /api/upload
 Upload a PDF or PowerPoint presentation for processing.
 
 **Request:**
-- Form data with `file` parameter containing the presentation file
-- Optional `language` parameter (default: "english")
+- JSON body with base64-encoded file data:
+  ```json
+  {
+    "filename": "presentation.pdf",
+    "file_data": "base64-encoded-file-content",
+    "language": "english",
+    "subtitle_language": "english",
+    "generate_avatar": true,
+    "generate_subtitles": true
+  }
+  ```
+- `language`: Audio language (default: "english")
+- `subtitle_language`: Subtitle language (optional)
+- `generate_avatar`: Whether to generate AI avatar (default: true)
+- `generate_subtitles`: Whether to generate subtitles (default: true)
 
 **Response:**
 ```json
@@ -67,6 +80,18 @@ Download the completed video presentation.
 
 **Response:**
 - Video file (MP4 format) or 404 if not found
+
+### Download Subtitles
+
+```
+GET /api/subtitles/{file_id}/srt
+GET /api/subtitles/{file_id}/vtt
+```
+
+Download subtitle files for the completed video.
+
+**Response:**
+- SRT or VTT subtitle file or 404 if not found
 
 ### Get Task Status
 
