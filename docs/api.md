@@ -113,6 +113,25 @@ Get the status of a background processing task.
 }
 ```
 
+### Cancel Task Processing
+
+```
+POST /api/task/{task_id}/cancel
+```
+
+Cancel a background processing task. If the task is queued, it will be removed from the queue. If the task is currently processing, it will be marked for cancellation and will stop at the next checkpoint.
+
+**Response:**
+```json
+{
+  "message": "Task cancelled successfully"
+}
+```
+
+**Error Response:**
+- 400: Task cannot be cancelled (already completed or not found)
+- 500: Failed to cancel task
+
 ## Processing Steps
 
 1. **extract_slides** - Extract content from the presentation file

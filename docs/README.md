@@ -7,7 +7,7 @@ Welcome to the SlideSpeaker documentation. This documentation covers installatio
 1. [Installation Guide](installation.md) - How to set up the project
 2. [Development Guide](development.md) - Development workflows and commands
 3. [API Documentation](api.md) - API endpoints and usage
-4. [Architecture Overview](architecture.md) - System design and components
+4. [Architecture Documentation](architecture.md) - System design and components
 
 ## Getting Started
 

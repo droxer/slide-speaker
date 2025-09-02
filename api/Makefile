@@ -11,8 +11,9 @@ help:
 	@echo "SlideSpeaker API - Makefile Commands"
 	@echo "=================================="
 	@echo "make install     - Install dependencies"
-	@echo "make dev         - Start development server with auto-reload"
+	@echo "make dev         - Start development server (auto-reload)"
 	@echo "make start       - Start production server"
+	@echo "make master-worker - Start master worker (automatically manages multiple workers)"
 	@echo "make clean       - Clean temporary files"
 
 # Install dependencies
@@ -23,12 +24,17 @@ install:
 # Development server
 .PHONY: dev
 dev: install
-	$(UVICORN) main:app --host 0.0.0.0 --port 8000 --reload
+	$(UVICORN) server:app --host 0.0.0.0 --port 8000 --reload
 
 # Production server
 .PHONY: start
 start: install
-	$(UVICORN) main:app --host 0.0.0.0 --port 8000
+	$(UVICORN) server:app --host 0.0.0.0 --port 8000
+
+# Master worker (automatically spawns/manages multiple worker processes)
+.PHONY: master-worker
+master-worker: install
+	$(PYTHON) master_worker.py
 
 # Clean temporary files
 .PHONY: clean

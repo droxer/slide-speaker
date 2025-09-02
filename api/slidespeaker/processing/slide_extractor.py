@@ -8,7 +8,7 @@ import io
 import subprocess
 import os
 
-class SlideProcessor:
+class SlideExtractor:
     async def extract_slides(self, file_path: Path, file_ext: str) -> List[str]:
         if file_ext == '.pdf':
             return await self._extract_pdf_slides(file_path)

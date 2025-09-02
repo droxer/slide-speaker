@@ -9,7 +9,41 @@ from loguru import logger
 
 load_dotenv()
 
-class ImageService:
+# Style prompts for DALL-E image generation
+STYLE_PROMPTS = {
+    "professional": "clean, modern, corporate presentation slide with subtle gradient background, "
+                  "minimalist design, professional typography, business aesthetic",
+    "creative": "creative, colorful presentation slide with abstract shapes, vibrant colors, "
+               "modern design elements, inspirational aesthetic",
+    "academic": "academic presentation slide with clean layout, serif typography, "
+               "research-oriented design, formal appearance",
+    "tech": "tech-focused presentation slide with futuristic elements, circuit board patterns, "
+           "blue color scheme, modern technology aesthetic"
+}
+
+# Base prompt template for DALL-E image generation
+IMAGE_PROMPT_TEMPLATE = """
+Create a presentation slide image that visually represents the following content:
+"{content}"
+
+Style: {base_style}
+
+Requirements:
+- 16:9 aspect ratio (will be cropped to 1024x1024)
+- No text on the image (purely visual)
+- Professional presentation style
+- Relevant imagery and metaphors for the content
+- Clean, modern design
+- Suitable for educational/business context
+"""
+
+# Simple background prompts
+SIMPLE_BACKGROUND_PROMPTS = {
+    "gradient": "A smooth, subtle gradient background in {color}, professional presentation style, no text, clean design",
+    "solid": "A clean, solid {color} background for presentation slides, minimalist design"
+}
+
+class ImageGenerator:
     def __init__(self):
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     
@@ -46,33 +80,9 @@ class ImageService:
     def _create_image_prompt(self, content: str, style: str) -> str:
         """Create a detailed prompt for presentation image generation"""
         
-        style_prompts = {
-            "professional": "clean, modern, corporate presentation slide with subtle gradient background, "
-                          "minimalist design, professional typography, business aesthetic",
-            "creative": "creative, colorful presentation slide with abstract shapes, vibrant colors, "
-                       "modern design elements, inspirational aesthetic",
-            "academic": "academic presentation slide with clean layout, serif typography, "
-                       "research-oriented design, formal appearance",
-            "tech": "tech-focused presentation slide with futuristic elements, circuit board patterns, "
-                   "blue color scheme, modern technology aesthetic"
-        }
+        base_style = STYLE_PROMPTS.get(style, STYLE_PROMPTS["professional"])
         
-        base_style = style_prompts.get(style, style_prompts["professional"])
-        
-        prompt = f"""
-Create a presentation slide image that visually represents the following content:
-"{content}"
-
-Style: {base_style}
-
-Requirements:
-- 16:9 aspect ratio (will be cropped to 1024x1024)
-- No text on the image (purely visual)
-- Professional presentation style
-- Relevant imagery and metaphors for the content
-- Clean, modern design
-- Suitable for educational/business context
-"""
+        prompt = IMAGE_PROMPT_TEMPLATE.format(content=content, base_style=base_style)
         
         return prompt.strip()
     
@@ -97,10 +107,8 @@ Requirements:
             # For simple backgrounds, we can create programmatic images
             # or use very simple DALL-E prompts
             
-            if style == "gradient":
-                prompt = f"A smooth, subtle gradient background in {color}, professional presentation style, no text, clean design"
-            else:
-                prompt = f"A clean, solid {color} background for presentation slides, minimalist design"
+            prompt_template = SIMPLE_BACKGROUND_PROMPTS.get(style, SIMPLE_BACKGROUND_PROMPTS["gradient"])
+            prompt = prompt_template.format(color=color)
             
             response = self.openai_client.images.generate(
                 model="dall-e-3",

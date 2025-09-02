@@ -3,8 +3,8 @@ import uuid
 from typing import Dict, Any, Optional
 from pathlib import Path
 from loguru import logger
-from slidespeaker.state_manager import state_manager
-from slidespeaker.orchestrator import process_presentation
+from slidespeaker.core.state_manager import state_manager
+from slidespeaker.core.pipeline import process_presentation
 
 class TaskManager:
     def __init__(self):
@@ -74,7 +74,7 @@ class TaskManager:
     async def _store_task_cancellation(self, task_id: str):
         """Store task cancellation status in state manager"""
         try:
-            from slidespeaker.state_manager import state_manager
+            from slidespeaker.core.state_manager import state_manager
             cancellation_state = {
                 "task_id": task_id,
                 "status": "cancelled",
@@ -84,7 +84,7 @@ class TaskManager:
         except Exception as e:
             logger.error(f"Failed to store task cancellation status for {task_id}: {e}")
     
-    async def _worker(self):
+    async def worker_loop(self):
         """Background worker to process tasks"""
         while True:
             try:
@@ -93,6 +93,10 @@ class TaskManager:
                 self.task_queue.task_done()
             except Exception as e:
                 logger.error(f"Worker error: {e}")
+                
+    async def _worker(self):
+        """Background worker to process tasks (legacy method)"""
+        await self.worker_loop()
     
     async def _process_task(self, task_id: str):
         """Process a single task"""

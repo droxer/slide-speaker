@@ -5,7 +5,7 @@ from datetime import timedelta
 import json
 from loguru import logger
 
-from .locale_utils import locale_utils
+from ..utils.locales import locale_utils
 
 
 class SubtitleGenerator:

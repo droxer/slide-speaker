@@ -5,9 +5,9 @@ from typing import Optional
 from dotenv import load_dotenv
 from loguru import logger
 
-from slidespeaker.image_service import ImageService
-from slidespeaker.tts_service import TTSService
-from slidespeaker.video_composer import VideoComposer
+from slidespeaker.processing.image_generator import ImageGenerator
+from slidespeaker.services.tts_service import TTSService
+from slidespeaker.processing.video_composer import VideoComposer
 
 load_dotenv()
 
@@ -18,7 +18,7 @@ class AvatarServiceAlt:
     """
     
     def __init__(self):
-        self.image_service = ImageService()
+        self.image_service = ImageGenerator()
         self.tts_service = TTSService()
         self.video_composer = VideoComposer()
     

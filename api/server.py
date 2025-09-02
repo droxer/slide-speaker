@@ -12,10 +12,12 @@ from dotenv import load_dotenv
 import aiofiles
 from loguru import logger
 
-from slidespeaker.state_manager import state_manager
-from slidespeaker.task_manager import task_manager
-from slidespeaker.orchestrator import process_presentation
-from slidespeaker.locale_utils import locale_utils
+from slidespeaker.core.state_manager import state_manager
+from slidespeaker.core.task_manager import task_manager
+from slidespeaker.core.pipeline import process_presentation
+from slidespeaker.utils.locales import locale_utils
+from slidespeaker.core.task_queue import task_queue
+from slidespeaker.utils.config import config
 
 load_dotenv()
 
@@ -24,6 +26,7 @@ app = FastAPI(title="AI Slider API")
 @app.on_event("startup")
 async def startup_event():
     """Initialize task manager on startup"""
+    # Initialize task manager
     task_manager.initialize()
 
 app.add_middleware(
@@ -34,10 +37,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = Path(__file__).parent / "uploads"
-OUTPUT_DIR = Path(__file__).parent / "output"
-UPLOAD_DIR.mkdir(exist_ok=True)
-OUTPUT_DIR.mkdir(exist_ok=True)
+UPLOAD_DIR = config.uploads_dir
+OUTPUT_DIR = config.output_dir
 
 
 @app.post("/api/upload")
@@ -81,8 +82,8 @@ async def upload_file(request: Request):
         # Create initial state
         await state_manager.create_state(file_id, file_path, file_ext, language, subtitle_language, generate_avatar, generate_subtitles)
         
-        # Submit task to task manager
-        task_id = task_manager.submit_task(
+        # Submit task to Redis task queue
+        task_id = task_queue.submit_task(
             "process_presentation",
             file_id=file_id,
             file_path=str(file_path),
@@ -109,7 +110,7 @@ async def upload_file(request: Request):
 @app.get("/api/task/{task_id}")
 async def get_task_status(task_id: str):
     """Get task status by ID"""
-    task_status = task_manager.get_task_status(task_id)
+    task_status = task_queue.get_task(task_id)
     if not task_status:
         raise HTTPException(status_code=404, detail="Task not found")
     
@@ -119,7 +120,7 @@ async def get_task_status(task_id: str):
 async def cancel_task(task_id: str):
     """Cancel a task"""
     try:
-        success = task_manager.cancel_task(task_id)
+        success = task_queue.cancel_task(task_id)
         if success:
             return {"message": "Task cancelled successfully"}
         else:

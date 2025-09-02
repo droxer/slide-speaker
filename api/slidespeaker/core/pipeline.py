@@ -1,17 +1,18 @@
 from pathlib import Path
 from loguru import logger
 
-from slidespeaker.slide_processor import SlideProcessor
-from slidespeaker.script_generator import ScriptGenerator
-from slidespeaker.tts_service import TTSService
-from slidespeaker.avatar_service_unified import UnifiedAvatarService
-from slidespeaker.video_composer import VideoComposer
-from slidespeaker.subtitle_generator import SubtitleGenerator
-from slidespeaker.video_previewer import VideoPreviewer
-from slidespeaker.state_manager import state_manager
-from slidespeaker.vision_service import VisionService
+from slidespeaker.processing.slide_extractor import SlideExtractor
+from slidespeaker.processing.script_generator import ScriptGenerator
+from slidespeaker.services.tts_service import TTSService
+from slidespeaker.services.avatar_service_unified import UnifiedAvatarService
+from slidespeaker.processing.video_composer import VideoComposer
+from slidespeaker.processing.subtitle_generator import SubtitleGenerator
+from slidespeaker.processing.video_previewer import VideoPreviewer
+from slidespeaker.core.state_manager import state_manager
+from slidespeaker.services.vision_service import VisionService
+from slidespeaker.utils.config import config
 
-slide_processor = SlideProcessor()
+slide_processor = SlideExtractor()
 script_generator = ScriptGenerator()
 tts_service = TTSService()
 avatar_service = UnifiedAvatarService()
@@ -33,8 +34,8 @@ async def process_presentation(file_id: str, file_path: Path, file_ext: str, lan
     
     # Check if task has been cancelled before starting (if task_id provided)
     if task_id:
-        task_status = await state_manager.get_state(f"task_{task_id}")
-        if task_status and task_status.get("status") == "cancelled":
+        from slidespeaker.core.task_queue import task_queue
+        if task_queue.is_task_cancelled(task_id):
             logger.info(f"Task {task_id} was cancelled before processing started")
             await state_manager.mark_failed(file_id)
             return
@@ -45,12 +46,19 @@ async def process_presentation(file_id: str, file_path: Path, file_ext: str, lan
     if not state:
         await state_manager.create_state(file_id, file_path, file_ext, language, subtitle_language, generate_avatar, generate_subtitles)
         state = await state_manager.get_state(file_id)
+        # Store task_id in state for easier access
+        if task_id:
+            state["task_id"] = task_id
+            await state_manager._save_state(file_id, state)
     else:
         # Update existing state with new parameters (in case they've changed)
         state["audio_language"] = language
         state["subtitle_language"] = subtitle_language
         state["generate_avatar"] = generate_avatar
         state["generate_subtitles"] = generate_subtitles
+        # Store task_id in state for easier access
+        if task_id:
+            state["task_id"] = task_id
         await state_manager._save_state(file_id, state)
     
     # Log initial state
@@ -110,8 +118,8 @@ async def process_presentation(file_id: str, file_path: Path, file_ext: str, lan
         for step_name in steps_order:
             # Check for cancellation before processing each step
             if task_id:
-                task_status = await state_manager.get_state(f"task_{task_id}")
-                if task_status and task_status.get("status") == "cancelled":
+                from slidespeaker.core.task_queue import task_queue
+                if task_queue.is_task_cancelled(task_id):
                     logger.info(f"Task {task_id} was cancelled during processing")
                     await state_manager.mark_failed(file_id)
                     return
@@ -145,8 +153,8 @@ async def _process_step(file_id: str, file_path: Path, file_ext: str, step_name:
     """Process a single step in the presentation pipeline"""
     # Check for cancellation before processing the step
     if task_id:
-        task_status = await state_manager.get_state(f"task_{task_id}")
-        if task_status and task_status.get("status") == "cancelled":
+        from slidespeaker.core.task_queue import task_queue
+        if task_queue.is_task_cancelled(task_id):
             logger.info(f"Task {task_id} was cancelled during step {step_name}")
             await state_manager.mark_failed(file_id)
             return
@@ -197,6 +205,10 @@ async def _process_step(file_id: str, file_path: Path, file_ext: str, step_name:
         display_name = step_display_names.get(step_name, step_name)
         logger.info(f"Executing stage: {display_name}")
         
+        # Update step status to processing
+        await state_manager.update_step_status(file_id, step_name, "processing")
+        logger.info(f"Stage '{display_name}' status updated to processing")
+        
         if step_name == "extract_slides":
             await extract_slides(file_id, file_path, file_ext)
         elif step_name == "analyze_slide_images":
@@ -226,6 +238,7 @@ async def extract_slides(file_id: str, file_path: Path, file_ext: str):
     slides = await slide_processor.extract_slides(file_path, file_ext)
     logger.info(f"Extracted {len(slides)} slides for file: {file_id}")
     await state_manager.update_step_status(file_id, "extract_slides", "completed", slides)
+    logger.info(f"Stage 'Extracting presentation content' completed successfully with {len(slides)} slides")
     
     # Verify state was updated
     updated_state = await state_manager.get_state(file_id)
@@ -287,6 +300,14 @@ async def generate_scripts(file_id: str, language: str = "english", is_subtitle:
     
     scripts = []
     for i, slide_content in enumerate(slides):
+        # Check for task cancellation periodically
+        if i % 3 == 0 and state and state.get("task_id"):  # Check every 3 slides
+            from slidespeaker.core.task_queue import task_queue
+            if task_queue.is_task_cancelled(state["task_id"]):
+                logger.info(f"Task {state['task_id']} was cancelled during script generation")
+                await state_manager.mark_failed(file_id)
+                return
+        
         # Get image analysis for this slide if available
         image_analysis = None
         if image_analyses and i < len(image_analyses):
@@ -301,8 +322,18 @@ async def generate_scripts(file_id: str, language: str = "english", is_subtitle:
 async def review_scripts(file_id: str, language: str = "english", is_subtitle: bool = False):
     """Review and refine all generated scripts for consistency and smooth flow"""
     step_name = "review_subtitle_scripts" if is_subtitle else "review_scripts"
+    step_display_name = "Reviewing subtitle scripts" if is_subtitle else "Reviewing and refining scripts"
     await state_manager.update_step_status(file_id, step_name, "processing")
+    logger.info(f"Starting {step_display_name} for file: {file_id}")
     state = await state_manager.get_state(file_id)
+    
+    # Check for task cancellation before starting
+    if state and state.get("task_id"):
+        from slidespeaker.core.task_queue import task_queue
+        if task_queue.is_task_cancelled(state["task_id"]):
+            logger.info(f"Task {state['task_id']} was cancelled during script review")
+            await state_manager.mark_failed(file_id)
+            return
     
     # Get generated scripts from the appropriate step
     source_step = "generate_subtitle_scripts" if is_subtitle else "generate_scripts"
@@ -320,6 +351,7 @@ async def review_scripts(file_id: str, language: str = "english", is_subtitle: b
     reviewed_scripts = await _review_and_refine_scripts(scripts, language)
     
     await state_manager.update_step_status(file_id, step_name, "completed", reviewed_scripts)
+    logger.info(f"Stage '{step_display_name}' completed successfully with {len(reviewed_scripts)} scripts")
 
 
 async def _review_and_refine_scripts(scripts: list, language: str = "english") -> list:
@@ -452,7 +484,16 @@ async def _review_and_refine_scripts(scripts: list, language: str = "english") -
 
 async def generate_audio(file_id: str, language: str = "english"):
     await state_manager.update_step_status(file_id, "generate_audio", "processing")
+    logger.info(f"Starting audio generation for file: {file_id}")
     state = await state_manager.get_state(file_id)
+    
+    # Check for task cancellation before starting
+    if state and state.get("task_id"):
+        from slidespeaker.core.task_queue import task_queue
+        if task_queue.is_task_cancelled(state["task_id"]):
+            logger.info(f"Task {state['task_id']} was cancelled during audio generation")
+            await state_manager.mark_failed(file_id)
+            return
     
     # Comprehensive null checking for scripts data
     scripts = []
@@ -467,11 +508,19 @@ async def generate_audio(file_id: str, language: str = "english"):
     
     audio_files = []
     for i, script_data in enumerate(scripts):
+        # Check for task cancellation periodically
+        if i % 2 == 0 and state and state.get("task_id"):  # Check every 2 slides
+            from slidespeaker.core.task_queue import task_queue
+            if task_queue.is_task_cancelled(state["task_id"]):
+                logger.info(f"Task {state['task_id']} was cancelled during audio generation")
+                await state_manager.mark_failed(file_id)
+                return
+        
         # Additional null check for individual script data
         if script_data and "script" in script_data and script_data["script"]:
             script_text = script_data["script"].strip()
             if script_text:  # Only generate audio if script is not empty
-                audio_path = Path(__file__).parent.parent / "output" / f"{file_id}_slide_{i+1}.mp3"
+                audio_path = config.output_dir / f"{file_id}_slide_{i+1}.mp3"
                 try:
                     # Try OpenAI first
                     await tts_service.generate_speech(script_text, audio_path, provider="openai", language=language)
@@ -493,6 +542,7 @@ async def generate_audio(file_id: str, language: str = "english"):
             logger.warning(f"Skipping audio generation for slide {i+1} due to missing or empty script data")
     
     await state_manager.update_step_status(file_id, "generate_audio", "completed", audio_files)
+    logger.info(f"Stage 'Synthesizing voice audio' completed successfully with {len(audio_files)} audio files")
     
     # Verify state was updated
     updated_state = await state_manager.get_state(file_id)
@@ -506,7 +556,16 @@ async def generate_audio(file_id: str, language: str = "english"):
 async def generate_avatar_videos(file_id: str):
     """Generate avatar videos from scripts"""
     await state_manager.update_step_status(file_id, "generate_avatar_videos", "processing")
+    logger.info(f"Starting avatar video generation for file: {file_id}")
     state = await state_manager.get_state(file_id)
+    
+    # Check for task cancellation before starting
+    if state and state.get("task_id"):
+        from slidespeaker.core.task_queue import task_queue
+        if task_queue.is_task_cancelled(state["task_id"]):
+            logger.info(f"Task {state['task_id']} was cancelled during avatar video generation")
+            await state_manager.mark_failed(file_id)
+            return
     
     # Check if avatar generation is enabled
     generate_avatar = True
@@ -517,6 +576,7 @@ async def generate_avatar_videos(file_id: str):
     if not generate_avatar:
         logger.info("Avatar generation disabled, skipping avatar video generation")
         await state_manager.update_step_status(file_id, "generate_avatar_videos", "completed", [])
+        logger.info(f"Stage 'Creating AI presenter videos' skipped (disabled)")
         return
     
     # Comprehensive null checking for scripts data
@@ -534,9 +594,17 @@ async def generate_avatar_videos(file_id: str):
     failed_slides = []
     
     for i, script_data in enumerate(scripts):
+        # Check for task cancellation periodically
+        if i % 2 == 0 and state and state.get("task_id"):  # Check every 2 slides
+            from slidespeaker.core.task_queue import task_queue
+            if task_queue.is_task_cancelled(state["task_id"]):
+                logger.info(f"Task {state['task_id']} was cancelled during avatar video generation")
+                await state_manager.mark_failed(file_id)
+                return
+        
         # Additional null check for individual script data
         if script_data and "script" in script_data and script_data["script"]:
-            video_path = Path(__file__).parent.parent / "output" / f"{file_id}_avatar_{i+1}.mp4"
+            video_path = config.output_dir / f"{file_id}_avatar_{i+1}.mp4"
             try:
                 await avatar_service.generate_avatar_video(
                     script_data["script"], video_path, 
@@ -560,6 +628,7 @@ async def generate_avatar_videos(file_id: str):
         logger.warning(f"Failed to generate avatar videos for slides: {failed_slides}. Continuing with remaining slides.")
     
     await state_manager.update_step_status(file_id, "generate_avatar_videos", "completed", avatar_videos)
+    logger.info(f"Stage 'Creating AI presenter videos' completed successfully with {len(avatar_videos)} videos")
     
     # Verify state was updated
     updated_state = await state_manager.get_state(file_id)
@@ -578,6 +647,14 @@ async def convert_slides_to_images(file_id: str, file_path: Path, file_ext: str)
     slide_images = []
     state = await state_manager.get_state(file_id)
     
+    # Check for task cancellation before starting
+    if state and state.get("task_id"):
+        from slidespeaker.core.task_queue import task_queue
+        if task_queue.is_task_cancelled(state["task_id"]):
+            logger.info(f"Task {state['task_id']} was cancelled during slide conversion")
+            await state_manager.mark_failed(file_id)
+            return
+    
     # Safely get slides data with comprehensive null checking
     slides = []
     if (state and 
@@ -590,7 +667,15 @@ async def convert_slides_to_images(file_id: str, file_path: Path, file_ext: str)
         raise ValueError("No slides data available for conversion to images")
     
     for i in range(len(slides)):
-        image_path = Path(__file__).parent.parent / "output" / f"{file_id}_slide_{i+1}.png"
+        # Check for task cancellation periodically
+        if i % 5 == 0 and state and state.get("task_id"):  # Check every 5 slides
+            from slidespeaker.core.task_queue import task_queue
+            if task_queue.is_task_cancelled(state["task_id"]):
+                logger.info(f"Task {state['task_id']} was cancelled during slide conversion")
+                await state_manager.mark_failed(file_id)
+                return
+        
+        image_path = config.output_dir / f"{file_id}_slide_{i+1}.png"
         await slide_processor.convert_to_image(Path(file_path), file_ext, i, image_path)
         slide_images.append(str(image_path))
     
@@ -600,7 +685,16 @@ async def convert_slides_to_images(file_id: str, file_path: Path, file_ext: str)
 async def compose_video(file_id: str, file_path: Path):
     """Compose the final video from all components"""
     await state_manager.update_step_status(file_id, "compose_video", "processing")
+    logger.info(f"Starting final video composition for file: {file_id}")
     state = await state_manager.get_state(file_id)
+    
+    # Check for task cancellation before starting
+    if state and state.get("task_id"):
+        from slidespeaker.core.task_queue import task_queue
+        if task_queue.is_task_cancelled(state["task_id"]):
+            logger.info(f"Task {state['task_id']} was cancelled during video composition")
+            await state_manager.mark_failed(file_id)
+            return
     
     # Comprehensive null checking for all required data
     slide_images_data = []
@@ -663,13 +757,21 @@ async def compose_video(file_id: str, file_path: Path):
     audio_files = [Path(p) for p in audio_files_data]
     
     # Use absolute path to ensure consistency with main.py
-    final_video_path = Path(__file__).parent.parent / "output" / f"{file_id}_final.mp4"
+    final_video_path = config.output_dir / f"{file_id}_final.mp4"
     
     # Generate subtitles before composing video (if enabled)
     if scripts_data and generate_subtitles:
         try:
             logger.info(f"Generating subtitles for {len(scripts_data)} scripts in language: {subtitle_language}")
             logger.info(f"Final video path: {final_video_path}")
+            
+            # Check for task cancellation during subtitle generation
+            if state and state.get("task_id"):
+                from slidespeaker.core.task_queue import task_queue
+                if task_queue.is_task_cancelled(state["task_id"]):
+                    logger.info(f"Task {state['task_id']} was cancelled during subtitle generation")
+                    await state_manager.mark_failed(file_id)
+                    return
             
             # If we have no audio files, we need to provide estimated durations
             if not audio_files_data:
@@ -729,12 +831,27 @@ async def compose_video(file_id: str, file_path: Path):
     if avatar_videos_data and avatar_generation_enabled:
         logger.info("Avatar videos found, creating full presentation with avatars")
         avatar_videos = [Path(p) for p in avatar_videos_data]
+        # Check for task cancellation before video composition
+        if state and state.get("task_id"):
+            from slidespeaker.core.task_queue import task_queue
+            if task_queue.is_task_cancelled(state["task_id"]):
+                logger.info(f"Task {state['task_id']} was cancelled during avatar video composition")
+                await state_manager.mark_failed(file_id)
+                return
         await video_composer.compose_video(slide_images, avatar_videos, audio_files, final_video_path)
     else:
         if avatar_generation_enabled:
             logger.warning("No avatar videos available, creating simple presentation without avatars")
         else:
             logger.info("Avatar generation disabled, creating simple presentation without avatars")
+        
+        # Check for task cancellation before video composition
+        if state and state.get("task_id"):
+            from slidespeaker.core.task_queue import task_queue
+            if task_queue.is_task_cancelled(state["task_id"]):
+                logger.info(f"Task {state['task_id']} was cancelled during simple video composition")
+                await state_manager.mark_failed(file_id)
+                return
         
         # Create video based on whether we have audio files or not
         if audio_files_data:
@@ -744,11 +861,12 @@ async def compose_video(file_id: str, file_path: Path):
             await video_composer.create_images_only_video(slide_images, final_video_path)
     
     await state_manager.update_step_status(file_id, "compose_video", "completed", str(final_video_path))
+    logger.info(f"Stage 'Composing final presentation' completed successfully")
     await state_manager.mark_completed(file_id)
     
     # Generate preview data
     try:
-        preview_data = video_previewer.generate_preview_data(file_id, Path(__file__).parent.parent / "output", subtitle_language)
+        preview_data = video_previewer.generate_preview_data(file_id, config.output_dir, subtitle_language)
         logger.info(f"Generated preview data: {preview_data}")
     except Exception as e:
         logger.error(f"Failed to generate preview data: {e}")

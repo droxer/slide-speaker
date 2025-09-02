@@ -9,6 +9,25 @@ from loguru import logger
 
 load_dotenv()
 
+# Prompt for slide image analysis
+SLIDE_ANALYSIS_PROMPT = """
+Analyze this presentation slide image and provide a comprehensive understanding of its content.
+
+Please provide:
+1. All text content visible on the slide (extract exactly as shown)
+2. Visual elements and their arrangement (charts, graphs, images, diagrams)
+3. The main topic/theme of the slide
+4. Key points being communicated
+5. Context and purpose of the content
+6. Any numerical data or statistics present
+7. The overall structure and layout
+
+Format your response as a structured analysis that can be used to generate a presentation script.
+"""
+
+# System prompt for slide analysis
+SLIDE_ANALYSIS_SYSTEM_PROMPT = "You are an expert presentation analyst. Analyze slide images and extract comprehensive content understanding for script generation."
+
 class VisionService:
     def __init__(self):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -27,33 +46,17 @@ class VisionService:
             # Encode the image
             base64_image = self._encode_image(image_path)
             
-            # Create detailed prompt for slide analysis
-            prompt = """
-Analyze this presentation slide image and provide a comprehensive understanding of its content.
-
-Please provide:
-1. All text content visible on the slide (extract exactly as shown)
-2. Visual elements and their arrangement (charts, graphs, images, diagrams)
-3. The main topic/theme of the slide
-4. Key points being communicated
-5. Context and purpose of the content
-6. Any numerical data or statistics present
-7. The overall structure and layout
-
-Format your response as a structured analysis that can be used to generate a presentation script.
-"""
-            
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are an expert presentation analyst. Analyze slide images and extract comprehensive content understanding for script generation."
+                        "content": SLIDE_ANALYSIS_SYSTEM_PROMPT
                     },
                     {
                         "role": "user",
                         "content": [
-                            {"type": "text", "text": prompt},
+                            {"type": "text", "text": SLIDE_ANALYSIS_PROMPT},
                             {
                                 "type": "image_url",
                                 "image_url": {

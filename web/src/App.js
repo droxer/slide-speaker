@@ -225,7 +225,7 @@ function App() {
       'analyze_slide_images': 'Analyzing Visuals',
       'generate_scripts': 'Creating Narratives',
       'review_scripts': 'Refining Content',
-      'generate_subtitle_scripts': 'Creating Subtitle Narratives',
+      'generate_subtitle_scripts': 'Generating Subtitles',
       'review_subtitle_scripts': 'Refining Subtitles',
       'generate_audio': 'Synthesizing Audio',
       'generate_avatar_videos': 'Generating Avatars',
@@ -261,7 +261,7 @@ function App() {
         'Analyzing Visuals': 'Examining slide visuals and content...',
         'Creating Narratives': 'Crafting engaging AI narratives...',
         'Refining Content': 'Polishing the script for perfect delivery...',
-        'Creating Subtitle Narratives': 'Generating subtitle translations...',
+        'Generating Subtitles': 'Creating subtitle translations...',
         'Refining Subtitles': 'Perfecting subtitle timing and accuracy...',
         'Synthesizing Audio': 'Creating natural voice narration...',
         'Generating Avatars': 'Bringing AI presenters to life...',
@@ -488,7 +488,6 @@ function App() {
                       </video>
                     </div>
                     <div className="preview-info-compact">
-                      <h4>Video Details</h4>
                       <div className="info-grid">
                         <div className="info-item">
                           <span className="info-label">Audio Language:</span>
@@ -507,50 +506,131 @@ function App() {
                           <span className="info-value">{generateSubtitles ? '✓ Enabled' : '✗ Disabled'}</span>
                         </div>
                       </div>
+                      
+                      {/* Resource Section with URLs and Download Buttons */}
+                      <div className="resource-section">
+                        
+                        {/* Video Resource */}
+                        <div className="resource-item">
+                          <div className="resource-info">
+                            <label>Video:</label>
+                            <input 
+                              type="text" 
+                              value={`${window.location.origin}/api/video/${fileId}`}
+                              readOnly 
+                              className="url-input"
+                            />
+                          </div>
+                          <div className="resource-actions">
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${window.location.origin}/api/video/${fileId}`);
+                                alert('Video URL copied to clipboard!');
+                              }}
+                              className="copy-btn"
+                            >
+                              Copy URL
+                            </button>
+                            <button onClick={downloadVideo} className="download-btn">
+                              Download
+                            </button>
+                          </div>
+                        </div>
+                        
+                        {/* Subtitle Resources */}
+                        {generateSubtitles && fileId && (
+                          <>
+                            <div className="resource-item">
+                              <div className="resource-info">
+                                <label>SRT Subtitles:</label>
+                                <input 
+                                  type="text" 
+                                  value={`${window.location.origin}/api/subtitles/${fileId}/srt`}
+                                  readOnly 
+                                  className="url-input"
+                                />
+                              </div>
+                              <div className="resource-actions">
+                                <button 
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(`${window.location.origin}/api/subtitles/${fileId}/srt`);
+                                    alert('SRT URL copied to clipboard!');
+                                  }}
+                                  className="copy-btn"
+                                >
+                                  Copy URL
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    if (fileId) {
+                                      const link = document.createElement('a');
+                                      link.href = `/api/subtitles/${fileId}/srt`;
+                                      link.download = `presentation_${fileId}.srt`;
+                                      link.target = '_blank';
+                                      document.body.appendChild(link);
+                                      link.click();
+                                      document.body.removeChild(link);
+                                    } else {
+                                      alert('Subtitles not available for download. Please try again.');
+                                    }
+                                  }} 
+                                  className="download-btn"
+                                >
+                                  Download
+                                </button>
+                              </div>
+                            </div>
+                            
+                            <div className="resource-item">
+                              <div className="resource-info">
+                                <label>VTT Subtitles:</label>
+                                <input 
+                                  type="text" 
+                                  value={`${window.location.origin}/api/subtitles/${fileId}/vtt`}
+                                  readOnly 
+                                  className="url-input"
+                                />
+                              </div>
+                              <div className="resource-actions">
+                                <button 
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(`${window.location.origin}/api/subtitles/${fileId}/vtt`);
+                                    alert('VTT URL copied to clipboard!');
+                                  }}
+                                  className="copy-btn"
+                                >
+                                  Copy URL
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    if (fileId) {
+                                      const link = document.createElement('a');
+                                      link.href = `/api/subtitles/${fileId}/vtt`;
+                                      link.download = `presentation_${fileId}.vtt`;
+                                      link.target = '_blank';
+                                      document.body.appendChild(link);
+                                      link.click();
+                                      document.body.removeChild(link);
+                                    } else {
+                                      alert('Subtitles not available for download. Please try again.');
+                                    }
+                                  }} 
+                                  className="download-btn"
+                                >
+                                  Download
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
                 
                 <div className="action-buttons">
-                  <button onClick={downloadVideo} className="primary-btn">
-                    Save Your Masterpiece
-                  </button>
-                  {generateSubtitles && fileId && (
-                    <>
-                      <button onClick={() => {
-                        if (fileId) {
-                          const link = document.createElement('a');
-                          link.href = `/api/subtitles/${fileId}/srt`;
-                          link.download = `presentation_${fileId}.srt`;
-                          link.target = '_blank';
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        } else {
-                          alert('Subtitles not available for download. Please try again.');
-                        }
-                      }} className="secondary-btn">
-                        Get SRT Captions
-                      </button>
-                      <button onClick={() => {
-                        if (fileId) {
-                          const link = document.createElement('a');
-                          link.href = `/api/subtitles/${fileId}/vtt`;
-                          link.download = `presentation_${fileId}.vtt`;
-                          link.target = '_blank';
-                          document.body.appendChild(link);
-                          link.click();
-                          document.body.removeChild(link);
-                        } else {
-                          alert('Subtitles not available for download. Please try again.');
-                        }
-                      }} className="secondary-btn">
-                        Get VTT Captions
-                      </button>
-                    </>
-                  )}
                   <button onClick={resetForm} className="secondary-btn">
-                    Create Another Magic
+                    Create Another Presentation
                   </button>
                 </div>
               </div>

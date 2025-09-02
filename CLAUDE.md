@@ -18,11 +18,13 @@ SlideSpeaker is a full-stack application that converts PDF/PPTX presentations in
 - Responsive design with App.css
 
 **Backend (FastAPI):** `./api/`
-- FastAPI server with async processing
+- **API Server** (`server.py`): Handles HTTP requests, task queuing, and status queries
+- **Master Worker** (`master_worker.py`): Polls Redis for tasks and dispatches to worker processes
+- **Task Workers** (`worker.py`): Process individual video generation tasks in isolation
 - Services architecture in `./api/slidespeaker/`
 - File uploads to `uploads/` directory
 - Output videos in `output/` directory
-- Redis-based state management
+- Redis-based state management for task coordination
 
 ## Development Commands
 
@@ -30,7 +32,7 @@ SlideSpeaker is a full-stack application that converts PDF/PPTX presentations in
 ```bash
 cd api
 uv sync  # Install dependencies
-python main.py  # Start server (port 8000)
+python server.py  # Start server (port 8000)
 ```
 
 ### Web Client (React)
@@ -53,14 +55,29 @@ HEYGEN_API_KEY=your_key
 
 ## Key Services
 
-- `slidespeaker/slide_processor.py`: PDF/PPTX content extraction
-- `slidespeaker/script_generator.py`: AI script generation with OpenAI
-- `slidespeaker/tts_service.py`: Text-to-speech with ElevenLabs/OpenAI
-- `slidespeaker/avatar_service.py`: HeyGen avatar video generation  
-- `slidespeaker/video_composer.py`: FFmpeg video composition
-- `slidespeaker/state_manager.py`: Redis-based processing state tracking
-- `slidespeaker/orchestrator.py`: Processing pipeline coordination
-- `slidespeaker/task_manager.py`: Background task management
+- `slidespeaker/processing/slide_extractor.py`: PDF/PPTX content extraction
+- `slidespeaker/processing/script_generator.py`: AI script generation with OpenAI
+- `slidespeaker/services/tts_service.py`: Text-to-speech with ElevenLabs/OpenAI
+- `slidespeaker/services/avatar_service_unified.py`: HeyGen avatar video generation  
+- `slidespeaker/processing/video_composer.py`: FFmpeg video composition
+- `slidespeaker/core/state_manager.py`: Redis-based processing state tracking
+- `slidespeaker/core/pipeline.py`: Processing pipeline coordination
+- `slidespeaker/core/task_queue.py`: Redis-based task queue management
+- `slidespeaker/core/task_manager.py`: Background task management
+
+## Enhanced Task Cancellation
+
+SlideSpeaker now features improved task cancellation with the following enhancements:
+
+1. **Immediate Cancellation Detection**: Tasks can be cancelled quickly through a dedicated Redis key that bypasses normal state checking
+2. **Frequent Checkpoints**: Cancellation is checked at regular intervals during long-running operations:
+   - Script generation (every 3 slides)
+   - Audio generation (every 2 slides)
+   - Avatar video generation (every 2 slides)
+   - Slide conversion (every 5 slides)
+   - Video composition (at key points)
+3. **Worker-Level Monitoring**: Task workers check for cancellation every 5 seconds for faster response
+4. **Resource Cleanup**: Cancelled tasks properly clean up temporary files and resources
 
 ## File Processing Flow
 
@@ -88,7 +105,6 @@ HEYGEN_API_KEY=your_key
 
 Detailed documentation is available in the `docs/` directory:
 - [Installation Guide](docs/installation.md)
-- [Development Guide](docs/development.md)
 - [API Documentation](docs/api.md)
-- [Architecture Overview](docs/architecture.md)
+- [Architecture Documentation](docs/architecture.md)
 - the generate_script in @api/slidespeaker/script_generator.py not handle traditional chinese and simpified chinese

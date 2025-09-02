@@ -4,7 +4,7 @@ from typing import List, Dict
 import base64
 from loguru import logger
 
-from .locale_utils import locale_utils
+from ..utils.locales import locale_utils
 
 class VideoPreviewer:
     """Generate preview data for videos with subtitles"""

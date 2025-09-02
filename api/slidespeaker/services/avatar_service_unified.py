@@ -5,8 +5,8 @@ from typing import Optional, Literal
 from dotenv import load_dotenv
 from loguru import logger
 
-from slidespeaker.avatar_service import AvatarService
-from slidespeaker.avatar_service_alt import AvatarServiceAlt
+from slidespeaker.services.avatar_service import AvatarService
+from slidespeaker.services.avatar_service_alt import AvatarServiceAlt
 
 load_dotenv()
 
