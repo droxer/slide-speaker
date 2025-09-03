@@ -50,8 +50,9 @@ class VisionService:
             # Encode the image
             base64_image = self._encode_image(image_path)
 
+            model_name = os.getenv("VISION_MODEL", "gpt-4o-mini")
             response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model=model_name,
                 messages=[
                     {"role": "system", "content": SLIDE_ANALYSIS_SYSTEM_PROMPT},
                     {

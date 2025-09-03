@@ -6,10 +6,8 @@ from pathlib import Path
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.services.avatar_service_unified import UnifiedAvatarService
+from slidespeaker.services.avatar_factory import AvatarFactory
 from slidespeaker.utils.config import config
-
-avatar_service = UnifiedAvatarService()
 
 
 async def generate_avatar_step(file_id: str) -> None:
@@ -78,11 +76,12 @@ async def generate_avatar_step(file_id: str) -> None:
         if script_data and "script" in script_data and script_data["script"]:
             video_path = config.output_dir / f"{file_id}_avatar_{i + 1}.mp4"
             try:
+                # Create avatar service using factory
+                avatar_service = AvatarFactory.create_service()
+                
                 await avatar_service.generate_avatar_video(
                     script_data["script"],
                     video_path,
-                    provider="heygen",  # Use HeyGen as primary
-                    fallback_to_alternative=True,  # Fallback to alternative if HeyGen fails
                 )
                 avatar_videos.append(str(video_path))
                 logger.info(f"Generated avatar video for slide {i + 1}: {video_path}")

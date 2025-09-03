@@ -72,8 +72,9 @@ class ScriptReviewer:
         )
 
         try:
+            model_name = os.getenv("SCRIPT_REVIEWER_MODEL", "gpt-4o")
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model=model_name,
                 messages=[
                     {
                         "role": "system",

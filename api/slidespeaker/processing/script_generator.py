@@ -89,8 +89,9 @@ Visual Analysis Context:
         """
 
         try:
+            model_name = os.getenv("SCRIPT_GENERATOR_MODEL", "gpt-4o")
             response = self.client.chat.completions.create(
-                model="gpt-4o",  # Use more capable model for better script generation
+                model=model_name,
                 messages=[
                     {
                         "role": "system",

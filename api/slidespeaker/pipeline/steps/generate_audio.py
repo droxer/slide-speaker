@@ -6,10 +6,8 @@ from pathlib import Path
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.services.tts_service import TTSService
+from slidespeaker.services.tts_factory import TTSFactory
 from slidespeaker.utils.config import config
-
-tts_service = TTSService()
 
 
 async def generate_audio_step(file_id: str, language: str = "english") -> None:
@@ -61,38 +59,23 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
             if script_text:  # Only generate audio if script is not empty
                 audio_path = config.output_dir / f"{file_id}_slide_{i + 1}.mp3"
                 try:
-                    # Try OpenAI first
+                    # Create TTS service using factory
+                    tts_service = TTSFactory.create_service()
+                    
+                    # Get supported voices for language
+                    voices = tts_service.get_supported_voices(language)
+                    voice = voices[0] if voices else None
+                    
                     await tts_service.generate_speech(
-                        script_text, audio_path, provider="openai", language=language
+                        script_text, audio_path, language=language, voice=voice
                     )
                     audio_files.append(str(audio_path))
                     logger.info(f"Generated audio for slide {i + 1}: {audio_path}")
                 except Exception as e:
                     logger.error(
-                        f"Failed to generate audio with OpenAI for slide {i + 1}: {e}"
+                        f"Failed to generate audio for slide {i + 1}: {e}"
                     )
-                    # Try ElevenLabs as fallback
-                    try:
-                        await tts_service.generate_speech(
-                            script_text,
-                            audio_path,
-                            provider="elevenlabs",
-                            language=language,
-                        )
-                        audio_files.append(str(audio_path))
-                        logger.info(
-                            f"Generated audio with ElevenLabs fallback for "
-                            f"slide {i + 1}: {audio_path}"
-                        )
-                    except Exception as fallback_e:
-                        logger.error(
-                            f"Fallback to ElevenLabs also failed for "
-                            f"slide {i + 1}: {fallback_e}"
-                        )
-                        raise Exception(
-                            f"Failed to generate audio for slide {i + 1} "
-                            f"with both providers: {e}"
-                        ) from e
+                    raise
             else:
                 logger.warning(
                     f"Skipping audio generation for slide {i + 1} due to empty script"
