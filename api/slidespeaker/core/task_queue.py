@@ -52,7 +52,7 @@ class RedisTaskQueue:
         await self.redis_client.set(task_key, json.dumps(task))
 
         # Add task ID to queue
-        await self.redis_client.lpush(self.queue_key, task_id)
+        await self.redis_client.lpush(self.queue_key, task_id)  # type: ignore
 
         logger.info(f"Task {task_id} submitted to Redis queue: {task_type}")
         return task_id
@@ -64,11 +64,13 @@ class RedisTaskQueue:
         if task_data:
             # Handle both bytes (from Redis) and string data
             if isinstance(task_data, bytes):
-                task_data = task_data.decode('utf-8')
+                task_data = task_data.decode("utf-8")
             return cast(dict[str, Any], json.loads(task_data))
         return None
 
-    async def update_task_status(self, task_id: str, status: str, **kwargs: Any) -> bool:
+    async def update_task_status(
+        self, task_id: str, status: str, **kwargs: Any
+    ) -> bool:
         """Update task status and additional fields"""
         task = await self.get_task(task_id)
         if not task:

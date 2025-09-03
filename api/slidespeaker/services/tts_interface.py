@@ -18,15 +18,6 @@ class TTSInterface(ABC):
         language: str = "english",
         voice: str | None = None,
     ) -> None:
-        """
-        Generate speech from text
-        
-        Args:
-            text: Text to convert to speech
-            output_path: Path to save the audio file
-            language: Language of the text
-            voice: Voice to use (implementation-specific)
-        """
         pass
 
     @abstractmethod

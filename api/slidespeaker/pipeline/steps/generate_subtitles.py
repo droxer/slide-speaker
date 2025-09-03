@@ -4,6 +4,7 @@ Generate subtitles step for the presentation pipeline.
 
 from pathlib import Path
 from typing import Any
+
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
@@ -79,10 +80,7 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
         else:
             audio_files = [Path(p) for p in audio_files_data]
             srt_path, vtt_path = subtitle_generator.generate_subtitles(
-                scripts_data,
-                audio_files,
-                video_path,
-                language
+                scripts_data, audio_files, video_path, language
             )
         logger.info(f"Generated subtitles: {srt_path}, {vtt_path}")
 
@@ -96,6 +94,7 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
     except Exception as e:
         logger.error(f"Failed to generate subtitles: {e}")
         import traceback
+
         logger.error(f"Subtitle generation traceback: {traceback.format_exc()}")
         await state_manager.update_step_status(
             file_id, "generate_subtitles", "failed", []

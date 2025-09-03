@@ -44,7 +44,9 @@ class HeyGenAvatarService(AvatarInterface):
 
         try:
             # Create talking avatar task
-            task_id = await self._create_talking_avatar_task(script, avatar_id, voice_id)
+            task_id = await self._create_talking_avatar_task(
+                script, avatar_id, voice_id
+            )
             logger.info(f"HeyGen task created with ID: {task_id}")
 
             # Wait for task completion and download video
@@ -67,7 +69,9 @@ class HeyGenAvatarService(AvatarInterface):
         """Get supported HeyGen configuration options"""
         return {
             "avatars": ["Judy", "Anna", "Brian", "Emma"],  # Common avatars
-            "voices": ["1bd001e7e50f421d891986aad5158bc8"],  # Default voice, extend as needed
+            "voices": [
+                "1bd001e7e50f421d891986aad5158bc8"
+            ],  # Default voice, extend as needed
             "features": ["talking_avatar", "custom_background", "hd_quality"],
         }
 
@@ -103,7 +107,7 @@ class HeyGenAvatarService(AvatarInterface):
             response.raise_for_status()
 
             data = response.json()
-            return data["data"]["task_id"]
+            return str(data["data"]["task_id"])
 
         except Exception as e:
             logger.error(f"HeyGen task creation failed: {e}")
@@ -119,16 +123,16 @@ class HeyGenAvatarService(AvatarInterface):
         url = f"{self.api_url}/video/task/{task_id}"
         headers = {"X-Api-Key": self.api_key}
 
-        for attempt in range(max_retries):
+        for _attempt in range(max_retries):
             try:
                 response = requests.get(url, headers=headers)
                 response.raise_for_status()
 
                 data = response.json()
-                status = data["data"]["status"]
+                status = str(data["data"]["status"])
 
                 if status == "completed":
-                    return data["data"]["video_url"]
+                    return str(data["data"]["video_url"])
                 elif status == "failed":
                     raise Exception(
                         f"HeyGen task failed: {data.get('error', 'Unknown error')}"

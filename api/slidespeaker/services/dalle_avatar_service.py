@@ -9,9 +9,9 @@ from typing import Any
 from dotenv import load_dotenv
 from loguru import logger
 
-from .avatar_interface import AvatarInterface
 from ..processing.image_generator import ImageGenerator
 from ..processing.video_composer import VideoComposer
+from .avatar_interface import AvatarInterface
 from .tts_factory import TTSFactory
 
 load_dotenv()
@@ -47,23 +47,31 @@ class DalleAvatarService(AvatarInterface):
             voice = kwargs.get("voice_id") or (voices[0] if voices else None)
 
             await tts_service.generate_speech(
-                script, audio_path, language=kwargs.get("language", "english"), voice=voice
+                script,
+                audio_path,
+                language=kwargs.get("language", "english"),
+                voice=voice,
             )
 
             # Generate image with DALL-E
-            content_for_image = kwargs.get("slide_content") or self._extract_keywords(script)
+            content_for_image = kwargs.get("slide_content") or self._extract_keywords(
+                script
+            )
             image_style = kwargs.get("image_style", "professional")
-            
+
             if kwargs.get("use_simple_background", False):
-                await self.image_service.generate_simple_background(image_path, 
-                                                                  kwargs.get("bg_color", "#f0f4f8"))
+                await self.image_service.generate_simple_background(
+                    image_path, kwargs.get("bg_color", "#f0f4f8")
+                )
             else:
                 await self.image_service.generate_presentation_image(
                     content_for_image, image_path, style=image_style
                 )
 
             # Compose video with static image and audio
-            await self.video_composer.create_slide_video(image_path, audio_path, output_path)
+            await self.video_composer.create_slide_video(
+                image_path, audio_path, output_path
+            )
 
             # Cleanup temp files
             await self._cleanup_temp_files([audio_path, image_path])

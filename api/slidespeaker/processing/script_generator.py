@@ -1,5 +1,4 @@
 import os
-import re
 from typing import Any
 
 from dotenv import load_dotenv
@@ -9,23 +8,23 @@ load_dotenv()
 
 # Language-specific prompts for generating presentation scripts
 LANGUAGE_PROMPTS = {
-    "english": "Create a natural, engaging presentation script in English based on the following slide content analysis.",
-    "simplified_chinese": "根据以下幻灯片内容分析，创建一个自然、吸引人的简体中文演示脚本。",
-    "traditional_chinese": "根據以下簡報內容分析，創建一個自然、吸引人的繁體中文演示腳本。",
-    "japanese": "以下のスライド内容分析に基づいて、自然で魅力的な日本語のプレゼンテーションスクリプトを作成してください。",
-    "korean": "다음 슬라이드 내용 분석을 바탕으로 자연스럽고 매력적인 한국어 프레젠테이션 스크립트를 작성해 주세요.",
-    "thai": "สร้างสคริปต์การนำเสนอที่เป็นธรรมชาติและน่าสนใจเป็นภาษาไทยโดยอิงจากเนื้อหาสไลด์ดังกล่าว",
+    "english": "Create a natural, engaging presentation script in English based on the following slide content analysis.",  # noqa: E501
+    "simplified_chinese": "根据以下幻灯片内容分析，创建一个自然、吸引人的简体中文演示脚本。",  # noqa: E501
+    "traditional_chinese": "根據以下簡報內容分析，創建一個自然、吸引人的繁體中文演示腳本。",  # noqa: E501
+    "japanese": "以下のスライド内容分析に基づいて、自然で魅力的な日本語のプレゼンテーションスクリプトを作成してください。",  # noqa: E501
+    "korean": "다음 슬라이드 내용 분석을 바탕으로 자연스럽고 매력적인 한국어 프레젠테이션 스크립트를 작성해 주세요.",  # noqa: E501
+    "thai": "สร้างสคริปต์การนำเสนอที่เป็นธรรมชาติและน่าสนใจเป็นภาษาไทยโดยอิงจากเนื้อหาสไลด์ดังกล่าว",  # noqa: E501
 }
 
 # Language-specific system prompts for AI
 SYSTEM_PROMPTS = {
     "english": "You are a professional presentation script writer. "
-    "Create concise, engaging scripts for AI avatars based on slide content analysis.",
-    "simplified_chinese": "你是一名专业的演示脚本撰写人。基于幻灯片内容分析为AI虚拟形象创建简洁、吸引人的简体中文脚本。",
-    "traditional_chinese": "你是一名專業的演示腳本撰寫人。基於簡報內容分析為AI虛擬形象創建簡潔、吸引人的繁體中文腳本。",
-    "japanese": "あなたはプロのプレゼンテーションスクリプトライターです。スライド内容分析に基づいてAIアバター用の簡潔で魅力的な日本語スクリプトを作成してください。",
-    "korean": "당신은 전문 프레젠테이션 스크립트 작가입니다. 슬라이드 내용 분석을 바탕으로 AI 아바타를 위한 간결하고 매력적인 한국어 스크립트를 작성해 주세요。",
-    "thai": "คุณเป็นนักเขียนสคริปต์การนำเสนอระดับมืออาชีพ สร้างสคริปต์ที่กระชับและน่าสนใจสำหรับอวตาร AI โดยอิงจากเนื้อหาสไลด์",
+    "Create concise, engaging scripts for AI avatars based on slide content analysis.",  # noqa: E501
+    "simplified_chinese": "你是一名专业的演示脚本撰写人。基于幻灯片内容分析为AI虚拟形象创建简洁、吸引人的简体中文脚本。",  # noqa: E501
+    "traditional_chinese": "你是一名專業的演示腳本撰寫人。基於簡報內容分析為AI虛擬形象創建簡潔、吸引人的繁體中文腳本。",  # noqa: E501
+    "japanese": "あなたはプロのプレゼンテーションスクリプトライターです。スライド内容分析に基づいてAIアバター用の簡潔で魅力的な日本語スクリプトを作成してください。",  # noqa: E501
+    "korean": "당신은 전문 프레젠테이션 스크립트 작가입니다. 슬라이드 내용 분석을 바탕으로 AI 아바타를 위한 간결하고 매력적인 한국어 스크립트를 작성해 주세요。",  # noqa: E501
+    "thai": "คุณเป็นนักเขียนสคริปต์การนำเสนอระดับมืออาชีพ สร้างสคริปต์ที่กระชับและน่าสนใจสำหรับอวตาร AI โดยอิงจากเนื้อหาสไลด์",  # noqa: E501
 }
 
 # Fallback scripts in different languages
@@ -54,7 +53,10 @@ class ScriptGenerator:
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     async def generate_script(
-        self, slide_content: str, image_analysis: dict[str, Any] | None = None, language: str = "english"
+        self,
+        slide_content: str,
+        image_analysis: dict[str, Any] | None = None,
+        language: str = "english",
     ) -> str:
         if not slide_content.strip() and not image_analysis:
             return "This slide contains visual content that will be presented."
@@ -121,7 +123,7 @@ Visual Analysis Context:
             fallback_content = (
                 content_to_use[:100] if content_to_use else "visual content"
             )
-            
+
             # If the content is just an image filename, provide a more meaningful fallback
             if fallback_content.startswith("Slide image:"):
                 # This is likely from vision analysis fallback - create better content
@@ -135,7 +137,7 @@ Visual Analysis Context:
                     return "이 중요한 시각적 콘텐츠를 설명해 드리겠습니다。"
                 elif language == "thai":
                     return "ให้ผมพาคุณไปดูเนื้อหาภาพที่สำคัญนี้"
-            
+
             fallback_template = ERROR_FALLBACK_SCRIPTS.get(
                 language, ERROR_FALLBACK_SCRIPTS["english"]
             )

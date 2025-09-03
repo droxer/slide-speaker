@@ -10,7 +10,9 @@ from slidespeaker.processing.script_reviewer import ScriptReviewer
 script_reviewer = ScriptReviewer()
 
 
-async def review_scripts_step(file_id: str, language: str = "english", is_subtitle: bool = False) -> None:
+async def review_scripts_step(
+    file_id: str, language: str = "english", is_subtitle: bool = False
+) -> None:
     """Review and refine all generated scripts for consistency and smooth flow"""
     step_name = "review_subtitle_scripts" if is_subtitle else "review_scripts"
     step_display_name = (
@@ -46,7 +48,9 @@ async def review_scripts_step(file_id: str, language: str = "english", is_subtit
         raise ValueError("No scripts data available for review")
 
     # Review and refine scripts for consistency
-    reviewed_scripts = await script_reviewer.review_and_refine_scripts(scripts, language)
+    reviewed_scripts = await script_reviewer.review_and_refine_scripts(
+        scripts, language
+    )
 
     await state_manager.update_step_status(
         file_id, step_name, "completed", reviewed_scripts

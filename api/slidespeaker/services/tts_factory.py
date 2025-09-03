@@ -4,35 +4,20 @@ Factory pattern implementation for creating TTS service instances
 """
 
 import os
-from typing import Dict, Type, Optional
 
-from .tts_interface import TTSInterface
-from .openai_tts_service import OpenAITTSService
 from .elevenlabs_tts_service import ElevenLabsTTSService
+from .openai_tts_service import OpenAITTSService
+from .tts_interface import TTSInterface
 
 
 class TTSFactory:
-    """Factory for creating TTS service instances"""
-
-    _services: Dict[str, Type[TTSInterface]] = {
+    _services: dict[str, type[TTSInterface]] = {
         "openai": OpenAITTSService,
         "elevenlabs": ElevenLabsTTSService,
     }
 
     @classmethod
-    def create_service(cls, service_name: Optional[str] = None) -> TTSInterface:
-        """
-        Create a TTS service instance based on configuration
-        
-        Args:
-            service_name: Optional service name override, defaults to env var
-            
-        Returns:
-            TTSInterface implementation instance
-            
-        Raises:
-            ValueError: If service name is invalid or service is not available
-        """
+    def create_service(cls, service_name: str | None = None) -> TTSInterface:
         if service_name is None:
             service_name = os.getenv("TTS_SERVICE", "openai").lower()
 
@@ -54,18 +39,12 @@ class TTSFactory:
         return service_instance
 
     @classmethod
-    def get_available_services(cls) -> Dict[str, Type[TTSInterface]]:
+    def get_available_services(cls) -> dict[str, type[TTSInterface]]:
         """Get all available TTS service classes"""
         return cls._services.copy()
 
     @classmethod
-    def get_configured_services(cls) -> Dict[str, bool]:
-        """
-        Get configuration status for all TTS services
-        
-        Returns:
-            Dictionary mapping service names to their configuration status
-        """
+    def get_configured_services(cls) -> dict[str, bool]:
         status = {}
         for name, service_class in cls._services.items():
             try:

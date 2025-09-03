@@ -2,7 +2,6 @@
 Generate avatar videos step for the presentation pipeline.
 """
 
-from pathlib import Path
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
@@ -78,7 +77,7 @@ async def generate_avatar_step(file_id: str) -> None:
             try:
                 # Create avatar service using factory
                 avatar_service = AvatarFactory.create_service()
-                
+
                 await avatar_service.generate_avatar_video(
                     script_data["script"],
                     video_path,

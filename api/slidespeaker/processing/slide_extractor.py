@@ -196,7 +196,9 @@ class SlideExtractor:
             # Fallback to placeholder if conversion fails
             self._create_placeholder_image(slide_index, output_path)
 
-    async def _create_content_image(self, slide: Any, slide_index: int, output_path: Path) -> None:
+    async def _create_content_image(
+        self, slide: Any, slide_index: int, output_path: Path
+    ) -> None:
         """Create an image based on slide content (text, etc.)"""
         try:
             import textwrap

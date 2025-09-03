@@ -156,4 +156,6 @@ class ImageGenerator:
 
         except ImportError:
             logger.warning("PIL not available for fallback backgrounds")
-            raise Exception("Image generation requires PIL for fallback backgrounds") from None
+            raise Exception(
+                "Image generation requires PIL for fallback backgrounds"
+            ) from None

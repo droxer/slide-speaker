@@ -4,23 +4,22 @@ Factory pattern implementation for creating avatar service instances
 """
 
 import os
-from typing import Dict, Type, Optional
 
 from .avatar_interface import AvatarInterface
-from .heygen_avatar_service import HeyGenAvatarService
 from .dalle_avatar_service import DalleAvatarService
+from .heygen_avatar_service import HeyGenAvatarService
 
 
 class AvatarFactory:
     """Factory for creating avatar service instances"""
 
-    _services: Dict[str, Type[AvatarInterface]] = {
+    _services: dict[str, type[AvatarInterface]] = {
         "heygen": HeyGenAvatarService,
         "dalle": DalleAvatarService,
     }
 
     @classmethod
-    def create_service(cls, service_name: Optional[str] = None) -> AvatarInterface:
+    def create_service(cls, service_name: str | None = None) -> AvatarInterface:
         """
         Create an avatar service instance based on configuration
 
@@ -54,12 +53,12 @@ class AvatarFactory:
         return service_instance
 
     @classmethod
-    def get_available_services(cls) -> Dict[str, Type[AvatarInterface]]:
+    def get_available_services(cls) -> dict[str, type[AvatarInterface]]:
         """Get all available avatar service classes"""
         return cls._services.copy()
 
     @classmethod
-    def get_configured_services(cls) -> Dict[str, bool]:
+    def get_configured_services(cls) -> dict[str, bool]:
         """
         Get configuration status for all avatar services
 

@@ -5,12 +5,13 @@ Compose final video step for the presentation pipeline.
 import os
 from pathlib import Path
 from typing import Any
+
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
+from slidespeaker.processing.subtitle_generator import SubtitleGenerator
 from slidespeaker.processing.video_composer import VideoComposer
 from slidespeaker.processing.video_previewer import VideoPreviewer
-from slidespeaker.processing.subtitle_generator import SubtitleGenerator
 from slidespeaker.utils.config import config
 
 video_composer = VideoComposer()
@@ -151,7 +152,7 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
                     scripts_data,
                     audio_files,
                     final_video_path,
-                    str(subtitle_language) if subtitle_language else "english"
+                    str(subtitle_language) if subtitle_language else "english",
                 )
             logger.info(f"Generated subtitles: {srt_path}, {vtt_path}")
 
@@ -188,6 +189,7 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
         except Exception as e:
             logger.error(f"Failed to generate subtitles: {e}")
             import traceback
+
             logger.error(f"Subtitle generation traceback: {traceback.format_exc()}")
             # If subtitles generation fails, we should raise an exception
             # to prevent continuing with the video composition
@@ -258,7 +260,9 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
     # Generate preview data
     try:
         preview_data = video_previewer.generate_preview_data(
-            file_id, config.output_dir, str(subtitle_language) if subtitle_language else "english"
+            file_id,
+            config.output_dir,
+            str(subtitle_language) if subtitle_language else "english",
         )
         logger.info(f"Generated preview data: {preview_data}")
     except Exception as e:

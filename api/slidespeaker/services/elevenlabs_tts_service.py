@@ -4,7 +4,6 @@ ElevenLabs TTS Service Implementation
 
 import os
 from pathlib import Path
-from typing import Dict
 
 import requests
 from dotenv import load_dotenv
@@ -21,7 +20,9 @@ class ElevenLabsTTSService(TTSInterface):
     def __init__(self) -> None:
         self.api_key = os.getenv("ELEVENLABS_API_KEY")
         self.base_url = "https://api.elevenlabs.io/v1"
-        self.default_voice_id = os.getenv("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")  # Default voice
+        self.default_voice_id = os.getenv(
+            "ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"
+        )  # Default voice
 
     async def generate_speech(
         self,
@@ -59,7 +60,7 @@ class ElevenLabsTTSService(TTSInterface):
         try:
             # Ensure output directory exists
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            
+
             response = requests.post(url, headers=headers, json=data, stream=True)
             response.raise_for_status()
 
@@ -102,5 +103,5 @@ class ElevenLabsTTSService(TTSInterface):
                 "VR6AewLTigWG4xSOukaG",  # Japanese Male
             ],
         }
-        
+
         return voices.get(language, [self.default_voice_id])

@@ -10,7 +10,9 @@ from slidespeaker.processing.script_generator import ScriptGenerator
 script_generator = ScriptGenerator()
 
 
-async def generate_scripts_step(file_id: str, language: str = "english", is_subtitle: bool = False) -> None:
+async def generate_scripts_step(
+    file_id: str, language: str = "english", is_subtitle: bool = False
+) -> None:
     """Generate scripts for each slide"""
     step_name = "generate_subtitle_scripts" if is_subtitle else "generate_scripts"
     await state_manager.update_step_status(file_id, step_name, "processing")

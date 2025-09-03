@@ -6,22 +6,22 @@ step execution, state tracking, and error handling.
 """
 
 from pathlib import Path
-from typing import Any
 
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
+
 from .steps import (
-    extract_slides_step,
-    convert_slides_step,
     analyze_slides_step,
-    generate_scripts_step,
-    review_scripts_step,
+    compose_video_step,
+    convert_slides_step,
+    extract_slides_step,
     generate_audio_step,
     generate_avatar_step,
+    generate_scripts_step,
     generate_subtitles_step,
-    compose_video_step,
+    review_scripts_step,
 )
 
 
@@ -48,11 +48,10 @@ async def process_presentation(
     )
 
     # Check if task has been cancelled before starting (if task_id provided)
-    if task_id:
-        if await task_queue.is_task_cancelled(task_id):
-            logger.info(f"Task {task_id} was cancelled before processing started")
-            await state_manager.mark_failed(file_id)
-            return
+    if task_id and await task_queue.is_task_cancelled(task_id):
+        logger.info(f"Task {task_id} was cancelled before processing started")
+        await state_manager.mark_failed(file_id)
+        return
 
     # Initialize state
     state = await state_manager.get_state(file_id)
@@ -85,7 +84,7 @@ async def process_presentation(
 
     # Log initial state
     await _log_initial_state(file_id)
-    
+
     if task_id:
         logger.info(f"=== Starting step-by-step processing for task {task_id} ===")
 
@@ -96,11 +95,10 @@ async def process_presentation(
         # Process each step in order, skipping completed ones
         for step_name in steps_order:
             # Check for cancellation before processing each step
-            if task_id:
-                if await task_queue.is_task_cancelled(task_id):
-                    logger.info(f"Task {task_id} was cancelled during processing")
-                    await state_manager.mark_failed(file_id)
-                    return
+            if task_id and await task_queue.is_task_cancelled(task_id):
+                logger.info(f"Task {task_id} was cancelled during processing")
+                await state_manager.mark_failed(file_id)
+                return
 
             await _execute_step(
                 file_id, file_path, file_ext, step_name, language, task_id=task_id
@@ -110,6 +108,7 @@ async def process_presentation(
         logger.error(f"AI presentation generation failed for file {file_id}: {e}")
         logger.error(f"Error category: {type(e).__name__}")
         import traceback
+
         logger.error(f"Technical details: {traceback.format_exc()}")
 
         # Update error state
@@ -199,11 +198,10 @@ async def _execute_step(
 ) -> None:
     """Execute a single step in the presentation pipeline"""
     # Check for cancellation before processing the step
-    if task_id:
-        if await task_queue.is_task_cancelled(task_id):
-            logger.info(f"Task {task_id} was cancelled during step {step_name}")
-            await state_manager.mark_failed(file_id)
-            return
+    if task_id and await task_queue.is_task_cancelled(task_id):
+        logger.info(f"Task {task_id} was cancelled during step {step_name}")
+        await state_manager.mark_failed(file_id)
+        return
 
     # Get fresh state
     state = await state_manager.get_state(file_id)
@@ -264,7 +262,7 @@ async def _execute_step(
         try:
             if task_id:
                 logger.info(f"=== Task {task_id} - Started: {display_name} ===")
-            
+
             # Execute the appropriate step
             if step_name == "extract_slides":
                 await extract_slides_step(file_id, file_path, file_ext)
@@ -273,7 +271,9 @@ async def _execute_step(
             elif step_name == "generate_scripts":
                 await generate_scripts_step(file_id, language)
             elif step_name == "generate_subtitle_scripts":
-                await generate_scripts_step(file_id, subtitle_language, is_subtitle=True)
+                await generate_scripts_step(
+                    file_id, subtitle_language, is_subtitle=True
+                )
             elif step_name == "review_scripts":
                 await review_scripts_step(file_id, language)
             elif step_name == "review_subtitle_scripts":
@@ -288,7 +288,7 @@ async def _execute_step(
                 await convert_slides_step(file_id, file_path, file_ext)
             elif step_name == "compose_video":
                 await compose_video_step(file_id, file_path)
-                
+
             if task_id:
                 logger.info(f"=== Task {task_id} - Completed: {display_name} ===")
         except Exception as e:

@@ -4,7 +4,6 @@ OpenAI TTS Service Implementation
 
 import os
 from pathlib import Path
-from typing import Any, Dict
 
 import openai
 from dotenv import load_dotenv
@@ -35,7 +34,7 @@ class OpenAITTSService(TTSInterface):
             raise ValueError("Text is empty or contains only whitespace")
 
         # Language-specific voice mapping
-        voice_mapping: Dict[str, str] = {
+        voice_mapping: dict[str, str] = {
             "english": "alloy",
             "chinese": "onyx",
             "japanese": "nova",
@@ -68,7 +67,7 @@ class OpenAITTSService(TTSInterface):
     def get_supported_voices(self, language: str = "english") -> list[str]:
         """Get supported OpenAI TTS voices"""
         all_voices = ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
-        
+
         # Language-specific recommendations
         language_voices = {
             "english": ["alloy", "echo", "fable", "onyx", "nova", "shimmer"],
@@ -77,5 +76,5 @@ class OpenAITTSService(TTSInterface):
             "korean": ["shimmer", "alloy"],
             "thai": ["alloy", "echo"],
         }
-        
+
         return language_voices.get(language, all_voices)

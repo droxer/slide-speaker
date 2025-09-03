@@ -96,7 +96,7 @@ class MasterWorker:
                     f"Master worker status: {active_workers}/{self.max_workers} workers active, "
                     f"tasks in progress: {list(self.worker_processes.keys())}"
                 )
-                
+
                 # Check for completed workers
                 await self.check_completed_workers()
 
@@ -121,7 +121,9 @@ class MasterWorker:
                         await asyncio.sleep(2)
                 else:
                     # At max capacity, just check for completed workers
-                    logger.debug("At maximum worker capacity, checking for completions...")
+                    logger.debug(
+                        "At maximum worker capacity, checking for completions..."
+                    )
                     await self.check_completed_workers()
                     await asyncio.sleep(2)
 
@@ -160,7 +162,9 @@ class MasterWorker:
                         "failed",
                         error=f"Worker failed with return code {process.returncode}",
                     )
-                    logger.error(f"Task {task_id} marked as failed with return code {process.returncode}")
+                    logger.error(
+                        f"Task {task_id} marked as failed with return code {process.returncode}"
+                    )
 
         # Remove completed workers
         for task_id in completed_tasks:

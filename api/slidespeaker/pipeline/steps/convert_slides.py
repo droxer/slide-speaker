@@ -3,6 +3,7 @@ Convert slides to images step for the presentation pipeline.
 """
 
 from pathlib import Path
+
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager

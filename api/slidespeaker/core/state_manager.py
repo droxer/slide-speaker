@@ -53,15 +53,19 @@ class RedisStateManager:
             },
             "compose_video": {"status": "pending", "data": None},
         }
-        
+
         # Only include subtitle script generation steps if languages are different
         # Default to audio language if subtitle language is not specified
-        effective_subtitle_language = subtitle_language if subtitle_language is not None else audio_language
+        effective_subtitle_language = (
+            subtitle_language if subtitle_language is not None else audio_language
+        )
         if audio_language != effective_subtitle_language:
-            steps.update({
-                "generate_subtitle_scripts": {"status": "pending", "data": None},
-                "review_subtitle_scripts": {"status": "pending", "data": None},
-            })
+            steps.update(
+                {
+                    "generate_subtitle_scripts": {"status": "pending", "data": None},
+                    "review_subtitle_scripts": {"status": "pending", "data": None},
+                }
+            )
 
         state: dict[str, Any] = {
             "file_id": file_id,

@@ -131,7 +131,10 @@ class SubtitleGenerator:
             raise
 
     def _generate_srt_content(
-        self, scripts: list[dict[str, Any]], audio_files: list[Path], language: str = "english"
+        self,
+        scripts: list[dict[str, Any]],
+        audio_files: list[Path],
+        language: str = "english",
     ) -> str:
         """
         Generate SRT subtitle content
@@ -187,7 +190,10 @@ class SubtitleGenerator:
         return "\n".join(srt_lines)
 
     def _generate_vtt_content(
-        self, scripts: list[dict[str, Any]], audio_files: list[Path], language: str = "english"
+        self,
+        scripts: list[dict[str, Any]],
+        audio_files: list[Path],
+        language: str = "english",
     ) -> str:
         """
         Generate VTT subtitle content

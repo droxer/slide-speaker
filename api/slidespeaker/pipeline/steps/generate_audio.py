@@ -2,7 +2,6 @@
 Generate audio step for the presentation pipeline.
 """
 
-from pathlib import Path
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
@@ -61,20 +60,18 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
                 try:
                     # Create TTS service using factory
                     tts_service = TTSFactory.create_service()
-                    
+
                     # Get supported voices for language
                     voices = tts_service.get_supported_voices(language)
                     voice = voices[0] if voices else None
-                    
+
                     await tts_service.generate_speech(
                         script_text, audio_path, language=language, voice=voice
                     )
                     audio_files.append(str(audio_path))
                     logger.info(f"Generated audio for slide {i + 1}: {audio_path}")
                 except Exception as e:
-                    logger.error(
-                        f"Failed to generate audio for slide {i + 1}: {e}"
-                    )
+                    logger.error(f"Failed to generate audio for slide {i + 1}: {e}")
                     raise
             else:
                 logger.warning(

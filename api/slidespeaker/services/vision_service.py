@@ -86,6 +86,7 @@ class VisionService:
         except Exception as e:
             logger.error(f"Vision analysis error for {image_path}: {e}")
             import traceback
+
             logger.error(f"Vision analysis traceback: {traceback.format_exc()}")
             # Fallback: return basic analysis with file info
             return {

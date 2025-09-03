@@ -3,7 +3,6 @@ Analyze slide images step for the presentation pipeline.
 """
 
 from pathlib import Path
-from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.services.vision_service import VisionService

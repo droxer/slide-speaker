@@ -14,8 +14,8 @@ from loguru import logger
 # Add the current directory to Python path so we can import slidespeaker modules
 sys.path.insert(0, str(Path(__file__).parent))
 
-from slidespeaker.pipeline.coordinator import process_presentation
 from slidespeaker.core.task_queue import task_queue
+from slidespeaker.pipeline.coordinator import process_presentation
 
 # Configure logging
 logger.remove()
@@ -42,7 +42,7 @@ class TaskProgressMonitor:
                 task = await task_queue.get_task(self.task_id)
                 if task and "status" in task:
                     check_count += 1
-                    
+
                     # Log detailed status every 5 checks (every 25 seconds)
                     if check_count % 5 == 0:
                         logger.info(

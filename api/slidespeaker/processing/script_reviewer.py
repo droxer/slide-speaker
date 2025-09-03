@@ -7,8 +7,6 @@ from dotenv import load_dotenv
 from loguru import logger
 from openai import OpenAI
 
-from ..utils.config import config
-
 # Language-specific review prompts
 REVIEW_PROMPTS = {
     "english": "Review and refine the following presentation scripts to ensure consistency in tone, style, and smooth transitions between slides. Make sure the language flows naturally and maintains a professional yet engaging presentation style.",  # noqa: E501
@@ -21,12 +19,12 @@ REVIEW_PROMPTS = {
 
 # Language-specific instruction prompts
 INSTRUCTION_PROMPTS = {
-    "english": "Please provide refined versions of each script that improve:\n1. Consistency in tone and terminology\n2. Smooth transitions between slides\n3. Professional yet engaging language\n4. Appropriate length (50-100 words per slide)\n\nPlease return the refined scripts in the same format as the original, with each slide clearly labeled.",
-    "simplified_chinese": "请提供每个脚本的精炼版本，改进以下方面：\n1. 语调和术语的一致性\n2. 幻灯片之间的平滑过渡\n3. 专业且引人入胜的语言\n4. 适当的长度（每张幻灯片50-100字）\n\n请以与原始格式相同的格式返回精炼后的脚本，每张幻灯片都清晰标注。",
-    "traditional_chinese": "請提供每個腳本的精煉版本，改進以下方面：\n1. 語調和術語的一致性\n2. 簡報之間的平滑過渡\n3. 專業且引人入勝的語言\n4. 適當的長度（每張簡報50-100字）\n\n請以與原始格式相同的格式返回精煉後的腳本，每張簡報都清晰標註。",
-    "japanese": "各スクリプトの洗練されたバージョンを提供してください。以下の点を改善してください：\n1. トーンと用語の一貫性\n2. スライド間のスムーズな移行\n3. 専門的で魅力的な言語\n4. 適切な長さ（スライドごとに50〜100語）\n\n元の形式と同じ形式で洗練されたスクリプトを返してください。各スライドを明確にラベル付けしてください。",
-    "korean": "각 스크립트의 정제된 버전을 제공해 주세요. 다음 사항을 개선하세요：\n1. 톤과 용어의 일관성\n2. 슬라이드 간의 원활한 전환\n3. 전문적이고 매력적인 언어\n4. 적절한 길이(슬라이드당 50~100단어)\n\n원본 형식과 동일한 형식으로 정제된 스크립트를 반환해 주세요. 각 슬라이드를 명확하게 레이블링하세요。",
-    "thai": "โปรดให้เวอร์ชันที่ปรับปรุงแล้วของแต่ละสคริปต์ซึ่งปรับปรุงด้านต่อไปนี้：\n1. ความสอดคล้องในน้ำเสียงและคำศัพท์\n2. การเปลี่ยนผ่านที่ราบรื่นระหว่างสไลด์\n3. ภาษาที่เป็นมืออาชีพและน่าสนใจ\n4. ความยาวที่เหมาะสม (50-100 คำต่อสไลด์)\n\nโปรดส่งคืนสคริปต์ที่ปรับปรุงแล้วในรูปแบบเดียวกับต้นฉบับ โดยติดป้ายกำกับแต่ละสไลด์อย่างชัดเจน"
+    "english": "Please provide refined versions of each script that improve:\n1. Consistency in tone and terminology\n2. Smooth transitions between slides\n3. Professional yet engaging language\n4. Appropriate length (50-100 words per slide)\n\nPlease return the refined scripts in the same format as the original, with each slide clearly labeled.",  # noqa: E501
+    "simplified_chinese": "请提供每个脚本的精炼版本，改进以下方面：\n1. 语调和术语的一致性\n2. 幻灯片之间的平滑过渡\n3. 专业且引人入胜的语言\n4. 适当的长度（每张幻灯片50-100字）\n\n请以与原始格式相同的格式返回精炼后的脚本，每张幻灯片都清晰标注。",  # noqa: E501
+    "traditional_chinese": "請提供每個腳本的精煉版本，改進以下方面：\n1. 語調和術語的一致性\n2. 簡報之間的平滑過渡\n3. 專業且引人入勝的語言\n4. 適當的長度（每張簡報50-100字）\n\n請以與原始格式相同的格式返回精煉後的腳本，每張簡報都清晰標註。",  # noqa: E501
+    "japanese": "各スクリプトの洗練されたバージョンを提供してください。以下の点を改善してください：\n1. トーンと用語の一貫性\n2. スライド間のスムーズな移行\n3. 専門的で魅力的な言語\n4. 適切な長さ（スライドごとに50〜100語）\n\n元の形式と同じ形式で洗練されたスクリプトを返してください。各スライドを明確にラベル付けしてください。",  # noqa: E501
+    "korean": "각 스크립트의 정제된 버전을 제공해 주세요. 다음 사항을 개선하세요：\n1. 톤과 용어의 일관성\n2. 슬라이드 간의 원활한 전환\n3. 전문적이고 매력적인 언어\n4. 적절한 길이(슬라이드당 50~100단어)\n\n원본 형식과 동일한 형식으로 정제된 스크립트를 반환해 주세요. 각 슬라이드를 명확하게 레이블링하세요。",  # noqa: E501
+    "thai": "โปรดให้เวอร์ชันที่ปรับปรุงแล้วของแต่ละสคริปต์ซึ่งปรับปรุงด้านต่อไปนี้：\n1. ความสอดคล้องในน้ำเสียงและคำศัพท์\n2. การเปลี่ยนผ่านที่ราบรื่นระหว่างสไลด์\n3. ภาษาที่เป็นมืออาชีพและน่าสนใจ\n4. ความยาวที่เหมาะสม (50-100 คำต่อสไลด์)\n\nโปรดส่งคืนสคริปต์ที่ปรับปรุงแล้วในรูปแบบเดียวกับต้นฉบับ โดยติดป้ายกำกับแต่ละสไลด์อย่างชัดเจน",  # noqa: E501
 }
 
 # Language-specific system prompts
@@ -37,15 +35,13 @@ SYSTEM_PROMPTS = {
     "japanese": "あなたはプロのプレゼンテーションエディターです。各スライドの核心的な内容とメッセージを維持しながら、プレゼンテーションスクリプトの一貫性、流れ、品質をレビューし、改善することがあなたの任務です。",  # noqa: E501
     "korean": "귀하는 전문 프레젠테이션 편집자입니다. 각 슬라이드의 핵심 내용과 메시지를 유지하면서 프레젠테이션 스크립트의 일관성, 흐름, 품질을 검토하고 개선하는 것이 귀하의 임무입니다.",  # noqa: E501
     "thai": "คุณเป็นผู้แก้ไขการนำเสนอระดับมืออาชีพ งานของคุณคือการตรวจสอบและปรับปรุงสคริปต์การนำเสนอให้มีความสอดคล้อง ไหลลื่น และมีคุณภาพ พร้อมทั้งรักษาเนื้อหาหลักและข้อความของแต่ละสไลด์ไว้",  # noqa: E501
-}  # noqa: E501
+}
 
 
 load_dotenv()
 
 
 class ScriptReviewer:
-    """Review and refine presentation scripts for consistency and quality."""
-
     def __init__(self) -> None:
         """Initialize the script reviewer with OpenAI client."""
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -53,17 +49,6 @@ class ScriptReviewer:
     async def review_and_refine_scripts(
         self, scripts: list[dict[str, Any]], language: str = "english"
     ) -> list[dict[str, Any]]:
-        """
-        Review and refine scripts for consistency, flow, and quality.
-        
-        Args:
-            scripts: List of script dictionaries with slide_number and script content
-            language: Language of the scripts
-            
-        Returns:
-            List of refined script dictionaries
-        """
-        # Prepare all scripts as a single context
         all_scripts_text = "\n\n".join(
             [
                 f"Slide {i + 1}: {script_data.get('script', '')}"
@@ -78,7 +63,9 @@ class ScriptReviewer:
                 messages=[
                     {
                         "role": "system",
-                        "content": SYSTEM_PROMPTS.get(language, SYSTEM_PROMPTS["english"]),
+                        "content": SYSTEM_PROMPTS.get(
+                            language, SYSTEM_PROMPTS["english"]
+                        ),
                     },
                     {
                         "role": "user",
@@ -96,9 +83,13 @@ class ScriptReviewer:
             )
 
             reviewed_content_response = response.choices[0].message.content
-            reviewed_content = reviewed_content_response.strip() if reviewed_content_response else ""
-            logger.info(f"Script review response received for language '{language}': {reviewed_content[:200]}...")
-            
+            reviewed_content = (
+                reviewed_content_response.strip() if reviewed_content_response else ""
+            )
+            logger.info(
+                f"Script review response received for language '{language}': {reviewed_content[:200]}..."
+            )
+
             # Debug: log the first few lines to see if parsing will work
             lines = reviewed_content.split("\n")
             if lines:
@@ -141,7 +132,9 @@ class ScriptReviewer:
                         current_slide = int(slide_match.group(1))
                         current_script = []
                     else:
-                        current_slide = len(reviewed_scripts) + 1 if reviewed_scripts else 1
+                        current_slide = (
+                            len(reviewed_scripts) + 1 if reviewed_scripts else 1
+                        )
                         current_script = [line]
                 elif current_slide is not None:
                     current_script.append(line)
@@ -176,7 +169,9 @@ class ScriptReviewer:
                     if reviewed_script_content:
                         final_scripts.append(
                             {
-                                "slide_number": original_script.get("slide_number", i + 1),
+                                "slide_number": original_script.get(
+                                    "slide_number", i + 1
+                                ),
                                 "script": reviewed_script_content,
                             }
                         )
@@ -184,7 +179,9 @@ class ScriptReviewer:
                         # If reviewed script is empty, use original
                         final_scripts.append(
                             {
-                                "slide_number": original_script.get("slide_number", i + 1),
+                                "slide_number": original_script.get(
+                                    "slide_number", i + 1
+                                ),
                                 "script": original_script.get("script", ""),
                             }
                         )
