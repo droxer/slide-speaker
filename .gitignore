@@ -6,6 +6,7 @@ __pycache__/
 *.pyd
 .Python
 *.so
+.mp4
 
 # Environment files
 .env

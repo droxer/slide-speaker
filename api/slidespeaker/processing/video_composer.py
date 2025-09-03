@@ -1,4 +1,5 @@
 import asyncio
+import gc
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -14,6 +15,64 @@ from moviepy.video.VideoClip import TextClip
 
 
 class VideoComposer:
+    def __init__(self, max_memory_mb: int = 500):
+        """
+        Initialize VideoComposer with memory constraints
+
+        Args:
+            max_memory_mb: Maximum memory to use for video processing (MB)
+        """
+        self.max_memory_mb = max_memory_mb
+
+    def _validate_video_file(self, video_path: Path) -> tuple[bool, str]:
+        """
+        Validate video file exists and is not corrupted
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        if not video_path.exists():
+            return False, f"Video file does not exist: {video_path}"
+
+        if video_path.stat().st_size == 0:
+            return False, f"Video file is empty: {video_path}"
+
+        try:
+            # Quick validation by loading just the first frame
+            with VideoFileClip(str(video_path)) as clip:
+                _ = clip.duration  # This will raise if file is corrupted
+                return True, ""
+        except Exception as e:
+            return False, f"Video file is corrupted: {video_path} - {str(e)}"
+
+    def _get_memory_safe_size(
+        self, original_clip: object, max_width: int = 1920, max_height: int = 1080
+    ) -> tuple[int, int]:
+        """
+        Calculate memory-safe dimensions for video processing
+
+        Returns:
+            Tuple of (width, height) for memory-safe processing
+        """
+        try:
+            original_width, original_height = original_clip.size  # type: ignore[attr-defined]
+
+            # Calculate aspect ratios
+            width_ratio = max_width / original_width
+            height_ratio = max_height / original_height
+            scale_ratio = min(width_ratio, height_ratio, 1.0)  # Don't scale up
+
+            new_width = int(original_width * scale_ratio)
+            new_height = int(original_height * scale_ratio)
+
+            # Ensure dimensions are even (required by some codecs)
+            new_width = new_width - (new_width % 2)
+            new_height = new_height - (new_height % 2)
+
+            return max(new_width, 320), max(new_height, 240)  # Minimum dimensions
+        except Exception:
+            return 1280, 720  # Safe fallback
+
     def _create_watermark(self, duration: float) -> TextClip | None:
         """Create a semi-transparent SlideSpeaker AI watermark"""
         try:
@@ -50,74 +109,164 @@ class VideoComposer:
     ) -> None:
         """
         Compose final video with slide images as background and AI avatar presenting
+        Memory-efficient version with progress tracking and error handling
         """
 
         def _compose_video_sync() -> None:
             try:
-                # Create video clips for each slide
-                video_clips = []
+                print(
+                    f"Starting video composition with {len(slide_images)} slides and avatars"
+                )
 
-                for _i, (slide_image, avatar_video, audio_file) in enumerate(
+                # Validate all avatar videos before processing
+                valid_avatar_videos = []
+                valid_audio_files = []
+                valid_slide_images = []
+
+                for i, (slide_image, avatar_video, audio_file) in enumerate(
                     zip(slide_images, avatar_videos, audio_files, strict=False)
                 ):
-                    # Load assets
-                    slide_clip = ImageClip(str(slide_image)).with_duration(
-                        AudioFileClip(str(audio_file)).duration
+                    print(f"Validating slide {i + 1} components...")
+
+                    # Validate files
+                    is_valid, error_msg = self._validate_video_file(avatar_video)
+                    if not is_valid:
+                        print(f"Skipping avatar video {i + 1}: {error_msg}")
+                        continue
+
+                    if not slide_image.exists():
+                        print(f"Skipping slide image {i + 1}: {slide_image} not found")
+                        continue
+
+                    if not audio_file.exists():
+                        print(f"Skipping audio file {i + 1}: {audio_file} not found")
+                        continue
+
+                    valid_slide_images.append(slide_image)
+                    valid_avatar_videos.append(avatar_video)
+                    valid_audio_files.append(audio_file)
+
+                if not valid_slide_images:
+                    raise ValueError("No valid slide/image combinations found")
+
+                print(f"Processing {len(valid_slide_images)} valid slides...")
+
+                # Process slides one at a time to avoid memory issues
+                video_clips = []
+
+                print(f"Processing {len(valid_slide_images)} slides individually...")
+
+                for i, (slide_image, avatar_video, audio_file) in enumerate(
+                    zip(
+                        valid_slide_images,
+                        valid_avatar_videos,
+                        valid_audio_files,
+                        strict=False,
                     )
-                    avatar_clip = VideoFileClip(str(avatar_video))
-                    audio_clip = AudioFileClip(str(audio_file))
+                ):
+                    print(f"Processing slide {i + 1}/{len(valid_slide_images)}...")
 
-                    # Resize avatar to appropriate size for presentation (larger than PIP)
-                    avatar_clip = avatar_clip.with_effects([Resize(height=400)])
+                    try:
+                        # Load audio to get duration
+                        audio_clip = AudioFileClip(str(audio_file))
+                        duration = audio_clip.duration
 
-                    # Position avatar on the right side with some margin
-                    avatar_clip = avatar_clip.with_position(("right", "top"))
+                        # Load slide image
+                        slide_clip = ImageClip(str(slide_image)).with_duration(duration)
+                        safe_width, safe_height = self._get_memory_safe_size(slide_clip)
+                        slide_clip = slide_clip.with_effects(
+                            [Resize(width=safe_width, height=safe_height)]
+                        )
+                        slide_clip = slide_clip.with_position("center")
 
-                    # Ensure slide image fills the background
-                    slide_clip = slide_clip.with_effects(
-                        [Resize(width=1920, height=1080)]
-                    )
+                        # Load avatar video
+                        avatar_clip = VideoFileClip(str(avatar_video))
+                        avatar_height = min(400, int(avatar_clip.h * 0.4))
+                        avatar_clip = avatar_clip.with_effects(
+                            [Resize(height=avatar_height)]
+                        )
+                        avatar_clip = avatar_clip.with_position(("right", "top"))
+                        avatar_clip = avatar_clip.with_duration(duration)
 
-                    # Position slide image
-                    slide_clip = slide_clip.with_position("center")
+                        # Create composite
+                        combined_clip = CompositeVideoClip([slide_clip, avatar_clip])
+                        combined_clip = combined_clip.with_audio(audio_clip)
 
-                    # Combine slide (background) and avatar (presenter)
-                    combined_clip = CompositeVideoClip(
-                        [slide_clip, avatar_clip]
-                    ).with_audio(audio_clip)
+                        video_clips.append(combined_clip)
 
-                    video_clips.append(combined_clip)
+                        # Force garbage collection after each slide
+                        gc.collect()
 
-                # Concatenate all clips
+                    except Exception as e:
+                        print(f"Error processing slide {i + 1}: {e}")
+                        # Clean up any open clips for this slide
+                        try:
+                            if "audio_clip" in locals():
+                                audio_clip.close()
+                            if "slide_clip" in locals():
+                                slide_clip.close()
+                            if "avatar_clip" in locals():
+                                avatar_clip.close()
+                        except Exception:
+                            pass
+                        continue
+
+                if not video_clips:
+                    raise ValueError("No valid clips were created")
+
+                print("Concatenating all clips...")
                 final_clip = concatenate_videoclips(video_clips)
 
-                # Add SlideSpeaker AI watermark
+                # Add watermark
                 watermark = self._create_watermark(final_clip.duration)
                 if watermark:
                     final_clip = CompositeVideoClip([final_clip, watermark])
 
-                # Write final video
+                print("Writing final video...")
+
+                # Write with optimized settings
                 final_clip.write_videofile(
                     str(output_path),
                     fps=24,
                     codec="libx264",
                     audio_codec="aac",
-                    threads=4,
+                    threads=2,  # Reduce threads to save memory
+                    preset="medium",  # Balance quality vs speed
+                    bitrate="2000k",  # Limit bitrate for memory
+                    audio_bitrate="128k",
+                    temp_audiofile=str(output_path.parent / "temp_audio.m4a"),
+                    remove_temp=True,
+                    logger=None,  # Disable moviepy logging
                 )
 
-                # Close all clips to free resources
-                for clip in video_clips:
-                    clip.close()
-                final_clip.close()
+                print(f"Video composition completed: {output_path}")
 
             except Exception as e:
                 print(f"Video composition error: {e}")
                 raise
+            finally:
+                # Clean up all clips
+                try:
+                    for clip in video_clips:
+                        clip.close()
+                    if "final_clip" in locals():
+                        final_clip.close()
+                except Exception:
+                    pass
+                gc.collect()
 
-        # Run the CPU-intensive video composition in a separate thread
+        # Run with timeout to prevent hanging
         loop = asyncio.get_event_loop()
-        with ThreadPoolExecutor() as executor:
-            await loop.run_in_executor(executor, _compose_video_sync)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            try:
+                await asyncio.wait_for(
+                    loop.run_in_executor(executor, _compose_video_sync),
+                    timeout=1800,  # 30 minutes timeout
+                )
+            except TimeoutError:
+                raise Exception(
+                    "Video composition timed out after 30 minutes"
+                ) from None
 
     async def create_simple_video(
         self, slide_images: list[Path], audio_files: list[Path], output_path: Path

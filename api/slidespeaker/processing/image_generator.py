@@ -14,10 +14,8 @@ STYLE_PROMPTS = {
     "minimalist design, professional typography, business aesthetic",
     "creative": "creative, colorful presentation slide with abstract shapes, vibrant colors, "
     "modern design elements, inspirational aesthetic",
-    "academic": "academic presentation slide with clean layout, serif typography, "
-    "research-oriented design, formal appearance",
-    "tech": "tech-focused presentation slide with futuristic elements, circuit board patterns, "
-    "blue color scheme, modern technology aesthetic",
+    "academic": "academic presentation slide with clean layout, serif typography, research-oriented design, formal appearance",  # noqa: E501
+    "tech": "tech-focused presentation slide with futuristic elements, circuit board patterns, blue color scheme, modern technology aesthetic",  # noqa: E501
 }
 
 # Base prompt template for DALL-E image generation
