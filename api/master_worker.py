@@ -32,7 +32,7 @@ class MasterWorker:
     def __init__(self) -> None:
         self.should_stop = False
         self.workers: list[subprocess.Popen[bytes]] = []
-        self.max_workers = int(os.getenv("MAX_WORKERS", "3"))  # Default to 3 workers
+        self.max_workers = int(os.getenv("MAX_WORKERS", "1"))  # Default to 3 workers
         self.worker_processes: dict[str, subprocess.Popen[bytes]] = {}
 
     def signal_handler(self, signum: int, frame: Any) -> None:
@@ -54,7 +54,10 @@ class MasterWorker:
         )
 
         self.worker_processes[task_id] = process
-        logger.info(f"Started worker process for task {task_id} with PID {process.pid}")
+        logger.info(
+            f"Started worker process for task {task_id} with PID {process.pid}, "
+            f"total workers now: {len(self.worker_processes)}/{self.max_workers}"
+        )
         return process
 
     def cleanup_workers(self) -> None:
@@ -87,6 +90,13 @@ class MasterWorker:
 
         try:
             while not self.should_stop:
+                # Log current worker status
+                active_workers = len(self.worker_processes)
+                logger.info(
+                    f"Master worker status: {active_workers}/{self.max_workers} workers active, "
+                    f"tasks in progress: {list(self.worker_processes.keys())}"
+                )
+                
                 # Check for completed workers
                 await self.check_completed_workers()
 
@@ -104,13 +114,16 @@ class MasterWorker:
                         logger.info(f"Found task {task_id}, starting worker process")
                         await task_queue.update_task_status(task_id, "processing")
                         self.start_worker_process(task_id)
+                        logger.info(f"Worker process started for task {task_id}")
                     else:
                         # No tasks available, sleep briefly
-                        await asyncio.sleep(1)
+                        logger.debug("No tasks available in queue, waiting...")
+                        await asyncio.sleep(2)
                 else:
                     # At max capacity, just check for completed workers
+                    logger.debug("At maximum worker capacity, checking for completions...")
                     await self.check_completed_workers()
-                    await asyncio.sleep(1)
+                    await asyncio.sleep(2)
 
         except Exception as e:
             logger.error(f"Master worker encountered an error: {e}")
@@ -140,16 +153,19 @@ class MasterWorker:
                 # Update task status based on return code
                 if process.returncode == 0:
                     await task_queue.update_task_status(task_id, "completed")
+                    logger.info(f"Task {task_id} marked as completed successfully")
                 else:
                     await task_queue.update_task_status(
                         task_id,
                         "failed",
                         error=f"Worker failed with return code {process.returncode}",
                     )
+                    logger.error(f"Task {task_id} marked as failed with return code {process.returncode}")
 
         # Remove completed workers
         for task_id in completed_tasks:
             del self.worker_processes[task_id]
+            logger.info(f"Removed completed worker for task {task_id}")
 
 
 if __name__ == "__main__":

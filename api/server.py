@@ -1,6 +1,7 @@
 import asyncio
 import base64
 import hashlib
+import os
 from pathlib import Path
 from typing import Any
 
@@ -271,7 +272,8 @@ if __name__ == "__main__":
     signal.signal(signal.SIGTERM, signal_handler)
 
     # Run the server with shutdown handling
-    uvicorn_config = uvicorn.Config(app, host="0.0.0.0", port=8000)
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn_config = uvicorn.Config(app, host="0.0.0.0", port=port)
     server = uvicorn.Server(uvicorn_config)
 
     async def run_server() -> None:

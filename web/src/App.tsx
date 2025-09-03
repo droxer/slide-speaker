@@ -447,18 +447,21 @@ function App() {
                     <div className="steps-grid">
                       {['extract_slides', 'convert_slides_to_images', 'analyze_slide_images', 'generate_scripts', 'review_scripts', 'generate_subtitle_scripts', 'review_subtitle_scripts', 'generate_audio', 'generate_avatar_videos', 'compose_video'].map((stepName) => {
                         const stepData = processingDetails.steps[stepName] || { status: 'pending' };
+                        // Hide skipped steps from UI
+                        if (stepData.status === 'skipped') {
+                          return null;
+                        }
                         return (
                           <div key={stepName} className={`step-item ${stepData.status}`}>
                             <span className="step-icon">
                               {stepData.status === 'completed' ? '✓' : 
-                               stepData.status === 'processing' ? '●' : 
-                               stepData.status === 'failed' ? '✗' : 
-                               stepData.status === 'skipped' ? '⊘' : '○'}
+                               stepData.status === 'processing' ? '⏳' : 
+                               stepData.status === 'failed' ? '✗' : '○'}
                             </span>
                             <span className="step-name">{formatStepName(stepName)}</span>
                           </div>
                         );
-                      })}
+                      }).filter(Boolean)}
                     </div>
                     
                     {processingDetails.errors && processingDetails.errors.length > 0 && (

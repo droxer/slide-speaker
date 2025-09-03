@@ -14,7 +14,7 @@ from loguru import logger
 # Add the current directory to Python path so we can import slidespeaker modules
 sys.path.insert(0, str(Path(__file__).parent))
 
-from slidespeaker.core.pipeline import process_presentation
+from slidespeaker.pipeline.coordinator import process_presentation
 from slidespeaker.core.task_queue import task_queue
 
 # Configure logging
@@ -35,12 +35,22 @@ class TaskProgressMonitor:
 
     async def monitor_progress(self) -> None:
         """Monitor task progress and log updates"""
+        check_count = 0
         while self.monitoring:
             try:
                 # Get current task status
                 task = await task_queue.get_task(self.task_id)
                 if task and "status" in task:
-                    logger.info(f"Task {self.task_id} current status: {task['status']}")
+                    check_count += 1
+                    
+                    # Log detailed status every 5 checks (every 25 seconds)
+                    if check_count % 5 == 0:
+                        logger.info(
+                            f"Task {self.task_id} status check #{check_count}: {task['status']}, "
+                            f"updated at: {task.get('updated_at', 'unknown')}"
+                        )
+                    else:
+                        logger.debug(f"Task {self.task_id} status: {task['status']}")
 
                     # If task is cancelled, stop monitoring
                     if task.get("status") == "cancelled":
@@ -104,7 +114,8 @@ async def process_task(task_id: str) -> bool:
 
         logger.info(
             f"Task {task_id} parameters extracted - file_id: {file_id}, "
-            f"file_ext: {file_ext}"
+            f"file_ext: {file_ext}, language: {language}, "
+            f"subtitle_language: {subtitle_language}, generate_avatar: {generate_avatar}"
         )
 
         if not file_id or not file_path or not file_ext:

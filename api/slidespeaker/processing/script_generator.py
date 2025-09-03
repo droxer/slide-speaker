@@ -9,12 +9,10 @@ load_dotenv()
 
 # Language-specific prompts for generating presentation scripts
 LANGUAGE_PROMPTS = {
-    "english": "Create a natural, engaging presentation script in English "
-    "based on the following slide content analysis.",
+    "english": "Create a natural, engaging presentation script in English based on the following slide content analysis.",
     "simplified_chinese": "根据以下幻灯片内容分析，创建一个自然、吸引人的简体中文演示脚本。",
     "traditional_chinese": "根據以下簡報內容分析，創建一個自然、吸引人的繁體中文演示腳本。",
-    "japanese": "以下のスライド内容分析に基づいて、自然で魅力的な日本語の"
-    "プレゼンテーションスクリプトを作成してください。",
+    "japanese": "以下のスライド内容分析に基づいて、自然で魅力的な日本語のプレゼンテーションスクリプトを作成してください。",
     "korean": "다음 슬라이드 내용 분석을 바탕으로 자연스럽고 매력적인 한국어 프레젠테이션 스크립트를 작성해 주세요.",
     "thai": "สร้างสคริปต์การนำเสนอที่เป็นธรรมชาติและน่าสนใจเป็นภาษาไทยโดยอิงจากเนื้อหาสไลด์ดังกล่าว",
 }
@@ -23,15 +21,10 @@ LANGUAGE_PROMPTS = {
 SYSTEM_PROMPTS = {
     "english": "You are a professional presentation script writer. "
     "Create concise, engaging scripts for AI avatars based on slide content analysis.",
-    "simplified_chinese": "你是一名专业的演示脚本撰写人。"
-    "基于幻灯片内容分析为AI虚拟形象创建简洁、吸引人的简体中文脚本。",
+    "simplified_chinese": "你是一名专业的演示脚本撰写人。基于幻灯片内容分析为AI虚拟形象创建简洁、吸引人的简体中文脚本。",
     "traditional_chinese": "你是一名專業的演示腳本撰寫人。基於簡報內容分析為AI虛擬形象創建簡潔、吸引人的繁體中文腳本。",
-    "japanese": "あなたはプロのプレゼンテーションスクリプトライターです。"
-    "スライド内容分析に基づいてAIアバター用の簡潔で魅力的な"
-    "日本語スクリプトを作成してください。",
-    "korean": "당신은 전문 프레젠테이션 스크립트 작가입니다. "
-    "슬라이드 내용 분석을 바탕으로 AI 아바타를 위한 간결하고 "
-    "매력적인 한국어 스크립트를 작성해 주세요。",
+    "japanese": "あなたはプロのプレゼンテーションスクリプトライターです。スライド内容分析に基づいてAIアバター用の簡潔で魅力的な日本語スクリプトを作成してください。",
+    "korean": "당신은 전문 프레젠테이션 스크립트 작가입니다. 슬라이드 내용 분석을 바탕으로 AI 아바타를 위한 간결하고 매력적인 한국어 스크립트를 작성해 주세요。",
     "thai": "คุณเป็นนักเขียนสคริปต์การนำเสนอระดับมืออาชีพ สร้างสคริปต์ที่กระชับและน่าสนใจสำหรับอวตาร AI โดยอิงจากเนื้อหาสไลด์",
 }
 
@@ -59,31 +52,6 @@ ERROR_FALLBACK_SCRIPTS = {
 class ScriptGenerator:
     def __init__(self) -> None:
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-    def _detect_language(self, text: str) -> str:
-        """Detect the primary language of the slide content"""
-        # Simple language detection based on character patterns
-        if not text.strip():
-            return "english"
-
-        # Check for Chinese characters - use simplified as default
-        if re.search(r"[\u4e00-\u9fff]", text):
-            return "simplified_chinese"
-
-        # Check for Japanese characters
-        if re.search(r"[\u3040-\u309f\u30a0-\u30ff\u4e00-\u9fff]", text):
-            return "japanese"
-
-        # Check for Korean characters
-        if re.search(r"[\uac00-\ud7a3]", text):
-            return "korean"
-
-        # Check for Thai characters
-        if re.search(r"[\u0e00-\u0e7f]", text):
-            return "thai"
-
-        # Default to English for Latin script and others
-        return "english"
 
     async def generate_script(
         self, slide_content: str, image_analysis: dict[str, Any] | None = None, language: str = "english"
@@ -152,6 +120,21 @@ Visual Analysis Context:
             fallback_content = (
                 content_to_use[:100] if content_to_use else "visual content"
             )
+            
+            # If the content is just an image filename, provide a more meaningful fallback
+            if fallback_content.startswith("Slide image:"):
+                # This is likely from vision analysis fallback - create better content
+                if language == "english":
+                    return "Let me walk you through this important visual content."
+                elif language in ["simplified_chinese", "traditional_chinese"]:
+                    return "让我为您介绍这一重要视觉内容。"
+                elif language == "japanese":
+                    return "この重要なビジュアルコンテンツについてご説明します。"
+                elif language == "korean":
+                    return "이 중요한 시각적 콘텐츠를 설명해 드리겠습니다。"
+                elif language == "thai":
+                    return "ให้ผมพาคุณไปดูเนื้อหาภาพที่สำคัญนี้"
+            
             fallback_template = ERROR_FALLBACK_SCRIPTS.get(
                 language, ERROR_FALLBACK_SCRIPTS["english"]
             )

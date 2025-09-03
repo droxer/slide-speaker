@@ -6,7 +6,7 @@ engaging video presentations with AI-generated narration and avatars.
 """
 
 # Core components
-from .core.pipeline import process_presentation
+from .pipeline.coordinator import process_presentation
 from .core.state_manager import state_manager
 from .core.task_manager import task_manager
 from .core.task_queue import task_queue

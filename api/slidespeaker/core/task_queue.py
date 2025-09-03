@@ -52,7 +52,7 @@ class RedisTaskQueue:
         await self.redis_client.set(task_key, json.dumps(task))
 
         # Add task ID to queue
-        self.redis_client.lpush(self.queue_key, task_id)
+        await self.redis_client.lpush(self.queue_key, task_id)
 
         logger.info(f"Task {task_id} submitted to Redis queue: {task_type}")
         return task_id

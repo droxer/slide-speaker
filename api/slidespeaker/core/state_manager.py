@@ -35,15 +35,13 @@ class RedisStateManager:
         generate_subtitles: bool = True,
     ) -> dict[str, Any]:
         """Create initial state for a file processing"""
-        # Initialize steps - always include all possible steps but set status appropriately
+        # Initialize steps - conditionally include subtitle script steps based on language needs
         steps = {
             "extract_slides": {"status": "pending", "data": None},
             "convert_slides_to_images": {"status": "pending", "data": None},
             "analyze_slide_images": {"status": "pending", "data": None},
             "generate_scripts": {"status": "pending", "data": None},
-            "generate_subtitle_scripts": {"status": "pending", "data": None},
             "review_scripts": {"status": "pending", "data": None},
-            "review_subtitle_scripts": {"status": "pending", "data": None},
             "generate_audio": {"status": "pending", "data": None},
             "generate_avatar_videos": {
                 "status": "pending" if generate_avatar else "skipped",
@@ -55,6 +53,15 @@ class RedisStateManager:
             },
             "compose_video": {"status": "pending", "data": None},
         }
+        
+        # Only include subtitle script generation steps if languages are different
+        # Default to audio language if subtitle language is not specified
+        effective_subtitle_language = subtitle_language if subtitle_language is not None else audio_language
+        if audio_language != effective_subtitle_language:
+            steps.update({
+                "generate_subtitle_scripts": {"status": "pending", "data": None},
+                "review_subtitle_scripts": {"status": "pending", "data": None},
+            })
 
         state: dict[str, Any] = {
             "file_id": file_id,
