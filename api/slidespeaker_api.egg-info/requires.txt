@@ -18,3 +18,7 @@ socksio>=1.0.0
 reportlab>=4.4.3
 imageio>=2.37.0
 asyncio>=4.0.0
+
+[dev]
+ruff>=0.1.6
+mypy>=1.7.0

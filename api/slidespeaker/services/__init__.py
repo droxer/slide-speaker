@@ -10,9 +10,9 @@ from .tts_service import TTSService
 from .vision_service import VisionService
 
 __all__ = [
-    'AvatarService',
-    'AvatarServiceAlt',
-    'UnifiedAvatarService',
-    'TTSService',
-    'VisionService'
+    "AvatarService",
+    "AvatarServiceAlt",
+    "UnifiedAvatarService",
+    "TTSService",
+    "VisionService",
 ]

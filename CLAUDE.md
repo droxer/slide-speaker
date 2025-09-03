@@ -15,7 +15,9 @@ SlideSpeaker is a full-stack application that converts PDF/PPTX presentations in
 **Frontend (React):** `./web/`
 - React app with axios for API calls
 - Proxy configured to API server (port 8000)
-- Responsive design with App.css
+- Responsive design with Sass/SCSS
+- TypeScript for type safety
+- ESLint for code linting
 
 **Backend (FastAPI):** `./api/`
 - **API Server** (`server.py`): Handles HTTP requests, task queuing, and status queries
@@ -32,7 +34,17 @@ SlideSpeaker is a full-stack application that converts PDF/PPTX presentations in
 ```bash
 cd api
 uv sync  # Install dependencies
+uv sync --extra=dev  # Install development dependencies (including ruff and mypy)
 python server.py  # Start server (port 8000)
+```
+
+### Code Quality Tools
+```bash
+cd api
+make lint        # Run ruff linter
+make format      # Run ruff formatter
+make typecheck   # Run mypy type checker
+make check       # Run both linting and type checking
 ```
 
 ### Web Client (React)
@@ -40,9 +52,23 @@ python server.py  # Start server (port 8000)
 cd web
 pnpm install    # Install dependencies (preferred)
 pnpm start      # Start dev server (port 3000)
+pnpm lint       # Run ESLint code linting
+pnpm typecheck  # Run TypeScript type checking
+pnpm check      # Run both linting and type checking
 # or
 npm install
 npm start
+npm run lint
+npm run typecheck
+npm run check
+
+# Using Makefile (supports both pnpm and npm):
+make install    # Install dependencies
+make dev        # Start development server
+make build      # Build production version
+make lint       # Run ESLint linting
+make typecheck  # Run TypeScript type checking
+make check      # Run both linting and type checking
 ```
 
 ### Environment Setup
@@ -64,6 +90,17 @@ HEYGEN_API_KEY=your_key
 - `slidespeaker/core/pipeline.py`: Processing pipeline coordination
 - `slidespeaker/core/task_queue.py`: Redis-based task queue management
 - `slidespeaker/core/task_manager.py`: Background task management
+
+## Code Quality Tools
+
+**Backend (Python):**
+- **Ruff**: Fast Python linter and formatter with sensible defaults
+- **MyPy**: Static type checker for Python with gradual typing
+
+**Frontend (React/TypeScript):**
+- **ESLint**: JavaScript/TypeScript code linting
+- **TypeScript**: Static type checking
+- **Sass/SCSS**: CSS preprocessor with enhanced features
 
 ## Enhanced Task Cancellation
 
@@ -92,7 +129,7 @@ SlideSpeaker now features improved task cancellation with the following enhancem
 ## Dependencies
 
 **Python (uv):** FastAPI, OpenAI, ElevenLabs, moviepy, ffmpeg-python, redis
-**Node.js (pnpm):** React, axios, testing libraries
+**Node.js (pnpm):** React, TypeScript, axios, ESLint, Sass, testing libraries
 
 ## Notes
 
@@ -107,4 +144,6 @@ Detailed documentation is available in the `docs/` directory:
 - [Installation Guide](docs/installation.md)
 - [API Documentation](docs/api.md)
 - [Architecture Documentation](docs/architecture.md)
-- the generate_script in @api/slidespeaker/script_generator.py not handle traditional chinese and simpified chinese
+- use makefile to run all tasks.
+- don't create git commit.
+- for python multiple line strings, use """

@@ -26,6 +26,12 @@ dependencies = [
     "asyncio>=4.0.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.1.6",
+    "mypy>=1.7.0",
+]
+
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"

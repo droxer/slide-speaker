@@ -23,3 +23,6 @@ Requires-Dist: socksio>=1.0.0
 Requires-Dist: reportlab>=4.4.3
 Requires-Dist: imageio>=2.37.0
 Requires-Dist: asyncio>=4.0.0
+Provides-Extra: dev
+Requires-Dist: ruff>=0.1.6; extra == "dev"
+Requires-Dist: mypy>=1.7.0; extra == "dev"

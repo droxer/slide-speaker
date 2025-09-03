@@ -1,26 +1,52 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import './App.css';
+import './App.scss';
+
+// Define TypeScript interfaces
+interface StepDetails {
+  status: string;
+  data?: any;
+}
+
+interface ProcessingError {
+  step: string;
+  error: string;
+  timestamp: string;
+}
+
+interface ProcessingDetails {
+  status: string;
+  progress: number;
+  current_step: string;
+  steps: Record<string, StepDetails>;
+  errors: ProcessingError[];
+  audio_language?: string;
+  subtitle_language?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+type AppStatus = 'idle' | 'uploading' | 'processing' | 'completed' | 'error';
 
 function App() {
-  const [file, setFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [fileId, setFileId] = useState(null);
-  const [taskId, setTaskId] = useState(null);
-  const [status, setStatus] = useState('idle');
-  const [progress, setProgress] = useState(0);
-  const [processingDetails, setProcessingDetails] = useState(null);
-  const [language, setLanguage] = useState('english');
-  const [subtitleLanguage, setSubtitleLanguage] = useState('english');
-  const [generateAvatar, setGenerateAvatar] = useState(false);
-  const [generateSubtitles, setGenerateSubtitles] = useState(false);
-  const videoRef = useRef(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState<boolean>(false);
+  const [fileId, setFileId] = useState<string | null>(null);
+  const [taskId, setTaskId] = useState<string | null>(null);
+  const [status, setStatus] = useState<AppStatus>('idle');
+  const [progress, setProgress] = useState<number>(0);
+  const [processingDetails, setProcessingDetails] = useState<ProcessingDetails | null>(null);
+  const [language, setLanguage] = useState<string>('english');
+  const [subtitleLanguage, setSubtitleLanguage] = useState<string>('english');
+  const [generateAvatar, setGenerateAvatar] = useState<boolean>(false);
+  const [generateSubtitles, setGenerateSubtitles] = useState<boolean>(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
   
-  const handleFileChange = (e) => {
-    const selectedFile = e.target.files[0];
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       const ext = selectedFile.name.toLowerCase().split('.').pop();
-      if (['pdf', 'pptx', 'ppt'].includes(ext)) {
+      if (ext && ['pdf', 'pptx', 'ppt'].includes(ext)) {
         setFile(selectedFile);
       } else {
         alert('Please select a PDF or PowerPoint file');
@@ -37,7 +63,8 @@ function App() {
     try {
       // Read file as array buffer for base64 encoding
       const arrayBuffer = await file.arrayBuffer();
-      const base64File = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+      const uint8Array = new Uint8Array(arrayBuffer);
+      const base64File = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
       
       // Send as JSON
       const response = await axios.post('/api/upload', 
@@ -54,10 +81,12 @@ function App() {
             'Content-Type': 'application/json',
           },
           onUploadProgress: (progressEvent) => {
-            const percentCompleted = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-            setProgress(percentCompleted);
+            if (progressEvent.total) {
+              const percentCompleted = Math.round(
+                (progressEvent.loaded * 100) / progressEvent.total
+              );
+              setProgress(percentCompleted);
+            }
           },
         }
       );
@@ -79,7 +108,7 @@ function App() {
     if (!taskId) return;
     
     try {
-      const response = await axios.post(`/api/task/${taskId}/cancel`);
+      const response = await axios.post<{ message: string }>(`/api/task/${taskId}/cancel`);
       console.log('Stop processing response:', response.data);
       alert('Processing has been stopped.');
       setStatus('idle');
@@ -126,12 +155,12 @@ function App() {
 
   // Poll for status updates when processing
   useEffect(() => {
-    let intervalId = null;
+    let intervalId: NodeJS.Timeout | null = null;
     
     if (status === 'processing' && fileId) {
       const checkStatus = async () => {
         try {
-          const response = await axios.get(`/api/progress/${fileId}`);
+          const response = await axios.get<ProcessingDetails>(`/api/progress/${fileId}`);
           setProcessingDetails(response.data);
           
           if (response.data.status === 'completed') {
@@ -177,7 +206,7 @@ function App() {
 
   // Add subtitle tracks when video is loaded
   useEffect(() => {
-    if (status === 'completed' && generateSubtitles && videoRef.current) {
+    if (status === 'completed' && generateSubtitles && fileId && videoRef.current) {
       const addSubtitles = () => {
         if (videoRef.current) {
           // Remove existing tracks
@@ -188,11 +217,11 @@ function App() {
           const track = document.createElement('track');
           track.kind = 'subtitles';
           track.src = `/api/subtitles/${fileId}/vtt`;
-          track.srcLang = subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 
+          track.setAttribute('srclang', subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 
                          subtitleLanguage === 'traditional_chinese' ? 'zh-Hant' : 
                          subtitleLanguage === 'japanese' ? 'ja' : 
                          subtitleLanguage === 'korean' ? 'ko' : 
-                         subtitleLanguage === 'thai' ? 'th' : 'en';
+                         subtitleLanguage === 'thai' ? 'th' : 'en');
           track.label = 'Subtitles';
           track.default = true;
           
@@ -219,8 +248,8 @@ function App() {
     }
   }, [status, generateSubtitles, subtitleLanguage, fileId]);
 
-  const formatStepName = (step) => {
-    const stepNames = {
+  const formatStepName = (step: string): string => {
+    const stepNames: Record<string, string> = {
       'extract_slides': 'Extracting Content',
       'analyze_slide_images': 'Analyzing Visuals',
       'generate_scripts': 'Creating Narratives',
@@ -236,8 +265,8 @@ function App() {
     return stepNames[step] || step;
   };
 
-  const getLanguageDisplayName = (languageCode) => {
-    const languageNames = {
+  const getLanguageDisplayName = (languageCode: string): string => {
+    const languageNames: Record<string, string> = {
       'english': 'English',
       'simplified_chinese': '简体中文',
       'traditional_chinese': '繁體中文',
@@ -248,7 +277,7 @@ function App() {
     return languageNames[languageCode] || languageCode;
   };
 
-  const getProcessingStatusMessage = () => {
+  const getProcessingStatusMessage = (): string => {
     if (!processingDetails) return 'Bringing Your Presentation to Life';
     
     const activeSteps = Object.entries(processingDetails.steps || {})
@@ -256,7 +285,7 @@ function App() {
     
     if (activeSteps.length > 0) {
       const stepName = formatStepName(activeSteps[0][0]);
-      const statusMessages = {
+      const statusMessages: Record<string, string> = {
         'Extracting Content': 'Analyzing your presentation structure...',
         'Analyzing Visuals': 'Examining slide visuals and content...',
         'Creating Narratives': 'Crafting engaging AI narratives...',
@@ -344,28 +373,15 @@ function App() {
                   </div>
                 </div>
                 
-                <div className="options-section">
-                  <div className="option-group">
-                    <div className="option-item">
-                      <input
-                        type="checkbox"
-                        id="generate-avatar"
-                        checked={generateAvatar}
-                        onChange={(e) => setGenerateAvatar(e.target.checked)}
-                      />
-                      <label htmlFor="generate-avatar">AI Avatar</label>
-                    </div>
-                    
-                    <div className="option-item">
-                      <input
-                        type="checkbox"
-                        id="generate-subtitles"
-                        checked={generateSubtitles}
-                        onChange={(e) => setGenerateSubtitles(e.target.checked)}
-                      />
-                      <label htmlFor="generate-subtitles">Subtitles</label>
-                    </div>
-                  </div>
+                {/* AI Avatar option */}
+                <div className="option-item">
+                  <input
+                    type="checkbox"
+                    id="generate-avatar"
+                    checked={generateAvatar}
+                    onChange={(e) => setGenerateAvatar(e.target.checked)}
+                  />
+                  <label htmlFor="generate-avatar">AI Avatar</label>
                 </div>
                 
                 {/* Subtle AI Disclaimer in Upload View */}
@@ -415,13 +431,6 @@ function App() {
                       style={{ width: `${progress}%` }}
                     ></div>
                   </div>
-                  {/* <p className="progress-text">{progress}% Complete</p>
-                  <p className="processing-status">
-                    {progress < 30 ? 'Initializing AI magic...' : 
-                     progress < 60 ? 'Transforming your content...' : 
-                     progress < 90 ? 'Finalizing your masterpiece...' : 
-                     'Almost there! Polishing details...'}
-                  </p> */}
                 </div>
                        
                 <button 
@@ -491,11 +500,11 @@ function App() {
                       <div className="info-grid">
                         <div className="info-item">
                           <span className="info-label">Audio Language:</span>
-                          <span className="info-value">{processingDetails.audio_language ? getLanguageDisplayName(processingDetails.audio_language) : 'English'}</span>
+                          <span className="info-value">{processingDetails?.audio_language ? getLanguageDisplayName(processingDetails.audio_language) : 'English'}</span>
                         </div>
                         <div className="info-item">
                           <span className="info-label">Subtitle Language:</span>
-                          <span className="info-value">{processingDetails.subtitle_language ? getLanguageDisplayName(processingDetails.subtitle_language) : 'English'}</span>
+                          <span className="info-value">{processingDetails?.subtitle_language ? getLanguageDisplayName(processingDetails.subtitle_language) : 'English'}</span>
                         </div>
                         <div className="info-item">
                           <span className="info-label">AI Avatar:</span>
