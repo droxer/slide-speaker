@@ -150,6 +150,33 @@ The API provides detailed error information in the progress endpoint under the `
 - `error`: Description of the error
 - `timestamp`: When the error occurred
 
+## Additional Endpoints
+
+### Get Supported Languages
+
+```
+GET /api/languages
+```
+
+Get a list of supported languages for content generation and subtitles.
+
+**Response:**
+```json
+{
+  "content_languages": ["english", "chinese", "japanese", "korean", "thai"],
+  "subtitle_languages": ["english", "chinese", "japanese", "korean", "thai"]
+}
+```
+
+## Service Configuration
+
+The API now supports multiple AI service providers. The system will automatically use available services based on configured API keys:
+
+### Supported Services
+- **Script Generation**: OpenAI GPT models or Qwen
+- **Text-to-Speech**: OpenAI TTS, ElevenLabs, or local TTS
+- **Avatar Generation**: HeyGen for realistic avatars or DALL-E for custom AI-generated presenters
+
 ## Memory Optimization Features
 
 ### Video Composition Improvements
@@ -166,3 +193,10 @@ Recent API enhancements include memory-optimized video processing:
 - **Corrupted video detection**: Specific error messages for corrupted avatar videos
 - **Timeout notifications**: Clear indication when video processing times out
 - **Resource cleanup**: Confirmation of cleanup operations after task cancellation
+
+## State Management Features
+
+### Task State Persistence
+- **Local Storage**: Frontend automatically saves task state to prevent data loss on page refresh
+- **Recovery**: Task progress is restored when users return to the application
+- **Session Management**: Upload history and download links are maintained across sessions

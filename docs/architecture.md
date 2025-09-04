@@ -30,7 +30,8 @@ SlideSpeaker uses a distributed microservices architecture with clear separation
                    ▼          ▼                                     ▼
          ┌──────────────────┐┌──────────────────┐        ┌──────────────────┐
          │  External APIs   ││  External APIs   │        │  External APIs   │
-         │ (OpenAI,HeyGen,  ││ (OpenAI,HeyGen,  │        │ (OpenAI,HeyGen,  │
+         │ (OpenAI,Qwen,    ││ (OpenAI,Qwen,    │        │ (OpenAI,Qwen,    │
+         │  HeyGen,DALL-E,  ││  HeyGen,DALL-E,  │        │  HeyGen,DALL-E,  │
          │  ElevenLabs)     ││  ElevenLabs)     │        │  ElevenLabs)     │
          └──────────────────┘└──────────────────┘        └──────────────────┘
 ```
@@ -49,7 +50,7 @@ For detailed pipeline diagrams showing the step-by-step processing flow, see the
 2. **Task Creation**: The API server creates processing tasks and queues them in Redis
 3. **Task Distribution**: The master worker polls Redis for new tasks and spawns worker processes
 4. **Parallel Processing**: Multiple worker processes handle tasks concurrently
-5. **External API Integration**: Workers call various AI services (OpenAI, HeyGen, ElevenLabs)
+5. **External API Integration**: Workers call various AI services (OpenAI, Qwen, HeyGen, DALL-E, ElevenLabs)
 6. **Result Storage**: Completed videos are stored in the output directory
 7. **Status Updates**: Progress is tracked through Redis and made available via API endpoints
 
@@ -92,3 +93,22 @@ Recent improvements to the video composition system address memory exhaustion is
 - **Memory exhaustion prevention**: Proactive memory management prevents system crashes
 - **Timeout protection**: Automatic termination of hanging processes
 - **Progress logging**: Real-time feedback during video composition
+
+## Enhanced Features
+
+### State Persistence
+Recent improvements include local storage integration to prevent data loss:
+- **Task State Recovery**: Automatically restores task progress on page refresh
+- **User Preferences**: Stores language and avatar preferences locally
+- **Session Management**: Maintains upload history and download links across sessions
+
+### Service Flexibility
+The architecture now supports multiple AI service providers:
+- **Script Generation**: OpenAI GPT models or Qwen for diverse content styles
+- **Avatar Creation**: HeyGen for realistic avatars or DALL-E for custom AI-generated presenters
+- **Text-to-Speech**: OpenAI TTS, ElevenLabs, or local TTS solutions for varied voice options
+
+### Enhanced User Experience
+- **Smoother Transitions**: Improved subtitle transitions between slides
+- **Better Error Handling**: More informative error messages and recovery options
+- **Real-time Feedback**: Enhanced progress indicators and status updates

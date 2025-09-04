@@ -115,7 +115,7 @@ graph LR
     F --> H
     G --> H
     
-    H --> I[OpenAI/ElevenLabs/HeyGen]
+    H --> I[OpenAI/Qwen/ElevenLabs/HeyGen/DALL-E]
     
     style A fill:#bbdefb
     style B fill:#e3f2fd
@@ -150,6 +150,23 @@ graph TD
     style G fill:#e3f2fd
     style H fill:#ffcdd2
 ```
+
+## Service Configuration Options
+
+The pipeline now supports multiple AI service providers, allowing users to mix and match based on their preferences and API key availability:
+
+### Script Generation Services
+- **OpenAI**: GPT models for high-quality script generation
+- **Qwen**: Alibaba's Qwen model, particularly effective for Chinese content
+
+### Text-to-Speech Services  
+- **OpenAI TTS**: Uses the same OpenAI API key for voice synthesis
+- **ElevenLabs**: Premium voices with high quality
+- **Local TTS**: Fallback option using local text-to-speech engines
+
+### Avatar Generation Services
+- **HeyGen**: Realistic AI presenters with natural movements
+- **DALL-E**: Custom AI-generated avatars using OpenAI's image generation
 
 ## Memory-Optimized Video Composition
 

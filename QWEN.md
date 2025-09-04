@@ -277,6 +277,46 @@ This is typically caused by malformed dictionary syntax in the `INSTRUCTION_PROM
 
 See `docs/script-reviewer-fix.md` for detailed information about this specific issue.
 
+## Development Priorities
+
+The project has a TODO.md file that outlines development priorities in three categories:
+
+### New Features
+- Add support for Keynote (.key) presentation files
+- Add support for OpenDocument Presentation (.odp) files
+- Implement user authentication and account management system
+- Add collaborative editing features for teams
+- Create presentation templates and themes
+- Add video editing capabilities (trimming, scene cutting)
+- Implement analytics dashboard for video performance metrics
+- Add voice customization options (pitch, speed, emotion)
+- Create mobile app version for on-the-go presentation creation
+- Add batch processing for multiple presentations simultaneously
+
+### Enhancement
+- Improve drag-and-drop file upload experience with better feedback
+- Add real-time preview of avatar selection during creation process
+- Create custom avatar selection and configuration interface
+- Implement dark mode for the web interface
+- Add keyboard shortcuts for common actions and navigation
+- Improve progress indicators with more detailed step information
+- Optimize image processing pipeline for faster slide conversion
+- Add tooltips and contextual help throughout the interface
+- Implement responsive design improvements for better mobile experience
+- Add video preview functionality before final download
+
+### Integration
+- Integrate with Google Drive for file import/export capabilities
+- Add Dropbox integration for cloud storage options
+- Integrate with Slack for processing notifications and updates
+- Add GitHub authentication for user login
+- Integrate with Google OAuth for single sign-on
+- Add Microsoft Azure AD integration for enterprise users
+- Integrate with Stripe for premium feature payments
+- Add Sentry integration for error tracking and monitoring
+- Integrate with Datadog for application performance monitoring
+- Add Zapier integration for workflow automation
+
 ## Directory Structure
 ```
 slide-speaker/

@@ -7,9 +7,9 @@
 - Redis server
 - FFmpeg
 - API keys for:
-  - OpenAI
-  - ElevenLabs
-  - HeyGen
+  - OpenAI or Qwen (for script generation)
+  - ElevenLabs or OpenAI TTS (for audio generation)
+  - HeyGen or DALL-E (for avatar generation)
 
 ## Backend Setup
 
@@ -25,9 +25,15 @@
 
 3. Create a `.env` file in the `api/` directory:
    ```env
+   # AI Service Keys (at least one from each category)
    OPENAI_API_KEY=your_openai_api_key
+   QWEN_API_KEY=your_qwen_api_key
+   
    ELEVENLABS_API_KEY=your_elevenlabs_api_key
+   
    HEYGEN_API_KEY=your_heygen_api_key
+   
+   # Redis Configuration
    REDIS_HOST=localhost
    REDIS_PORT=6379
    REDIS_PASSWORD=your_redis_password_or_empty
@@ -81,12 +87,12 @@
 
 2. Install Node.js dependencies:
    ```bash
-   npm install  # or pnpm install
+   pnpm install  # or npm install
    ```
 
 3. Start the development server:
    ```bash
-   npm start    # or pnpm start
+   pnpm start    # or npm start
    ```
 
 The frontend will be available at `http://localhost:3000` and automatically proxy API requests to the backend at `http://localhost:8000`.
@@ -116,3 +122,25 @@ Recent improvements include memory-efficient video composition to prevent hangin
 - **Error handling**: Graceful handling of corrupted avatar videos
 - **Progress logging**: Real-time feedback during video composition
 - **Memory-safe scaling**: Automatic dimension adjustment based on available memory
+
+## Service Configuration Options
+
+### AI Service Selection
+The application supports multiple AI service providers. You can configure which services to use:
+
+**Script Generation:**
+- OpenAI: Set `OPENAI_API_KEY` for GPT-based script generation
+- Qwen: Set `QWEN_API_KEY` for Alibaba's Qwen model (good for Chinese content)
+
+**Text-to-Speech:**
+- ElevenLabs: Set `ELEVENLABS_API_KEY` for high-quality voices
+- OpenAI TTS: Uses the same `OPENAI_API_KEY` for OpenAI's TTS service
+
+**Avatar Generation:**
+- HeyGen: Set `HEYGEN_API_KEY` for realistic AI presenters
+- DALL-E: Uses the same `OPENAI_API_KEY` for custom AI-generated avatars
+
+### Enhanced Features
+- **State Persistence**: Local storage automatically saves task progress to prevent data loss
+- **Improved UI**: Better error messages and real-time feedback
+- **Flexible Configuration**: Mix and match services based on your preferences and API key availability

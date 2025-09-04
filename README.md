@@ -13,11 +13,14 @@ For detailed information about the SlideSpeaker architecture, see the [Architect
 - **Real-time Progress Tracking**: Live updates on video generation progress
 - **Instant Task Cancellation**: Immediate cancellation of processing tasks with resource cleanup
 - **Multi-language Support**: Generate content in English, Chinese, Japanese, Korean, and Thai
-- **AI Avatar Integration**: HeyGen-powered virtual presenters with memory optimization
-- **Text-to-Speech**: Natural voice narration with OpenAI and ElevenLabs
+- **Multiple AI Services**: OpenAI and Qwen for script generation, HeyGen and DALL-E for avatars
+- **Flexible TTS Options**: OpenAI TTS, ElevenLabs, and local TTS providers
+- **Script Review**: AI-powered script refinement for better presentation flow
 - **Subtitle Generation**: Automatic subtitle creation in multiple languages
 - **Responsive Web Interface**: Modern React frontend with real-time feedback
 - **Video Validation**: Automatic validation of avatar videos before processing
+- **State Persistence**: Local storage prevents data loss on page refresh
+- **Enhanced UI**: Improved user experience with better error handling
 
 ## Quick Start
 
@@ -25,15 +28,15 @@ For detailed information about the SlideSpeaker architecture, see the [Architect
    ```bash
    cd api
    uv sync
-   # Create .env with your API keys (OpenAI, ElevenLabs, HeyGen)
+   # Create .env with your API keys (OpenAI, Qwen, ElevenLabs, HeyGen)
    make dev
    ```
 
 2. **Web Setup**
    ```bash
    cd web
-   npm install
-   npm start
+   pnpm install  # or npm install
+   pnpm start    # or npm start
    ```
 
 3. **Visit** `http://localhost:3000` to upload presentations and create AI-powered videos
