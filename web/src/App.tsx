@@ -544,7 +544,7 @@ function App() {
                     disabled={isResumingTask}
                   />
                   <label htmlFor="file-upload" className={`file-upload-label ${isResumingTask ? 'disabled' : ''}`}>
-                    <div className="upload-icon">📁</div>
+                    <div className="upload-icon">📄</div>
                     <div className="upload-text">
                       {file ? file.name : 'Choose a file'}
                     </div>
@@ -593,15 +593,14 @@ function App() {
                   </div>
                 </div>
                 
-                {/* AI Avatar option */}
-                <div className="option-item">
+                <div className="option-item minimal">
                   <input
                     type="checkbox"
                     id="generate-avatar"
                     checked={generateAvatar}
                     onChange={(e) => setGenerateAvatar(e.target.checked)}
                   />
-                  <label htmlFor="generate-avatar">AI Avatar</label>
+                  <label htmlFor="generate-avatar" className="minimal-label">AI Avatar</label>
                 </div>
                 
                 {/* Subtle AI Disclaimer in Upload View */}
@@ -749,119 +748,65 @@ function App() {
                         </div>
                       </div>
                       
-                      {/* Resource Section with URLs and Download Buttons */}
-                      <div className="resource-section">
-                        
-                        {/* Video Resource */}
-                        <div className="resource-item">
-                          <div className="resource-info">
-                            <label>Video:</label>
-                            <input 
-                              type="text" 
-                              value={`${window.location.origin}/api/video/${fileId}`}
-                              readOnly 
-                              className="url-input"
-                            />
-                          </div>
-                          <div className="resource-actions">
-                            <button 
-                              onClick={() => {
-                                navigator.clipboard.writeText(`${window.location.origin}/api/video/${fileId}`);
-                                alert('Video URL copied to clipboard!');
-                              }}
-                              className="copy-btn"
-                            >
-                              Copy URL
-                            </button>
-                            <button onClick={downloadVideo} className="download-btn">
-                              Download
-                            </button>
-                          </div>
+                      {/* Resource URLs */}
+                      <div className="resource-links">
+                        <div className="url-copy-row">
+                          <span className="resource-label-inline">Video</span>
+                          <input 
+                            type="text" 
+                            value={`${window.location.origin}/api/video/${fileId}`}
+                            readOnly 
+                            className="url-input-enhanced"
+                          />
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${window.location.origin}/api/video/${fileId}`);
+                              alert('Video URL copied!');
+                            }}
+                            className="copy-btn-enhanced"
+                          >
+                            Copy
+                          </button>
                         </div>
                         
-                        {/* Subtitle Resources */}
                         {generateSubtitles && fileId && (
                           <>
-                            <div className="resource-item">
-                              <div className="resource-info">
-                                <label>SRT Subtitles:</label>
-                                <input 
-                                  type="text" 
-                                  value={`${window.location.origin}/api/subtitles/${fileId}/srt`}
-                                  readOnly 
-                                  className="url-input"
-                                />
-                              </div>
-                              <div className="resource-actions">
-                                <button 
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(`${window.location.origin}/api/subtitles/${fileId}/srt`);
-                                    alert('SRT URL copied to clipboard!');
-                                  }}
-                                  className="copy-btn"
-                                >
-                                  Copy URL
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    if (fileId) {
-                                      const link = document.createElement('a');
-                                      link.href = `/api/subtitles/${fileId}/srt`;
-                                      link.download = `presentation_${fileId}.srt`;
-                                      link.target = '_blank';
-                                      document.body.appendChild(link);
-                                      link.click();
-                                      document.body.removeChild(link);
-                                    } else {
-                                      alert('Subtitles not available for download. Please try again.');
-                                    }
-                                  }} 
-                                  className="download-btn"
-                                >
-                                  Download
-                                </button>
-                              </div>
+                            <div className="url-copy-row">
+                              <span className="resource-label-inline">SRT</span>
+                              <input 
+                                type="text" 
+                                value={`${window.location.origin}/api/subtitles/${fileId}/srt`}
+                                readOnly 
+                                className="url-input-enhanced"
+                              />
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(`${window.location.origin}/api/subtitles/${fileId}/srt`);
+                                  alert('SRT URL copied!');
+                                }}
+                                className="copy-btn-enhanced"
+                              >
+                                Copy
+                              </button>
                             </div>
                             
-                            <div className="resource-item">
-                              <div className="resource-info">
-                                <label>VTT Subtitles:</label>
-                                <input 
-                                  type="text" 
-                                  value={`${window.location.origin}/api/subtitles/${fileId}/vtt`}
-                                  readOnly 
-                                  className="url-input"
-                                />
-                              </div>
-                              <div className="resource-actions">
-                                <button 
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(`${window.location.origin}/api/subtitles/${fileId}/vtt`);
-                                    alert('VTT URL copied to clipboard!');
-                                  }}
-                                  className="copy-btn"
-                                >
-                                  Copy URL
-                                </button>
-                                <button 
-                                  onClick={() => {
-                                    if (fileId) {
-                                      const link = document.createElement('a');
-                                      link.href = `/api/subtitles/${fileId}/vtt`;
-                                      link.download = `presentation_${fileId}.vtt`;
-                                      link.target = '_blank';
-                                      document.body.appendChild(link);
-                                      link.click();
-                                      document.body.removeChild(link);
-                                    } else {
-                                      alert('Subtitles not available for download. Please try again.');
-                                    }
-                                  }} 
-                                  className="download-btn"
-                                >
-                                  Download
-                                </button>
-                              </div>
+                            <div className="url-copy-row">
+                              <span className="resource-label-inline">VTT</span>
+                              <input 
+                                type="text" 
+                                value={`${window.location.origin}/api/subtitles/${fileId}/vtt`}
+                                readOnly 
+                                className="url-input-enhanced"
+                              />
+                              <button 
+                                onClick={() => {
+                                  navigator.clipboard.writeText(`${window.location.origin}/api/subtitles/${fileId}/vtt`);
+                                  alert('VTT URL copied!');
+                                }}
+                                className="copy-btn-enhanced"
+                              >
+                                Copy
+                              </button>
                             </div>
                           </>
                         )}
@@ -871,42 +816,9 @@ function App() {
                 </div>
                 
                 <div className="action-buttons">
-                  <button onClick={resetForm} className="secondary-btn">
-                    Create Another Presentation
+                  <button onClick={resetForm} className="primary-btn create-new-btn">
+                    Create New Video
                   </button>
-                  {generateSubtitles && fileId && (
-                    <button 
-                      onClick={() => {
-                        if (videoRef.current) {
-                          const tracks = videoRef.current.textTracks;
-                          if (tracks.length > 0) {
-                            const track = tracks[0];
-                            track.mode = track.mode === 'showing' ? 'hidden' : 'showing';
-                            console.log('Subtitle track mode:', track.mode);
-                          } else {
-                            console.log('No subtitle tracks found');
-                            // Manual reload attempt
-                            const track = document.createElement('track');
-                            track.kind = 'subtitles';
-                            track.src = `${window.location.origin}/api/subtitles/${fileId}/vtt`;
-                            track.setAttribute('srclang', subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 'en');
-                            track.label = 'Subtitles';
-                            track.default = true;
-                            videoRef.current.appendChild(track);
-                            track.addEventListener('load', () => {
-                              console.log('Manual subtitle reload successful');
-                              if (videoRef.current) {
-                                videoRef.current.textTracks[0].mode = 'showing';
-                              }
-                            });
-                          }
-                        }
-                      }} 
-                      className="secondary-btn"
-                    >
-                      Toggle Subtitles
-                    </button>
-                  )}
                 </div>
               </div>
             )}
