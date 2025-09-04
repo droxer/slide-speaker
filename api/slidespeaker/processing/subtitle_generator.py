@@ -137,7 +137,7 @@ class SubtitleGenerator:
         language: str = "english",
     ) -> str:
         """
-        Generate SRT subtitle content
+        Generate SRT subtitle content with text splitting for reasonable length
 
         Args:
             scripts: List of script dictionaries with slide_number and script content
@@ -170,22 +170,29 @@ class SubtitleGenerator:
                 self._get_audio_duration(audio_path) if audio_path.exists() else 5.0
             )
 
-            # Calculate end time
-            end_time = start_time + timedelta(seconds=duration)
+            # Split long text into reasonable chunks
+            text_chunks = self._split_text_for_subtitles(script_text, max_chars=42)
 
-            # Format timestamps (SRT format: HH:MM:SS,mmm)
-            start_timestamp = self._format_srt_timestamp(start_time)
-            end_timestamp = self._format_srt_timestamp(end_time)
+            # Calculate time per chunk
+            time_per_chunk = duration / len(text_chunks)
 
-            # Add subtitle entry
-            srt_lines.append(str(subtitle_number))  # Subtitle number
-            srt_lines.append(f"{start_timestamp} --> {end_timestamp}")  # Time range
-            srt_lines.append(script_text)  # Subtitle text
-            srt_lines.append("")  # Empty line separator
+            for chunk in text_chunks:
+                chunk_start_time = start_time
+                chunk_end_time = start_time + timedelta(seconds=time_per_chunk)
 
-            # Update subtitle number and start time for next subtitle
-            subtitle_number += 1
-            start_time = end_time
+                # Format timestamps (SRT format: HH:MM:SS,mmm)
+                start_timestamp = self._format_srt_timestamp(chunk_start_time)
+                end_timestamp = self._format_srt_timestamp(chunk_end_time)
+
+                # Add subtitle entry
+                srt_lines.append(str(subtitle_number))
+                srt_lines.append(f"{start_timestamp} --> {end_timestamp}")
+                srt_lines.append(chunk)
+                srt_lines.append("")
+
+                # Update for next subtitle
+                subtitle_number += 1
+                start_time = chunk_end_time
 
         return "\n".join(srt_lines)
 
@@ -196,7 +203,7 @@ class SubtitleGenerator:
         language: str = "english",
     ) -> str:
         """
-        Generate VTT subtitle content
+        Generate VTT subtitle content with text splitting for reasonable length
 
         Args:
             scripts: List of script dictionaries with slide_number and script content
@@ -230,22 +237,114 @@ class SubtitleGenerator:
                 self._get_audio_duration(audio_path) if audio_path.exists() else 5.0
             )
 
-            # Calculate end time
-            end_time = start_time + timedelta(seconds=duration)
+            # Split long text into reasonable chunks
+            text_chunks = self._split_text_for_subtitles(script_text, max_chars=42)
 
-            # Format timestamps (VTT format: HH:MM:SS.mmm)
-            start_timestamp = self._format_vtt_timestamp(start_time)
-            end_timestamp = self._format_vtt_timestamp(end_time)
+            # Calculate time per chunk
+            time_per_chunk = duration / len(text_chunks)
 
-            # Add subtitle entry
-            vtt_lines.append(f"{start_timestamp} --> {end_timestamp}")  # Time range
-            vtt_lines.append(script_text)  # Subtitle text
-            vtt_lines.append("")  # Empty line separator
+            for chunk in text_chunks:
+                chunk_start_time = start_time
+                chunk_end_time = start_time + timedelta(seconds=time_per_chunk)
 
-            # Update start time for next subtitle
-            start_time = end_time
+                # Format timestamps (VTT format: HH:MM:SS.mmm)
+                start_timestamp = self._format_vtt_timestamp(chunk_start_time)
+                end_timestamp = self._format_vtt_timestamp(chunk_end_time)
+
+                # Add subtitle entry
+                vtt_lines.append(f"{start_timestamp} --> {end_timestamp}")
+                vtt_lines.append(chunk)
+                vtt_lines.append("")
+
+                # Update start time for next subtitle
+                start_time = chunk_end_time
 
         return "\n".join(vtt_lines)
+
+    def _split_text_for_subtitles(self, text: str, max_chars: int = 42) -> list[str]:
+        """
+        Split long text into smaller chunks suitable for subtitles
+
+        Args:
+            text: The text to split
+            max_chars: Maximum characters per subtitle chunk
+
+        Returns:
+            List of text chunks
+        """
+        if not text:
+            return []
+
+        # Clean and normalize text
+        text = text.strip()
+
+        # If text is short enough, return as single chunk
+        if len(text) <= max_chars:
+            return [text]
+
+        # Split by sentences first, then by word boundaries
+        chunks = []
+
+        # Try to split by sentence boundaries first
+        sentences = []
+        current = ""
+
+        # Split by common sentence endings
+        for char in text:
+            current += char
+            if char in ".!?;" and len(current.strip()) > 20:
+                if current.strip():
+                    sentences.append(current.strip())
+                current = ""
+
+        if current.strip():
+            sentences.append(current.strip())
+
+        # If we have good sentence splits, use them
+        if len(sentences) > 1:
+            for sentence in sentences:
+                if len(sentence) <= max_chars:
+                    chunks.append(sentence)
+                else:
+                    # Split long sentences by comma or space
+                    chunks.extend(self._split_long_sentence(sentence, max_chars))
+        else:
+            # Split long text by words
+            chunks.extend(self._split_long_sentence(text, max_chars))
+
+        # Ensure no chunk is empty
+        chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
+
+        return chunks if chunks else [text]
+
+    def _split_long_sentence(self, sentence: str, max_chars: int) -> list[str]:
+        """Split a long sentence by word boundaries"""
+        words = sentence.split()
+        chunks = []
+        current = ""
+
+        for word in words:
+            if len(current + " " + word) <= max_chars:
+                if current:
+                    current += " " + word
+                else:
+                    current = word
+            else:
+                if current:
+                    chunks.append(current)
+                current = word
+
+                # If single word is too long, split it
+                if len(current) > max_chars:
+                    # Split by character count
+                    for i in range(0, len(current), max_chars):
+                        chunks.append(current[i : i + max_chars])
+                    current = ""
+
+        if current:
+            chunks.append(current)
+
+        return chunks
 
     def _get_audio_duration(self, audio_path: Path) -> float:
         """

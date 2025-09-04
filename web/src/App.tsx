@@ -2,6 +2,16 @@ import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import './App.scss';
 
+// Constants for local storage keys
+const LOCAL_STORAGE_KEYS = {
+  TASK_STATE: 'slidespeaker_task_state',
+  FILE_ID: 'slidespeaker_file_id',
+  TASK_ID: 'slidespeaker_task_id',
+  STATUS: 'slidespeaker_status',
+  PROCESSING_DETAILS: 'slidespeaker_processing_details',
+  LATEST_TASK_TIMESTAMP: 'slidespeaker_latest_task_timestamp'
+};
+
 // Define TypeScript interfaces
 interface StepDetails {
   status: string;
@@ -28,6 +38,100 @@ interface ProcessingDetails {
 
 type AppStatus = 'idle' | 'uploading' | 'processing' | 'completed' | 'error';
 
+// Local storage utility functions
+const localStorageUtils = {
+  saveTaskState: (state: {
+    fileId: string | null;
+    taskId: string | null;
+    status: AppStatus;
+    processingDetails: ProcessingDetails | null;
+    language: string;
+    subtitleLanguage: string;
+    generateAvatar: boolean;
+    generateSubtitles: boolean;
+  }) => {
+    try {
+      const stateToSave = {
+        ...state,
+        timestamp: new Date().toISOString()
+      };
+      localStorage.setItem(LOCAL_STORAGE_KEYS.TASK_STATE, JSON.stringify(stateToSave));
+      localStorage.setItem(LOCAL_STORAGE_KEYS.LATEST_TASK_TIMESTAMP, new Date().toISOString());
+    } catch (error) {
+      console.warn('Failed to save task state to local storage:', error);
+    }
+  },
+
+  loadTaskState: () => {
+    try {
+      const savedState = localStorage.getItem(LOCAL_STORAGE_KEYS.TASK_STATE);
+      if (savedState) {
+        const parsed = JSON.parse(savedState);
+        // Validate the timestamp to ensure it's recent (within 24 hours)
+        const timestamp = new Date(parsed.timestamp);
+        const now = new Date();
+        const hoursDiff = (now.getTime() - timestamp.getTime()) / (1000 * 60 * 60);
+        
+        if (hoursDiff < 24) {
+          return parsed;
+        } else {
+          // Clean up old data
+          localStorageUtils.clearTaskState();
+          return null;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.warn('Failed to load task state from local storage:', error);
+      return null;
+    }
+  },
+
+  clearTaskState: () => {
+    try {
+      Object.values(LOCAL_STORAGE_KEYS).forEach(key => {
+        localStorage.removeItem(key);
+      });
+    } catch (error) {
+      console.warn('Failed to clear task state from local storage:', error);
+    }
+  },
+
+  saveFileId: (fileId: string) => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEYS.FILE_ID, fileId);
+    } catch (error) {
+      console.warn('Failed to save file ID to local storage:', error);
+    }
+  },
+
+  loadFileId: (): string | null => {
+    try {
+      return localStorage.getItem(LOCAL_STORAGE_KEYS.FILE_ID);
+    } catch (error) {
+      console.warn('Failed to load file ID from local storage:', error);
+      return null;
+    }
+  },
+
+  saveTaskId: (taskId: string) => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEYS.TASK_ID, taskId);
+    } catch (error) {
+      console.warn('Failed to save task ID to local storage:', error);
+    }
+  },
+
+  loadTaskId: (): string | null => {
+    try {
+      return localStorage.getItem(LOCAL_STORAGE_KEYS.TASK_ID);
+    } catch (error) {
+      console.warn('Failed to load task ID from local storage:', error);
+      return null;
+    }
+  }
+};
+
 function App() {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
@@ -40,6 +144,7 @@ function App() {
   const [subtitleLanguage, setSubtitleLanguage] = useState<string>('english');
   const [generateAvatar, setGenerateAvatar] = useState<boolean>(false);
   const [generateSubtitles, setGenerateSubtitles] = useState<boolean>(true);
+  const [isResumingTask, setIsResumingTask] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,11 +252,71 @@ function App() {
     setProcessingDetails(null);
     // Keep the current subtitle language selection
     setGenerateAvatar(false);
-    setGenerateSubtitles(false);
+    setGenerateSubtitles(true);
     if (videoRef.current) {
       videoRef.current.src = '';
     }
+    
+    // Clear local storage
+    localStorageUtils.clearTaskState();
   };
+
+  // Load saved task state on component mount
+  useEffect(() => {
+    const loadSavedState = async () => {
+      const savedState = localStorageUtils.loadTaskState();
+      if (savedState) {
+        setIsResumingTask(true);
+        
+        // Restore the saved state
+        setFileId(savedState.fileId);
+        setTaskId(savedState.taskId);
+        setStatus(savedState.status);
+        setProgress(savedState.processingDetails?.progress || 0);
+        setProcessingDetails(savedState.processingDetails);
+        setLanguage(savedState.language);
+        setSubtitleLanguage(savedState.subtitleLanguage);
+        setGenerateAvatar(savedState.generateAvatar);
+        setGenerateSubtitles(savedState.generateSubtitles);
+        
+        console.log('Resuming task from local storage:', {
+          fileId: savedState.fileId,
+          taskId: savedState.taskId,
+          status: savedState.status
+        });
+        
+        setIsResumingTask(false);
+      }
+    };
+
+    loadSavedState();
+  }, []);
+
+  // Save task state to local storage whenever relevant state changes
+  useEffect(() => {
+    if (status !== 'idle' && !isResumingTask) {
+      localStorageUtils.saveTaskState({
+        fileId,
+        taskId,
+        status,
+        processingDetails,
+        language,
+        subtitleLanguage,
+        generateAvatar,
+        generateSubtitles
+      });
+    }
+  }, [
+    fileId,
+    taskId,
+    status,
+    processingDetails,
+    language,
+    subtitleLanguage,
+    generateAvatar,
+    generateSubtitles,
+    isResumingTask
+  ]);
 
   // Poll for status updates when processing
   useEffect(() => {
@@ -167,25 +332,36 @@ function App() {
             setStatus('completed');
             setUploading(false);
             setProgress(100);
-            setTaskId(null); // Clear task ID when completed
+            setTaskId(null);
             
-            // Preview data is no longer needed for client-side popup approach
+            // Clear local storage when completed
+            localStorageUtils.clearTaskState();
+            
           } else if (response.data.status === 'processing' || response.data.status === 'uploaded') {
             setStatus('processing');
             setProgress(response.data.progress);
           } else if (response.data.status === 'failed') {
             setStatus('error');
             setUploading(false);
-            setTaskId(null); // Clear task ID when failed
+            setTaskId(null);
+            
+            // Clear local storage when failed
+            localStorageUtils.clearTaskState();
           } else {
             setStatus('error');
             setUploading(false);
-            setTaskId(null); // Clear task ID when error
+            setTaskId(null);
+            
+            // Clear local storage when error
+            localStorageUtils.clearTaskState();
           }
         } catch (error) {
           console.error('Status check error:', error);
           setStatus('error');
           setUploading(false);
+          
+          // Clear local storage on error
+          localStorageUtils.clearTaskState();
         }
       };
       
@@ -351,6 +527,13 @@ function App() {
           <div className={`content-card ${status === 'completed' ? 'wide' : ''}`}>
             {status === 'idle' && (
               <div className="upload-view">
+                {isResumingTask && (
+                  <div className="resume-indicator">
+                    <div className="spinner"></div>
+                    <p>Resuming your last task...</p>
+                  </div>
+                )}
+                
                 <div className="file-upload-area">
                   <input
                     type="file"
@@ -358,8 +541,9 @@ function App() {
                     accept=".pdf,.pptx,.ppt"
                     onChange={handleFileChange}
                     className="file-input"
+                    disabled={isResumingTask}
                   />
-                  <label htmlFor="file-upload" className="file-upload-label">
+                  <label htmlFor="file-upload" className={`file-upload-label ${isResumingTask ? 'disabled' : ''}`}>
                     <div className="upload-icon">📁</div>
                     <div className="upload-text">
                       {file ? file.name : 'Choose a file'}
