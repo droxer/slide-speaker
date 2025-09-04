@@ -100,4 +100,19 @@ SlideSpeaker now features improved task cancellation that allows users to immedi
 - Resources are cleaned up promptly
 - Users receive immediate feedback through the web interface
 
-This feature provides better resource management and user experience when tasks need to be stopped.
+## Memory Optimization
+
+Recent improvements include memory-efficient video composition to prevent hanging when AI avatars are enabled:
+
+- **Per-slide processing**: Videos are processed one slide at a time to prevent memory exhaustion
+- **Video validation**: Avatar videos are validated before processing to catch corruption issues
+- **Resource cleanup**: Proper cleanup of video clips and garbage collection after each slide
+- **Optimized encoding**: Reduced memory usage with optimized video encoding settings
+- **30-minute timeout**: Protection against hanging processes with automatic timeout
+
+## Video Composition Improvements
+
+- **Batch processing**: Process slides individually to manage memory
+- **Error handling**: Graceful handling of corrupted avatar videos
+- **Progress logging**: Real-time feedback during video composition
+- **Memory-safe scaling**: Automatic dimension adjustment based on available memory

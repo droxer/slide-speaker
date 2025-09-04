@@ -2,148 +2,83 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## Quick Start Commands
 
-SlideSpeaker is a full-stack application that converts PDF/PPTX presentations into AI-generated videos using:
-- OpenAI for script generation
-- HeyGen for AI avatar videos  
-- ElevenLabs for text-to-speech
-- FFmpeg for video composition
-
-## Architecture
-
-**Frontend (React):** `./web/`
-- React app with axios for API calls
-- Proxy configured to API server (port 8000)
-- Responsive design with Sass/SCSS
-- TypeScript for type safety
-- ESLint for code linting
-
-**Backend (FastAPI):** `./api/`
-- **API Server** (`server.py`): Handles HTTP requests, task queuing, and status queries
-- **Master Worker** (`master_worker.py`): Polls Redis for tasks and dispatches to worker processes
-- **Task Workers** (`worker.py`): Process individual video generation tasks in isolation
-- Services architecture in `./api/slidespeaker/`
-- File uploads to `uploads/` directory
-- Output videos in `output/` directory
-- Redis-based state management for task coordination
-
-## Development Commands
-
-### API Server (Python)
+### Backend (FastAPI)
 ```bash
 cd api
-uv sync  # Install dependencies
-uv sync --extra=dev  # Install development dependencies (including ruff and mypy)
-python server.py  # Start server (port 8000)
+uv sync --extra=dev          # Install dependencies
+python server.py             # Start API server (port 8000)
+python master_worker.py      # Start master worker for background tasks
+make lint                    # Run ruff linter
+make format                  # Run ruff formatter  
+make typecheck               # Run mypy type checker
+make check                   # Run both linting and type checking
 ```
 
-### Code Quality Tools
-```bash
-cd api
-make lint        # Run ruff linter
-make format      # Run ruff formatter
-make typecheck   # Run mypy type checker
-make check       # Run both linting and type checking
-```
-
-### Web Client (React)
+### Frontend (React)
 ```bash
 cd web
-pnpm install    # Install dependencies (preferred)
-pnpm start      # Start dev server (port 3000)
-pnpm lint       # Run ESLint code linting
-pnpm typecheck  # Run TypeScript type checking
-pnpm check      # Run both linting and type checking
-# or
-npm install
-npm start
-npm run lint
-npm run typecheck
-npm run check
-
-# Using Makefile (supports both pnpm and npm):
-make install    # Install dependencies
-make dev        # Start development server
-make build      # Build production version
-make lint       # Run ESLint linting
-make typecheck  # Run TypeScript type checking
-make check      # Run both linting and type checking
+pnpm install                # Install dependencies (preferred)
+pnpm start                  # Start dev server (port 3000)
+make lint                   # Run ESLint
+make typecheck              # Run TypeScript type checking
+make check                  # Run both linting and type checking
 ```
 
+## Architecture Overview
+
+**SlideSpeaker** converts PDF/PPTX presentations into AI-generated videos using:
+- **Frontend**: React + TypeScript + Sass (port 3000)
+- **Backend**: FastAPI + Redis + Python workers (port 8000)
+- **Services**: OpenAI (scripts), ElevenLabs/TTS (audio), HeyGen (avatars), FFmpeg (video composition)
+
+### Processing Pipeline
+1. **Upload**: PDF/PPTX → `uploads/` directory
+2. **Extraction**: PDF/PPTX → slide images + text content
+3. **Script Generation**: OpenAI creates presentation scripts per slide
+4. **Audio Generation**: Text-to-speech with ElevenLabs or OpenAI
+5. **Avatar Generation**: HeyGen creates AI presenter videos (optional)
+6. **Video Composition**: FFmpeg combines slides + avatar + audio into final MP4
+7. **Output**: `output/{file_id}_final.mp4` with optional subtitles
+
+### Key Components
+
+**Backend Services**:
+- `api/slidespeaker/core/` - State management, task queue, pipeline coordination
+- `api/slidespeaker/processing/` - Video composition, subtitle generation, image processing
+- `api/slidespeaker/services/` - External API integrations (OpenAI, ElevenLabs, HeyGen)
+- `api/slidespeaker/pipeline/` - Individual processing steps (extract slides, generate scripts, etc.)
+
+**State Management**:
+- Redis-based task queue with cancellation support
+- File-based state persistence for long-running tasks
+- Real-time progress tracking via WebSocket updates
+
+**File Structure**:
+- `api/` - FastAPI backend
+- `web/` - React frontend
+- `uploads/` - Temporary uploaded files
+- `output/` - Generated videos and subtitles
+- `.env` - API keys (OpenAI, ElevenLabs, HeyGen)
+
 ### Environment Setup
-```bash
-# API keys required in api/.env:
+Required API keys in `api/.env`:
+```
 OPENAI_API_KEY=your_key
-ELEVENLABS_API_KEY=your_key  
+ELEVENLABS_API_KEY=your_key
 HEYGEN_API_KEY=your_key
 ```
 
-## Key Services
+### Development Workflow
+1. Start backend: `cd api && python server.py`
+2. Start frontend: `cd web && pnpm start`
+3. Access UI at http://localhost:3000
+4. API docs at http://localhost:8000/docs
 
-- `slidespeaker/processing/slide_extractor.py`: PDF/PPTX content extraction
-- `slidespeaker/processing/script_generator.py`: AI script generation with OpenAI
-- `slidespeaker/services/tts_service.py`: Text-to-speech with ElevenLabs/OpenAI
-- `slidespeaker/services/avatar_service_unified.py`: HeyGen avatar video generation  
-- `slidespeaker/processing/video_composer.py`: FFmpeg video composition
-- `slidespeaker/core/state_manager.py`: Redis-based processing state tracking
-- `slidespeaker/core/pipeline.py`: Processing pipeline coordination
-- `slidespeaker/core/task_queue.py`: Redis-based task queue management
-- `slidespeaker/core/task_manager.py`: Background task management
-
-## Code Quality Tools
-
-**Backend (Python):**
-- **Ruff**: Fast Python linter and formatter with sensible defaults
-- **MyPy**: Static type checker for Python with gradual typing
-
-**Frontend (React/TypeScript):**
-- **ESLint**: JavaScript/TypeScript code linting
-- **TypeScript**: Static type checking
-- **Sass/SCSS**: CSS preprocessor with enhanced features
-
-## Enhanced Task Cancellation
-
-SlideSpeaker now features improved task cancellation with the following enhancements:
-
-1. **Immediate Cancellation Detection**: Tasks can be cancelled quickly through a dedicated Redis key that bypasses normal state checking
-2. **Frequent Checkpoints**: Cancellation is checked at regular intervals during long-running operations:
-   - Script generation (every 3 slides)
-   - Audio generation (every 2 slides)
-   - Avatar video generation (every 2 slides)
-   - Slide conversion (every 5 slides)
-   - Video composition (at key points)
-3. **Worker-Level Monitoring**: Task workers check for cancellation every 5 seconds for faster response
-4. **Resource Cleanup**: Cancelled tasks properly clean up temporary files and resources
-
-## File Processing Flow
-
-1. Upload PDF/PPTX → `uploads/`
-2. Extract slide content → Markdown/text
-3. Generate AI scripts per slide → OpenAI
-4. Create TTS audio → ElevenLabs/OpenAI  
-5. Generate avatar videos → HeyGen
-6. Compose final video → FFmpeg
-7. Output MP4 → `output/`
-
-## Dependencies
-
-**Python (uv):** FastAPI, OpenAI, ElevenLabs, moviepy, ffmpeg-python, redis
-**Node.js (pnpm):** React, TypeScript, axios, ESLint, Sass, testing libraries
-
-## Notes
-
-- Uses Aliyun mirrors for package downloads in China
-- FFmpeg required for video processing
-- Large files may require increased timeouts
-- Background processing handles long-running tasks
-
-## Documentation
-
-Detailed documentation is available in the `docs/` directory:
-- [Installation Guide](docs/installation.md)
-- [API Documentation](docs/api.md)
-- [Architecture Documentation](docs/architecture.md)
-- use makefile to run all tasks.
-- don't create git commit.
-- for python multiple line strings, use """
+### Memory-Optimized Video Processing
+Recent improvements include memory-efficient video composition with:
+- Per-slide processing to prevent memory exhaustion
+- Video validation before processing
+- Proper resource cleanup and garbage collection
+- 30-minute timeout protection

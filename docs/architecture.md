@@ -65,3 +65,28 @@ The architecture supports immediate task cancellation through:
 - Periodic checkpoints in long-running operations
 - Worker-level monitoring for quick response to cancellation requests
 - Proper resource cleanup when tasks are cancelled
+
+## Memory-Optimized Video Processing
+
+Recent improvements to the video composition system address memory exhaustion issues when processing AI avatar videos:
+
+### Memory Management Features
+- **Per-slide processing**: Videos are processed one slide at a time to prevent memory exhaustion
+- **Video validation**: Avatar videos are validated for corruption before processing
+- **Resource cleanup**: Automatic cleanup of video clips and garbage collection after each slide
+- **Memory-safe scaling**: Automatic dimension adjustment based on available memory
+- **30-minute timeout**: Protection against hanging processes with automatic timeout
+- **Optimized encoding**: Reduced memory usage with optimized video encoding settings
+
+### Processing Flow
+1. **Validation Phase**: All avatar videos are validated for corruption and compatibility
+2. **Memory Planning**: Dimensions are calculated based on available system memory
+3. **Sequential Processing**: Each slide is processed individually to manage memory
+4. **Resource Management**: Automatic cleanup between slides prevents memory leaks
+5. **Fallback Handling**: Graceful degradation if individual slides fail processing
+
+### Error Handling
+- **Corrupted video detection**: Early detection and handling of corrupted avatar videos
+- **Memory exhaustion prevention**: Proactive memory management prevents system crashes
+- **Timeout protection**: Automatic termination of hanging processes
+- **Progress logging**: Real-time feedback during video composition

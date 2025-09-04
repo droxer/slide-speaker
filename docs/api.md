@@ -149,3 +149,20 @@ The API provides detailed error information in the progress endpoint under the `
 - `step`: The processing step where the error occurred
 - `error`: Description of the error
 - `timestamp`: When the error occurred
+
+## Memory Optimization Features
+
+### Video Composition Improvements
+Recent API enhancements include memory-optimized video processing:
+
+- **Memory-efficient processing**: Videos are processed one slide at a time to prevent memory exhaustion
+- **Video validation**: Avatar videos are automatically validated for corruption before processing
+- **Error recovery**: Failed slides are skipped gracefully without affecting other slides
+- **Timeout protection**: 30-minute timeout prevents hanging processes
+- **Progress feedback**: Real-time progress updates during video composition
+
+### Enhanced Error Reporting
+- **Memory-related errors**: Detailed reporting when video processing exceeds memory limits
+- **Corrupted video detection**: Specific error messages for corrupted avatar videos
+- **Timeout notifications**: Clear indication when video processing times out
+- **Resource cleanup**: Confirmation of cleanup operations after task cancellation
