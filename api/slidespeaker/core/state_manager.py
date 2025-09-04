@@ -1,25 +1,14 @@
 import json
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
-import redis.asyncio as redis
-from dotenv import load_dotenv
-
-load_dotenv()
-
 
 class RedisStateManager:
     def __init__(self) -> None:
-        self.redis_client = redis.Redis(
-            host=os.getenv("REDIS_HOST", "localhost"),
-            port=int(os.getenv("REDIS_PORT", 6379)),
-            db=int(os.getenv("REDIS_DB", 0)),
-            password=os.getenv("REDIS_PASSWORD", None),
-            decode_responses=True,
-            socket_timeout=5.0,  # Add timeout to prevent hanging
-        )
+        from slidespeaker.utils.redis_config import RedisConfig
+
+        self.redis_client = RedisConfig.get_redis_client()
 
     def _get_key(self, file_id: str) -> str:
         return f"ai_slider:state:{file_id}"

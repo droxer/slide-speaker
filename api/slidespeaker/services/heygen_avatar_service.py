@@ -8,12 +8,9 @@ from pathlib import Path
 from typing import Any
 
 import requests
-from dotenv import load_dotenv
 from loguru import logger
 
 from .avatar_interface import AvatarInterface
-
-load_dotenv()
 
 
 class HeyGenAvatarService(AvatarInterface):

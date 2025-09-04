@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 import aiofiles
-from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -16,8 +15,6 @@ from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 from slidespeaker.utils.config import config
 from slidespeaker.utils.locales import locale_utils
-
-load_dotenv()
 
 app = FastAPI(title="AI Slider API")
 
@@ -236,7 +233,10 @@ async def get_vtt_subtitles(file_id: str) -> FileResponse:
         media_type="text/vtt",
         filename=f"presentation_{file_id}.vtt",
         headers={
-            "Content-Disposition": f"attachment; filename=presentation_{file_id}.vtt"
+            "Content-Disposition": f"inline; filename=presentation_{file_id}.vtt",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, OPTIONS",
+            "Access-Control-Allow-Headers": "*",
         },
     )
 

@@ -4,29 +4,19 @@ This module provides the foundation for a master-worker architecture.
 """
 
 import json
-import os
 import uuid
 from typing import Any, cast
 
-import redis.asyncio as redis
-from dotenv import load_dotenv
 from loguru import logger
-
-load_dotenv()
 
 
 class RedisTaskQueue:
     """Redis-based task queue for distributed processing"""
 
     def __init__(self) -> None:
-        self.redis_client = redis.Redis(
-            host=os.getenv("REDIS_HOST", "localhost"),
-            port=int(os.getenv("REDIS_PORT", 6379)),
-            db=int(os.getenv("REDIS_DB", 0)),
-            password=os.getenv("REDIS_PASSWORD", None),
-            decode_responses=True,
-            socket_timeout=5.0,
-        )
+        from slidespeaker.utils.redis_config import RedisConfig
+
+        self.redis_client = RedisConfig.get_redis_client()
         self.task_prefix = "ai_slider:task"
         self.queue_key = "ai_slider:task_queue"
 
@@ -49,23 +39,41 @@ class RedisTaskQueue:
 
         # Store task in Redis
         task_key = self._get_task_key(task_id)
-        await self.redis_client.set(task_key, json.dumps(task))
+        task_json = json.dumps(task)
+        result = await self.redis_client.set(task_key, task_json)
+        logger.info(f"Task stored in Redis: {task_key} = {task_json}, result: {result}")
 
-        # Add task ID to queue
-        await self.redis_client.lpush(self.queue_key, task_id)  # type: ignore
+        # Add task ID to queue - use RPUSH to maintain FIFO order
+        queue_result = await self.redis_client.rpush(self.queue_key, task_id)  # type: ignore
+        logger.info(
+            f"Task ID {task_id} added to queue {self.queue_key} with RPUSH, result: {queue_result}"
+        )
 
-        logger.info(f"Task {task_id} submitted to Redis queue: {task_type}")
+        # Verify task was stored and queued
+        stored_task = await self.redis_client.get(task_key)
+        queue_length = await self.redis_client.llen(self.queue_key)  # type: ignore
+        queue_contents = await self.redis_client.lrange(self.queue_key, 0, -1)  # type: ignore
+        logger.info(
+            f"Verification - task stored: {stored_task}, queue length: {queue_length}, queue: {queue_contents}"
+        )
+
         return task_id
 
     async def get_task(self, task_id: str) -> dict[str, Any] | None:
         """Get task details by ID"""
         task_key = self._get_task_key(task_id)
         task_data = await self.redis_client.get(task_key)
+
         if task_data:
             # Handle both bytes (from Redis) and string data
             if isinstance(task_data, bytes):
                 task_data = task_data.decode("utf-8")
-            return cast(dict[str, Any], json.loads(task_data))
+            try:
+                return cast(dict[str, Any], json.loads(task_data))
+            except json.JSONDecodeError as e:
+                logger.error(f"JSON decode error for task {task_id}: {e}")
+                return None
+
         return None
 
     async def update_task_status(
@@ -91,29 +99,27 @@ class RedisTaskQueue:
     async def get_next_task(self) -> str | None:
         """Get the next task ID from the queue (non-blocking)"""
         task_id: str | None = None
+
+        # First, check if we have any tasks in the queue
+        queue_length = await self.redis_client.llen(self.queue_key)  # type: ignore
+        logger.info(f"Queue length: {queue_length}")
+
         try:
-            # Use blmove for Redis 6.2+ (replaces deprecated brpoplpush)
-            task_id_raw = await self.redis_client.blmove(
-                self.queue_key,
-                f"{self.queue_key}:processing",
-                1,  # timeout
-                "RIGHT",
-                "LEFT",
-            )
-            task_id = str(task_id_raw) if task_id_raw is not None else None
-        except AttributeError:
-            # Fallback to brpoplpush for older Redis versions
-            task_id_raw = await self.redis_client.brpoplpush(  # type: ignore
-                self.queue_key, f"{self.queue_key}:processing", timeout=1
-            )
-            task_id = str(task_id_raw) if task_id_raw is not None else None
+            # Use rpop to get the task ID without moving it (safer approach)
+            task_id_raw = await self.redis_client.brpop(self.queue_key, timeout=1)  # type: ignore
+            if task_id_raw:
+                task_id = str(task_id_raw[1])  # brpop returns tuple (key, value)
+                logger.info(f"Retrieved task ID from queue: {task_id}")
+            else:
+                logger.info("No tasks in queue")
+        except Exception as e:
+            logger.error(f"Error getting next task: {e}")
 
         return task_id
 
     async def complete_task_processing(self, task_id: str) -> bool:
-        """Move task from processing queue back to main queue if needed, or mark as complete"""
-        # Remove from processing queue - ignore return value
-        _ = await self.redis_client.lrem(f"{self.queue_key}:processing", 1, task_id)  # type: ignore
+        """Mark task as complete - no processing queue cleanup needed"""
+        logger.info(f"Completing task processing for: {task_id}")
         return True
 
     async def get_task_status(self, task_id: str) -> str | None:

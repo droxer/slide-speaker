@@ -2,20 +2,16 @@
 Compose final video step for the presentation pipeline.
 """
 
-import os
 from pathlib import Path
-from typing import Any
 
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.processing.subtitle_generator import SubtitleGenerator
 from slidespeaker.processing.video_composer import VideoComposer
 from slidespeaker.processing.video_previewer import VideoPreviewer
 from slidespeaker.utils.config import config
 
 video_composer = VideoComposer()
-subtitle_generator = SubtitleGenerator()
 video_previewer = VideoPreviewer()
 
 
@@ -40,7 +36,6 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
     slide_images_data = []
     avatar_videos_data = []
     audio_files_data = []
-    scripts_data: list[dict[str, Any]] = []
 
     if (
         state
@@ -66,39 +61,13 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
     ):
         audio_files_data = state["steps"]["generate_audio"]["data"]
 
-    # Get scripts for subtitle generation
-    # Use subtitle-specific scripts if they exist (when languages differ)
-    if state and "steps" in state:
-        # Check if subtitle scripts exist (languages are different)
-        if (
-            "review_subtitle_scripts" in state["steps"]
-            and state["steps"]["review_subtitle_scripts"]["data"] is not None
-        ):
-            scripts_data = state["steps"]["review_subtitle_scripts"]["data"]
-            logger.info("Using subtitle-specific scripts for subtitle generation")
-        # Fall back to regular scripts if subtitle scripts don't exist
-        elif (
-            "review_scripts" in state["steps"]
-            and state["steps"]["review_scripts"]["data"] is not None
-        ):
-            scripts_data = state["steps"]["review_scripts"]["data"]
-            logger.info("Using regular scripts for subtitle generation")
-
-    # Get subtitle language and generation flag from state
+    # Get subtitle language from state for preview generation
     subtitle_language = None
-    generate_subtitles = True
     if state and "subtitle_language" in state:
         subtitle_language = state["subtitle_language"]  # Preserve user selection
     # Default to audio language if subtitle language not specified
     if subtitle_language is None and state and "audio_language" in state:
         subtitle_language = state["audio_language"]
-    if state and "generate_subtitles" in state:
-        generate_subtitles = state["generate_subtitles"]
-
-    logger.info(
-        f"Subtitle settings - Language: {subtitle_language}, "
-        f"Generate: {generate_subtitles}"
-    )
 
     # Validate all required data exists
     if not slide_images_data:
@@ -110,90 +79,6 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
 
     # Use absolute path to ensure consistency with main.py
     final_video_path = config.output_dir / f"{file_id}_final.mp4"
-
-    # Generate subtitles before composing video (if enabled)
-    if scripts_data and generate_subtitles:
-        try:
-            logger.info(
-                f"Generating subtitles for {len(scripts_data)} scripts in "
-                f"language: {subtitle_language}"
-            )
-            logger.info(f"Final video path: {final_video_path}")
-
-            # Check for task cancellation during subtitle generation
-            if state and state.get("task_id"):
-                from slidespeaker.core.task_queue import task_queue
-
-                if await task_queue.is_task_cancelled(state["task_id"]):
-                    logger.info(
-                        f"Task {state['task_id']} was cancelled during "
-                        f"subtitle generation"
-                    )
-                    await state_manager.mark_failed(file_id)
-                    return
-
-            # If we have no audio files, we need to provide estimated durations
-            if not audio_files_data:
-                logger.info(
-                    "No audio files available, using estimated durations for subtitles"
-                )
-                # Create a list of dummy paths for estimated durations (5 seconds each)
-                estimated_audio_files = [
-                    Path(f"/tmp/dummy_audio_{i}.mp3") for i in range(len(scripts_data))
-                ]
-                srt_path, vtt_path = subtitle_generator.generate_subtitles(
-                    scripts_data,
-                    estimated_audio_files,
-                    final_video_path,
-                    str(subtitle_language) if subtitle_language else "english",
-                )
-            else:
-                srt_path, vtt_path = subtitle_generator.generate_subtitles(
-                    scripts_data,
-                    audio_files,
-                    final_video_path,
-                    str(subtitle_language) if subtitle_language else "english",
-                )
-            logger.info(f"Generated subtitles: {srt_path}, {vtt_path}")
-
-            # Verify files were created
-            if os.path.exists(srt_path):
-                srt_size = os.path.getsize(srt_path)
-                logger.info(
-                    f"SRT file created successfully: {srt_path}, size: {srt_size} bytes"
-                )
-                # Log first few lines for debugging
-                try:
-                    with open(srt_path, encoding="utf-8") as f:
-                        first_lines = f.read(500)
-                        logger.info(f"SRT file first 500 chars: {first_lines}")
-                except Exception as e:
-                    logger.error(f"Error reading SRT file: {e}")
-            else:
-                logger.error(f"SRT file not found: {srt_path}")
-
-            if os.path.exists(vtt_path):
-                vtt_size = os.path.getsize(vtt_path)
-                logger.info(
-                    f"VTT file created successfully: {vtt_path}, size: {vtt_size} bytes"
-                )
-                # Log first few lines for debugging
-                try:
-                    with open(vtt_path, encoding="utf-8") as f:
-                        first_lines = f.read(500)
-                        logger.info(f"VTT file first 500 chars: {first_lines}")
-                except Exception as e:
-                    logger.error(f"Error reading VTT file: {e}")
-            else:
-                logger.error(f"VTT file not found: {vtt_path}")
-        except Exception as e:
-            logger.error(f"Failed to generate subtitles: {e}")
-            import traceback
-
-            logger.error(f"Subtitle generation traceback: {traceback.format_exc()}")
-            # If subtitles generation fails, we should raise an exception
-            # to prevent continuing with the video composition
-            raise Exception(f"Failed to generate subtitles: {e}") from e
 
     # Check if avatar generation was enabled and completed
     avatar_generation_enabled = True

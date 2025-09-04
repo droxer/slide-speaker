@@ -12,12 +12,16 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from loguru import logger
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add the current directory to Python path so we can import slidespeaker modules
 sys.path.insert(0, str(Path(__file__).parent))
 
-from slidespeaker.core.task_queue import task_queue
+from slidespeaker.core.task_queue import task_queue  # noqa: E402
 
 # Configure logging
 logger.remove()
@@ -84,6 +88,28 @@ class MasterWorker:
         logger.info("Starting master worker...")
         logger.info(f"Will manage up to {self.max_workers} worker processes")
 
+        # Test Redis connection
+        try:
+            ping_result = await task_queue.redis_client.ping()
+            logger.info(f"Master worker Redis ping result: {ping_result}")
+
+            # Log Redis config
+            config_info = task_queue.redis_client.connection_pool.connection_kwargs
+            logger.info(f"Master worker Redis config: {config_info}")
+
+            # Check for existing tasks
+            keys = await task_queue.redis_client.keys("ai_slider:task:*")
+            logger.info(f"Existing task keys: {keys}")
+
+            queue_items = await task_queue.redis_client.lrange(
+                "ai_slider:task_queue", 0, -1
+            )  # type: ignore
+            logger.info(f"Existing queue items: {queue_items}")
+
+        except Exception as e:
+            logger.error(f"Master worker Redis connection error: {e}")
+            return
+
         # Set up signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
@@ -113,6 +139,10 @@ class MasterWorker:
 
                         logger.info(f"Found task {task_id}, starting worker process")
                         await task_queue.update_task_status(task_id, "processing")
+
+                        # Small delay to ensure task is fully committed to Redis
+                        await asyncio.sleep(0.5)
+
                         self.start_worker_process(task_id)
                         logger.info(f"Worker process started for task {task_id}")
                     else:

@@ -24,7 +24,7 @@ SlideSpeaker uses a distributed microservices architecture with clear separation
                    ▼                 ▼             ▼                 ▼
          ┌──────────────────┐ ┌──────────────────┐ ...    ┌──────────────────┐
          │  Task Worker 1   │ │  Task Worker 2   │        │  Task Worker N   │
-         │ (task_worker.py) │ │ (task_worker.py) │        │ (task_worker.py) │
+         │ (worker.py)      │ │ (worker.py)      │        │ (worker.py)      │
          └──────────────────┘ ┌──────────────────┘        └──────────────────┘
                    │          │                                     │
                    ▼          ▼                                     ▼
@@ -34,6 +34,8 @@ SlideSpeaker uses a distributed microservices architecture with clear separation
          │  ElevenLabs)     ││  ElevenLabs)     │        │  ElevenLabs)     │
          └──────────────────┘└──────────────────┘        └──────────────────┘
 ```
+
+For detailed pipeline diagrams showing the step-by-step processing flow, see the [Pipeline Diagrams Documentation](pipeline-diagrams.md).
 
 ## Component Descriptions
 

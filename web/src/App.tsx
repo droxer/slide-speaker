@@ -213,6 +213,12 @@ function App() {
           const existingTracks = videoRef.current.querySelectorAll('track');
           existingTracks.forEach(track => track.remove());
           
+          // Ensure video has loaded metadata before adding track
+          if (videoRef.current.readyState === 0) {
+            console.log('Video not ready, waiting for metadata...');
+            return;
+          }
+          
           // Add VTT subtitle track if subtitles are enabled
           const track = document.createElement('track');
           track.kind = 'subtitles';
@@ -222,27 +228,56 @@ function App() {
                          subtitleLanguage === 'japanese' ? 'ja' : 
                          subtitleLanguage === 'korean' ? 'ko' : 
                          subtitleLanguage === 'thai' ? 'th' : 'en');
-          track.label = 'Subtitles';
+          track.label = getLanguageDisplayName(subtitleLanguage);
           track.default = true;
           
           track.addEventListener('load', () => {
             console.log('Subtitle track loaded successfully');
             if (videoRef.current && videoRef.current.textTracks.length > 0) {
-              videoRef.current.textTracks[0].mode = 'showing';
+              const textTrack = videoRef.current.textTracks[0];
+              textTrack.mode = 'showing';
+              console.log('Subtitles are now showing');
             }
           });
           
           track.addEventListener('error', (e) => {
             console.error('Subtitle track loading error:', e);
+            // Fallback: try loading with absolute URL
+            const absoluteUrl = `${window.location.origin}/api/subtitles/${fileId}/vtt`;
+            console.log('Trying absolute URL:', absoluteUrl);
+            track.src = absoluteUrl;
           });
           
           videoRef.current.appendChild(track);
+          
+          // Force reload if track fails
+          setTimeout(() => {
+            if (videoRef.current && videoRef.current.textTracks.length === 0) {
+              console.log('Retrying subtitle loading...');
+              const retryTrack = document.createElement('track');
+              retryTrack.kind = 'subtitles';
+              retryTrack.src = `${window.location.origin}/api/subtitles/${fileId}/vtt`;
+              retryTrack.setAttribute('srclang', subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 'en');
+              retryTrack.label = 'Subtitles';
+              retryTrack.default = true;
+              videoRef.current.appendChild(retryTrack);
+            }
+          }, 1000);
         }
       };
       
-      if (videoRef.current.readyState >= 2) {
+      // Wait for video to be fully loaded
+      const handleLoadedMetadata = () => {
+        console.log('Video metadata loaded, adding subtitles...');
+        addSubtitles();
+      };
+      
+      if (videoRef.current.readyState >= 1) {
+        // Metadata already loaded
         addSubtitles();
       } else {
+        // Wait for metadata to load
+        videoRef.current.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true });
         videoRef.current.addEventListener('loadeddata', addSubtitles, { once: true });
       }
     }
@@ -254,11 +289,12 @@ function App() {
       'analyze_slide_images': 'Analyzing Visuals',
       'generate_scripts': 'Creating Narratives',
       'review_scripts': 'Refining Content',
-      'generate_subtitle_scripts': 'Generating Subtitles',
-      'review_subtitle_scripts': 'Refining Subtitles',
+      'generate_subtitle_scripts': 'Generating subtitle narratives',
+      'review_subtitle_scripts': 'Reviewing subtitle scripts',
       'generate_audio': 'Synthesizing Audio',
       'generate_avatar_videos': 'Generating Avatars',
       'convert_slides_to_images': 'Converting Slides',
+      'generate_subtitles': 'Generating subtitles',
       'compose_video': 'Composing Video',
       'unknown': 'Initializing'
     };
@@ -290,8 +326,8 @@ function App() {
         'Analyzing Visuals': 'Examining slide visuals and content...',
         'Creating Narratives': 'Crafting engaging AI narratives...',
         'Refining Content': 'Polishing the script for perfect delivery...',
-        'Generating Subtitles': 'Creating subtitle translations...',
-        'Refining Subtitles': 'Perfecting subtitle timing and accuracy...',
+        'Generating subtitle narratives': 'Creating subtitle translations...',
+        'Reviewing subtitle scripts': 'Perfecting subtitle timing and accuracy...',
         'Synthesizing Audio': 'Creating natural voice narration...',
         'Generating Avatars': 'Bringing AI presenters to life...',
         'Converting Slides': 'Preparing slides for video composition...',
@@ -445,7 +481,17 @@ function App() {
                   <div className="steps-container">
                     <h4>Processing Steps</h4>
                     <div className="steps-grid">
-                      {['extract_slides', 'convert_slides_to_images', 'analyze_slide_images', 'generate_scripts', 'review_scripts', 'generate_subtitle_scripts', 'review_subtitle_scripts', 'generate_audio', 'generate_avatar_videos', 'compose_video'].map((stepName) => {
+                      {[
+                        'extract_slides',
+                        'convert_slides_to_images', 
+                        'analyze_slide_images',
+                        'generate_scripts',
+                        'review_scripts',
+                        'generate_audio',
+                        'generate_avatar_videos',
+                        'generate_subtitles',
+                        'compose_video'
+                      ].map((stepName) => {
                         const stepData = processingDetails.steps[stepName] || { status: 'pending' };
                         // Hide skipped steps from UI
                         if (stepData.status === 'skipped') {
@@ -644,6 +690,39 @@ function App() {
                   <button onClick={resetForm} className="secondary-btn">
                     Create Another Presentation
                   </button>
+                  {generateSubtitles && fileId && (
+                    <button 
+                      onClick={() => {
+                        if (videoRef.current) {
+                          const tracks = videoRef.current.textTracks;
+                          if (tracks.length > 0) {
+                            const track = tracks[0];
+                            track.mode = track.mode === 'showing' ? 'hidden' : 'showing';
+                            console.log('Subtitle track mode:', track.mode);
+                          } else {
+                            console.log('No subtitle tracks found');
+                            // Manual reload attempt
+                            const track = document.createElement('track');
+                            track.kind = 'subtitles';
+                            track.src = `${window.location.origin}/api/subtitles/${fileId}/vtt`;
+                            track.setAttribute('srclang', subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 'en');
+                            track.label = 'Subtitles';
+                            track.default = true;
+                            videoRef.current.appendChild(track);
+                            track.addEventListener('load', () => {
+                              console.log('Manual subtitle reload successful');
+                              if (videoRef.current) {
+                                videoRef.current.textTracks[0].mode = 'showing';
+                              }
+                            });
+                          }
+                        }
+                      }} 
+                      className="secondary-btn"
+                    >
+                      Toggle Subtitles
+                    </button>
+                  )}
                 </div>
               </div>
             )}

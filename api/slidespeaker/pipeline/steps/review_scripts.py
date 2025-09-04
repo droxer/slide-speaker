@@ -48,9 +48,7 @@ async def review_scripts_step(
         raise ValueError("No scripts data available for review")
 
     # Review and refine scripts for consistency
-    reviewed_scripts = await script_reviewer.review_and_refine_scripts(
-        scripts, language
-    )
+    reviewed_scripts = await script_reviewer.revise_scripts(scripts, language)
 
     await state_manager.update_step_status(
         file_id, step_name, "completed", reviewed_scripts

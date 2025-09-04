@@ -9,13 +9,17 @@ import os
 import sys
 from pathlib import Path
 
+from dotenv import load_dotenv
 from loguru import logger
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Add the current directory to Python path so we can import slidespeaker modules
 sys.path.insert(0, str(Path(__file__).parent))
 
-from slidespeaker.core.task_queue import task_queue
-from slidespeaker.pipeline.coordinator import process_presentation
+from slidespeaker.core.task_queue import task_queue  # noqa: E402
+from slidespeaker.pipeline.coordinator import process_presentation  # noqa: E402
 
 # Configure logging
 logger.remove()

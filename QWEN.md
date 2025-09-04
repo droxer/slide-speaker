@@ -237,6 +237,46 @@ SlideSpeaker features improved task cancellation that allows users to immediatel
 - Resources are cleaned up promptly
 - Users receive immediate feedback through the web interface
 
+## Troubleshooting Redis Issues
+
+If you encounter issues with task processing, check the following:
+
+1. **Redis Database Configuration**: Ensure that the REDIS_DB environment variable in your `.env` file matches the database where tasks are stored. Mismatched configurations can cause workers to fail to find tasks.
+
+2. **Stale Tasks**: Clean up stale tasks from Redis databases that are no longer in use:
+   ```bash
+   # Check for tasks in different Redis databases
+   redis-cli -n 0 keys "ai_slider:*"
+   redis-cli -n 7 keys "ai_slider:*"
+   
+   # Remove stale tasks from unused databases
+   redis-cli -n 0 del ai_slider:task:TASK_ID
+   ```
+
+3. **Processing Queue Cleanup**: If tasks are stuck in the processing queue:
+   ```bash
+   # Check the processing queue
+   redis-cli llen ai_slider:task_queue:processing
+   
+   # Remove tasks from processing queue
+   redis-cli lrem ai_slider:task_queue:processing 1 TASK_ID
+   ```
+
+## Common Syntax Errors
+
+### Script Reviewer Syntax Error
+If you encounter a syntax error in `slidespeaker/processing/script_reviewer.py`:
+```
+SyntaxError: '{' was never closed
+```
+
+This is typically caused by malformed dictionary syntax in the `INSTRUCTION_PROMPTS` dictionary. To fix:
+1. Ensure all dictionary entries are separated by commas
+2. Verify that all multi-line strings are properly formatted
+3. Check that the dictionary has a closing brace `}`
+
+See `docs/script-reviewer-fix.md` for detailed information about this specific issue.
+
 ## Directory Structure
 ```
 slide-speaker/
@@ -251,5 +291,9 @@ slide-speaker/
 │   ├── package.json     # Node.js dependencies and scripts
 │   └── src/             # Source code
 ├── docs/                # Documentation
+│   ├── pipeline-diagrams.md # Pipeline flow diagrams
+│   ├── architecture.md      # System architecture
+│   ├── api.md              # API documentation
+│   └── installation.md     # Setup instructions
 └── README.md            # Project overview
 ```

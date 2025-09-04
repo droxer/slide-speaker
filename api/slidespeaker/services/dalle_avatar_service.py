@@ -6,15 +6,12 @@ Alternative avatar service using DALL-E images and TTS audio
 from pathlib import Path
 from typing import Any
 
-from dotenv import load_dotenv
 from loguru import logger
 
 from ..processing.image_generator import ImageGenerator
 from ..processing.video_composer import VideoComposer
 from .avatar_interface import AvatarInterface
 from .tts_factory import TTSFactory
-
-load_dotenv()
 
 
 class DalleAvatarService(AvatarInterface):

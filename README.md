@@ -45,6 +45,7 @@ For detailed documentation, see the [docs](docs/) directory:
 - [Installation Guide](docs/installation.md)
 - [API Documentation](docs/api.md)
 - [Architecture Documentation](docs/architecture.md)
+- [Pipeline Diagrams](docs/pipeline-diagrams.md)
 
 ## License
 

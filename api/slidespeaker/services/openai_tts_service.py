@@ -6,12 +6,9 @@ import os
 from pathlib import Path
 
 import openai
-from dotenv import load_dotenv
 from loguru import logger
 
 from .tts_interface import TTSInterface
-
-load_dotenv()
 
 
 class OpenAITTSService(TTSInterface):

@@ -2,11 +2,8 @@ import os
 from pathlib import Path
 
 import requests
-from dotenv import load_dotenv
 from loguru import logger
 from openai import OpenAI
-
-load_dotenv()
 
 # Style prompts for DALL-E image generation
 STYLE_PROMPTS = {
