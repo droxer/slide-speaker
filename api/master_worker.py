@@ -21,22 +21,19 @@ load_dotenv()
 # Add the current directory to Python path so we can import slidespeaker modules
 sys.path.insert(0, str(Path(__file__).parent))
 
-from slidespeaker.core.task_queue import task_queue  # noqa: E402
+from slidespeaker.utils.logging_config import setup_logging  # noqa: E402
 
-# Configure logging
-logger.remove()
-logger.add(
-    sys.stderr,
-    format="{time} | {level} | {name}:{function}:{line} - {message}",
-    level="INFO",
-)
+log_level = os.getenv("LOG_LEVEL", "INFO")
+setup_logging(log_level)
+
+from slidespeaker.core.task_queue import task_queue  # noqa: E402
 
 
 class MasterWorker:
     def __init__(self) -> None:
         self.should_stop = False
         self.workers: list[subprocess.Popen[bytes]] = []
-        self.max_workers = int(os.getenv("MAX_WORKERS", "1"))  # Default to 3 workers
+        self.max_workers = int(os.getenv("MAX_WORKERS", "2"))  # Default to 3 workers
         self.worker_processes: dict[str, subprocess.Popen[bytes]] = {}
 
     def signal_handler(self, signum: int, frame: Any) -> None:
@@ -66,6 +63,12 @@ class MasterWorker:
 
     def cleanup_workers(self) -> None:
         """Clean up all worker processes"""
+        if not self.worker_processes:
+            logger.debug("No worker processes to clean up")
+            return
+
+        logger.info(f"Cleaning up {len(self.worker_processes)} worker processes")
+
         for task_id, process in self.worker_processes.items():
             if process.poll() is None:  # Process is still running
                 logger.info(f"Terminating worker for task {task_id}")
@@ -78,10 +81,11 @@ class MasterWorker:
                 logger.info(f"Worker for task {task_id} terminated successfully")
             except subprocess.TimeoutExpired:
                 logger.warning(
-                    f"Worker for task {task_id} did not terminate, killing..."
+                    f"Worker for task {task_id} did not terminate within timeout, killing..."
                 )
                 process.kill()
                 process.wait()
+                logger.info(f"Worker for task {task_id} killed forcefully")
 
     async def run(self) -> None:
         """Run the master worker"""
@@ -99,15 +103,16 @@ class MasterWorker:
 
             # Check for existing tasks
             keys = await task_queue.redis_client.keys("ai_slider:task:*")
-            logger.info(f"Existing task keys: {keys}")
+            logger.info(f"Found {len(keys)} existing task keys")
 
             queue_items = await task_queue.redis_client.lrange(
                 "ai_slider:task_queue", 0, -1
             )  # type: ignore
-            logger.info(f"Existing queue items: {queue_items}")
+            logger.info(f"Found {len(queue_items)} items in task queue")
 
         except Exception as e:
             logger.error(f"Master worker Redis connection error: {e}")
+            logger.error("Cannot continue without Redis connection. Exiting...")
             return
 
         # Set up signal handlers for graceful shutdown
@@ -127,7 +132,11 @@ class MasterWorker:
                 await self.check_completed_workers()
 
                 # If we have capacity, look for new tasks
-                if len(self.worker_processes) < self.max_workers:
+                active_workers = len(self.worker_processes)
+                if active_workers < self.max_workers:
+                    logger.debug(
+                        f"Worker capacity available: {active_workers}/{self.max_workers}"
+                    )
                     task_id = await task_queue.get_next_task()
                     if task_id:
                         # Check if task is cancelled before starting worker
@@ -148,7 +157,6 @@ class MasterWorker:
                     else:
                         # No tasks available, sleep briefly
                         logger.debug("No tasks available in queue, waiting...")
-                        await asyncio.sleep(2)
                 else:
                     # At max capacity, just check for completed workers
                     logger.debug(

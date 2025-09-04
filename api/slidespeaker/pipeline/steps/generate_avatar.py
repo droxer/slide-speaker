@@ -25,7 +25,9 @@ async def generate_avatar_step(file_id: str) -> None:
             logger.info(
                 f"Task {state['task_id']} was cancelled during avatar video generation"
             )
-            await state_manager.mark_failed(file_id)
+            await state_manager.mark_cancelled(
+                file_id, cancelled_step="generate_avatar_videos"
+            )
             return
 
     # Check if avatar generation is enabled
@@ -68,7 +70,9 @@ async def generate_avatar_step(file_id: str) -> None:
                     f"Task {state['task_id']} was cancelled during "
                     f"avatar video generation"
                 )
-                await state_manager.mark_failed(file_id)
+                await state_manager.mark_cancelled(
+                    file_id, cancelled_step="generate_avatar_videos"
+                )
                 return
 
         # Additional null check for individual script data

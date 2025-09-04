@@ -3,6 +3,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
+from loguru import logger
+
 
 class RedisStateManager:
     def __init__(self) -> None:
@@ -82,21 +84,46 @@ class RedisStateManager:
             return cast(dict[str, Any], json.loads(state_json))
         return None
 
+    async def get_step_status(
+        self, file_id: str, step_name: str
+    ) -> dict[str, Any] | None:
+        """Get the status of a specific step"""
+        state = await self.get_state(file_id)
+        if state and "steps" in state and step_name in state["steps"]:
+            return dict(state["steps"][step_name])
+        return None
+
     async def update_step_status(
         self, file_id: str, step_name: str, status: str, data: Any = None
     ) -> None:
         """Update status of a specific step"""
         state = await self.get_state(file_id)
         if state:
-            state["steps"][step_name]["status"] = status
-            if data is not None:
-                state["steps"][step_name]["data"] = data
-            state["updated_at"] = datetime.now().isoformat()
-            state["current_step"] = step_name
-            await self._save_state(file_id, state)
+            if step_name in state["steps"]:
+                old_status = state["steps"][step_name]["status"]
+                state["steps"][step_name]["status"] = status
+                if data is not None:
+                    state["steps"][step_name]["data"] = data
+                state["updated_at"] = datetime.now().isoformat()
+                state["current_step"] = step_name
+                await self._save_state(file_id, state)
+                logger.debug(
+                    f"Step {step_name} status updated from '{old_status}' to '{status}' for file {file_id}"
+                )
+            else:
+                logger.warning(
+                    f"Step {step_name} not found in state for file {file_id}"
+                )
+        else:
+            logger.warning(
+                f"Cannot update step status for non-existent state: {file_id}"
+            )
 
     async def add_error(self, file_id: str, error: str, step: str) -> None:
         """Add error to state"""
+        logger.warning(
+            f"Adding error to state for file {file_id}, step {step}: {error}"
+        )
         state = await self.get_state(file_id)
         if state:
             state["errors"].append(
@@ -104,22 +131,60 @@ class RedisStateManager:
             )
             state["updated_at"] = datetime.now().isoformat()
             await self._save_state(file_id, state)
+            logger.info(
+                f"Error added to state for file {file_id}, now has {len(state['errors'])} errors"
+            )
 
     async def mark_completed(self, file_id: str) -> None:
         """Mark processing as completed"""
         state = await self.get_state(file_id)
         if state:
+            old_status = state["status"]
             state["status"] = "completed"
             state["updated_at"] = datetime.now().isoformat()
             await self._save_state(file_id, state)
+            logger.info(
+                f"Processing marked as completed for file {file_id} (was {old_status})"
+            )
 
     async def mark_failed(self, file_id: str) -> None:
         """Mark processing as failed"""
         state = await self.get_state(file_id)
         if state:
+            old_status = state["status"]
             state["status"] = "failed"
             state["updated_at"] = datetime.now().isoformat()
             await self._save_state(file_id, state)
+            logger.error(
+                f"Processing marked as failed for file {file_id} (was {old_status})"
+            )
+
+    async def mark_cancelled(
+        self, file_id: str, cancelled_step: str | None = None
+    ) -> None:
+        """Mark processing as cancelled"""
+        state = await self.get_state(file_id)
+        if state:
+            old_status = state["status"]
+            state["status"] = "cancelled"
+            state["updated_at"] = datetime.now().isoformat()
+
+            # Mark the current step as cancelled if provided
+            if cancelled_step and cancelled_step in state["steps"]:
+                state["steps"][cancelled_step]["status"] = "cancelled"
+
+            # Mark any pending steps as cancelled
+            for _step_name, step_data in state["steps"].items():
+                if (
+                    step_data["status"] == "in_progress"
+                    or step_data["status"] == "pending"
+                ):
+                    step_data["status"] = "cancelled"
+
+            await self._save_state(file_id, state)
+            logger.info(
+                f"Processing marked as cancelled for file {file_id} (was {old_status})"
+            )
 
     async def _save_state(self, file_id: str, state: dict[str, Any]) -> None:
         """Save state to Redis"""

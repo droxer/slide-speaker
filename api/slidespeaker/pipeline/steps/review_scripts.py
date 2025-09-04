@@ -30,7 +30,7 @@ async def review_scripts_step(
 
         if await task_queue.is_task_cancelled(state["task_id"]):
             logger.info(f"Task {state['task_id']} was cancelled during script review")
-            await state_manager.mark_failed(file_id)
+            await state_manager.mark_cancelled(file_id, cancelled_step=step_name)
             return
 
     # Get generated scripts from the appropriate step

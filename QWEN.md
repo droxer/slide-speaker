@@ -317,6 +317,28 @@ The project has a TODO.md file that outlines development priorities in three cat
 - Integrate with Datadog for application performance monitoring
 - Add Zapier integration for workflow automation
 
+## Logging Improvements
+
+The project now includes enhanced logging capabilities:
+
+### Features
+- Structured logging with consistent formatting
+- Configurable log levels via environment variables
+- File-based logging with rotation and retention policies
+- Enhanced warning and error logging with contextual information
+- Performance logging for long-running operations
+- Thread-safe logging for async environments
+
+### Configuration
+- `LOG_LEVEL` - Set log level (DEBUG, INFO, WARNING, ERROR)
+- `LOG_FILE` - Optional file path for file-based logging
+
+### Benefits
+- Better debugging with detailed debug information
+- Improved monitoring with progress tracking
+- Enhanced error handling with informative error messages
+- Production-ready logging with file rotation and compression
+
 ## Directory Structure
 ```
 slide-speaker/

@@ -27,6 +27,8 @@ class RedisTaskQueue:
     async def submit_task(self, task_type: str, **kwargs: Any) -> str:
         """Submit a task to the Redis queue and return task ID"""
         task_id = str(uuid.uuid4())
+        created_at = __import__("datetime").datetime.now().isoformat()
+
         task = {
             "task_id": task_id,
             "task_type": task_type,
@@ -34,14 +36,14 @@ class RedisTaskQueue:
             "kwargs": kwargs,
             "result": None,
             "error": None,
-            "created_at": __import__("datetime").datetime.now().isoformat(),
+            "created_at": created_at,
         }
 
         # Store task in Redis
         task_key = self._get_task_key(task_id)
         task_json = json.dumps(task)
         result = await self.redis_client.set(task_key, task_json)
-        logger.info(f"Task stored in Redis: {task_key} = {task_json}, result: {result}")
+        logger.info(f"Task {task_id} stored in Redis with result: {result}")
 
         # Add task ID to queue - use RPUSH to maintain FIFO order
         queue_result = await self.redis_client.rpush(self.queue_key, task_id)  # type: ignore
@@ -49,13 +51,19 @@ class RedisTaskQueue:
             f"Task ID {task_id} added to queue {self.queue_key} with RPUSH, result: {queue_result}"
         )
 
+        # Log task summary
+        file_id = kwargs.get("file_id", "unknown")
+        logger.info(f"New task {task_id} created for file {file_id} at {created_at}")
+
         # Verify task was stored and queued
         stored_task = await self.redis_client.get(task_key)
         queue_length = await self.redis_client.llen(self.queue_key)  # type: ignore
-        queue_contents = await self.redis_client.lrange(self.queue_key, 0, -1)  # type: ignore
-        logger.info(
-            f"Verification - task stored: {stored_task}, queue length: {queue_length}, queue: {queue_contents}"
+        logger.debug(
+            f"Task verification - task stored: {stored_task is not None}, queue length: {queue_length}"
         )
+
+        if not stored_task:
+            logger.warning(f"Failed to verify task storage for {task_key}")
 
         return task_id
 
@@ -101,7 +109,7 @@ class RedisTaskQueue:
         task_id: str | None = None
 
         # First, check if we have any tasks in the queue
-        queue_length = await self.redis_client.llen(self.queue_key)  # type: ignore
+        queue_length = await self.redis_client.llen(self.queue_key)  # type: ignore  # type: ignore
         logger.info(f"Queue length: {queue_length}")
 
         try:
@@ -133,21 +141,28 @@ class RedisTaskQueue:
         """Cancel a task if it's still queued or processing"""
         task = await self.get_task(task_id)
         if not task:
+            logger.warning(f"Attempted to cancel non-existent task {task_id}")
             return False
 
-        if task["status"] == "queued":
+        current_status = task["status"]
+        if current_status == "queued":
             # Remove from queue - ignore return value
-            _ = await self.redis_client.lrem(self.queue_key, 1, task_id)  # type: ignore
+            removed_count = await self.redis_client.lrem(self.queue_key, 1, task_id)  # type: ignore
             task["status"] = "cancelled"
             task["error"] = "Task was cancelled by user"
             task_key = self._get_task_key(task_id)
             await self.redis_client.set(task_key, json.dumps(task))
-            logger.info(f"Task {task_id} cancelled while queued")
+            logger.info(
+                f"Task {task_id} cancelled while queued (removed {removed_count} instances from queue)"
+            )
             return True
-        elif task["status"] == "processing":
+        elif current_status == "processing":
             # For processing tasks, we mark as cancelled
             # The actual processing function would need to check for cancellation
             task["status"] = "cancelled"
+            logger.info(
+                f"Task {task_id} marked for cancellation (currently processing)"
+            )
             task["error"] = "Task was cancelled by user"
             task_key = self._get_task_key(task_id)
             await self.redis_client.set(task_key, json.dumps(task))

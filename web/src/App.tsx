@@ -12,6 +12,9 @@ const LOCAL_STORAGE_KEYS = {
   LATEST_TASK_TIMESTAMP: 'slidespeaker_latest_task_timestamp'
 };
 
+// API configuration
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8000`;
+
 // Define TypeScript interfaces
 interface StepDetails {
   status: string;
@@ -36,7 +39,7 @@ interface ProcessingDetails {
   updated_at: string;
 }
 
-type AppStatus = 'idle' | 'uploading' | 'processing' | 'completed' | 'error';
+type AppStatus = 'idle' | 'uploading' | 'processing' | 'completed' | 'error' | 'cancelled';
 
 // Local storage utility functions
 const localStorageUtils = {
@@ -215,32 +218,17 @@ function App() {
     try {
       const response = await axios.post<{ message: string }>(`/api/task/${taskId}/cancel`);
       console.log('Stop processing response:', response.data);
-      alert('Processing has been stopped.');
-      setStatus('idle');
-      setUploading(false);
-      setProgress(0);
-      setProcessingDetails(null);
-      setTaskId(null);
+      
+      // Instead of immediately setting to idle, let the polling detect the cancelled state
+      // This ensures frontend and backend stay in sync
+      setStatus('processing'); // Keep showing processing until backend confirms cancelled
+      alert('Processing is being stopped... Please wait a moment.');
     } catch (error) {
       console.error('Stop processing error:', error);
       alert('Failed to stop processing. The task may have already completed or failed.');
     }
   };
 
-  const downloadVideo = () => {
-    if (fileId) {
-      // Create a temporary link element
-      const link = document.createElement('a');
-      link.href = `/api/video/${fileId}`;
-      link.download = `presentation_${fileId}.mp4`;
-      link.target = '_blank';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    } else {
-      alert('Video not available for download. Please try again.');
-    }
-  };
 
   const resetForm = () => {
     setFile(null);
@@ -340,6 +328,15 @@ function App() {
           } else if (response.data.status === 'processing' || response.data.status === 'uploaded') {
             setStatus('processing');
             setProgress(response.data.progress);
+          } else if (response.data.status === 'cancelled') {
+            setStatus('cancelled');
+            setUploading(false);
+            setTaskId(null);
+            setProgress(0);
+            
+            // Clear local storage when cancelled
+            localStorageUtils.clearTaskState();
+            
           } else if (response.data.status === 'failed') {
             setStatus('error');
             setUploading(false);
@@ -419,7 +416,7 @@ function App() {
           track.addEventListener('error', (e) => {
             console.error('Subtitle track loading error:', e);
             // Fallback: try loading with absolute URL
-            const absoluteUrl = `${window.location.origin}/api/subtitles/${fileId}/vtt`;
+            const absoluteUrl = `${API_BASE_URL}/api/subtitles/${fileId}/vtt`;
             console.log('Trying absolute URL:', absoluteUrl);
             track.src = absoluteUrl;
           });
@@ -432,7 +429,7 @@ function App() {
               console.log('Retrying subtitle loading...');
               const retryTrack = document.createElement('track');
               retryTrack.kind = 'subtitles';
-              retryTrack.src = `${window.location.origin}/api/subtitles/${fileId}/vtt`;
+              retryTrack.src = `${API_BASE_URL}/api/subtitles/${fileId}/vtt`;
               retryTrack.setAttribute('srclang', subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 'en');
               retryTrack.label = 'Subtitles';
               retryTrack.default = true;
@@ -471,7 +468,7 @@ function App() {
       'generate_avatar_videos': 'Generating Avatars',
       'convert_slides_to_images': 'Converting Slides',
       'generate_subtitles': 'Generating subtitles',
-      'compose_video': 'Composing Video',
+      'compose_video': 'Crafting Your Masterpiece',
       'unknown': 'Initializing'
     };
     return stepNames[step] || step;
@@ -493,7 +490,7 @@ function App() {
     if (!processingDetails) return 'Bringing Your Presentation to Life';
     
     const activeSteps = Object.entries(processingDetails.steps || {})
-      .filter(([_, step]) => step.status === 'processing');
+      .filter(([_, step]) => step.status === 'in_progress' || step.status === 'processing');
     
     if (activeSteps.length > 0) {
       const stepName = formatStepName(activeSteps[0][0]);
@@ -507,7 +504,7 @@ function App() {
         'Synthesizing Audio': 'Creating natural voice narration...',
         'Generating Avatars': 'Bringing AI presenters to life...',
         'Converting Slides': 'Preparing slides for video composition...',
-        'Composing Video': 'Assembling your final masterpiece...'
+        'Crafting Your Masterpiece': 'Bringing every element together in perfect harmony...'
       };
       return statusMessages[stepName] || `Working on: ${stepName}`;
     }
@@ -558,7 +555,7 @@ function App() {
                   <h3 className="language-section-title">Language Settings</h3>
                   <div className="language-group">
                     <div className="language-selector">
-                      <label htmlFor="language-select">Audio Language</label>
+                      <label htmlFor="language-select">Voice Language</label>
                       <select 
                         id="language-select" 
                         value={language} 
@@ -614,7 +611,7 @@ function App() {
                     className="primary-btn"
                     disabled={uploading}
                   >
-                    Transform to AI Magic
+                    Create Your Masterpiece
                   </button>
                 )}
               </div>
@@ -654,15 +651,15 @@ function App() {
                        
                 <button 
                   onClick={handleStopProcessing} 
-                  className="stop-btn"
+                  className="cancel-btn"
                 >
-                  Stop Processing
+                  STOP
                 </button>
          
                 
                 {processingDetails && (
                   <div className="steps-container">
-                    <h4>Processing Steps</h4>
+                    <h4>🌟 Creating Your Masterpiece</h4>
                     <div className="steps-grid">
                       {[
                         'extract_slides',
@@ -684,7 +681,7 @@ function App() {
                           <div key={stepName} className={`step-item ${stepData.status}`}>
                             <span className="step-icon">
                               {stepData.status === 'completed' ? '✓' : 
-                               stepData.status === 'processing' ? '⏳' : 
+                               stepData.status === 'processing' || stepData.status === 'in_progress' ? '⏳' : 
                                stepData.status === 'failed' ? '✗' : '○'}
                             </span>
                             <span className="step-name">{formatStepName(stepName)}</span>
@@ -722,7 +719,7 @@ function App() {
                       <video 
                         ref={videoRef}
                         controls
-                        src={`/api/video/${fileId}`}
+                        src={`${API_BASE_URL}/api/video/${fileId}`}
                         className="preview-video-large"
                       >
                         {/* Video tracks will be added dynamically via useEffect */}
@@ -731,7 +728,7 @@ function App() {
                     <div className="preview-info-compact">
                       <div className="info-grid">
                         <div className="info-item">
-                          <span className="info-label">Audio Language:</span>
+                          <span className="info-label">Voice Language:</span>
                           <span className="info-value">{processingDetails?.audio_language ? getLanguageDisplayName(processingDetails.audio_language) : 'English'}</span>
                         </div>
                         <div className="info-item">
@@ -742,10 +739,6 @@ function App() {
                           <span className="info-label">AI Avatar:</span>
                           <span className="info-value">{generateAvatar ? '✓ Generated' : '✗ Disabled'}</span>
                         </div>
-                        <div className="info-item">
-                          <span className="info-label">Subtitles:</span>
-                          <span className="info-value">{generateSubtitles ? '✓ Enabled' : '✗ Disabled'}</span>
-                        </div>
                       </div>
                       
                       {/* Resource URLs */}
@@ -754,13 +747,13 @@ function App() {
                           <span className="resource-label-inline">Video</span>
                           <input 
                             type="text" 
-                            value={`${window.location.origin}/api/video/${fileId}`}
+                            value={`${API_BASE_URL}/api/video/${fileId}`}
                             readOnly 
                             className="url-input-enhanced"
                           />
                           <button 
                             onClick={() => {
-                              navigator.clipboard.writeText(`${window.location.origin}/api/video/${fileId}`);
+                              navigator.clipboard.writeText(`${API_BASE_URL}/api/video/${fileId}`);
                               alert('Video URL copied!');
                             }}
                             className="copy-btn-enhanced"
@@ -775,13 +768,13 @@ function App() {
                               <span className="resource-label-inline">SRT</span>
                               <input 
                                 type="text" 
-                                value={`${window.location.origin}/api/subtitles/${fileId}/srt`}
+                                value={`${API_BASE_URL}/api/subtitles/${fileId}/srt`}
                                 readOnly 
                                 className="url-input-enhanced"
                               />
                               <button 
                                 onClick={() => {
-                                  navigator.clipboard.writeText(`${window.location.origin}/api/subtitles/${fileId}/srt`);
+                                  navigator.clipboard.writeText(`${API_BASE_URL}/api/subtitles/${fileId}/srt`);
                                   alert('SRT URL copied!');
                                 }}
                                 className="copy-btn-enhanced"
@@ -794,13 +787,13 @@ function App() {
                               <span className="resource-label-inline">VTT</span>
                               <input 
                                 type="text" 
-                                value={`${window.location.origin}/api/subtitles/${fileId}/vtt`}
+                                value={`${API_BASE_URL}/api/subtitles/${fileId}/vtt`}
                                 readOnly 
                                 className="url-input-enhanced"
                               />
                               <button 
                                 onClick={() => {
-                                  navigator.clipboard.writeText(`${window.location.origin}/api/subtitles/${fileId}/vtt`);
+                                  navigator.clipboard.writeText(`${API_BASE_URL}/api/subtitles/${fileId}/vtt`);
                                   alert('VTT URL copied!');
                                 }}
                                 className="copy-btn-enhanced"
@@ -817,7 +810,7 @@ function App() {
                 
                 <div className="action-buttons">
                   <button onClick={resetForm} className="primary-btn create-new-btn">
-                    Create New Video
+                    Create Your Next Masterpiece
                   </button>
                 </div>
               </div>
@@ -838,7 +831,7 @@ function App() {
       </main>
 
       <footer className="app-footer">
-        <p>Powered by SlideSpeaker AI • Where presentations meet AI magic</p>
+        <p>Powered by SlideSpeaker AI • Where presentations become your masterpiece</p>
       </footer>
     </div>
   );

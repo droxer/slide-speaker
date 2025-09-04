@@ -18,16 +18,14 @@ load_dotenv()
 # Add the current directory to Python path so we can import slidespeaker modules
 sys.path.insert(0, str(Path(__file__).parent))
 
+from slidespeaker.utils.logging_config import setup_logging  # noqa: E402
+
+log_level = os.getenv("LOG_LEVEL", "INFO")
+log_file = os.getenv("LOG_FILE")
+setup_logging(log_level, log_file)
+
 from slidespeaker.core.task_queue import task_queue  # noqa: E402
 from slidespeaker.pipeline.coordinator import process_presentation  # noqa: E402
-
-# Configure logging
-logger.remove()
-logger.add(
-    sys.stderr,
-    format="{time} | {level} | {name}:{function}:{line} - {message}",
-    level="INFO",
-)
 
 
 class TaskProgressMonitor:
@@ -40,12 +38,21 @@ class TaskProgressMonitor:
     async def monitor_progress(self) -> None:
         """Monitor task progress and log updates"""
         check_count = 0
+        last_status = None
         while self.monitoring:
             try:
                 # Get current task status
                 task = await task_queue.get_task(self.task_id)
                 if task and "status" in task:
                     check_count += 1
+
+                    # Log status changes
+                    current_status = task["status"]
+                    if current_status != last_status:
+                        logger.info(
+                            f"Task {self.task_id} status changed from '{last_status}' to '{current_status}'"
+                        )
+                        last_status = current_status
 
                     # Log detailed status every 5 checks (every 25 seconds)
                     if check_count % 5 == 0:
@@ -90,11 +97,15 @@ async def process_task(task_id: str) -> bool:
     # Get task details from Redis
     task = await task_queue.get_task(task_id)
     if not task:
-        logger.error(f"Task {task_id} not found")
+        logger.error(f"Task {task_id} not found in Redis")
         return False
 
+    logger.info(
+        f"Task {task_id} retrieved from Redis with status: {task.get('status', 'unknown')}"
+    )
+
     if task["status"] == "cancelled":
-        logger.info(f"Task {task_id} was cancelled, skipping")
+        logger.info(f"Task {task_id} was cancelled, skipping processing")
         return True
 
     # Start progress monitoring
@@ -122,8 +133,23 @@ async def process_task(task_id: str) -> bool:
             f"subtitle_language: {subtitle_language}, generate_avatar: {generate_avatar}"
         )
 
-        if not file_id or not file_path or not file_ext:
-            raise ValueError("Missing required parameters for presentation processing")
+        # Validate required parameters
+        missing_params = []
+        if not file_id:
+            missing_params.append("file_id")
+        if not file_path:
+            missing_params.append("file_path")
+        if not file_ext:
+            missing_params.append("file_ext")
+
+        if missing_params:
+            error_msg = f"Missing required parameters for presentation processing: {', '.join(missing_params)}"
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        # Log file path security check
+        if file_path and not os.path.exists(file_path):
+            logger.warning(f"File path does not exist: {file_path}")
 
         # Process the presentation
         logger.info(

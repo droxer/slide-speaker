@@ -17,9 +17,12 @@ video_previewer = VideoPreviewer()
 
 async def compose_video_step(file_id: str, file_path: Path) -> None:
     """Compose the final video from all components"""
-    await state_manager.update_step_status(file_id, "compose_video", "processing")
+    await state_manager.update_step_status(file_id, "compose_video", "in_progress")
     logger.info(f"Starting final video composition for file: {file_id}")
     state = await state_manager.get_state(file_id)
+    logger.info(
+        f"Compose video step started - current step: {state.get('current_step', 'unknown') if state else 'no state'}"
+    )
 
     # Check for task cancellation before starting
     if state and state.get("task_id"):
@@ -29,7 +32,7 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
             logger.info(
                 f"Task {state['task_id']} was cancelled during video composition"
             )
-            await state_manager.mark_failed(file_id)
+            await state_manager.mark_cancelled(file_id, cancelled_step="compose_video")
             return
 
     # Comprehensive null checking for all required data
@@ -71,7 +74,11 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
 
     # Validate all required data exists
     if not slide_images_data:
+        logger.error(f"No slide images data found for file {file_id}")
+        logger.error(f"State data: {state}")
         raise ValueError("No slide images data available for video composition")
+
+    logger.info(f"Found {len(slide_images_data)} slide images for composition")
     # Audio files are optional - we can create a video without them
 
     slide_images = [Path(p) for p in slide_images_data]
@@ -85,56 +92,94 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
     if state and "generate_avatar" in state:
         avatar_generation_enabled = state["generate_avatar"]
 
-    # Use avatar videos if available and enabled, otherwise create simple video
-    if avatar_videos_data and avatar_generation_enabled:
-        logger.info("Avatar videos found, creating full presentation with avatars")
-        avatar_videos = [Path(p) for p in avatar_videos_data]
-        # Check for task cancellation before video composition
-        if state and state.get("task_id"):
-            from slidespeaker.core.task_queue import task_queue
+    try:
+        # Use avatar videos if available and enabled, otherwise create simple video
+        if avatar_videos_data and avatar_generation_enabled:
+            logger.info("Avatar videos found, creating full presentation with avatars")
+            avatar_videos = [Path(p) for p in avatar_videos_data]
+            # Check for task cancellation before video composition
+            if state and state.get("task_id"):
+                from slidespeaker.core.task_queue import task_queue
 
-            if await task_queue.is_task_cancelled(state["task_id"]):
-                logger.info(
-                    f"Task {state['task_id']} was cancelled during "
-                    f"avatar video composition"
-                )
-                await state_manager.mark_failed(file_id)
-                return
-        await video_composer.compose_video(
-            slide_images, avatar_videos, audio_files, final_video_path
-        )
-    else:
-        if avatar_generation_enabled:
-            logger.warning(
-                "No avatar videos available, creating simple "
-                "presentation without avatars"
-            )
-        else:
+                if await task_queue.is_task_cancelled(state["task_id"]):
+                    logger.info(
+                        f"Task {state['task_id']} was cancelled during "
+                        f"avatar video composition"
+                    )
+                    await state_manager.mark_cancelled(
+                        file_id, cancelled_step="compose_video"
+                    )
+                    return
+
             logger.info(
-                "Avatar generation disabled, creating simple presentation without avatars"
+                f"Composing video with {len(slide_images)} slides, {len(avatar_videos)} avatars, "
+                f"{len(audio_files)} audio files"
             )
-
-        # Check for task cancellation before video composition
-        if state and state.get("task_id"):
-            from slidespeaker.core.task_queue import task_queue
-
-            if await task_queue.is_task_cancelled(state["task_id"]):
-                logger.info(
-                    f"Task {state['task_id']} was cancelled during simple video composition"
-                )
-                await state_manager.mark_failed(file_id)
-                return
-
-        # Create video based on whether we have audio files or not
-        if audio_files_data:
-            await video_composer.create_simple_video(
-                slide_images, audio_files, final_video_path
+            await video_composer.compose_video(
+                slide_images, avatar_videos, audio_files, final_video_path
             )
         else:
-            logger.info("No audio files available, creating images-only video")
-            await video_composer.create_images_only_video(
-                slide_images, final_video_path
-            )
+            if avatar_generation_enabled:
+                logger.warning(
+                    "No avatar videos available, creating simple "
+                    "presentation without avatars"
+                )
+            else:
+                logger.info(
+                    "Avatar generation disabled, creating simple presentation without avatars"
+                )
+
+            # Check for task cancellation before video composition
+            if state and state.get("task_id"):
+                from slidespeaker.core.task_queue import task_queue
+
+                if await task_queue.is_task_cancelled(state["task_id"]):
+                    logger.info(
+                        f"Task {state['task_id']} was cancelled during simple video composition"
+                    )
+                    await state_manager.mark_cancelled(
+                        file_id, cancelled_step="compose_video"
+                    )
+                    return
+
+            # Create video based on whether we have audio files or not
+            if audio_files_data:
+                # Filter out any invalid audio files
+                valid_audio_files = []
+                for audio_file in audio_files:
+                    is_valid, error_msg = video_composer._validate_audio_file(
+                        audio_file
+                    )
+                    if is_valid:
+                        valid_audio_files.append(audio_file)
+                    else:
+                        logger.warning(f"Skipping invalid audio file: {error_msg}")
+
+                if valid_audio_files:
+                    logger.info(
+                        f"Creating simple video with {len(slide_images)} slides and "
+                        f"{len(valid_audio_files)} valid audio files"
+                    )
+                    await video_composer.create_simple_video(
+                        slide_images, valid_audio_files, final_video_path
+                    )
+                else:
+                    logger.warning(
+                        "No valid audio files found, creating images-only video"
+                    )
+                    await video_composer.create_images_only_video(
+                        slide_images, final_video_path
+                    )
+            else:
+                logger.info(
+                    f"Creating images-only video with {len(slide_images)} slides"
+                )
+                await video_composer.create_images_only_video(
+                    slide_images, final_video_path
+                )
+    except Exception as e:
+        logger.error(f"Video composition failed: {e}")
+        raise
 
     await state_manager.update_step_status(
         file_id, "compose_video", "completed", str(final_video_path)

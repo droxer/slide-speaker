@@ -1,28 +1,32 @@
-# SlideSpeaker Todo List
+# SlideSpeaker Logging Improvements Todo List
 
 ## New Features
-- [ ] Add support for more presentation file formats (e.g., Keynote, ODP)
-- [ ] Implement user authentication and account system
-- [ ] Add video editing capabilities (trimming, cutting scenes)
-- [ ] Add voice customization options (pitch, speed, emotion)
-- [ ] Create mobile app version for on-the-go presentation creation
-- [ ] Add batch processing for multiple presentations
+- [x] Add structured logging with key-value pairs for better searchability
+- [x] Implement log levels configuration via environment variables
+- [ ] Add trace-level logging for detailed debugging
+- [x] Implement log rotation and retention policies
+- [ ] Add JSON logging format option for better parsing
 
 ## Enhancement
-- [ ] Improve drag-and-drop file upload experience
-- [ ] Add real-time preview of avatar selection
-- [ ] Create custom avatar selection interface
-- [ ] Implement dark mode for the web interface
-- [ ] Improve progress indicators with more detailed information
-- [ ] Optimize image processing for faster slide conversion
-- [ ] Implement caching for frequently used assets
-- [ ] Add parallel processing for multiple slide conversion
-- [ ] Optimize memory usage during video composition
+- [x] Add more warning logs in master worker for worker process issues
+- [x] Enhance debug logging in task queue operations
+- [x] Add warning logs for Redis connection issues and timeouts
+- [x] Improve error logging with more contextual information
+- [x] Add performance logging for long-running operations
+- [x] Implement consistent log message formatting across all modules
+- [ ] Add resource usage logging (memory, CPU) for monitoring
+- [x] Enhance cancellation logging with more detailed information
+- [ ] Add logging for retry attempts and backoff strategies
+- [x] Implement log filtering by component or task ID
 
 ## Integration
-- [ ] Integrate with Google Drive for file import/export
-- [ ] Add GitHub authentication
-- [ ] Integrate with Google OAuth
-- [ ] Add Sentry integration for error tracking
-- [ ] Integrate with Datadog for application monitoring
-- [ ] Add Zapier integration for workflow automation
+- [ ] Integrate with Sentry for error tracking and monitoring
+- [ ] Add Datadog integration for application performance monitoring
+- [ ] Integrate with ELK stack for centralized log management
+- [ ] Add Prometheus integration for metrics collection
+- [ ] Integrate with Grafana for dashboard visualization
+- [ ] Add Loggly integration for log management
+- [ ] Integrate with CloudWatch for AWS deployments
+- [ ] Add Google Cloud Logging integration
+- [ ] Integrate with Azure Monitor for Microsoft cloud deployments
+- [ ] Add webhook integration for custom log forwarding

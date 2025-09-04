@@ -51,7 +51,7 @@ async def generate_scripts_step(
                 logger.info(
                     f"Task {state['task_id']} was cancelled during script generation"
                 )
-                await state_manager.mark_failed(file_id)
+                await state_manager.mark_cancelled(file_id, cancelled_step=step_name)
                 return
 
         # Get image analysis for this slide if available

@@ -47,10 +47,16 @@ async def process_presentation(
         f"Generate avatar: {generate_avatar}, Generate subtitles: {generate_subtitles}"
     )
 
+    # Log file validation
+    if not file_path.exists():
+        logger.warning(f"File path does not exist: {file_path}")
+    elif not file_path.is_file():
+        logger.warning(f"File path is not a regular file: {file_path}")
+
     # Check if task has been cancelled before starting (if task_id provided)
     if task_id and await task_queue.is_task_cancelled(task_id):
         logger.info(f"Task {task_id} was cancelled before processing started")
-        await state_manager.mark_failed(file_id)
+        await state_manager.mark_cancelled(file_id)
         return
 
     # Initialize state
@@ -93,16 +99,58 @@ async def process_presentation(
 
     try:
         # Process each step in order, skipping completed ones
-        for step_name in steps_order:
+        total_steps = len(steps_order)
+        completed_steps = 0
+
+        for step_index, step_name in enumerate(steps_order, 1):
             # Check for cancellation before processing each step
             if task_id and await task_queue.is_task_cancelled(task_id):
-                logger.info(f"Task {task_id} was cancelled during processing")
-                await state_manager.mark_failed(file_id)
+                logger.info(
+                    f"Task {task_id} was cancelled during processing at step {step_name}"
+                )
+                await state_manager.mark_cancelled(file_id, cancelled_step=step_name)
                 return
 
-            await _execute_step(
-                file_id, file_path, file_ext, step_name, language, task_id=task_id
+            # Get current step status
+            step_status = await state_manager.get_step_status(file_id, step_name)
+            if step_status and step_status.get("status") == "completed":
+                logger.info(
+                    f"Skipping already completed step: {step_name} ({step_index}/{total_steps})"
+                )
+                completed_steps += 1
+                continue
+
+            logger.info(
+                f"Starting processing step: {step_name} ({step_index}/{total_steps})"
             )
+
+            # Execute the step
+            try:
+                await _execute_step(
+                    file_id, file_path, file_ext, step_name, language, task_id
+                )
+
+                # Mark step as completed
+                await state_manager.update_step_status(
+                    file_id, step_name, "completed", data=None
+                )
+                completed_steps += 1
+                logger.info(f"Completed step: {step_name} ({step_index}/{total_steps})")
+
+            except Exception as step_error:
+                logger.error(f"Step {step_name} failed: {step_error}")
+                await state_manager.update_step_status(
+                    file_id, step_name, "failed", data={"error": str(step_error)}
+                )
+                await state_manager.add_error(file_id, str(step_error), step_name)
+                raise step_error
+
+        # All steps completed successfully
+        await state_manager.mark_completed(file_id)
+        logger.info(f"All processing steps completed for file {file_id}")
+
+        if task_id:
+            logger.info(f"Task {task_id} processing completed successfully")
 
     except Exception as e:
         logger.error(f"AI presentation generation failed for file {file_id}: {e}")
@@ -117,11 +165,21 @@ async def process_presentation(
         if state and "current_step" in state:
             current_step = state["current_step"]
 
+        # Check if this was actually a cancellation
+        task_id = state.get("task_id") if state else None
+        was_cancelled = False
+        if task_id and await task_queue.is_task_cancelled(task_id):
+            was_cancelled = True
+
         try:
-            await state_manager.update_step_status(file_id, current_step, "failed")
-            await state_manager.add_error(file_id, str(e), current_step)
-            await state_manager.mark_failed(file_id)
-            logger.info(f"Processing marked as failed for file {file_id}")
+            if was_cancelled:
+                await state_manager.mark_cancelled(file_id, cancelled_step=current_step)
+                logger.info(f"Processing marked as cancelled for file {file_id}")
+            else:
+                await state_manager.update_step_status(file_id, current_step, "failed")
+                await state_manager.add_error(file_id, str(e), current_step)
+                await state_manager.mark_failed(file_id)
+                logger.info(f"Processing marked as failed for file {file_id}")
         except Exception as inner_error:
             logger.error(f"Unable to update processing state: {inner_error}")
 
@@ -233,11 +291,11 @@ async def _execute_step(
         logger.info(f"=== Task {task_id} - Stage already completed: {display_name} ===")
         return
 
-    # Process pending, failed, or processing steps
+    # Process pending, failed, or in_progress steps
     if state and state["steps"][step_name]["status"] in [
         "pending",
         "failed",
-        "processing",
+        "in_progress",
     ]:
         step_display_names = {
             "extract_slides": "Extracting presentation content",
@@ -255,9 +313,9 @@ async def _execute_step(
         display_name = step_display_names.get(step_name, step_name)
         logger.info(f"=== Task {task_id} - Executing stage: {display_name} ===")
 
-        # Update step status to processing
-        await state_manager.update_step_status(file_id, step_name, "processing")
-        logger.info(f"Stage '{display_name}' status updated to processing")
+        # Update step status to in_progress
+        await state_manager.update_step_status(file_id, step_name, "in_progress")
+        logger.info(f"Stage '{display_name}' status updated to in_progress")
 
         try:
             if task_id:
@@ -288,6 +346,11 @@ async def _execute_step(
                 await convert_slides_step(file_id, file_path, file_ext)
             elif step_name == "compose_video":
                 await compose_video_step(file_id, file_path)
+
+            # Mark step as completed
+            await state_manager.update_step_status(
+                file_id, step_name, "completed", data=None
+            )
 
             if task_id:
                 logger.info(f"=== Task {task_id} - Completed: {display_name} ===")

@@ -20,6 +20,14 @@ class Config:
         self._output_dir: Path | None = None
         self._uploads_dir: Path | None = None
 
+        # Watermark configuration
+        self.watermark_enabled = (
+            os.getenv("WATERMARK_ENABLED", "true").lower() == "true"
+        )
+        self.watermark_text = os.getenv("WATERMARK_TEXT", "SlideSpeaker AI")
+        self.watermark_opacity = float(os.getenv("WATERMARK_OPACITY", "0.95"))
+        self.watermark_size = int(os.getenv("WATERMARK_SIZE", "64"))
+
     @property
     def output_dir(self) -> Path:
         """Get the output directory path, configurable via "

@@ -41,6 +41,8 @@ async def get_progress(file_id: str) -> dict[str, Any]:
         "current_step": state["current_step"],
         "steps": state["steps"],
         "errors": state["errors"],
+        "audio_language": state["audio_language"],
+        "subtitle_language": state.get("subtitle_language", state["audio_language"]),
         "created_at": state["created_at"],
         "updated_at": state["updated_at"],
     }

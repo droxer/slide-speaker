@@ -16,7 +16,7 @@ slide_processor = SlideExtractor()
 async def convert_slides_step(file_id: str, file_path: Path, file_ext: str) -> None:
     """Convert slides to images"""
     await state_manager.update_step_status(
-        file_id, "convert_slides_to_images", "processing"
+        file_id, "convert_slides_to_images", "in_progress"
     )
     slide_images = []
     state = await state_manager.get_state(file_id)
@@ -29,7 +29,9 @@ async def convert_slides_step(file_id: str, file_path: Path, file_ext: str) -> N
             logger.info(
                 f"Task {state['task_id']} was cancelled during slide conversion"
             )
-            await state_manager.mark_failed(file_id)
+            await state_manager.mark_cancelled(
+                file_id, cancelled_step="convert_slides_to_images"
+            )
             return
 
     # Safely get slides data with comprehensive null checking
@@ -54,7 +56,9 @@ async def convert_slides_step(file_id: str, file_path: Path, file_ext: str) -> N
                 logger.info(
                     f"Task {state['task_id']} was cancelled during slide conversion"
                 )
-                await state_manager.mark_failed(file_id)
+                await state_manager.mark_cancelled(
+                    file_id, cancelled_step="convert_slides_to_images"
+                )
                 return
 
         image_path = config.output_dir / f"{file_id}_slide_{i + 1}.png"

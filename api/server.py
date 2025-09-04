@@ -10,6 +10,7 @@ from slidespeaker.routes.languages import router as languages_router
 from slidespeaker.routes.progress import router as progress_router
 from slidespeaker.routes.tasks import router as tasks_router
 from slidespeaker.routes.upload import router as upload_router
+from slidespeaker.utils.logging_config import setup_logging
 
 app = FastAPI(title="AI Slider API")
 
@@ -17,7 +18,9 @@ app = FastAPI(title="AI Slider API")
 @app.on_event("startup")
 async def startup_event() -> None:
     """Initialize on startup"""
-    pass
+    log_level = os.getenv("LOG_LEVEL", "INFO")
+    log_file = os.getenv("LOG_FILE")
+    setup_logging(log_level, log_file)
 
 
 app.add_middleware(

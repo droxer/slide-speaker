@@ -1,5 +1,6 @@
 import asyncio
 import gc
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -12,6 +13,8 @@ from moviepy import (
 )
 from moviepy.video.fx.Resize import Resize
 from moviepy.video.VideoClip import TextClip
+
+logger = logging.getLogger(__name__)
 
 
 class VideoComposer:
@@ -45,6 +48,32 @@ class VideoComposer:
         except Exception as e:
             return False, f"Video file is corrupted: {video_path} - {str(e)}"
 
+    def _validate_audio_file(self, audio_path: Path) -> tuple[bool, str]:
+        """
+        Validate audio file exists and is not corrupted
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        if not audio_path.exists():
+            return False, f"Audio file does not exist: {audio_path}"
+
+        if audio_path.stat().st_size == 0:
+            return False, f"Audio file is empty: {audio_path}"
+
+        try:
+            # Quick validation by loading the audio file
+            with AudioFileClip(str(audio_path)) as clip:
+                duration = clip.duration
+                if duration <= 0:
+                    return (
+                        False,
+                        f"Audio file has zero or negative duration: {audio_path}",
+                    )
+                return True, ""
+        except Exception as e:
+            return False, f"Audio file is corrupted: {audio_path} - {str(e)}"
+
     def _get_memory_safe_size(
         self, original_clip: object, max_width: int = 1920, max_height: int = 1080
     ) -> tuple[int, int]:
@@ -73,31 +102,101 @@ class VideoComposer:
         except Exception:
             return 1280, 720  # Safe fallback
 
-    def _create_watermark(self, duration: float) -> TextClip | None:
-        """Create a semi-transparent SlideSpeaker AI watermark"""
+    def _create_watermark(self, final_clip: VideoFileClip) -> TextClip | None:
+        """Create a highly visible SlideSpeaker AI watermark - memory-optimized for long videos"""
         try:
-            watermark = TextClip(
-                "SlideSpeaker AI",
-                fontsize=20,
-                color="white",
-                font="Arial-Bold",
-                bg_color="rgba(0,0,0,0.4)",  # Semi-transparent black background
-                size=(200, 40),
-                method="caption",
+            from slidespeaker.utils.config import config
+
+            if not config.watermark_enabled:
+                logger.info("Watermark disabled via configuration")
+                return None
+
+            logger.info("Starting watermark creation...")
+
+            try:
+                visible_font_size = max(config.watermark_size, 48)
+                try:
+                    watermark = TextClip(
+                        text=config.watermark_text,
+                        font_size=visible_font_size,
+                        color="white",
+                        stroke_color="black",
+                        stroke_width=4,  # Thicker stroke for maximum contrast
+                        method="label",
+                        font="Arial",  # Use standard Arial font
+                    )
+                    logger.info("✓ Enhanced watermark created successfully")
+                except Exception as font_error:
+                    logger.warning(
+                        f"Enhanced watermark with Arial failed: {font_error}"
+                    )
+                    # Fallback to system default font
+                    watermark = TextClip(
+                        text=config.watermark_text,
+                        font_size=visible_font_size,
+                        color="white",
+                        stroke_color="black",
+                        stroke_width=3,
+                        method="label",
+                    )
+                    logger.info("✓ Fallback watermark created successfully")
+
+            except Exception as e:
+                logger.warning(f"Enhanced watermark failed: {e}")
+                logger.info("Attempting fallback watermark...")
+
+                try:
+                    # Use enhanced fallback with larger size
+                    visible_font_size = max(config.watermark_size, 42)
+                    watermark = TextClip(
+                        text=config.watermark_text,
+                        font_size=visible_font_size,
+                        color="white",
+                        stroke_color="black",
+                        stroke_width=3,  # Thicker fallback stroke
+                        font="Arial",
+                    )
+                    logger.info("✓ Fallback watermark created successfully")
+                except Exception as e2:
+                    logger.error(f"Fallback watermark also failed: {e2}")
+                    return None
+
+            # Position watermark relative to video dimensions with margins
+            # Calculate exact position: video.w - watermark.w - 50, video.h - watermark.h - 50
+            # Use lambda function for dynamic positioning based on video dimensions
+            watermark_width = watermark.size[0]
+            watermark_height = watermark.size[1]
+
+            try:
+                width = int(final_clip.w)
+                height = int(final_clip.h)
+            except (AttributeError, ValueError):
+                # Fallback if clip doesn't have w/h attributes
+                if hasattr(final_clip, "size") and len(final_clip.size) >= 2:
+                    width = int(final_clip.size[0])
+                    height = int(final_clip.size[1])
+                else:
+                    width = 1920
+                    height = 1080
+
+            watermark = watermark.with_position(
+                (
+                    max(0, width - watermark_width - 50),
+                    max(0, height - watermark_height - 50),
+                )
             )
+            watermark = watermark.with_duration(final_clip.duration)
+            # Increase opacity for better visibility
+            visible_opacity = min(max(config.watermark_opacity, 0.9), 1.0)
+            watermark = watermark.with_opacity(visible_opacity)
 
-            # Set position (bottom right corner with some margin)
-            watermark = watermark.with_position(("right", "bottom")).with_duration(
-                duration
-            )
-
-            # Add slight transparency to the watermark itself
-            watermark = watermark.with_effects([lambda clip: clip.with_opacity(0.7)])
-
+            logger.info(f"✓ Watermark ready: '{config.watermark_text}'")
+            logger.info("=== WATERMARK CREATION COMPLETE ===")
             return watermark
+
         except Exception as e:
-            print(f"Watermark creation error: {e}")
-            # Return None if watermark creation fails - don't break the video
+            logger.error(f"Watermark creation failed: {e}")
+            logger.exception("Full watermark creation traceback:")
             return None
 
     async def compose_video(
@@ -109,52 +208,45 @@ class VideoComposer:
     ) -> None:
         """
         Compose final video with slide images as background and AI avatar presenting
-        Memory-efficient version with progress tracking and error handling
+        Memory-efficient version with progress tracking, error handling, and timeout protection
         """
 
         def _compose_video_sync() -> None:
             try:
-                print(
+                logger.info(
                     f"Starting video composition with {len(slide_images)} slides and avatars"
                 )
 
-                # Validate all avatar videos before processing
-                valid_avatar_videos = []
-                valid_audio_files = []
-                valid_slide_images = []
-
-                for i, (slide_image, avatar_video, audio_file) in enumerate(
-                    zip(slide_images, avatar_videos, audio_files, strict=False)
+                # Validate inputs
+                if not slide_images:
+                    raise ValueError("No slide images provided")
+                if not avatar_videos:
+                    logger.warning(
+                        "No avatar videos provided, falling back to simple video"
+                    )
+                    return
+                if len(slide_images) != len(avatar_videos) or len(slide_images) != len(
+                    audio_files
                 ):
-                    print(f"Validating slide {i + 1} components...")
+                    logger.warning(
+                        f"Mismatched file counts: slides={len(slide_images)}, "
+                        f"avatars={len(avatar_videos)}, audio={len(audio_files)}"
+                    )
 
-                    # Validate files
-                    is_valid, error_msg = self._validate_video_file(avatar_video)
-                    if not is_valid:
-                        print(f"Skipping avatar video {i + 1}: {error_msg}")
-                        continue
+                # Ensure minimum for processing
+                min_files = min(len(slide_images), len(avatar_videos), len(audio_files))
+                if min_files == 0:
+                    raise ValueError("No valid files for video composition")
 
-                    if not slide_image.exists():
-                        print(f"Skipping slide image {i + 1}: {slide_image} not found")
-                        continue
+                # Truncate to minimum to prevent mismatched processing
+                valid_slide_images = slide_images[:min_files]
+                valid_avatar_videos = avatar_videos[:min_files]
+                valid_audio_files = audio_files[:min_files]
 
-                    if not audio_file.exists():
-                        print(f"Skipping audio file {i + 1}: {audio_file} not found")
-                        continue
-
-                    valid_slide_images.append(slide_image)
-                    valid_avatar_videos.append(avatar_video)
-                    valid_audio_files.append(audio_file)
-
-                if not valid_slide_images:
-                    raise ValueError("No valid slide/image combinations found")
-
-                print(f"Processing {len(valid_slide_images)} valid slides...")
-
-                # Process slides one at a time to avoid memory issues
-                video_clips = []
-
-                print(f"Processing {len(valid_slide_images)} slides individually...")
+                # Validate all avatar videos before processing
+                final_avatar_videos = []
+                final_audio_files = []
+                final_slide_images = []
 
                 for i, (slide_image, avatar_video, audio_file) in enumerate(
                     zip(
@@ -164,7 +256,52 @@ class VideoComposer:
                         strict=False,
                     )
                 ):
-                    print(f"Processing slide {i + 1}/{len(valid_slide_images)}...")
+                    logger.info(f"Validating slide {i + 1} components...")
+
+                    # Validate files
+                    is_valid, error_msg = self._validate_video_file(avatar_video)
+                    if not is_valid:
+                        logger.warning(f"Skipping avatar video {i + 1}: {error_msg}")
+                        continue
+
+                    if not slide_image.exists():
+                        logger.warning(
+                            f"Skipping slide image {i + 1}: {slide_image} not found"
+                        )
+                        continue
+
+                    is_valid, error_msg = self._validate_audio_file(audio_file)
+                    if not is_valid:
+                        logger.warning(f"Skipping audio file {i + 1}: {error_msg}")
+                        continue
+
+                    final_slide_images.append(slide_image)
+                    final_avatar_videos.append(avatar_video)
+                    final_audio_files.append(audio_file)
+
+                if not final_slide_images:
+                    raise ValueError("No valid slide/image combinations found")
+
+                logger.info(f"Processing {len(final_slide_images)} valid slides...")
+
+                # Process slides one at a time to avoid memory issues
+                video_clips = []
+
+                logger.info(
+                    f"Processing {len(final_slide_images)} slides individually..."
+                )
+
+                for i, (slide_image, avatar_video, audio_file) in enumerate(
+                    zip(
+                        final_slide_images,
+                        final_avatar_videos,
+                        final_audio_files,
+                        strict=False,
+                    )
+                ):
+                    logger.info(
+                        f"Processing slide {i + 1}/{len(final_slide_images)}..."
+                    )
 
                     try:
                         # Load audio to get duration
@@ -198,7 +335,7 @@ class VideoComposer:
                         gc.collect()
 
                     except Exception as e:
-                        print(f"Error processing slide {i + 1}: {e}")
+                        logger.error(f"Error processing slide {i + 1}: {e}")
                         # Clean up any open clips for this slide
                         try:
                             if "audio_clip" in locals():
@@ -214,15 +351,32 @@ class VideoComposer:
                 if not video_clips:
                     raise ValueError("No valid clips were created")
 
-                print("Concatenating all clips...")
+                logger.info("Concatenating all clips...")
                 final_clip = concatenate_videoclips(video_clips)
-
-                # Add watermark
-                watermark = self._create_watermark(final_clip.duration)
+                watermark = self._create_watermark(final_clip)
                 if watermark:
-                    final_clip = CompositeVideoClip([final_clip, watermark])
+                    logger.info("✓ Watermark received from _create_watermark")
+                    logger.info("Adding watermark to final video...")
 
-                print("Writing final video...")
+                    try:
+                        # Use memory-efficient composition
+                        final_clip = CompositeVideoClip(
+                            [final_clip, watermark], use_bgclip=True
+                        )
+                        logger.info(
+                            "✓ Watermark successfully composited with final video"
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to composite watermark: {e}")
+                        logger.exception("Watermark composition traceback:")
+                else:
+                    logger.warning(
+                        "✗ No watermark created or watermark creation failed"
+                    )
+
+                logger.info("=== WATERMARK INTEGRATION COMPLETE ===")
+
+                logger.info("Writing final video...")
 
                 # Write with optimized settings
                 final_clip.write_videofile(
@@ -239,10 +393,10 @@ class VideoComposer:
                     logger=None,  # Disable moviepy logging
                 )
 
-                print(f"Video composition completed: {output_path}")
+                logger.info(f"Video composition completed: {output_path}")
 
             except Exception as e:
-                print(f"Video composition error: {e}")
+                logger.error(f"Video composition error: {e}")
                 raise
             finally:
                 # Clean up all clips
@@ -274,59 +428,7 @@ class VideoComposer:
         """
         Fallback method without avatar videos
         """
-
-        def _create_simple_video_sync() -> None:
-            try:
-                video_clips = []
-
-                # Handle case where audio_files might be empty
-                if audio_files:
-                    for slide_image, audio_file in zip(
-                        slide_images, audio_files, strict=False
-                    ):
-                        slide_clip = ImageClip(str(slide_image)).with_duration(
-                            AudioFileClip(str(audio_file)).duration
-                        )
-                        slide_clip = slide_clip.with_audio(
-                            AudioFileClip(str(audio_file))
-                        )
-                        video_clips.append(slide_clip)
-                else:
-                    # Create video clips without audio
-                    for slide_image in slide_images:
-                        # Default duration of 5 seconds per slide if no audio
-                        slide_clip = ImageClip(str(slide_image)).with_duration(5.0)
-                        video_clips.append(slide_clip)
-
-                final_clip = concatenate_videoclips(video_clips)
-
-                # Add SlideSpeaker AI watermark
-                watermark = self._create_watermark(final_clip.duration)
-                if watermark:
-                    final_clip = CompositeVideoClip([final_clip, watermark])
-
-                final_clip.write_videofile(
-                    str(output_path),
-                    fps=24,
-                    codec="libx264",
-                    audio_codec="aac"
-                    if audio_files
-                    else None,  # No audio codec if no audio files
-                    threads=4,
-                )
-
-                for clip in video_clips:
-                    clip.close()
-                final_clip.close()
-
-            except Exception as e:
-                print(f"Simple video composition error: {e}")
-                raise
-
-        # Run the CPU-intensive video composition in a separate thread
-        loop = asyncio.get_event_loop()
-        with ThreadPoolExecutor() as executor:
-            await loop.run_in_executor(executor, _create_simple_video_sync)
+        await self._create_basic_video(slide_images, audio_files, output_path)
 
     async def create_images_only_video(
         self, slide_images: list[Path], output_path: Path
@@ -334,20 +436,69 @@ class VideoComposer:
         """
         Create a video with only images and no audio
         """
+        await self._create_basic_video(slide_images, [], output_path)
 
-        def _create_images_only_video_sync() -> None:
+    async def _create_basic_video(
+        self, slide_images: list[Path], audio_files: list[Path], output_path: Path
+    ) -> None:
+        """
+        Common method for creating basic videos with or without audio
+        """
+
+        def _create_basic_video_sync() -> None:
             try:
                 video_clips = []
 
-                # Create video clips without audio (5 seconds per slide)
-                for slide_image in slide_images:
-                    slide_clip = ImageClip(str(slide_image)).with_duration(5.0)
-                    video_clips.append(slide_clip)
+                if not slide_images:
+                    raise ValueError("No slide images provided")
+
+                has_audio = bool(audio_files and len(audio_files) > 0)
+                logger.info(
+                    f"Creating basic video with {len(slide_images)} slides, audio={has_audio}"
+                )
+
+                if has_audio:
+                    # Process with audio
+                    for slide_image, audio_file in zip(
+                        slide_images, audio_files, strict=False
+                    ):
+                        # Validate audio file before processing
+                        is_valid, error_msg = self._validate_audio_file(audio_file)
+                        if not is_valid:
+                            logger.warning(f"Skipping audio file: {error_msg}")
+                            continue
+
+                        try:
+                            audio_clip = AudioFileClip(str(audio_file))
+                            duration = audio_clip.duration
+                            if duration <= 0:
+                                logger.warning(
+                                    f"Skipping audio file with zero duration: {audio_file}"
+                                )
+                                audio_clip.close()
+                                continue
+
+                            slide_clip = ImageClip(str(slide_image)).with_duration(
+                                duration
+                            )
+                            slide_clip = slide_clip.with_audio(audio_clip)
+                            video_clips.append(slide_clip)
+                        except Exception as e:
+                            logger.error(f"Error loading audio file {audio_file}: {e}")
+                            continue
+                else:
+                    # Process without audio
+                    for slide_image in slide_images:
+                        # Default duration of 5 seconds per slide if no audio
+                        slide_clip = ImageClip(str(slide_image)).with_duration(5.0)
+                        video_clips.append(slide_clip)
+
+                if not video_clips:
+                    raise ValueError("No valid video clips were created")
 
                 final_clip = concatenate_videoclips(video_clips)
 
-                # Add SlideSpeaker AI watermark
-                watermark = self._create_watermark(final_clip.duration)
+                watermark = self._create_watermark(final_clip)
                 if watermark:
                     final_clip = CompositeVideoClip([final_clip, watermark])
 
@@ -355,22 +506,45 @@ class VideoComposer:
                     str(output_path),
                     fps=24,
                     codec="libx264",
-                    audio_codec=None,  # No audio
-                    threads=4,
+                    audio_codec="aac" if has_audio else None,
+                    threads=2,
+                    preset="medium",
+                    bitrate="2000k",
+                    audio_bitrate="128k",
+                    temp_audiofile=str(output_path.parent / "temp_audio.m4a"),
+                    remove_temp=True,
+                    logger=None,
                 )
 
-                for clip in video_clips:
-                    clip.close()
-                final_clip.close()
-
             except Exception as e:
-                print(f"Images-only video composition error: {e}")
+                logger.error(f"Basic video composition error: {e}")
                 raise
+            finally:
+                # Aggressive cleanup
+                try:
+                    for clip in video_clips:
+                        clip.close()
+                    if "final_clip" in locals():
+                        final_clip.close()
+                    if "watermark" in locals() and watermark:
+                        watermark.close()
+                except Exception:
+                    pass
+                gc.collect()
 
-        # Run the CPU-intensive video composition in a separate thread
+        # Run with timeout to prevent hanging
         loop = asyncio.get_event_loop()
-        with ThreadPoolExecutor() as executor:
-            await loop.run_in_executor(executor, _create_images_only_video_sync)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            try:
+                await asyncio.wait_for(
+                    loop.run_in_executor(executor, _create_basic_video_sync),
+                    timeout=1800,  # 30 minutes timeout
+                )
+            except TimeoutError:
+                video_type = "simple" if audio_files else "images-only"
+                raise Exception(
+                    f"{video_type} video composition timed out after 30 minutes"
+                ) from None
 
     async def create_slide_video(
         self, image_path: Path, audio_path: Path, output_path: Path
@@ -391,30 +565,53 @@ class VideoComposer:
                 # Combine image and audio
                 video_clip = image_clip.with_audio(audio_clip)
 
-                # Add SlideSpeaker AI watermark
-                watermark = self._create_watermark(video_clip.duration)
+                watermark = self._create_watermark(video_clip)
                 if watermark:
+                    logger.info("Adding watermark to single slide video...")
                     video_clip = CompositeVideoClip([video_clip, watermark])
+                    logger.info("✓ Watermark added to single slide video")
+                else:
+                    logger.warning("✗ No watermark for single slide video")
 
-                # Write video
+                # Write video with memory-optimized settings
                 video_clip.write_videofile(
                     str(output_path),
                     fps=24,
                     codec="libx264",
                     audio_codec="aac",
-                    threads=4,
+                    threads=2,  # Reduced threads to prevent hanging
+                    preset="medium",  # Balance quality vs speed
+                    bitrate="2000k",  # Limit bitrate for memory
+                    audio_bitrate="128k",
+                    temp_audiofile=str(output_path.parent / "temp_audio.m4a"),
+                    remove_temp=True,
+                    logger=None,  # Disable moviepy logging
                 )
 
-                # Close clips
-                image_clip.close()
-                audio_clip.close()
-                video_clip.close()
-
             except Exception as e:
-                print(f"Slide video creation error: {e}")
+                logger.error(f"Slide video creation error: {e}")
                 raise
+            finally:
+                # Aggressive cleanup
+                try:
+                    image_clip.close()
+                    audio_clip.close()
+                    video_clip.close()
+                    if "watermark" in locals() and watermark:
+                        watermark.close()
+                except Exception:
+                    pass
+                gc.collect()
 
-        # Run the CPU-intensive video composition in a separate thread
+        # Run with timeout to prevent hanging
         loop = asyncio.get_event_loop()
-        with ThreadPoolExecutor() as executor:
-            await loop.run_in_executor(executor, _create_slide_video_sync)
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            try:
+                await asyncio.wait_for(
+                    loop.run_in_executor(executor, _create_slide_video_sync),
+                    timeout=1800,  # 30 minutes timeout
+                )
+            except TimeoutError:
+                raise Exception(
+                    "Single slide video composition timed out after 30 minutes"
+                ) from None

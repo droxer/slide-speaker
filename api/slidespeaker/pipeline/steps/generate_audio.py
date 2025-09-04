@@ -23,7 +23,7 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
             logger.info(
                 f"Task {state['task_id']} was cancelled during audio generation"
             )
-            await state_manager.mark_failed(file_id)
+            await state_manager.mark_cancelled(file_id, cancelled_step="generate_audio")
             return
 
     # Comprehensive null checking for scripts data
@@ -49,7 +49,9 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
                 logger.info(
                     f"Task {state['task_id']} was cancelled during audio generation"
                 )
-                await state_manager.mark_failed(file_id)
+                await state_manager.mark_cancelled(
+                    file_id, cancelled_step="generate_audio"
+                )
                 return
 
         # Additional null check for individual script data

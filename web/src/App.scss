@@ -359,32 +359,70 @@ body {
   outline: none;
 }
 
-.stop-btn {
-  background: linear-gradient(135deg, #ef4444, #dc2626);
-  color: white;
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 12px;
+.cancel-btn {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(248, 250, 252, 0.95));
+  color: #ef4444;
+  padding: 0.875rem 2rem;
+  border: 1.5px solid rgba(239, 68, 68, 0.2);
+  border-radius: 50px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  font-size: 0.95rem;
-  font-weight: 600;
-  max-width: 200px;
-  margin: 1rem auto;
-  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  max-width: 180px;
+  margin: 1.5rem auto;
+  backdrop-filter: blur(20px);
   position: relative;
   overflow: hidden;
   outline: none;
+  box-shadow: 0 8px 32px rgba(239, 68, 68, 0.15);
 }
 
-.stop-btn:hover {
-  background: linear-gradient(135deg, #dc2626, #b91c1c);
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.35);
+.cancel-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transition: left 0.6s ease;
 }
 
-.stop-btn:focus {
-  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.4);
+.cancel-btn:hover::before {
+  left: 100%;
+}
+
+.cancel-btn:hover {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: #dc2626;
+  border-color: rgba(220, 38, 38, 0.4);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 12px 40px rgba(239, 68, 68, 0.25);
+}
+
+.cancel-btn:active {
+  transform: translateY(-1px) scale(0.98);
+  background: linear-gradient(135deg, #fca5a5, #f87171);
+}
+
+.cancel-btn:focus {
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.25), 0 8px 32px rgba(239, 68, 68, 0.15);
+}
+
+@keyframes pulse-red {
+  0%, 100% {
+    box-shadow: 0 8px 32px rgba(239, 68, 68, 0.15);
+  }
+  50% {
+    box-shadow: 0 8px 32px rgba(239, 68, 68, 0.25);
+  }
+}
+
+.cancel-btn {
+  animation: pulse-red 2s ease-in-out infinite;
 }
 
 .primary-btn {
@@ -628,7 +666,8 @@ body {
   border-color: #22c55e;
 }
 
-.step-item.processing {
+.step-item.processing,
+.step-item.in_progress {
   background: #dbeafe;
   border-color: #3b82f6;
   position: relative;
@@ -636,7 +675,8 @@ body {
   animation: stepPulse 2s ease-in-out infinite;
 }
 
-.step-item.processing::before {
+.step-item.processing::before,
+.step-item.in_progress::before {
   content: '';
   position: absolute;
   top: 0;
@@ -693,7 +733,8 @@ body {
   font-weight: 600;
 }
 
-.step-item.processing .step-icon {
+.step-item.processing .step-icon,
+.step-item.in_progress .step-icon {
   display: inline-block;
   animation: stepSpin 1s linear infinite;
 }
@@ -991,27 +1032,29 @@ body {
 
 .info-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 0.75rem;
 }
 
 .info-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 1.25rem;
+  padding: 0.875rem 1rem;
   background: rgba(248, 250, 252, 0.9);
-  border-radius: 14px;
+  border-radius: 12px;
   border: 1px solid rgba(226, 232, 240, 0.7);
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   transition: all 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .info-item:hover {
   background: rgba(241, 245, 249, 0.95);
   border-color: rgba(203, 213, 225, 0.8);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
 }
 
 @media (max-width: 768px) {
@@ -1022,11 +1065,16 @@ body {
   
   .info-grid {
     grid-template-columns: 1fr;
-    gap: 0.75rem;
+    gap: 0.5rem;
   }
   
   .info-item {
-    padding: 0.875rem 1rem;
+    padding: 0.75rem 0.875rem;
+  }
+  
+  .info-label,
+  .info-value {
+    font-size: 0.8rem;
   }
   
   .preview-info-compact h4 {
@@ -1038,17 +1086,23 @@ body {
 .info-label {
   color: #475569;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   letter-spacing: -0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+  margin-right: 0.5rem;
 }
 
 .info-value {
   color: #0f172a;
-  font-weight: 700;
-  font-size: 0.9rem;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
 }
 
 /* Status indicator styles - we'll handle this with classes in React */
