@@ -20,7 +20,7 @@ async def startup_event() -> None:
     """Initialize on startup"""
     log_level = os.getenv("LOG_LEVEL", "INFO")
     log_file = os.getenv("LOG_FILE")
-    setup_logging(log_level, log_file)
+    setup_logging(log_level, log_file, enable_file_logging=log_file is not None)
 
 
 app.add_middleware(
