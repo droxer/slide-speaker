@@ -89,6 +89,7 @@ HEYGEN_API_KEY=your_key
 - Local storage for task state persistence (prevents data loss on page refresh)
 - Smoother subtitle transitions between slides
 - Improved UI with better error handling and progress tracking
+- Fixed video preview modal darkness issues with optimized overlay styling
 
 **Code Quality Improvements**:
 - Fixed E402 import order errors in script_reviewer.py by moving imports to the top of the file

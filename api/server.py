@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from slidespeaker.routes.downloads import router as downloads_router
 from slidespeaker.routes.languages import router as languages_router
+from slidespeaker.routes.monitoring import router as monitoring_router
 from slidespeaker.routes.progress import router as progress_router
 from slidespeaker.routes.tasks import router as tasks_router
 from slidespeaker.routes.upload import router as upload_router
@@ -43,6 +44,7 @@ app.include_router(tasks_router)
 app.include_router(progress_router)
 app.include_router(downloads_router)
 app.include_router(languages_router)
+app.include_router(monitoring_router)
 
 
 @app.get("/")

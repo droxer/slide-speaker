@@ -124,14 +124,14 @@ async def process_task(task_id: str) -> bool:
         file_id = kwargs.get("file_id")
         file_path = kwargs.get("file_path")
         file_ext = kwargs.get("file_ext")
-        language = kwargs.get("language", "english")
+        voice_language = kwargs.get("voice_language", "english")
         subtitle_language = kwargs.get("subtitle_language")
         generate_avatar = kwargs.get("generate_avatar", True)
         generate_subtitles = True  # Always generate subtitles
 
         logger.info(
             f"Task {task_id} parameters extracted - file_id: {file_id}, "
-            f"file_ext: {file_ext}, language: {language}, "
+            f"file_ext: {file_ext}, voice_language: {voice_language}, "
             f"subtitle_language: {subtitle_language}, generate_avatar: {generate_avatar}"
         )
 
@@ -161,7 +161,7 @@ async def process_task(task_id: str) -> bool:
             file_id,
             Path(file_path),
             file_ext,
-            language,
+            voice_language,
             subtitle_language,
             generate_avatar,
             generate_subtitles,

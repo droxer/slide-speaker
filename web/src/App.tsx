@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import './App.scss';
+import TaskMonitor from './components/TaskMonitor';
 
 // Constants for local storage keys
 const LOCAL_STORAGE_KEYS = {
@@ -148,6 +149,7 @@ function App() {
   const [generateAvatar, setGenerateAvatar] = useState<boolean>(false);
   const [generateSubtitles, setGenerateSubtitles] = useState<boolean>(true);
   const [isResumingTask, setIsResumingTask] = useState<boolean>(false);
+  const [showTaskMonitor, setShowTaskMonitor] = useState<boolean>(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -515,13 +517,52 @@ function App() {
   return (
     <div className="App">
       <header className="app-header">
-        <h1>SlideSpeaker AI</h1>
-        <p>Transform slides into AI-powered videos</p>
+        <div className="header-content">
+          <div className="header-left">
+            {/* Spacer to balance the layout */}
+          </div>
+          <div className="header-center">
+            <h1>SlideSpeaker AI</h1>
+            <p>Transform slides into AI-powered videos</p>
+          </div>
+          <div className="header-right">
+            <div className="view-toggle" role="tablist" aria-label="View Toggle">
+              <button
+                onClick={() => setShowTaskMonitor(false)}
+                className={`toggle-btn ${!showTaskMonitor ? 'active' : ''}`}
+                title="Processing View"
+                role="tab"
+                aria-selected={!showTaskMonitor}
+                aria-controls="processing-panel"
+              >
+                <span className="toggle-icon" aria-hidden="true">▶</span>
+                <span className="toggle-text">Process</span>
+              </button>
+              <button
+                onClick={() => setShowTaskMonitor(true)}
+                className={`toggle-btn ${showTaskMonitor ? 'active' : ''}`}
+                title="Task Monitor"
+                role="tab"
+                aria-selected={showTaskMonitor}
+                aria-controls="monitor-panel"
+              >
+                <span className="toggle-icon" aria-hidden="true">📊</span>
+                <span className="toggle-text">Monitor</span>
+              </button>
+            </div>
+          </div>
+        </div>
       </header>
 
       <main className="main-content">
-        <div className="card-container">
-          <div className={`content-card ${status === 'completed' ? 'wide' : ''}`}>
+        {showTaskMonitor ? (
+          <div id="monitor-panel" role="tabpanel" aria-labelledby="monitor-tab">
+            <TaskMonitor apiBaseUrl={API_BASE_URL} />
+          </div>
+        ) : (
+          <div id="processing-panel" role="tabpanel" aria-labelledby="process-tab">
+            <div className="card-container">
+              <div className={`content-card ${status === 'completed' ? 'wide' : ''}`}>
             {status === 'idle' && (
               <div className="upload-view">
                 {isResumingTask && (
@@ -826,8 +867,10 @@ function App() {
                 </button>
               </div>
             )}
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </main>
 
       <footer className="app-footer">
