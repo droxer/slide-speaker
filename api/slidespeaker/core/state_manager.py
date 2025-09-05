@@ -30,7 +30,7 @@ class RedisStateManager:
         file_id: str,
         file_path: Path,
         file_ext: str,
-        audio_language: str = "english",
+        voice_language: str = "english",
         subtitle_language: str | None = None,
         generate_avatar: bool = True,
         generate_subtitles: bool = True,
@@ -58,9 +58,9 @@ class RedisStateManager:
         # Only include subtitle script generation steps if languages are different
         # Default to audio language if subtitle language is not specified
         effective_subtitle_language = (
-            subtitle_language if subtitle_language is not None else audio_language
+            subtitle_language if subtitle_language is not None else voice_language
         )
-        if audio_language != effective_subtitle_language:
+        if voice_language != effective_subtitle_language:
             steps.update(
                 {
                     "generate_subtitle_scripts": {"status": "pending", "data": None},
@@ -72,7 +72,7 @@ class RedisStateManager:
             "file_id": file_id,
             "file_path": str(file_path),
             "file_ext": file_ext,
-            "audio_language": audio_language,
+            "voice_language": voice_language,
             "subtitle_language": subtitle_language,
             "generate_avatar": generate_avatar,
             "generate_subtitles": generate_subtitles,

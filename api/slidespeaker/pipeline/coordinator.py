@@ -30,7 +30,7 @@ async def process_presentation(
     file_id: str,
     file_path: Path,
     file_ext: str,
-    language: str = "english",
+    voice_language: str = "english",
     subtitle_language: str | None = None,
     generate_avatar: bool = True,
     generate_subtitles: bool = True,
@@ -48,7 +48,9 @@ async def process_presentation(
     logger.info(
         f"Initiating AI presentation generation for file: {file_id}, format: {file_ext}"
     )
-    logger.info(f"Audio language: {language}, Subtitle language: {subtitle_language}")
+    logger.info(
+        f"Voice language: {voice_language}, Subtitle language: {subtitle_language}"
+    )
     logger.info(
         f"Generate avatar: {generate_avatar}, Generate subtitles: {generate_subtitles}"
     )
@@ -72,7 +74,7 @@ async def process_presentation(
             file_id,
             file_path,
             file_ext,
-            language,
+            voice_language,
             subtitle_language,
             generate_avatar,
             generate_subtitles,
@@ -85,7 +87,7 @@ async def process_presentation(
     else:
         # Update existing state with new parameters (in case they've changed)
         if state:
-            state["audio_language"] = language
+            state["voice_language"] = voice_language
             state["subtitle_language"] = subtitle_language
             state["generate_avatar"] = generate_avatar
             state["generate_subtitles"] = generate_subtitles
@@ -101,7 +103,9 @@ async def process_presentation(
         logger.info(f"=== Starting step-by-step processing for task {task_id} ===")
 
     # Define processing steps in order
-    steps_order = _get_processing_steps(language, subtitle_language, generate_avatar)
+    steps_order = _get_processing_steps(
+        voice_language, subtitle_language, generate_avatar
+    )
 
     try:
         # Process each step in order, skipping completed ones
@@ -133,7 +137,7 @@ async def process_presentation(
             # Execute the step
             try:
                 await _execute_step(
-                    file_id, file_path, file_ext, step_name, language, task_id
+                    file_id, file_path, file_ext, step_name, voice_language, task_id
                 )
 
                 # Mark step as completed
@@ -221,7 +225,7 @@ async def _log_initial_state(file_id: str) -> None:
 
 
 def _get_processing_steps(
-    language: str, subtitle_language: str | None, generate_avatar: bool
+    voice_language: str, subtitle_language: str | None, generate_avatar: bool
 ) -> list[str]:
     """
     Get the ordered list of processing steps based on parameters.
@@ -238,7 +242,7 @@ def _get_processing_steps(
     ]
 
     # Add subtitle script generation steps only if languages are different
-    if language != subtitle_language:
+    if voice_language != subtitle_language:
         steps_order.extend(["generate_subtitle_scripts", "review_subtitle_scripts"])
 
     # Continue with audio and video generation
@@ -262,7 +266,7 @@ async def _execute_step(
     file_path: Path,
     file_ext: str,
     step_name: str,
-    language: str = "english",
+    voice_language: str = "english",
     task_id: str | None = None,
 ) -> None:
     """
@@ -286,7 +290,7 @@ async def _execute_step(
         subtitle_language = state["subtitle_language"]
     # Default to audio language if subtitle language not specified
     if subtitle_language is None:
-        subtitle_language = language
+        subtitle_language = voice_language
 
     # Skip completed steps
     if state and state["steps"][step_name]["status"] == "completed":
@@ -343,17 +347,17 @@ async def _execute_step(
             elif step_name == "analyze_slide_images":
                 await analyze_slides_step(file_id)
             elif step_name == "generate_scripts":
-                await generate_scripts_step(file_id, language)
+                await generate_scripts_step(file_id, voice_language)
             elif step_name == "generate_subtitle_scripts":
                 await generate_scripts_step(
                     file_id, subtitle_language, is_subtitle=True
                 )
             elif step_name == "review_scripts":
-                await review_scripts_step(file_id, language)
+                await review_scripts_step(file_id, voice_language)
             elif step_name == "review_subtitle_scripts":
                 await review_scripts_step(file_id, subtitle_language, is_subtitle=True)
             elif step_name == "generate_audio":
-                await generate_audio_step(file_id, language)
+                await generate_audio_step(file_id, voice_language)
             elif step_name == "generate_avatar_videos":
                 await generate_avatar_step(file_id)
             elif step_name == "generate_subtitles":

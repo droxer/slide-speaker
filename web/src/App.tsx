@@ -33,7 +33,7 @@ interface ProcessingDetails {
   current_step: string;
   steps: Record<string, StepDetails>;
   errors: ProcessingError[];
-  audio_language?: string;
+  voice_language?: string;
   subtitle_language?: string;
   created_at: string;
   updated_at: string;
@@ -48,7 +48,7 @@ const localStorageUtils = {
     taskId: string | null;
     status: AppStatus;
     processingDetails: ProcessingDetails | null;
-    language: string;
+    voiceLanguage: string;
     subtitleLanguage: string;
     generateAvatar: boolean;
     generateSubtitles: boolean;
@@ -143,7 +143,7 @@ function App() {
   const [status, setStatus] = useState<AppStatus>('idle');
   const [progress, setProgress] = useState<number>(0);
   const [processingDetails, setProcessingDetails] = useState<ProcessingDetails | null>(null);
-  const [language, setLanguage] = useState<string>('english');
+  const [voiceLanguage, setVoiceLanguage] = useState<string>('english');
   const [subtitleLanguage, setSubtitleLanguage] = useState<string>('english');
   const [generateAvatar, setGenerateAvatar] = useState<boolean>(false);
   const [generateSubtitles, setGenerateSubtitles] = useState<boolean>(true);
@@ -179,7 +179,7 @@ function App() {
         {
           filename: file.name,
           file_data: base64File,
-          language: language,
+          voice_language: voiceLanguage,
           subtitle_language: subtitleLanguage,
           generate_avatar: generateAvatar,
           generate_subtitles: generateSubtitles
@@ -262,7 +262,7 @@ function App() {
         setStatus(savedState.status);
         setProgress(savedState.processingDetails?.progress || 0);
         setProcessingDetails(savedState.processingDetails);
-        setLanguage(savedState.language);
+        setVoiceLanguage(savedState.voiceLanguage);
         setSubtitleLanguage(savedState.subtitleLanguage);
         setGenerateAvatar(savedState.generateAvatar);
         setGenerateSubtitles(savedState.generateSubtitles);
@@ -288,7 +288,7 @@ function App() {
         taskId,
         status,
         processingDetails,
-        language,
+        voiceLanguage,
         subtitleLanguage,
         generateAvatar,
         generateSubtitles
@@ -299,7 +299,7 @@ function App() {
     taskId,
     status,
     processingDetails,
-    language,
+    voiceLanguage,
     subtitleLanguage,
     generateAvatar,
     generateSubtitles,
@@ -558,8 +558,8 @@ function App() {
                       <label htmlFor="language-select">Voice Language</label>
                       <select 
                         id="language-select" 
-                        value={language} 
-                        onChange={(e) => setLanguage(e.target.value)}
+                        value={voiceLanguage} 
+                        onChange={(e) => setVoiceLanguage(e.target.value)}
                         className="language-select"
                       >
                         <option value="english">English</option>
@@ -729,7 +729,7 @@ function App() {
                       <div className="info-grid">
                         <div className="info-item">
                           <span className="info-label">Voice Language:</span>
-                          <span className="info-value">{processingDetails?.audio_language ? getLanguageDisplayName(processingDetails.audio_language) : 'English'}</span>
+                          <span className="info-value">{processingDetails?.voice_language ? getLanguageDisplayName(processingDetails.voice_language) : 'English'}</span>
                         </div>
                         <div className="info-item">
                           <span className="info-label">Subtitle Language:</span>

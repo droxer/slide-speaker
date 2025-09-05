@@ -95,3 +95,4 @@ HEYGEN_API_KEY=your_key
 - Consolidated documentation into single CLAUDE.md file (removed separate docs/ directory)
 - Added more descriptive comments throughout codebase
 - Improved logging configuration for better debugging
+- Updated Redis key namespace from "ai_slider" to "ss" for consistency

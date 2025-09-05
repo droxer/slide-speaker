@@ -32,7 +32,7 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         body = await request.json()
         filename = body.get("filename")
         file_data = body.get("file_data")
-        language = body.get("language", "english")
+        voice_language = body.get("voice_language", "english")
         subtitle_language = body.get(
             "subtitle_language"
         )  # Don't default to audio language
@@ -54,9 +54,9 @@ async def upload_file(request: Request) -> dict[str, str | None]:
             )
 
         # Validate languages
-        if not locale_utils.validate_language(language):
+        if not locale_utils.validate_language(voice_language):
             raise HTTPException(
-                status_code=400, detail=f"Unsupported audio language: {language}"
+                status_code=400, detail=f"Unsupported voice language: {voice_language}"
             )
 
         if subtitle_language and not locale_utils.validate_language(subtitle_language):
@@ -79,7 +79,7 @@ async def upload_file(request: Request) -> dict[str, str | None]:
             file_id,
             file_path,
             file_ext,
-            language,
+            voice_language,
             subtitle_language,
             generate_avatar,
             generate_subtitles,
@@ -91,7 +91,7 @@ async def upload_file(request: Request) -> dict[str, str | None]:
             file_id=file_id,
             file_path=str(file_path),
             file_ext=file_ext,
-            language=language,
+            voice_language=voice_language,
             subtitle_language=subtitle_language,
             generate_avatar=generate_avatar,
             generate_subtitles=generate_subtitles,
