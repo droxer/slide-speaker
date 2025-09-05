@@ -5,14 +5,19 @@
 SlideSpeaker is an AI-powered application that transforms PDF and PowerPoint presentations into engaging video presentations with AI-generated narration and avatars. The application uses a distributed microservices architecture with clear separation of concerns.
 
 ### Key Features
+- Memory-Efficient Video Processing: Optimized video composition to prevent hanging with AI avatars
 - Distributed processing with Redis queue for scalability
 - Real-time progress tracking
 - Instant task cancellation with resource cleanup
 - Multi-language support (English, Chinese, Japanese, Korean, Thai)
-- AI avatar integration (HeyGen)
-- Text-to-speech (OpenAI and ElevenLabs)
+- AI avatar integration (HeyGen and DALL-E)
+- Text-to-speech (OpenAI, Qwen, and ElevenLabs)
+- AI-powered script refinement for better presentation flow
 - Automatic subtitle generation
 - Responsive React frontend
+- Video validation: Automatic validation of avatar videos before processing
+- State persistence: Local storage prevents data loss on page refresh
+- Enhanced UI: Improved user experience with better error handling
 
 ### Architecture
 ```
@@ -43,8 +48,9 @@ SlideSpeaker is an AI-powered application that transforms PDF and PowerPoint pre
                    ▼          ▼                                     ▼
          ┌──────────────────┐┌──────────────────┐        ┌──────────────────┐
          │  External APIs   ││  External APIs   │        │  External APIs   │
-         │ (OpenAI,HeyGen,  ││ (OpenAI,HeyGen,  │        │ (OpenAI,HeyGen,  │
-         │  ElevenLabs)     ││  ElevenLabs)     │        │  ElevenLabs)     │
+         │ (OpenAI,Qwen,    ││ (OpenAI,Qwen,    │        │ (OpenAI,Qwen,    │
+         │  ElevenLabs,     ││  ElevenLabs,     │        │  ElevenLabs,     │
+         │  HeyGen,DALL-E)  ││  HeyGen,DALL-E)  │        │  HeyGen,DALL-E)  │
          └──────────────────┘└──────────────────┘        └──────────────────┘
 ```
 
@@ -79,10 +85,10 @@ pre-commit run --all-files
 
 ### Prerequisites
 - Python 3.12+
-- Node.js 16+
+- Node.js 20+
 - Redis server
 - FFmpeg
-- API keys for OpenAI, ElevenLabs, and HeyGen
+- API keys for OpenAI, Qwen, ElevenLabs, and HeyGen
 
 ### Backend Setup
 ```bash
@@ -94,6 +100,7 @@ uv sync
 
 # Create .env file with API keys
 # OPENAI_API_KEY=your_openai_api_key
+# QWEN_API_KEY=your_qwen_api_key
 # ELEVENLABS_API_KEY=your_elevenlabs_api_key
 # HEYGEN_API_KEY=your_heygen_api_key
 # REDIS_HOST=localhost
@@ -116,10 +123,10 @@ make master-worker
 cd web
 
 # Install dependencies
-npm install
+pnpm install
 
 # Start development server
-npm start
+pnpm start
 ```
 
 The frontend will be available at `http://localhost:3000` and automatically proxy API requests to the backend at `http://localhost:8000`.
@@ -156,25 +163,25 @@ make clean
 ### Frontend Commands
 ```bash
 # Start development server
-npm start
+pnpm start
 
 # Build for production
-npm run build
+pnpm run build
 
 # Run tests
-npm test
+pnpm test
 
 # Lint code
-npm run lint
+pnpm run lint
 
 # Fix linting issues
-npm run lint:fix
+pnpm run lint:fix
 
 # Type checking
-npm run typecheck
+pnpm run typecheck
 
 # Combined check
-npm run check
+pnpm run check
 ```
 
 ## API Documentation
@@ -190,6 +197,7 @@ All API endpoints are relative to: `http://localhost:8000/api`
 - `GET /api/subtitles/{file_id}/vtt` - Download VTT subtitles
 - `GET /api/task/{task_id}` - Get task status
 - `POST /api/task/{task_id}/cancel` - Cancel task processing
+- `GET /api/languages` - Get supported languages
 
 ### Processing Steps
 1. extract_slides - Extract content from the presentation file
@@ -211,18 +219,18 @@ All API endpoints are relative to: `http://localhost:8000/api`
 
 ### Frontend Development
 1. Make changes to files in the `web/src/` directory
-2. Use `npm start` for development with hot reload
-3. Run `npm run check` to lint and type-check code
-4. Run `npm run lint:fix` to automatically fix linting issues
+2. Use `pnpm start` for development with hot reload
+3. Run `pnpm run check` to lint and type-check code
+4. Run `pnpm run lint:fix` to automatically fix linting issues
 
 ### Code Quality Checks
 The project uses pre-commit hooks to ensure code quality. These hooks automatically run:
 - API linting (`make lint` in api directory)
 - API formatting (`make format` in api directory)
 - API type checking (`make typecheck` in api directory)
-- Web linting (`make lint` in web directory)
-- Web formatting (`make lint-fix` in web directory)
-- Web type checking (`make typecheck` in web directory)
+- Web linting (`pnpm run lint` in web directory)
+- Web formatting (`pnpm run lint:fix` in web directory)
+- Web type checking (`pnpm run typecheck` in web directory)
 
 Before committing, you can manually run all checks with:
 ```bash
@@ -279,43 +287,38 @@ See `docs/script-reviewer-fix.md` for detailed information about this specific i
 
 ## Development Priorities
 
-The project has a TODO.md file that outlines development priorities in three categories:
+Based on the current TODO.md file, the project's logging improvements are a key focus area:
 
 ### New Features
-- Add support for Keynote (.key) presentation files
-- Add support for OpenDocument Presentation (.odp) files
-- Implement user authentication and account management system
-- Add collaborative editing features for teams
-- Create presentation templates and themes
-- Add video editing capabilities (trimming, scene cutting)
-- Implement analytics dashboard for video performance metrics
-- Add voice customization options (pitch, speed, emotion)
-- Create mobile app version for on-the-go presentation creation
-- Add batch processing for multiple presentations simultaneously
+- [x] Add structured logging with key-value pairs for better searchability
+- [x] Implement log levels configuration via environment variables
+- [ ] Add trace-level logging for detailed debugging
+- [x] Implement log rotation and retention policies
+- [ ] Add JSON logging format option for better parsing
 
 ### Enhancement
-- Improve drag-and-drop file upload experience with better feedback
-- Add real-time preview of avatar selection during creation process
-- Create custom avatar selection and configuration interface
-- Implement dark mode for the web interface
-- Add keyboard shortcuts for common actions and navigation
-- Improve progress indicators with more detailed step information
-- Optimize image processing pipeline for faster slide conversion
-- Add tooltips and contextual help throughout the interface
-- Implement responsive design improvements for better mobile experience
-- Add video preview functionality before final download
+- [x] Add more warning logs in master worker for worker process issues
+- [x] Enhance debug logging in task queue operations
+- [x] Add warning logs for Redis connection issues and timeouts
+- [x] Improve error logging with more contextual information
+- [x] Add performance logging for long-running operations
+- [x] Implement consistent log message formatting across all modules
+- [ ] Add resource usage logging (memory, CPU) for monitoring
+- [x] Enhance cancellation logging with more detailed information
+- [ ] Add logging for retry attempts and backoff strategies
+- [x] Implement log filtering by component or task ID
 
 ### Integration
-- Integrate with Google Drive for file import/export capabilities
-- Add Dropbox integration for cloud storage options
-- Integrate with Slack for processing notifications and updates
-- Add GitHub authentication for user login
-- Integrate with Google OAuth for single sign-on
-- Add Microsoft Azure AD integration for enterprise users
-- Integrate with Stripe for premium feature payments
-- Add Sentry integration for error tracking and monitoring
-- Integrate with Datadog for application performance monitoring
-- Add Zapier integration for workflow automation
+- [ ] Integrate with Sentry for error tracking and monitoring
+- [ ] Add Datadog integration for application performance monitoring
+- [ ] Integrate with ELK stack for centralized log management
+- [ ] Add Prometheus integration for metrics collection
+- [ ] Integrate with Grafana for dashboard visualization
+- [ ] Add Loggly integration for log management
+- [ ] Integrate with CloudWatch for AWS deployments
+- [ ] Add Google Cloud Logging integration
+- [ ] Integrate with Azure Monitor for Microsoft cloud deployments
+- [ ] Add webhook integration for custom log forwarding
 
 ## Logging Improvements
 

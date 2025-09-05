@@ -1,6 +1,6 @@
 # SlideSpeaker
 
-SlideSpeaker is an AI-powered application that transforms PDF and PowerPoint presentations into engaging video presentations with AI-generated narration and avatars.
+From slides to videos with AI voices and avatars.
 
 ## Architecture
 
@@ -47,8 +47,6 @@ For detailed documentation, see the [docs](docs/) directory:
 
 - [Installation Guide](docs/installation.md)
 - [API Documentation](docs/api.md)
-- [Architecture Documentation](docs/architecture.md)
-- [Pipeline Diagrams](docs/pipeline-diagrams.md)
 
 ## License
 

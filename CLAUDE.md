@@ -89,3 +89,9 @@ HEYGEN_API_KEY=your_key
 - Local storage for task state persistence (prevents data loss on page refresh)
 - Smoother subtitle transitions between slides
 - Improved UI with better error handling and progress tracking
+
+**Code Quality Improvements**:
+- Fixed E402 import order errors in script_reviewer.py by moving imports to the top of the file
+- Consolidated documentation into single CLAUDE.md file (removed separate docs/ directory)
+- Added more descriptive comments throughout codebase
+- Improved logging configuration for better debugging
