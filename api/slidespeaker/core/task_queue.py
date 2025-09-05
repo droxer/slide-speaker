@@ -19,8 +19,8 @@ class RedisTaskQueue:
         from slidespeaker.utils.redis_config import RedisConfig
 
         self.redis_client = RedisConfig.get_redis_client()
-        self.task_prefix = "ai_slider:task"
-        self.queue_key = "ai_slider:task_queue"
+        self.task_prefix = "ss:task"
+        self.queue_key = "ss:task_queue"
 
     def _get_task_key(self, task_id: str) -> str:
         """Generate Redis key for a task"""

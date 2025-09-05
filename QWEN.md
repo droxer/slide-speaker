@@ -254,20 +254,20 @@ If you encounter issues with task processing, check the following:
 2. **Stale Tasks**: Clean up stale tasks from Redis databases that are no longer in use:
    ```bash
    # Check for tasks in different Redis databases
-   redis-cli -n 0 keys "ai_slider:*"
-   redis-cli -n 7 keys "ai_slider:*"
+   redis-cli -n 0 keys "ss:*"
+   redis-cli -n 7 keys "ss:*"
    
    # Remove stale tasks from unused databases
-   redis-cli -n 0 del ai_slider:task:TASK_ID
+   redis-cli -n 0 del ss:task:TASK_ID
    ```
 
 3. **Processing Queue Cleanup**: If tasks are stuck in the processing queue:
    ```bash
    # Check the processing queue
-   redis-cli llen ai_slider:task_queue:processing
+   redis-cli llen ss:task_queue:processing
    
    # Remove tasks from processing queue
-   redis-cli lrem ai_slider:task_queue:processing 1 TASK_ID
+   redis-cli lrem ss:task_queue:processing 1 TASK_ID
    ```
 
 ## Common Syntax Errors

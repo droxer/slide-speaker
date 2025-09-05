@@ -23,7 +23,7 @@ class RedisStateManager:
 
     def _get_key(self, file_id: str) -> str:
         """Generate Redis key for a file's state"""
-        return f"ai_slider:state:{file_id}"
+        return f"ss:state:{file_id}"
 
     async def create_state(
         self,

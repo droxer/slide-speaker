@@ -106,12 +106,10 @@ class MasterWorker:
             logger.info(f"Master worker Redis config: {config_info}")
 
             # Check for existing tasks
-            keys = await task_queue.redis_client.keys("ai_slider:task:*")
+            keys = await task_queue.redis_client.keys("ss:task:*")
             logger.info(f"Found {len(keys)} existing task keys")
 
-            queue_items = await task_queue.redis_client.lrange(
-                "ai_slider:task_queue", 0, -1
-            )  # type: ignore
+            queue_items = await task_queue.redis_client.lrange("ss:task_queue", 0, -1)  # type: ignore
             logger.info(f"Found {len(queue_items)} items in task queue")
 
         except Exception as e:
