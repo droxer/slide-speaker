@@ -2,6 +2,9 @@
 """
 Locale and language utilities for consistent language handling across the application.
 Provides locale-aware language code mapping, validation, and formatting utilities.
+
+This module handles language localization and internationalization for the SlideSpeaker application,
+providing utilities for language code conversion, validation, and display name management.
 """
 
 from loguru import logger

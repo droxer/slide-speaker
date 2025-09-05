@@ -1,5 +1,9 @@
 """
 Generate scripts step for the presentation pipeline.
+
+This module generates AI-powered presentation scripts for each slide.
+It uses the extracted slide content and visual analysis to create
+natural, engaging scripts suitable for AI avatar presentation.
 """
 
 from loguru import logger
@@ -13,7 +17,14 @@ script_generator = ScriptGenerator()
 async def generate_scripts_step(
     file_id: str, language: str = "english", is_subtitle: bool = False
 ) -> None:
-    """Generate scripts for each slide"""
+    """
+    Generate scripts for each slide using AI language models.
+
+    This function creates presentation scripts for each slide using OpenAI's GPT models.
+    It combines the extracted slide text content with visual analysis to generate
+    engaging, natural-sounding scripts that are suitable for AI avatar presentation.
+    The function includes periodic cancellation checks for responsive task management.
+    """
     step_name = "generate_subtitle_scripts" if is_subtitle else "generate_scripts"
     await state_manager.update_step_status(file_id, step_name, "processing")
     state = await state_manager.get_state(file_id)

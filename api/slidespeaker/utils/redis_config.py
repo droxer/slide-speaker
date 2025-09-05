@@ -1,6 +1,9 @@
 """
 Centralized Redis configuration for SlideSpeaker.
 Ensures consistent Redis configuration across all modules.
+
+This module provides centralized Redis client configuration and management
+to ensure consistent connection settings across all components of the application.
 """
 
 import os
@@ -18,7 +21,12 @@ class RedisConfig:
 
     @classmethod
     def get_redis_client(cls) -> redis.Redis:
-        """Get a Redis client with consistent configuration"""
+        """
+        Get a Redis client with consistent configuration
+
+        Returns:
+            Configured Redis client instance
+        """
         return redis.Redis(
             host=os.getenv("REDIS_HOST", "localhost"),
             port=int(os.getenv("REDIS_PORT", 6379)),

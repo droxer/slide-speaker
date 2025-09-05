@@ -1,4 +1,9 @@
-"""Module for reviewing and refining presentation scripts."""
+"""Module for reviewing and refining presentation scripts.
+
+This module uses AI language models to review and improve generated presentation scripts
+for consistency, flow, and quality. It ensures appropriate formatting for AI avatar delivery
+and handles proper positioning of opening/closing statements.
+"""
 
 import os
 from typing import Any
@@ -38,13 +43,24 @@ SYSTEM_PROMPTS = {
 
 
 class ScriptReviewer:
+    """Reviewer for AI-generated presentation scripts using OpenAI GPT models"""
+
     def __init__(self) -> None:
-        """Initialize the script reviewer with OpenAI client."""
+        """Initialize the script reviewer with OpenAI client"""
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     async def revise_scripts(
         self, scripts: list[dict[str, Any]], language: str = "english"
     ) -> list[dict[str, Any]]:
+        """
+        Review and refine all generated scripts for consistency and smooth flow.
+
+        This method uses AI language models to improve script quality by ensuring:
+        - Consistent tone and terminology across all slides
+        - Smooth transitions between slides
+        - Proper positioning of opening/closing statements
+        - Appropriate length and formatting for AI avatar delivery
+        """
         all_scripts_text = "\n\n".join(
             [
                 f"Slide {i + 1}: {script_data.get('script', '')}"

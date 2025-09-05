@@ -1,4 +1,9 @@
-"""Progress tracking routes for monitoring processing status."""
+"""
+Progress tracking routes for monitoring processing status.
+
+This module provides API endpoints for retrieving detailed progress information
+about presentation processing tasks, including current step, status, and errors.
+"""
 
 from typing import Any
 

@@ -1,3 +1,11 @@
+"""
+Script generation module for SlideSpeaker.
+
+This module generates AI-powered presentation scripts for each slide using OpenAI's GPT models.
+It supports multiple languages and incorporates visual analysis context to create
+engaging, natural-sounding scripts suitable for AI avatar presentation.
+"""
+
 import os
 from typing import Any
 
@@ -46,7 +54,10 @@ ERROR_FALLBACK_SCRIPTS = {
 
 
 class ScriptGenerator:
+    """Generator for AI-powered presentation scripts using OpenAI GPT models"""
+
     def __init__(self) -> None:
+        """Initialize the script generator with OpenAI client"""
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     async def generate_script(
@@ -55,6 +66,13 @@ class ScriptGenerator:
         image_analysis: dict[str, Any] | None = None,
         language: str = "english",
     ) -> str:
+        """
+        Generate a presentation script for a slide using AI.
+
+        This method creates a natural, engaging script suitable for AI avatar presentation
+        by combining slide text content with visual analysis context. It supports multiple
+        languages and includes comprehensive error handling with fallback mechanisms.
+        """
         if not slide_content.strip() and not image_analysis:
             return "This slide contains visual content that will be presented."
 

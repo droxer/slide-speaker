@@ -1,5 +1,8 @@
 """
 HeyGen Avatar Service Implementation
+
+This module provides an implementation of the avatar interface using HeyGen's avatar video API.
+It generates talking avatar videos from text scripts using HeyGen's platform.
 """
 
 import asyncio
@@ -17,6 +20,7 @@ class HeyGenAvatarService(AvatarInterface):
     """HeyGen avatar video generation implementation"""
 
     def __init__(self) -> None:
+        """Initialize the HeyGen avatar service with API configuration"""
         self.api_key = os.getenv("HEYGEN_API_KEY")
         self.api_url = "https://api.heygen.com/v2"
         self.default_avatar_id = "Judy"

@@ -1,3 +1,11 @@
+"""
+Slide extraction and conversion module for SlideSpeaker.
+
+This module handles the extraction of content from presentation files (PDF, PPTX, PPT)
+and conversion of slides to image formats. It provides robust error handling and
+fallback mechanisms for various file formats and conversion scenarios.
+"""
+
 import contextlib
 import io
 import os
@@ -11,7 +19,15 @@ from pptx import Presentation
 
 
 class SlideExtractor:
+    """Extractor for presentation slides and converter to images"""
+
     async def extract_slides(self, file_path: Path, file_ext: str) -> list[str]:
+        """
+        Extract text content from presentation slides.
+
+        This method supports PDF, PPTX, and PPT file formats. It extracts
+        text content from each slide for use in script generation.
+        """
         if file_ext == ".pdf":
             return await self._extract_pdf_slides(file_path)
         elif file_ext in [".pptx", ".ppt"]:
@@ -20,6 +36,7 @@ class SlideExtractor:
             raise ValueError(f"Unsupported file format: {file_ext}")
 
     async def _extract_pdf_slides(self, file_path: Path) -> list[str]:
+        """Extract text content from PDF slides"""
         slides = []
         with open(file_path, "rb") as file:
             pdf_reader = PyPDF2.PdfReader(file)
@@ -30,6 +47,7 @@ class SlideExtractor:
         return slides
 
     async def _extract_pptx_slides(self, file_path: Path) -> list[str]:
+        """Extract text content from PowerPoint slides"""
         slides = []
         try:
             presentation = Presentation(str(file_path))
@@ -49,6 +67,13 @@ class SlideExtractor:
     async def convert_to_image(
         self, file_path: Path, file_ext: str, slide_index: int, output_path: Path
     ) -> None:
+        """
+        Convert a specific slide to an image file.
+
+        This method handles conversion of both PDF and PowerPoint slides to PNG images.
+        It uses external tools (pdftoppm, LibreOffice) for conversion with fallback
+        mechanisms for error handling.
+        """
         if file_ext == ".pdf":
             await self._convert_pdf_to_image(file_path, slide_index, output_path)
         elif file_ext in [".pptx", ".ppt"]:
@@ -57,6 +82,12 @@ class SlideExtractor:
     async def _convert_pdf_to_image(
         self, file_path: Path, page_index: int, output_path: Path
     ) -> None:
+        """
+        Convert a specific PDF page to a PNG image.
+
+        Uses the pdftoppm utility for high-quality PDF to image conversion.
+        Includes timeout handling and fallback to placeholder images on failure.
+        """
         # Convert specific PDF page to image using pdftoppm directly
         try:
             # Use pdftoppm to convert PDF page to PNG
@@ -113,6 +144,12 @@ class SlideExtractor:
     async def _convert_pptx_to_image(
         self, file_path: Path, slide_index: int, output_path: Path
     ) -> None:
+        """
+        Convert a specific PowerPoint slide to a PNG image.
+
+        First converts PPTX to PDF using LibreOffice, then converts the PDF page to image.
+        Includes timeout handling and fallback mechanisms for conversion failures.
+        """
         # Convert PPTX to PDF first using LibreOffice (soffice), then export PDF pages to images
         try:
             # Convert PPTX to PDF using LibreOffice
@@ -161,6 +198,12 @@ class SlideExtractor:
     async def _convert_pptx_to_image_original(
         self, file_path: Path, slide_index: int, output_path: Path
     ) -> None:
+        """
+        Fallback method for converting PowerPoint slides to images.
+
+        Extracts content directly from the PPTX file and creates an image representation
+        based on the slide's text and image content.
+        """
         # Original content-based approach as fallback
         try:
             presentation = Presentation(str(file_path))
@@ -199,7 +242,12 @@ class SlideExtractor:
     async def _create_content_image(
         self, slide: Any, slide_index: int, output_path: Path
     ) -> None:
-        """Create an image based on slide content (text, etc.)"""
+        """
+        Create an image based on slide content (text, etc.).
+
+        Generates a visually appealing image representation of the slide's text content
+        when direct image extraction is not possible.
+        """
         try:
             import textwrap
 

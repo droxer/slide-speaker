@@ -1,4 +1,10 @@
-"""Upload routes for handling file uploads."""
+"""
+Upload routes for handling file uploads.
+
+This module provides API endpoints for uploading presentation files and initiating
+the processing pipeline. It handles file validation, state initialization, and
+task queue submission.
+"""
 
 import base64
 import hashlib

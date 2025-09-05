@@ -1,3 +1,9 @@
+"""
+State management module for SlideSpeaker.
+This module provides Redis-based state management for tracking presentation processing tasks.
+It maintains the status of each step in the processing pipeline and handles state transitions.
+"""
+
 import json
 from datetime import datetime
 from pathlib import Path
@@ -7,12 +13,16 @@ from loguru import logger
 
 
 class RedisStateManager:
+    """Redis-based state manager for tracking presentation processing tasks"""
+
     def __init__(self) -> None:
+        """Initialize the state manager with a Redis client connection"""
         from slidespeaker.utils.redis_config import RedisConfig
 
         self.redis_client = RedisConfig.get_redis_client()
 
     def _get_key(self, file_id: str) -> str:
+        """Generate Redis key for a file's state"""
         return f"ai_slider:state:{file_id}"
 
     async def create_state(
@@ -25,7 +35,7 @@ class RedisStateManager:
         generate_avatar: bool = True,
         generate_subtitles: bool = True,
     ) -> dict[str, Any]:
-        """Create initial state for a file processing"""
+        """Create initial state for a file processing task"""
         # Initialize steps - conditionally include subtitle script steps based on language needs
         steps = {
             "extract_slides": {"status": "pending", "data": None},
@@ -77,7 +87,7 @@ class RedisStateManager:
         return state
 
     async def get_state(self, file_id: str) -> dict[str, Any] | None:
-        """Get current state for a file"""
+        """Get current state for a file processing task"""
         key = self._get_key(file_id)
         state_json = await self.redis_client.get(key)
         if state_json:
@@ -87,7 +97,7 @@ class RedisStateManager:
     async def get_step_status(
         self, file_id: str, step_name: str
     ) -> dict[str, Any] | None:
-        """Get the status of a specific step"""
+        """Get the status of a specific processing step"""
         state = await self.get_state(file_id)
         if state and "steps" in state and step_name in state["steps"]:
             return dict(state["steps"][step_name])
@@ -96,7 +106,7 @@ class RedisStateManager:
     async def update_step_status(
         self, file_id: str, step_name: str, status: str, data: Any = None
     ) -> None:
-        """Update status of a specific step"""
+        """Update status of a specific processing step"""
         state = await self.get_state(file_id)
         if state:
             if step_name in state["steps"]:
@@ -120,7 +130,7 @@ class RedisStateManager:
             )
 
     async def add_error(self, file_id: str, error: str, step: str) -> None:
-        """Add error to state"""
+        """Add error to state for a specific processing step"""
         logger.warning(
             f"Adding error to state for file {file_id}, step {step}: {error}"
         )
@@ -136,7 +146,7 @@ class RedisStateManager:
             )
 
     async def mark_completed(self, file_id: str) -> None:
-        """Mark processing as completed"""
+        """Mark processing as completed successfully"""
         state = await self.get_state(file_id)
         if state:
             old_status = state["status"]
@@ -148,7 +158,7 @@ class RedisStateManager:
             )
 
     async def mark_failed(self, file_id: str) -> None:
-        """Mark processing as failed"""
+        """Mark processing as failed with errors"""
         state = await self.get_state(file_id)
         if state:
             old_status = state["status"]
@@ -162,7 +172,7 @@ class RedisStateManager:
     async def mark_cancelled(
         self, file_id: str, cancelled_step: str | None = None
     ) -> None:
-        """Mark processing as cancelled"""
+        """Mark processing as cancelled by user"""
         state = await self.get_state(file_id)
         if state:
             old_status = state["status"]
@@ -187,7 +197,7 @@ class RedisStateManager:
             )
 
     async def _save_state(self, file_id: str, state: dict[str, Any]) -> None:
-        """Save state to Redis"""
+        """Save state to Redis with 24-hour expiration"""
         key = self._get_key(file_id)
         await self.redis_client.set(key, json.dumps(state), ex=86400)  # 24h expiration
 

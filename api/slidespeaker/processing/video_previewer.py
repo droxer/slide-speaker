@@ -1,3 +1,10 @@
+"""
+Video preview generation module for SlideSpeaker.
+
+This module generates preview data for completed videos, including video information
+and subtitle content for use in the web interface.
+"""
+
 from pathlib import Path
 from typing import Any
 

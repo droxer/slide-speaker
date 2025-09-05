@@ -1,5 +1,9 @@
 """
 Convert slides to images step for the presentation pipeline.
+
+This module handles the conversion of presentation slides to image files.
+It takes the extracted slide content and generates PNG images for each slide
+that can be used in subsequent processing steps like visual analysis and video composition.
 """
 
 from pathlib import Path
@@ -14,7 +18,13 @@ slide_processor = SlideExtractor()
 
 
 async def convert_slides_step(file_id: str, file_path: Path, file_ext: str) -> None:
-    """Convert slides to images"""
+    """
+    Convert slides to images for visual processing.
+
+    This function converts each slide from the presentation file into a PNG image.
+    These images are used for visual analysis and as backgrounds in the final video.
+    The function includes periodic cancellation checks to allow for task interruption.
+    """
     await state_manager.update_step_status(
         file_id, "convert_slides_to_images", "in_progress"
     )

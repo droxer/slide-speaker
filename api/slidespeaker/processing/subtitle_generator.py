@@ -1,3 +1,10 @@
+"""
+Subtitle generation module for SlideSpeaker.
+
+This module generates timed subtitle files (SRT and VTT formats) from presentation scripts.
+It synchronizes subtitles with audio durations when available and supports multiple languages.
+"""
+
 from datetime import timedelta
 from pathlib import Path
 from typing import Any

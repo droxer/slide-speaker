@@ -1,5 +1,9 @@
 """
 Compose final video step for the presentation pipeline.
+
+This module composes the final presentation video by combining slide images,
+audio files, avatar videos, and subtitles. It handles both full-featured
+presentations with avatars and simpler image+audio presentations.
 """
 
 from pathlib import Path
@@ -16,7 +20,14 @@ video_previewer = VideoPreviewer()
 
 
 async def compose_video_step(file_id: str, file_path: Path) -> None:
-    """Compose the final video from all components"""
+    """
+    Compose the final video from all presentation components.
+
+    This function creates the final presentation video by combining slide images,
+    audio files, avatar videos (if available), and subtitles. It supports both
+    full-featured presentations with AI avatars and simpler image+audio presentations.
+    The function includes comprehensive error handling and cleanup of temporary files.
+    """
     await state_manager.update_step_status(file_id, "compose_video", "in_progress")
     logger.info(f"Starting final video composition for file: {file_id}")
     state = await state_manager.get_state(file_id)
@@ -160,7 +171,7 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
                         f"Creating simple video with {len(slide_images)} slides and "
                         f"{len(valid_audio_files)} valid audio files"
                     )
-                    await video_composer.create_simple_video(
+                    await video_composer._create_video(
                         slide_images, valid_audio_files, final_video_path
                     )
                 else:

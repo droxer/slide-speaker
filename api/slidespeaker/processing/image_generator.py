@@ -1,3 +1,10 @@
+"""
+Image generation module for SlideSpeaker.
+
+This module generates presentation-style images using DALL-E based on slide content.
+It can create both detailed presentation slides and simple background images.
+"""
+
 import os
 from pathlib import Path
 
@@ -40,7 +47,10 @@ SIMPLE_BACKGROUND_PROMPTS = {
 
 
 class ImageGenerator:
+    """Generator for presentation-style images using DALL-E"""
+
     def __init__(self) -> None:
+        """Initialize the image generator with OpenAI client"""
         self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     async def generate_presentation_image(
@@ -48,6 +58,9 @@ class ImageGenerator:
     ) -> bool:
         """
         Generate a presentation-style image using DALL-E based on slide content
+
+        This method creates visually appealing presentation slides by converting
+        slide content into descriptive prompts for DALL-E image generation.
         """
         try:
             # Create a prompt for presentation image

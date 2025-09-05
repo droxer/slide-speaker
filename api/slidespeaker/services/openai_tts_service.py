@@ -1,5 +1,8 @@
 """
 OpenAI TTS Service Implementation
+
+This module provides an implementation of the TTS interface using OpenAI's text-to-speech API.
+It supports multiple voices and languages through the OpenAI TTS models.
 """
 
 import os
@@ -15,6 +18,7 @@ class OpenAITTSService(TTSInterface):
     """OpenAI TTS implementation"""
 
     def __init__(self) -> None:
+        """Initialize the OpenAI TTS service with API client and configuration"""
         self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.model = os.getenv("OPENAI_TTS_MODEL", "tts-1")
         self.default_voice = os.getenv("OPENAI_TTS_VOICE", "alloy")

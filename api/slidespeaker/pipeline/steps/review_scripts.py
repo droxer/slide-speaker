@@ -1,5 +1,9 @@
 """
 Review scripts step for the presentation pipeline.
+
+This module reviews and refines the generated scripts for consistency,
+flow, and quality. It ensures that the presentation has a coherent narrative
+and that scripts are appropriately formatted for AI avatar delivery.
 """
 
 from loguru import logger
@@ -13,7 +17,14 @@ script_reviewer = ScriptReviewer()
 async def review_scripts_step(
     file_id: str, language: str = "english", is_subtitle: bool = False
 ) -> None:
-    """Review and refine all generated scripts for consistency and smooth flow"""
+    """
+    Review and refine all generated scripts for consistency and smooth flow.
+
+    This function uses AI language models to review and improve the generated scripts.
+    It ensures consistent tone, proper transitions between slides, and appropriate
+    formatting for AI avatar presentation. The review process also handles
+    positioning of opening/closing statements correctly.
+    """
     step_name = "review_subtitle_scripts" if is_subtitle else "review_scripts"
     step_display_name = (
         "Reviewing subtitle scripts"

@@ -1,3 +1,11 @@
+"""
+Vision Service for Slide Analysis
+
+This module provides image analysis capabilities using OpenAI's GPT-4 Vision model
+to extract content from presentation slides. It analyzes both text and visual elements
+to provide context for script generation.
+"""
+
 import base64
 import os
 from pathlib import Path
@@ -43,7 +51,10 @@ SLIDE_ANALYSIS_SYSTEM_PROMPT = (
 
 
 class VisionService:
+    """Vision service for analyzing slide images using OpenAI GPT-4 Vision"""
+
     def __init__(self) -> None:
+        """Initialize the vision service with OpenAI client"""
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
     def _encode_image(self, image_path: Path) -> str:
@@ -61,6 +72,9 @@ class VisionService:
         Args:
             image_path: Path to the slide image
             slide_text: Optional extracted text content from the slide for enhanced context
+
+        Returns:
+            Structured analysis of the slide content optimized for script generation
         """
         try:
             # Encode the image

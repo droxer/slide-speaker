@@ -1,5 +1,9 @@
 """
 Generate subtitles step for the presentation pipeline.
+
+This module generates subtitle files (SRT and VTT formats) from the scripts.
+It creates timed subtitles that can be used with the final presentation video,
+supporting multiple languages and automatic timing based on audio durations.
 """
 
 from pathlib import Path
@@ -15,7 +19,14 @@ subtitle_generator = SubtitleGenerator()
 
 
 async def generate_subtitles_step(file_id: str, language: str = "english") -> None:
-    """Generate subtitles from scripts"""
+    """
+    Generate subtitles from scripts in SRT and VTT formats.
+
+    This function creates timed subtitle files for the presentation video.
+    It uses either subtitle-specific scripts (when audio and subtitle languages differ)
+    or regular scripts, and synchronizes subtitles with audio durations when available.
+    The function supports multiple languages and generates both SRT and VTT formats.
+    """
     await state_manager.update_step_status(file_id, "generate_subtitles", "processing")
     logger.info(f"Starting subtitle generation for file: {file_id}")
     state = await state_manager.get_state(file_id)

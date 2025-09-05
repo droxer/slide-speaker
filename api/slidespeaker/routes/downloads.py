@@ -1,4 +1,9 @@
-"""Download routes for serving generated files."""
+"""
+Download routes for serving generated files.
+
+This module provides API endpoints for downloading generated presentation videos
+and subtitle files. It handles file serving with appropriate content types and headers.
+"""
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse

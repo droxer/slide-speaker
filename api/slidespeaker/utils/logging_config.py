@@ -1,3 +1,11 @@
+"""
+Logging configuration module for SlideSpeaker.
+Provides centralized logging setup with configurable levels and handlers.
+
+This module configures the application's logging system with support for
+both console and file-based logging, customizable formats, and log rotation.
+"""
+
 import logging
 import logging.config
 import os

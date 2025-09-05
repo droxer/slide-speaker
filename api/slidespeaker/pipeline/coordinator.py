@@ -2,7 +2,8 @@
 Pipeline coordinator for SlideSpeaker processing.
 
 This module coordinates the presentation processing pipeline by managing
-step execution, state tracking, and error handling.
+step execution, state tracking, and error handling. It provides state-aware
+processing that can resume from any step and handles task cancellation.
 """
 
 from pathlib import Path
@@ -35,7 +36,12 @@ async def process_presentation(
     generate_subtitles: bool = True,
     task_id: str | None = None,
 ) -> None:
-    """State-aware processing that can resume from any step"""
+    """
+    State-aware processing that can resume from any step in the presentation pipeline.
+
+    This function orchestrates the complete presentation processing workflow,
+    managing each step's execution, tracking progress, and handling errors or cancellations.
+    """
     # Don't default subtitle language to audio language - preserve user selection
     # subtitle_language remains as provided (could be None)
 
@@ -187,7 +193,7 @@ async def process_presentation(
 
 
 async def _log_initial_state(file_id: str) -> None:
-    """Log the initial processing state"""
+    """Log the initial processing state with human-readable step names"""
     state = await state_manager.get_state(file_id)
     if state:
         logger.info(f"Current processing status: {state['status']}")
@@ -217,7 +223,12 @@ async def _log_initial_state(file_id: str) -> None:
 def _get_processing_steps(
     language: str, subtitle_language: str | None, generate_avatar: bool
 ) -> list[str]:
-    """Get the ordered list of processing steps based on parameters"""
+    """
+    Get the ordered list of processing steps based on parameters.
+
+    The steps are dynamically determined based on user preferences such as
+    language settings, avatar generation, and subtitle requirements.
+    """
     steps_order = [
         "extract_slides",
         "convert_slides_to_images",
@@ -254,7 +265,12 @@ async def _execute_step(
     language: str = "english",
     task_id: str | None = None,
 ) -> None:
-    """Execute a single step in the presentation pipeline"""
+    """
+    Execute a single step in the presentation pipeline.
+
+    This function handles step execution with proper cancellation checking,
+    state management, and error handling for each processing stage.
+    """
     # Check for cancellation before processing the step
     if task_id and await task_queue.is_task_cancelled(task_id):
         logger.info(f"Task {task_id} was cancelled during step {step_name}")

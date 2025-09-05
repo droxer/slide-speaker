@@ -1,3 +1,9 @@
+"""
+Main FastAPI server module for SlideSpeaker.
+This module initializes the FastAPI application, configures routes, CORS middleware,
+and handles graceful server startup and shutdown.
+"""
+
 import asyncio
 import os
 from typing import Any
@@ -17,7 +23,7 @@ app = FastAPI(title="AI Slider API")
 
 @app.on_event("startup")
 async def startup_event() -> None:
-    """Initialize on startup"""
+    """Initialize logging configuration on application startup"""
     log_level = os.getenv("LOG_LEVEL", "INFO")
     log_file = os.getenv("LOG_FILE")
     setup_logging(log_level, log_file, enable_file_logging=log_file is not None)
@@ -41,6 +47,7 @@ app.include_router(languages_router)
 
 @app.get("/")
 async def root() -> dict[str, str]:
+    """Root endpoint that returns a welcome message"""
     return {"message": "AI Slider Backend API"}
 
 

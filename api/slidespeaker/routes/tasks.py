@@ -1,4 +1,9 @@
-"""Task management routes for handling task operations."""
+"""
+Task management routes for handling task operations.
+
+This module provides API endpoints for retrieving task status and canceling tasks.
+It interfaces with the Redis task queue system to manage presentation processing tasks.
+"""
 
 from typing import Any
 

@@ -1,6 +1,10 @@
 """
 DALL-E + TTS Avatar Service Implementation
 Alternative avatar service using DALL-E images and TTS audio
+
+This module provides an implementation of the avatar interface that generates
+static image avatars using DALL-E and combines them with TTS audio to create
+simple avatar-style videos as an alternative to full avatar services.
 """
 
 from pathlib import Path
@@ -18,6 +22,7 @@ class DalleAvatarService(AvatarInterface):
     """DALL-E + TTS avatar video generation implementation"""
 
     def __init__(self) -> None:
+        """Initialize the DALL-E avatar service with required components"""
         self.image_service = ImageGenerator()
         self.video_composer = VideoComposer()
 

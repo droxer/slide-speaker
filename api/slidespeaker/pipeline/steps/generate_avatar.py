@@ -1,5 +1,9 @@
 """
 Generate avatar videos step for the presentation pipeline.
+
+This module generates AI avatar videos from the reviewed scripts.
+It uses configurable avatar services (HeyGen, DALL-E) to create
+animated avatar presentations for each slide in the presentation.
 """
 
 from loguru import logger
@@ -10,7 +14,14 @@ from slidespeaker.utils.config import config
 
 
 async def generate_avatar_step(file_id: str) -> None:
-    """Generate avatar videos from scripts"""
+    """
+    Generate avatar videos from scripts using AI avatar services.
+
+    This function creates AI avatar videos for each slide using the reviewed scripts.
+    It supports multiple avatar providers through a factory pattern and includes
+    error handling for individual slide processing. The function can be disabled
+    via configuration and includes periodic cancellation checks.
+    """
     await state_manager.update_step_status(
         file_id, "generate_avatar_videos", "processing"
     )

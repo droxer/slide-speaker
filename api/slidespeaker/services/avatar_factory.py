@@ -1,6 +1,10 @@
 """
 Avatar Service Factory
 Factory pattern implementation for creating avatar service instances
+
+This module implements the factory pattern for creating avatar video generation
+service instances. It supports multiple avatar providers (HeyGen, DALL-E) and handles
+service availability checking and configuration validation.
 """
 
 import os

@@ -1,6 +1,9 @@
 """
-Configuration module for SlideSpeaker
+Configuration module for SlideSpeaker.
 Handles environment-based configuration including output directory settings.
+
+This module manages application configuration through environment variables and
+provides centralized access to configuration values with appropriate defaults.
 """
 
 import os
@@ -16,6 +19,7 @@ class Config:
     """Configuration class for SlideSpeaker application"""
 
     def __init__(self) -> None:
+        """Initialize configuration with default values and environment overrides"""
         # Output directory configuration
         self._output_dir: Path | None = None
         self._uploads_dir: Path | None = None

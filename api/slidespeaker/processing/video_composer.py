@@ -1,3 +1,11 @@
+"""
+Video composition module for SlideSpeaker.
+
+This module handles the creation of final presentation videos by combining
+slide images, audio files, avatar videos, and subtitles. It supports both
+full-featured presentations with AI avatars and simpler image+audio presentations.
+"""
+
 import asyncio
 import gc
 import logging
@@ -18,6 +26,8 @@ logger = logging.getLogger(__name__)
 
 
 class VideoComposer:
+    """Composer for creating final presentation videos from components"""
+
     def __init__(self, max_memory_mb: int = 500):
         """
         Initialize VideoComposer with memory constraints
@@ -422,23 +432,15 @@ class VideoComposer:
                     "Video composition timed out after 30 minutes"
                 ) from None
 
-    async def create_simple_video(
-        self, slide_images: list[Path], audio_files: list[Path], output_path: Path
-    ) -> None:
-        """
-        Fallback method without avatar videos
-        """
-        await self._create_basic_video(slide_images, audio_files, output_path)
-
     async def create_images_only_video(
         self, slide_images: list[Path], output_path: Path
     ) -> None:
         """
         Create a video with only images and no audio
         """
-        await self._create_basic_video(slide_images, [], output_path)
+        await self._create_video(slide_images, [], output_path)
 
-    async def _create_basic_video(
+    async def _create_video(
         self, slide_images: list[Path], audio_files: list[Path], output_path: Path
     ) -> None:
         """

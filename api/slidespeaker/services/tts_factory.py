@@ -1,6 +1,10 @@
 """
 TTS Service Factory
 Factory pattern implementation for creating TTS service instances
+
+This module implements the factory pattern for creating Text-to-Speech service
+instances. It supports multiple TTS providers (OpenAI, ElevenLabs) and handles
+service availability checking and configuration validation.
 """
 
 import os
@@ -11,6 +15,8 @@ from .tts_interface import TTSInterface
 
 
 class TTSFactory:
+    """Factory for creating TTS service instances"""
+
     _services: dict[str, type[TTSInterface]] = {
         "openai": OpenAITTSService,
         "elevenlabs": ElevenLabsTTSService,
@@ -18,6 +24,18 @@ class TTSFactory:
 
     @classmethod
     def create_service(cls, service_name: str | None = None) -> TTSInterface:
+        """
+        Create a TTS service instance based on configuration
+
+        Args:
+            service_name: Optional service name override, defaults to env var
+
+        Returns:
+            TTSInterface implementation instance
+
+        Raises:
+            ValueError: If service name is invalid or service is not available
+        """
         if service_name is None:
             service_name = os.getenv("TTS_SERVICE", "openai").lower()
 

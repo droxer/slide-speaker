@@ -1,6 +1,10 @@
 """
 Avatar Service Interface
 Abstract base class for avatar video generation services
+
+This module defines the interface that all avatar service implementations must follow.
+It provides a consistent API for generating avatar videos from text scripts with
+support for various avatar providers and configuration options.
 """
 
 from abc import ABC, abstractmethod
@@ -33,7 +37,12 @@ class AvatarInterface(ABC):
 
     @abstractmethod
     def is_available(self) -> bool:
-        """Check if the avatar service is available/configured"""
+        """
+        Check if the avatar service is available/configured
+
+        Returns:
+            True if the service is properly configured and available, False otherwise
+        """
         pass
 
     @abstractmethod

@@ -1,5 +1,9 @@
 """
 Generate audio step for the presentation pipeline.
+
+This module generates text-to-speech audio files from the reviewed scripts.
+It uses configurable TTS services (OpenAI, ElevenLabs) to create natural-sounding
+voice audio for each slide in the presentation.
 """
 
 from loguru import logger
@@ -10,7 +14,14 @@ from slidespeaker.utils.config import config
 
 
 async def generate_audio_step(file_id: str, language: str = "english") -> None:
-    """Generate audio from scripts using TTS"""
+    """
+    Generate audio from scripts using TTS services.
+
+    This function converts the reviewed presentation scripts into audio files
+    using text-to-speech technology. It supports multiple TTS providers through
+    a factory pattern and includes error handling for individual slide processing.
+    The function includes periodic cancellation checks for responsive task management.
+    """
     await state_manager.update_step_status(file_id, "generate_audio", "processing")
     logger.info(f"Starting audio generation for file: {file_id}")
     state = await state_manager.get_state(file_id)

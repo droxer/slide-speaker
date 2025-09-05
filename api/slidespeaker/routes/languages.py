@@ -1,4 +1,9 @@
-"""Language configuration routes."""
+"""
+Language configuration routes.
+
+This module provides API endpoints for retrieving supported languages
+and their locale information for the presentation processing system.
+"""
 
 from fastapi import APIRouter
 

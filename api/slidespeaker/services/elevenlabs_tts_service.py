@@ -1,5 +1,8 @@
 """
 ElevenLabs TTS Service Implementation
+
+This module provides an implementation of the TTS interface using ElevenLabs' text-to-speech API.
+It supports multiple voices and high-quality speech synthesis through the ElevenLabs platform.
 """
 
 import os
@@ -15,6 +18,7 @@ class ElevenLabsTTSService(TTSInterface):
     """ElevenLabs TTS implementation"""
 
     def __init__(self) -> None:
+        """Initialize the ElevenLabs TTS service with API configuration"""
         self.api_key = os.getenv("ELEVENLABS_API_KEY")
         self.base_url = "https://api.elevenlabs.io/v1"
         self.default_voice_id = os.getenv(

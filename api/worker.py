@@ -2,6 +2,7 @@
 """
 Worker process for SlideSpeaker AI processing tasks.
 This script is spawned by the master worker to process individual tasks.
+It handles the complete presentation processing pipeline for a single task.
 """
 
 import asyncio
@@ -32,6 +33,7 @@ class TaskProgressMonitor:
     """Monitor task progress and update status periodically"""
 
     def __init__(self, task_id: str):
+        """Initialize the progress monitor for a specific task"""
         self.task_id = task_id
         self.monitoring = True
 
@@ -91,7 +93,7 @@ class TaskProgressMonitor:
 
 
 async def process_task(task_id: str) -> bool:
-    """Process a single task by ID"""
+    """Process a single task by ID through the complete presentation pipeline"""
     logger.info(f"Worker starting to process task {task_id}")
 
     # Get task details from Redis
@@ -181,7 +183,7 @@ async def process_task(task_id: str) -> bool:
 
 
 async def main() -> None:
-    """Main worker process"""
+    """Main worker process entry point"""
     # Get task ID from environment variable
     task_id = os.getenv("TASK_ID")
     if not task_id:

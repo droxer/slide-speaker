@@ -1,6 +1,7 @@
 """
 Task Queue System using Redis for distributed task processing.
 This module provides the foundation for a master-worker architecture.
+It handles task submission, status tracking, and distributed processing coordination.
 """
 
 import json
@@ -11,9 +12,10 @@ from loguru import logger
 
 
 class RedisTaskQueue:
-    """Redis-based task queue for distributed processing"""
+    """Redis-based task queue for distributed processing of presentation tasks"""
 
     def __init__(self) -> None:
+        """Initialize the task queue with Redis client and key prefixes"""
         from slidespeaker.utils.redis_config import RedisConfig
 
         self.redis_client = RedisConfig.get_redis_client()
@@ -68,7 +70,7 @@ class RedisTaskQueue:
         return task_id
 
     async def get_task(self, task_id: str) -> dict[str, Any] | None:
-        """Get task details by ID"""
+        """Get task details by ID from Redis storage"""
         task_key = self._get_task_key(task_id)
         task_data = await self.redis_client.get(task_key)
 
@@ -87,7 +89,7 @@ class RedisTaskQueue:
     async def update_task_status(
         self, task_id: str, status: str, **kwargs: Any
     ) -> bool:
-        """Update task status and additional fields"""
+        """Update task status and additional fields in Redis"""
         task = await self.get_task(task_id)
         if not task:
             return False
@@ -131,7 +133,7 @@ class RedisTaskQueue:
         return True
 
     async def get_task_status(self, task_id: str) -> str | None:
-        """Get the status of a task"""
+        """Get the status of a task from Redis storage"""
         task = await self.get_task(task_id)
         if task:
             return task.get("status")
@@ -179,7 +181,7 @@ class RedisTaskQueue:
             return False
 
     async def is_task_cancelled(self, task_id: str) -> bool:
-        """Check if a task has been cancelled"""
+        """Check if a task has been cancelled by user"""
         # Check the main task status
         task = await self.get_task(task_id)
         if task and task.get("status") == "cancelled":

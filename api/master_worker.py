@@ -2,6 +2,7 @@
 """
 Master Worker for SlideSpeaker AI processing tasks.
 This script polls Redis for tasks and dispatches them to worker processes.
+It manages the lifecycle of worker processes and ensures proper task distribution.
 """
 
 import asyncio
@@ -30,7 +31,10 @@ from slidespeaker.core.task_queue import task_queue  # noqa: E402
 
 
 class MasterWorker:
+    """Master worker that manages task distribution to worker processes"""
+
     def __init__(self) -> None:
+        """Initialize the master worker with configuration settings"""
         self.should_stop = False
         self.workers: list[subprocess.Popen[bytes]] = []
         self.max_workers = int(os.getenv("MAX_WORKERS", "2"))  # Default to 3 workers
@@ -88,7 +92,7 @@ class MasterWorker:
                 logger.info(f"Worker for task {task_id} killed forcefully")
 
     async def run(self) -> None:
-        """Run the master worker"""
+        """Run the master worker main loop"""
         logger.info("Starting master worker...")
         logger.info(f"Will manage up to {self.max_workers} worker processes")
 

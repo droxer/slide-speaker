@@ -1,5 +1,9 @@
 """
 Analyze slide images step for the presentation pipeline.
+
+This module performs visual analysis of slide images using AI vision services.
+It extracts visual elements, charts, diagrams, and other non-text content
+that should be considered when generating presentation scripts.
 """
 
 from pathlib import Path
@@ -11,7 +15,14 @@ vision_service = VisionService()
 
 
 async def analyze_slides_step(file_id: str) -> None:
-    """Analyze slide images using vision service"""
+    """
+    Analyze slide images using vision service to extract visual content.
+
+    This function processes each slide image with an AI vision service to identify
+    visual elements like charts, diagrams, images, and other non-text content.
+    The analysis results help inform script generation by providing context
+    about what's visually presented in each slide.
+    """
     await state_manager.update_step_status(
         file_id, "analyze_slide_images", "processing"
     )
