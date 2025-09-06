@@ -1,5 +1,4 @@
-"""
-Video composition module for SlideSpeaker.
+"""Video composition module for SlideSpeaker.
 
 This module handles the creation of final presentation videos by combining
 slide images, audio files, avatar videos, and subtitles. It supports both
@@ -11,6 +10,7 @@ import gc
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from urllib.parse import urlparse
 
 from moviepy import (
     AudioFileClip,
@@ -22,6 +22,8 @@ from moviepy import (
 from moviepy.video.fx.Resize import Resize
 from moviepy.video.VideoClip import TextClip
 
+from slidespeaker.utils.config import get_storage_provider
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,12 +32,15 @@ class VideoComposer:
 
     def __init__(self, max_memory_mb: int = 500):
         """
-        Initialize VideoComposer with memory constraints
+        Initialize VideoComposer with memory constraints and storage support.
 
         Args:
             max_memory_mb: Maximum memory to use for video processing (MB)
         """
         self.max_memory_mb = max_memory_mb
+        self.executor = ThreadPoolExecutor(max_workers=2)
+        self.storage_provider = get_storage_provider()
+        self.temp_files: list[Path] = []
 
     def _validate_video_file(self, video_path: Path) -> tuple[bool, str]:
         """
@@ -209,6 +214,95 @@ class VideoComposer:
             logger.exception("Full watermark creation traceback:")
             return None
 
+    def _is_cloud_url(self, path: str) -> bool:
+        """Check if a path is a cloud storage URL."""
+        return path.startswith(("s3://", "gs://", "https://", "http://"))
+
+    def _get_local_path_from_url(self, url: str) -> Path:
+        """Extract object key from cloud storage URL."""
+        if url.startswith("s3://"):
+            # Extract bucket and key from s3://bucket/key format
+            parsed = urlparse(url)
+            # bucket = parsed.netloc  # Not used, but kept for clarity
+            key = parsed.path.lstrip("/")
+            return Path(key)
+        elif url.startswith(("https://", "http://")):
+            # Extract key from presigned URL
+            parsed = urlparse(url)
+            path = parsed.path.lstrip("/")
+            return Path(path)
+        else:
+            return Path(url)
+
+    async def _download_cloud_file(self, url: str, temp_dir: str) -> Path:
+        """Download a cloud file to a temporary location."""
+        try:
+            object_key = str(self._get_local_path_from_url(url))
+            temp_path = Path(temp_dir) / Path(object_key).name
+
+            # Ensure temp directory exists
+            temp_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Download the file
+            self.storage_provider.download_file(object_key, temp_path)
+            self.temp_files.append(temp_path)  # Track for cleanup
+
+            logger.info(f"Downloaded cloud file: {url} -> {temp_path}")
+            return temp_path
+        except Exception as e:
+            logger.error(f"Failed to download cloud file {url}: {e}")
+            raise
+
+    async def _prepare_files_for_processing(
+        self, file_paths: list[Path], temp_dir: str
+    ) -> list[Path]:
+        """Prepare files for processing - now only handles local files."""
+        prepared_paths = []
+
+        for file_path in file_paths:
+            file_str = str(file_path)
+
+            if self._is_cloud_url(file_str):
+                # Only download if it's actually a cloud URL (should be rare now)
+                local_path = await self._download_cloud_file(file_str, temp_dir)
+                prepared_paths.append(local_path)
+            else:
+                # Use local file directly (this is the normal case now)
+                prepared_paths.append(Path(file_path))
+
+        return prepared_paths
+
+    def cleanup_temp_files(self) -> None:
+        """Clean up temporary downloaded files."""
+        for temp_file in self.temp_files:
+            try:
+                if temp_file.exists():
+                    temp_file.unlink()
+                    logger.debug(f"Cleaned up temp file: {temp_file}")
+            except Exception as e:
+                logger.warning(f"Failed to cleanup temp file {temp_file}: {e}")
+        self.temp_files.clear()
+
+    async def create_images_only_video(
+        self, slide_images: list[Path], output_path: Path
+    ) -> None:
+        """
+        Create a video with only images and no audio.
+        Now only handles local files - intermediate files stay local.
+        """
+        # Directly use local files - no cloud download needed for intermediate files
+        await self._create_video(slide_images, [], output_path)
+
+    async def create_video_with_audio(
+        self, slide_images: list[Path], audio_files: list[Path], output_path: Path
+    ) -> None:
+        """
+        Create a video with images and audio.
+        Now only handles local files - intermediate files stay local.
+        """
+        # Directly use local files - no cloud download needed for intermediate files
+        await self._create_video(slide_images, audio_files, output_path)
+
     async def compose_video(
         self,
         slide_images: list[Path],
@@ -217,8 +311,23 @@ class VideoComposer:
         output_path: Path,
     ) -> None:
         """
-        Compose final video with slide images as background and AI avatar presenting
-        Memory-efficient version with progress tracking, error handling, and timeout protection
+        Compose final video with slide images as background and AI avatar presenting.
+        Now only handles local files - intermediate files stay local.
+        """
+        # Directly use local files - no cloud download needed for intermediate files
+        await self._compose_video_with_local_files(
+            slide_images, avatar_videos, audio_files, output_path
+        )
+
+    async def _compose_video_with_local_files(
+        self,
+        slide_images: list[Path],
+        avatar_videos: list[Path],
+        audio_files: list[Path],
+        output_path: Path,
+    ) -> None:
+        """
+        Internal method to compose video with local file paths only.
         """
 
         def _compose_video_sync() -> None:
@@ -431,14 +540,6 @@ class VideoComposer:
                 raise Exception(
                     "Video composition timed out after 30 minutes"
                 ) from None
-
-    async def create_images_only_video(
-        self, slide_images: list[Path], output_path: Path
-    ) -> None:
-        """
-        Create a video with only images and no audio
-        """
-        await self._create_video(slide_images, [], output_path)
 
     async def _create_video(
         self, slide_images: list[Path], audio_files: list[Path], output_path: Path

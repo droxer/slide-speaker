@@ -24,6 +24,7 @@ dependencies = [
     "reportlab>=4.4.3",
     "imageio>=2.37.0",
     "asyncio>=4.0.0",
+    "oss2>=2.19.1",
 ]
 
 [project.optional-dependencies]
@@ -32,13 +33,11 @@ dev = [
     "mypy>=1.7.0",
     "pre-commit>=3.5.0",
 ]
+aws = [
+    "boto3>=1.34.0",
+]
+oss = [
+    "oss2>=2.17.0",
+]
 
-[build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
 
-[tool.setuptools]
-packages.find = {exclude = ["output", "uploads", "slidespeaker", "slidespeaker_api.egg-info"]}
-
-[tool.uv]
-sources = { pypi = { url = "https://mirrors.aliyun.com/pypi/simple/" } }

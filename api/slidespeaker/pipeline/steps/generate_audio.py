@@ -10,7 +10,10 @@ from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.services.tts_factory import TTSFactory
-from slidespeaker.utils.config import config
+from slidespeaker.utils.config import config, get_storage_provider
+
+# Get storage provider instance
+storage_provider = get_storage_provider()
 
 
 async def generate_audio_step(file_id: str, language: str = "english") -> None:
@@ -81,8 +84,11 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
                     await tts_service.generate_speech(
                         script_text, audio_path, language=language, voice=voice
                     )
+
+                    # Keep audio files local - only final files should be uploaded to cloud storage
                     audio_files.append(str(audio_path))
                     logger.info(f"Generated audio for slide {i + 1}: {audio_path}")
+
                 except Exception as e:
                     logger.error(f"Failed to generate audio for slide {i + 1}: {e}")
                     raise

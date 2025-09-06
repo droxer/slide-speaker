@@ -12,9 +12,12 @@ from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.processing.slide_extractor import SlideExtractor
-from slidespeaker.utils.config import config
+from slidespeaker.utils.config import config, get_storage_provider
 
 slide_processor = SlideExtractor()
+
+# Get storage provider instance
+storage_provider = get_storage_provider()
 
 
 async def convert_slides_step(file_id: str, file_path: Path, file_ext: str) -> None:
@@ -73,7 +76,10 @@ async def convert_slides_step(file_id: str, file_path: Path, file_ext: str) -> N
 
         image_path = config.output_dir / f"{file_id}_slide_{i + 1}.png"
         await slide_processor.convert_to_image(Path(file_path), file_ext, i, image_path)
+
+        # Keep slide images local - only final files should be uploaded to cloud storage
         slide_images.append(str(image_path))
+        logger.info(f"Converted slide {i + 1}: {image_path}")
 
     await state_manager.update_step_status(
         file_id, "convert_slides_to_images", "completed", slide_images

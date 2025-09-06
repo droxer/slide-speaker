@@ -13,9 +13,13 @@ from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.processing.subtitle_generator import SubtitleGenerator
-from slidespeaker.utils.config import config
+from slidespeaker.utils.config import config, get_storage_provider
+from slidespeaker.utils.locales import locale_utils
 
 subtitle_generator = SubtitleGenerator()
+
+# Get storage provider instance
+storage_provider = get_storage_provider()
 
 
 async def generate_subtitles_step(file_id: str, language: str = "english") -> None:
@@ -95,10 +99,27 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
             )
         logger.info(f"Generated subtitles: {srt_path}, {vtt_path}")
 
-        # Store the subtitle file paths in the state
-        subtitle_files = [str(srt_path), str(vtt_path)]
+        # Upload subtitle files to storage provider
+        subtitle_urls = []
+        try:
+            # Include locale/language in filename to distinguish different language variants
+            locale_code = locale_utils.get_locale_code(language)
+            srt_key = f"{file_id}_final_{locale_code}.srt"
+            vtt_key = f"{file_id}_final_{locale_code}.vtt"
+
+            srt_url = storage_provider.upload_file(str(srt_path), srt_key, "text/plain")
+            vtt_url = storage_provider.upload_file(str(vtt_path), vtt_key, "text/vtt")
+
+            subtitle_urls = [srt_url, vtt_url]
+            logger.info(f"Uploaded subtitles to storage: {srt_url}, {vtt_url}")
+        except Exception as e:
+            logger.error(f"Failed to upload subtitles to storage: {e}")
+            # Fallback to local paths if storage upload fails
+            subtitle_urls = [str(srt_path), str(vtt_path)]
+
+        # Store the subtitle file URLs in the state
         await state_manager.update_step_status(
-            file_id, "generate_subtitles", "completed", subtitle_files
+            file_id, "generate_subtitles", "completed", subtitle_urls
         )
         logger.info("Stage 'Generating subtitles' completed successfully")
 

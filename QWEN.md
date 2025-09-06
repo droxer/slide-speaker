@@ -18,6 +18,8 @@ SlideSpeaker is an AI-powered application that transforms PDF and PowerPoint pre
 - Video validation: Automatic validation of avatar videos before processing
 - State persistence: Local storage prevents data loss on page refresh
 - Enhanced UI: Improved user experience with better error handling
+- Task monitoring: Comprehensive task tracking and management with statistics
+- Watermark integration: Automatic watermarking of generated videos
 
 ### Architecture
 ```
@@ -198,6 +200,11 @@ All API endpoints are relative to: `http://localhost:8000/api`
 - `GET /api/task/{task_id}` - Get task status
 - `POST /api/task/{task_id}/cancel` - Cancel task processing
 - `GET /api/languages` - Get supported languages
+- `GET /api/tasks` - Get list of all tasks with filtering and pagination
+- `GET /api/tasks/search` - Search for tasks by file ID or properties
+- `GET /api/tasks/statistics` - Get comprehensive task statistics
+- `GET /api/tasks/{task_id}` - Get detailed information about a specific task
+- `DELETE /api/tasks/{task_id}` - Cancel a specific task
 
 ### Processing Steps
 1. extract_slides - Extract content from the presentation file
@@ -244,6 +251,31 @@ SlideSpeaker features improved task cancellation that allows users to immediatel
 - Currently processing tasks are marked for cancellation and stop at the next checkpoint
 - Resources are cleaned up promptly
 - Users receive immediate feedback through the web interface
+
+## Task Monitoring
+
+SlideSpeaker now includes comprehensive task monitoring capabilities:
+- List all tasks with filtering and pagination
+- Search for specific tasks by file ID or properties
+- Get detailed statistics about task processing
+- View detailed information about individual tasks
+- Cancel specific tasks through the API
+
+## Watermark Integration
+
+All generated videos automatically include a watermark:
+- Configurable watermark text (default: "SlideSpeaker AI")
+- Adjustable opacity (default: 0.95)
+- Customizable size (default: 64)
+- Highly visible positioning in the bottom-right corner
+
+Configuration via environment variables:
+```
+WATERMARK_ENABLED=true
+WATERMARK_TEXT="SlideSpeaker AI"
+WATERMARK_OPACITY=0.95
+WATERMARK_SIZE=64
+```
 
 ## Troubleshooting Redis Issues
 

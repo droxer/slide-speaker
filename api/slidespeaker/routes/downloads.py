@@ -5,162 +5,238 @@ This module provides API endpoints for downloading generated presentation videos
 and subtitle files. It handles file serving with appropriate content types and headers.
 """
 
-import re
-from collections.abc import Iterator
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request, Response
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse
 
-from slidespeaker.utils.config import config
+from slidespeaker.processing.video_previewer import VideoPreviewer
+from slidespeaker.storage import StorageProvider
+from slidespeaker.utils.config import config, get_storage_provider
 
 router = APIRouter(prefix="/api", tags=["downloads"])
 
-OUTPUT_DIR = config.output_dir
+# Get storage provider instance
+storage_provider: StorageProvider = get_storage_provider()
+
+# Initialize video previewer
+video_previewer = VideoPreviewer()
 
 
 @router.get("/video/{file_id}")
-async def get_video(file_id: str, request: Request) -> StreamingResponse | FileResponse:
+async def get_video(file_id: str, request: Request) -> Any:
     """Serve generated video file with HTTP Range support for HTML5 video."""
-    video_path = OUTPUT_DIR / f"{file_id}_final.mp4"
-    if not video_path.exists():
+    object_key = f"{file_id}_final.mp4"
+
+    # Check if file exists
+    if not storage_provider.file_exists(object_key):
         raise HTTPException(status_code=404, detail="Video not found")
 
-    file_size = video_path.stat().st_size
     range_header = request.headers.get("range") or request.headers.get("Range")
 
-    # If the client requested a byte range, return 206 with partial content
+    # Get the file URL from storage provider (works for all storage types)
+    file_url = storage_provider.get_file_url(object_key, expires_in=300)
+
+    # Log the generated URL for debugging (first 100 chars)
+    print(f"DEBUG: Generated file URL for video: {file_url[:100]}...")
+
+    # Handle range requests based on storage provider
     if range_header:
-        # Expected format: bytes=start-end
-        range_match = re.match(r"bytes=(\d+)-(\d*)", range_header)
-        if range_match:
-            start = int(range_match.group(1))
-            end = range_match.group(2)
-            end_byte = int(end) if end else file_size - 1
+        if config.storage_provider == "local":
+            # For local storage, serve directly with range support using the actual file path
+            # FastAPI's FileResponse handles range requests automatically
+            print(f"DEBUG: Serving range request directly from local file: {file_url}")
+            return FileResponse(
+                file_url,  # Use the actual file path from storage
+                media_type="video/mp4",
+                filename=f"presentation_{file_id}.mp4",
+                headers={
+                    "Content-Disposition": f"inline; filename=presentation_{file_id}.mp4",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                    "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language",
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Accept-Ranges": "bytes",
+                },
+            )
+        else:
+            # For cloud storage, redirect to presigned URL
+            print(
+                f"DEBUG: Redirecting range request to storage URL: {file_url[:100]}..."
+            )
+            return Response(
+                status_code=307,
+                headers={
+                    "Location": file_url,
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                    "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language",
+                },
+            )
 
-            if start >= file_size or end_byte >= file_size:
-                # Invalid range
-                raise HTTPException(
-                    status_code=416, detail="Requested Range Not Satisfiable"
-                )
-
-            chunk_size = 1024 * 1024  # 1MB
-            length = end_byte - start + 1
-
-            def iter_file() -> Iterator[bytes]:
-                with open(video_path, "rb") as f:
-                    f.seek(start)
-                    remaining = length
-                    while remaining > 0:
-                        read_size = min(chunk_size, remaining)
-                        data = f.read(read_size)
-                        if not data:
-                            break
-                        remaining -= len(data)
-                        yield data
-
-            headers = {
-                "Content-Range": f"bytes {start}-{end_byte}/{file_size}",
-                "Accept-Ranges": "bytes",
-                "Content-Length": str(length),
-                "Content-Type": "video/mp4",
+    # For non-range requests, handle based on storage provider
+    if config.storage_provider == "local":
+        # Local storage: serve directly for better performance using the actual file path
+        print(f"DEBUG: Serving non-range request directly from local file: {file_url}")
+        return FileResponse(
+            file_url,  # Use the actual file path from storage
+            media_type="video/mp4",
+            filename=f"presentation_{file_id}.mp4",
+            headers={
                 "Content-Disposition": f"inline; filename=presentation_{file_id}.mp4",
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
                 "Access-Control-Allow-Headers": "*",
                 "Cache-Control": "public, max-age=3600",
-            }
-            return StreamingResponse(
-                iter_file(), status_code=206, headers=headers, media_type="video/mp4"
-            )
+                "Accept-Ranges": "bytes",
+            },
+        )
+    else:
+        # Cloud storage: redirect to presigned URL for non-range requests too
+        print(
+            f"DEBUG: Redirecting non-range request to storage URL: {file_url[:100]}..."
+        )
+        return Response(
+            status_code=307,
+            headers={
+                "Location": file_url,
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language",
+            },
+        )
 
-    # Fallback: serve whole file with Accept-Ranges header
-    return FileResponse(
-        video_path,
-        media_type="video/mp4",
-        filename=f"presentation_{file_id}.mp4",
-        headers={
-            "Content-Disposition": f"inline; filename=presentation_{file_id}.mp4",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-            "Cache-Control": "public, max-age=3600",
-            "Accept-Ranges": "bytes",
-        },
-    )
+
+@router.options("/video/{file_id}")
+async def options_video(file_id: str) -> Response:
+    """OPTIONS endpoint to handle CORS preflight requests for video."""
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
+        "Access-Control-Max-Age": "86400",
+    }
+    return Response(status_code=200, headers=headers)
 
 
 @router.head("/video/{file_id}")
 async def head_video(file_id: str) -> Response:
     """HEAD endpoint to check if the generated video exists."""
-    video_path = OUTPUT_DIR / f"{file_id}_final.mp4"
-    if not video_path.exists():
+    object_key = f"{file_id}_final.mp4"
+    if not storage_provider.file_exists(object_key):
         raise HTTPException(status_code=404, detail="Video not found")
 
+    # For cloud storage, we can't easily get file size without downloading metadata
+    # So we'll use a generic response
     headers = {
         "Content-Type": "video/mp4",
-        "Content-Length": str(video_path.stat().st_size),
         "Accept-Ranges": "bytes",
         "Content-Disposition": f"inline; filename=presentation_{file_id}.mp4",
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-        "Access-Control-Allow-Headers": "*",
+        "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
         "Cache-Control": "public, max-age=3600",
     }
     return Response(status_code=200, headers=headers)
 
 
-@router.get("/subtitles/{file_id}/srt")
-async def get_srt_subtitles(file_id: str) -> FileResponse:
-    """Download SRT subtitle file."""
-    srt_path = OUTPUT_DIR / f"{file_id}_final.srt"
-    if not srt_path.exists():
-        raise HTTPException(status_code=404, detail="SRT subtitles not found")
+@router.options("/subtitles/{file_id}/srt")
+async def options_srt_subtitles(file_id: str) -> Response:
+    """OPTIONS endpoint to handle CORS preflight requests for SRT subtitles."""
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
+        "Access-Control-Max-Age": "86400",
+    }
+    return Response(status_code=200, headers=headers)
 
-    return FileResponse(
-        srt_path,
+
+@router.get("/subtitles/{file_id}/srt")
+async def get_srt_subtitles(file_id: str) -> Response:
+    """Download SRT subtitle file."""
+    # Try locale-aware filename first, then fall back to legacy format
+    locale_code = "en"  # Default to English for now
+    object_key = f"{file_id}_final_{locale_code}.srt"
+
+    if not storage_provider.file_exists(object_key):
+        # Fall back to legacy format for backward compatibility
+        legacy_key = f"{file_id}_final.srt"
+        if storage_provider.file_exists(legacy_key):
+            object_key = legacy_key
+        else:
+            raise HTTPException(status_code=404, detail="SRT subtitles not found")
+
+    # Download subtitle content
+    subtitle_content = storage_provider.download_bytes(object_key)
+
+    return Response(
+        content=subtitle_content,
         media_type="text/plain",
-        filename=f"presentation_{file_id}.srt",
         headers={
             "Content-Disposition": f"attachment; filename=presentation_{file_id}.srt",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
         },
     )
 
 
 @router.get("/subtitles/{file_id}/vtt")
-async def get_vtt_subtitles(file_id: str) -> FileResponse:
+async def get_vtt_subtitles(file_id: str) -> Response:
     """Download VTT subtitle file."""
-    vtt_path = OUTPUT_DIR / f"{file_id}_final.vtt"
-    if not vtt_path.exists():
-        raise HTTPException(status_code=404, detail="VTT subtitles not found")
+    # Try locale-aware filename first, then fall back to legacy format
+    locale_code = "en"  # Default to English for now
+    object_key = f"{file_id}_final_{locale_code}.vtt"
 
-    return FileResponse(
-        vtt_path,
+    if not storage_provider.file_exists(object_key):
+        # Fall back to legacy format for backward compatibility
+        legacy_key = f"{file_id}_final.vtt"
+        if storage_provider.file_exists(legacy_key):
+            object_key = legacy_key
+        else:
+            raise HTTPException(status_code=404, detail="VTT subtitles not found")
+
+    # Download subtitle content
+    subtitle_content = storage_provider.download_bytes(object_key)
+
+    return Response(
+        content=subtitle_content,
         media_type="text/vtt",
-        filename=f"presentation_{file_id}.vtt",
         headers={
             "Content-Disposition": f"inline; filename=presentation_{file_id}.vtt",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
         },
     )
+
+
+@router.options("/subtitles/{file_id}/vtt")
+async def options_vtt_subtitles(file_id: str) -> Response:
+    """OPTIONS endpoint to handle CORS preflight requests for VTT subtitles."""
+    headers = {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
+        "Access-Control-Max-Age": "86400",
+    }
+    return Response(status_code=200, headers=headers)
 
 
 @router.head("/subtitles/{file_id}/vtt")
 async def head_vtt_subtitles(file_id: str) -> Response:
     """HEAD endpoint to check if VTT subtitle file exists."""
-    vtt_path = OUTPUT_DIR / f"{file_id}_final.vtt"
-    if not vtt_path.exists():
+    object_key = f"{file_id}_final.vtt"
+    if not storage_provider.file_exists(object_key):
         raise HTTPException(status_code=404, detail="VTT subtitles not found")
     headers = {
         "Content-Type": "text/vtt",
-        "Content-Length": str(vtt_path.stat().st_size),
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-        "Access-Control-Allow-Headers": "*",
+        "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
     }
     return Response(status_code=200, headers=headers)
 
@@ -168,14 +244,13 @@ async def head_vtt_subtitles(file_id: str) -> Response:
 @router.head("/subtitles/{file_id}/srt")
 async def head_srt_subtitles(file_id: str) -> Response:
     """HEAD endpoint to check if SRT subtitle file exists."""
-    srt_path = OUTPUT_DIR / f"{file_id}_final.srt"
-    if not srt_path.exists():
+    object_key = f"{file_id}_final.srt"
+    if not storage_provider.file_exists(object_key):
         raise HTTPException(status_code=404, detail="SRT subtitles not found")
     headers = {
         "Content-Type": "text/plain",
-        "Content-Length": str(srt_path.stat().st_size),
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-        "Access-Control-Allow-Headers": "*",
+        "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
     }
     return Response(status_code=200, headers=headers)

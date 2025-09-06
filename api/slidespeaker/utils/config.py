@@ -8,8 +8,11 @@ provides centralized access to configuration values with appropriate defaults.
 
 import os
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
+
+from slidespeaker.storage import StorageConfig, StorageProvider, create_storage_provider
 
 # Load environment variables once at module import
 load_dotenv()
@@ -31,6 +34,10 @@ class Config:
         self.watermark_text = os.getenv("WATERMARK_TEXT", "SlideSpeaker AI")
         self.watermark_opacity = float(os.getenv("WATERMARK_OPACITY", "0.95"))
         self.watermark_size = int(os.getenv("WATERMARK_SIZE", "64"))
+
+        # Storage configuration
+        self.storage_provider = os.getenv("STORAGE_PROVIDER", "local")
+        self.storage_config = self._get_storage_config()
 
     @property
     def output_dir(self) -> Path:
@@ -63,9 +70,61 @@ class Config:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.uploads_dir.mkdir(parents=True, exist_ok=True)
 
+    def _get_storage_config(self) -> dict[str, Any]:
+        """Get storage configuration based on provider type."""
+        if self.storage_provider == "local":
+            return {"base_path": str(self.output_dir), "base_url": "/"}
+        elif self.storage_provider == "s3":
+            return {
+                "bucket_name": os.getenv("AWS_S3_BUCKET_NAME", ""),
+                "region_name": os.getenv("AWS_REGION", "us-east-1"),
+                "aws_access_key_id": os.getenv("AWS_ACCESS_KEY_ID", ""),
+                "aws_secret_access_key": os.getenv("AWS_SECRET_ACCESS_KEY", ""),
+                "endpoint_url": os.getenv("AWS_S3_ENDPOINT_URL"),  # For testing/minio
+            }
+        elif self.storage_provider == "oss":
+            return {
+                "bucket_name": os.getenv("OSS_BUCKET_NAME", ""),
+                "endpoint": os.getenv("OSS_ENDPOINT", ""),
+                "access_key_id": os.getenv("OSS_ACCESS_KEY_ID", ""),
+                "access_key_secret": os.getenv("OSS_ACCESS_KEY_SECRET", ""),
+                "region": os.getenv("OSS_REGION", ""),
+            }
+        else:
+            raise ValueError(f"Unsupported storage provider: {self.storage_provider}")
+
+    def get_storage_provider(self) -> StorageProvider:
+        """Get a storage provider instance based on configuration."""
+        try:
+            storage_config = StorageConfig(
+                provider=self.storage_provider, **self.storage_config
+            )
+            return create_storage_provider(storage_config)
+        except ImportError as e:
+            # If optional dependencies are missing, fall back to local storage
+            if self.storage_provider != "local":
+                print(f"Warning: {e}. Falling back to local storage.")
+                local_config = StorageConfig(
+                    provider="local", base_path=str(self.output_dir), base_url="/"
+                )
+                return create_storage_provider(local_config)
+            raise
+
 
 # Global configuration instance
 config = Config()
+
+# Global storage provider instance (lazy initialization)
+_storage_provider_instance = None
+
+
+def get_storage_provider() -> StorageProvider:
+    """Get the global storage provider instance with lazy initialization."""
+    global _storage_provider_instance
+    if _storage_provider_instance is None:
+        _storage_provider_instance = config.get_storage_provider()
+    return _storage_provider_instance
+
 
 # Ensure directories exist on import
 config.ensure_directories_exist()

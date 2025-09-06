@@ -13,10 +13,13 @@ from loguru import logger
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.processing.video_composer import VideoComposer
 from slidespeaker.processing.video_previewer import VideoPreviewer
-from slidespeaker.utils.config import config
+from slidespeaker.utils.config import config, get_storage_provider
 
 video_composer = VideoComposer()
 video_previewer = VideoPreviewer()
+
+# Get storage provider instance
+storage_provider = get_storage_provider()
 
 
 async def compose_video_step(file_id: str, file_path: Path) -> None:
@@ -171,7 +174,7 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
                         f"Creating simple video with {len(slide_images)} slides and "
                         f"{len(valid_audio_files)} valid audio files"
                     )
-                    await video_composer._create_video(
+                    await video_composer.create_video_with_audio(
                         slide_images, valid_audio_files, final_video_path
                     )
                 else:
@@ -192,9 +195,25 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
         logger.error(f"Video composition failed: {e}")
         raise
 
-    await state_manager.update_step_status(
-        file_id, "compose_video", "completed", str(final_video_path)
-    )
+    # Upload final video to storage provider
+    try:
+        object_key = f"{file_id}_final.mp4"
+        storage_url = storage_provider.upload_file(
+            str(final_video_path), object_key, "video/mp4"
+        )
+        logger.info(f"Uploaded final video to storage: {storage_url}")
+
+        # Store the storage URL instead of local path
+        await state_manager.update_step_status(
+            file_id, "compose_video", "completed", storage_url
+        )
+    except Exception as e:
+        logger.error(f"Failed to upload video to storage: {e}")
+        # Fallback to local path if storage upload fails
+        await state_manager.update_step_status(
+            file_id, "compose_video", "completed", str(final_video_path)
+        )
+
     logger.info("Stage 'Composing final presentation' completed successfully")
     await state_manager.mark_completed(file_id)
 
@@ -202,7 +221,6 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
     try:
         preview_data = video_previewer.generate_preview_data(
             file_id,
-            config.output_dir,
             str(subtitle_language) if subtitle_language else "english",
         )
         logger.info(f"Generated preview data: {preview_data}")

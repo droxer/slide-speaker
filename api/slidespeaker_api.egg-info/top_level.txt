@@ -1,3 +1,0 @@
-output
-slidespeaker
-temp

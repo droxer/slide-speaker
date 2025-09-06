@@ -7,7 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Backend (FastAPI)
 ```bash
 cd api
-uv sync --extra=dev          # Install dependencies
+uv sync                      # Install base dependencies
+uv sync --extra=dev          # Install with development tools (ruff, mypy, pre-commit)
+uv sync --extra=aws          # Install with AWS S3 support (boto3)
+uv sync --extra=oss          # Install with Aliyun OSS support (oss2)
+uv sync --extra=dev --extra=aws --extra=oss  # Install all optional dependencies
 python server.py             # Start API server (port 8000)
 python master_worker.py      # Start master worker for background tasks
 make lint                    # Run ruff linter
@@ -56,12 +60,21 @@ make check                  # Run both linting and type checking
 - File-based state persistence for long-running tasks
 - Real-time progress tracking via WebSocket updates
 
+**Storage Architecture**:
+- Extensible cloud storage system with abstract `StorageProvider` interface
+- Support for multiple providers: Local filesystem, AWS S3, Aliyun OSS
+- Automatic fallback to local storage if cloud upload fails
+- Presigned URL generation for secure file access
+- All pipeline steps automatically upload to configured storage provider
+- Unified URL generation across all storage providers
+- Locale-aware subtitle filename generation with backward compatibility
+
 **File Structure**:
 - `api/` - FastAPI backend
 - `web/` - React frontend
 - `uploads/` - Temporary uploaded files
-- `output/` - Generated videos and subtitles
-- `.env` - API keys (OpenAI, Qwen, ElevenLabs, HeyGen)
+- `output/` - Generated videos and subtitles (local storage)
+- `.env` - API keys (OpenAI, Qwen, ElevenLabs, HeyGen) and storage configuration
 
 ### Environment Setup
 Required API keys in `api/.env`:
@@ -70,6 +83,22 @@ OPENAI_API_KEY=your_key
 QWEN_API_KEY=your_key
 ELEVENLABS_API_KEY=your_key
 HEYGEN_API_KEY=your_key
+
+# Storage Configuration (optional - defaults to local filesystem)
+STORAGE_PROVIDER=local  # Options: local, s3, oss
+
+# AWS S3 Configuration (required when STORAGE_PROVIDER=s3)
+AWS_S3_BUCKET_NAME=your-bucket-name
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your-access-key-id
+AWS_SECRET_ACCESS_KEY=your-secret-access-key
+
+# Aliyun OSS Configuration (required when STORAGE_PROVIDER=oss)
+OSS_BUCKET_NAME=your-bucket-name
+OSS_ENDPOINT=oss-cn-region.aliyuncs.com
+OSS_ACCESS_KEY_ID=your-access-key-id
+OSS_ACCESS_KEY_SECRET=your-access-key-secret
+OSS_REGION=cn-region
 ```
 
 ### Development Workflow
@@ -79,6 +108,14 @@ HEYGEN_API_KEY=your_key
 4. API docs at http://localhost:8000/docs
 
 ### Recent Improvements
+**Storage System Overhaul**:
+- Replaced Google Cloud Storage with Aliyun OSS support
+- Added comprehensive Aliyun OSS implementation with presigned URLs
+- Unified storage provider interface across local, S3, and OSS
+- Fixed URL generation for consistent behavior across all storage providers
+- Added locale-aware subtitle filename generation (e.g., `_en.srt`, `_zh-Hans.vtt`)
+- Maintains backward compatibility with legacy filename formats
+
 **Memory-Optimized Video Processing**:
 - Per-slide processing to prevent memory exhaustion
 - Video validation before processing

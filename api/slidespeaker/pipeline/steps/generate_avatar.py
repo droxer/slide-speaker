@@ -10,7 +10,10 @@ from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.services.avatar_factory import AvatarFactory
-from slidespeaker.utils.config import config
+from slidespeaker.utils.config import config, get_storage_provider
+
+# Get storage provider instance
+storage_provider = get_storage_provider()
 
 
 async def generate_avatar_step(file_id: str) -> None:
@@ -97,8 +100,11 @@ async def generate_avatar_step(file_id: str) -> None:
                     script_data["script"],
                     video_path,
                 )
+
+                # Keep avatar videos local - only final files should be uploaded to cloud storage
                 avatar_videos.append(str(video_path))
                 logger.info(f"Generated avatar video for slide {i + 1}: {video_path}")
+
             except Exception as e:
                 logger.error(f"Failed to generate avatar video for slide {i + 1}: {e}")
                 failed_slides.append(i + 1)
