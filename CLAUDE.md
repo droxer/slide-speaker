@@ -134,3 +134,4 @@ OSS_REGION=cn-region
 - Added more descriptive comments throughout codebase
 - Improved logging configuration for better debugging
 - Updated Redis key namespace from "ai_slider" to "ss" for consistency
+- do NOT git commit

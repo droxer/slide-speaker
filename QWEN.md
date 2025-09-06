@@ -5,6 +5,7 @@
 SlideSpeaker is an AI-powered application that transforms PDF and PowerPoint presentations into engaging video presentations with AI-generated narration and avatars. The application uses a distributed microservices architecture with clear separation of concerns.
 
 ### Key Features
+- Unified Storage System: Support for Local filesystem, AWS S3, and Aliyun OSS with automatic fallback
 - Memory-Efficient Video Processing: Optimized video composition to prevent hanging with AI avatars
 - Distributed processing with Redis queue for scalability
 - Real-time progress tracking
@@ -13,7 +14,7 @@ SlideSpeaker is an AI-powered application that transforms PDF and PowerPoint pre
 - AI avatar integration (HeyGen and DALL-E)
 - Text-to-speech (OpenAI, Qwen, and ElevenLabs)
 - AI-powered script refinement for better presentation flow
-- Automatic subtitle generation
+- Automatic subtitle generation with locale-aware filenames
 - Responsive React frontend
 - Video validation: Automatic validation of avatar videos before processing
 - State persistence: Local storage prevents data loss on page refresh
@@ -254,12 +255,21 @@ SlideSpeaker features improved task cancellation that allows users to immediatel
 
 ## Task Monitoring
 
-SlideSpeaker now includes comprehensive task monitoring capabilities:
+SlideSpeaker includes comprehensive task monitoring capabilities:
 - List all tasks with filtering and pagination
 - Search for specific tasks by file ID or properties
 - Get detailed statistics about task processing
 - View detailed information about individual tasks
 - Cancel specific tasks through the API
+
+### Monitoring Features
+
+The task monitoring system provides:
+- **Real-time task tracking**: View current status of all tasks
+- **Advanced filtering**: Filter tasks by status, creation date, and other properties
+- **Comprehensive search**: Find tasks quickly using search queries
+- **Detailed analytics**: Understand processing patterns and performance metrics
+- **Task statistics**: View success rates, processing times, and recent activity
 
 ## Watermark Integration
 

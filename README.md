@@ -2,12 +2,9 @@
 
 From slides to videos with AI voices and avatars.
 
-## Architecture
-
-For detailed information about the SlideSpeaker architecture, see the [Architecture Documentation](docs/architecture.md).
-
 ## Key Features
 
+- **Unified Storage System**: Support for Local filesystem, AWS S3, and Aliyun OSS with automatic fallback
 - **Memory-Efficient Video Processing**: Optimized video composition to prevent hanging with AI avatars
 - **Distributed Processing**: Background task processing with Redis queue for scalability
 - **Real-time Progress Tracking**: Live updates on video generation progress
@@ -16,19 +13,24 @@ For detailed information about the SlideSpeaker architecture, see the [Architect
 - **Multiple AI Services**: OpenAI and Qwen for script generation, HeyGen and DALL-E for avatars
 - **Flexible TTS Options**: OpenAI TTS, ElevenLabs, and local TTS providers
 - **Script Review**: AI-powered script refinement for better presentation flow
-- **Subtitle Generation**: Automatic subtitle creation in multiple languages
+- **Subtitle Generation**: Automatic subtitle creation in multiple languages with locale-aware filenames
 - **Responsive Web Interface**: Modern React frontend with real-time feedback
 - **Video Validation**: Automatic validation of avatar videos before processing
 - **State Persistence**: Local storage prevents data loss on page refresh
 - **Enhanced UI**: Improved user experience with better error handling
+- **Task Monitoring**: Comprehensive task tracking and management with statistics
+- **Watermark Integration**: Automatic watermarking of generated videos
 
 ## Quick Start
 
 1. **API Setup**
    ```bash
    cd api
-   uv sync
-   # Create .env with your API keys (OpenAI, Qwen, ElevenLabs, HeyGen)
+   uv sync                      # Install base dependencies
+   uv sync --extra=dev          # Install with development tools (ruff, mypy, pre-commit)
+   uv sync --extra=aws          # Install with AWS S3 support (boto3)
+   uv sync --extra=oss          # Install with Aliyun OSS support (oss2)
+   # Create .env with your API keys and storage configuration
    make dev
    ```
 
@@ -40,6 +42,8 @@ For detailed information about the SlideSpeaker architecture, see the [Architect
    ```
 
 3. **Visit** `http://localhost:3000` to upload presentations and create AI-powered videos
+
+4. **API Documentation** is available at `http://localhost:8000/docs`
 
 ## Documentation
 

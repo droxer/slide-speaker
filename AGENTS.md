@@ -4,7 +4,7 @@
 - `api/`: FastAPI backend (`slidespeaker/` modules, `routes/`, `processing/`, `pipeline/steps/`).
 - `web/`: React + TypeScript frontend (`src/`, `public/`).
 - `docs/`: Installation and API references.
-- Supporting files: `api/Makefile`, `web/Makefile`, `setup-precommit.sh`.
+- Supporting files: `api/Makefile`, `web/Makefile`.
 
 ## Build, Test, and Development Commands
 - API: `cd api`
@@ -34,6 +34,5 @@
 
 ## Security & Configuration Tips
 - API requires `.env` (OpenAI, Qwen, ElevenLabs, HeyGen, Redis). Never commit secrets.
-- Install hooks: run `./setup-precommit.sh` to enable Python and web pre-commit checks.
 - Engines: Python ≥3.12 via `uv`; Node ≥20 for web.
 
