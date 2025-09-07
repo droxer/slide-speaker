@@ -16,6 +16,7 @@ help:
 	@echo "make dev         - Start development server (auto-reload)"
 	@echo "make start       - Start production server"
 	@echo "make master-worker - Start master worker (automatically manages multiple workers)"
+	@echo "make cli         - Show CLI tool help"
 	@echo "make lint        - Run ruff linter"
 	@echo "make format      - Run ruff formatter"
 	@echo "make typecheck   - Run mypy type checker"
@@ -41,6 +42,11 @@ start: install
 .PHONY: master-worker
 master-worker: install
 	$(PYTHON) master_worker.py
+
+# CLI tool
+.PHONY: cli
+cli: install
+	$(PYTHON) cli.py --help
 
 # Linting with ruff
 .PHONY: lint

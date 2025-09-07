@@ -14,6 +14,7 @@ uv sync --extra=oss          # Install with Aliyun OSS support (oss2)
 uv sync --extra=dev --extra=aws --extra=oss  # Install all optional dependencies
 python server.py             # Start API server (port 8000)
 python master_worker.py      # Start master worker for background tasks
+python cli.py --help         # Show CLI tool help
 make lint                    # Run ruff linter
 make format                  # Run ruff formatter  
 make typecheck               # Run mypy type checker
