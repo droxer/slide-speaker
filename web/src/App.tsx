@@ -788,14 +788,7 @@ function App() {
             {status === 'processing' && (
               <div className="processing-view">
                 <div className="spinner"></div>
-                <h3>{getProcessingStatusMessage()}</h3>
-                <div className="file-type-context">
-                  {isPdfFile(file?.name || null) ? (
-                    <p className="file-context-text">Processing PDF Document</p>
-                  ) : (
-                    <p className="file-context-text">Processing PowerPoint Presentation</p>
-                  )}
-                </div>
+                <h3>{getProcessingStatusMessage()}</h3>                
                 <div className="progress-container">
                   <div className="progress-bar">
                     <div 
@@ -939,7 +932,7 @@ function App() {
                           </div>
                         ) : (
                           <div className="info-item">
-                            <span className="info-label">AI Avatar:</span>
+                            <span className="info-label disabled">AI Avatar:</span>
                             <span className="info-value">{generateAvatar ? '✓ Generated' : '✗ Disabled'}</span>
                           </div>
                         )}

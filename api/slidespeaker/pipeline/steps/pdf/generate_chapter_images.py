@@ -61,9 +61,7 @@ async def generate_chapter_images_step(file_id: str, language: str = "english") 
 
         # Generate chapter images
         logger.info(f"Starting image generation for {len(chapters)} chapters")
-        image_paths = await image_generator.generate_chapter_images(
-            chapters, images_dir, language
-        )
+        image_paths = await image_generator.generate_images(chapters, images_dir)
         logger.info(f"Generated {len(image_paths)} chapter images")
 
         # For PDF processing, we only need local paths for subsequent steps
