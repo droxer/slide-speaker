@@ -15,7 +15,7 @@ from slidespeaker.core.task_queue import task_queue
 
 # Import specialized coordinators
 from .pdf_coordinator import process_pdf_file
-from .presentation_coordinator import process_presentation_file
+from .slide_coordinator import process_slide_file
 
 
 async def accept_task(
@@ -101,7 +101,7 @@ async def accept_task(
         )
     else:
         # Use PPT/PPTX-specific coordinator
-        await process_presentation_file(
+        await process_slide_file(
             file_id,
             file_path,
             file_ext,

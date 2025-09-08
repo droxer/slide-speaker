@@ -1,7 +1,7 @@
 """
-Presentation processing steps for SlideSpeaker.
+Slide processing steps for SlideSpeaker.
 
-This module contains individual processing steps for the presentation pipeline.
+This module contains individual processing steps for the slide pipeline.
 """
 
 from .analyze_slides import analyze_slides_step

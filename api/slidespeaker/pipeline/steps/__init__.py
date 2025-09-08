@@ -24,15 +24,15 @@ from .pdf import (
 from .pdf import (
     segment_content_step as segment_pdf_content_step,
 )
-from .presentation.analyze_slides import analyze_slides_step
-from .presentation.compose_video import compose_video_step
-from .presentation.convert_slides import convert_slides_step
-from .presentation.extract_slides import extract_slides_step
-from .presentation.generate_audio import generate_audio_step
-from .presentation.generate_avatar import generate_avatar_step
-from .presentation.generate_scripts import generate_scripts_step
-from .presentation.generate_subtitles import generate_subtitles_step
-from .presentation.review_scripts import review_scripts_step
+from .slides.analyze_slides import analyze_slides_step
+from .slides.compose_video import compose_video_step
+from .slides.convert_slides import convert_slides_step
+from .slides.extract_slides import extract_slides_step
+from .slides.generate_audio import generate_audio_step
+from .slides.generate_avatar import generate_avatar_step
+from .slides.generate_scripts import generate_scripts_step
+from .slides.generate_subtitles import generate_subtitles_step
+from .slides.review_scripts import review_scripts_step
 
 __all__ = [
     # Presentation processing steps

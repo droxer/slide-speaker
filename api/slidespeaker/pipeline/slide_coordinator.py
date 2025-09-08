@@ -1,7 +1,7 @@
 """
-PPT/PPTX processing coordinator for SlideSpeaker.
+Slide processing coordinator for SlideSpeaker.
 
-This module coordinates the PPT/PPTX processing pipeline by managing step execution,
+This module coordinates the slide processing pipeline by managing step execution,
 state tracking, and error handling. It provides state-aware processing that
 can resume from any step and handles task cancellation.
 """
@@ -13,7 +13,7 @@ from loguru import logger
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 
-from .steps.presentation import (
+from .steps.slides import (
     analyze_slides_step,
     compose_video_step,
     convert_slides_step,
@@ -98,7 +98,7 @@ async def _execute_step(
     task_id: str | None = None,
 ) -> None:
     """
-    Execute a single step in the presentation pipeline.
+    Execute a single step in the slide pipeline.
 
     This function handles step execution with proper cancellation checking,
     state management, and error handling for each processing stage.
@@ -224,7 +224,7 @@ async def _execute_step(
             raise
 
 
-async def process_presentation_file(
+async def process_slide_file(
     file_id: str,
     file_path: Path,
     file_ext: str,
@@ -235,16 +235,16 @@ async def process_presentation_file(
     task_id: str | None = None,
 ) -> None:
     """
-    State-aware processing that can resume from any step in the presentation pipeline.
+    State-aware processing that can resume from any step in the slide pipeline.
 
-    This function orchestrates the complete presentation processing workflow,
+    This function orchestrates the complete slide processing workflow,
     managing each step's execution, tracking progress, and handling errors or cancellations.
     """
     # Don't default subtitle language to audio language - preserve user selection
     # subtitle_language remains as provided (could be None)
 
     logger.info(
-        f"Initiating AI presentation generation for file: {file_id}, format: {file_ext}"
+        f"Initiating AI slide generation for file: {file_id}, format: {file_ext}"
     )
     logger.info(
         f"Voice language: {voice_language}, Subtitle language: {subtitle_language}"
@@ -361,7 +361,7 @@ async def process_presentation_file(
             logger.info(f"Task {task_id} processing completed successfully")
 
     except Exception as e:
-        logger.error(f"AI presentation generation failed for file {file_id}: {e}")
+        logger.error(f"AI slide generation failed for file {file_id}: {e}")
         logger.error(f"Error category: {type(e).__name__}")
         import traceback
 
@@ -401,7 +401,7 @@ async def _log_initial_state(file_id: str) -> None:
         logger.info(f"Current processing status: {state['status']}")
         for step_name, step_data in state["steps"].items():
             step_display_names = {
-                "extract_slides": "Extracting presentation content",
+                "extract_slides": "Extracting slide content",
                 "convert_slides_to_images": "Converting slides to images",
                 "analyze_slide_images": "Analyzing visual content",
                 "generate_scripts": "Generating AI narratives",
