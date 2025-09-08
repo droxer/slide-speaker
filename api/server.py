@@ -13,8 +13,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from slidespeaker.routes.downloads import router as downloads_router
 from slidespeaker.routes.languages import router as languages_router
-from slidespeaker.routes.monitoring import router as monitoring_router
 from slidespeaker.routes.progress import router as progress_router
+from slidespeaker.routes.stats import router as stats_router
 from slidespeaker.routes.tasks import router as tasks_router
 from slidespeaker.routes.upload import router as upload_router
 from slidespeaker.utils.logging_config import setup_logging
@@ -44,13 +44,13 @@ app.include_router(tasks_router)
 app.include_router(progress_router)
 app.include_router(downloads_router)
 app.include_router(languages_router)
-app.include_router(monitoring_router)
+app.include_router(stats_router)
 
 
 @app.get("/")
 async def root() -> dict[str, str]:
     """Root endpoint that returns a welcome message"""
-    return {"message": "AI Slider Backend API"}
+    return {"message": "SlideSpeaker Backend API"}
 
 
 if __name__ == "__main__":

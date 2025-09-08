@@ -297,6 +297,26 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     return stepNames[step] || step;
   };
 
+  // Get file type display name
+  const getFileTypeDisplayName = (fileExt: string): string => {
+    const ext = fileExt?.toLowerCase();
+    switch (ext) {
+      case '.pdf':
+        return 'PDF Document';
+      case '.pptx':
+        return 'PowerPoint Presentation';
+      case '.ppt':
+        return 'PowerPoint 97-2003 Presentation';
+      default:
+        return `${ext?.toUpperCase() || 'Unknown'} File`;
+    }
+  };
+
+  // Check if file is PDF
+  const isPdfFile = (fileExt: string): boolean => {
+    return fileExt?.toLowerCase() === '.pdf';
+  };
+
   // Handle search
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -511,6 +531,14 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                   );
                 })()}
                 
+                {/* File type information */}
+                <div className="task-info">
+                  <span className="info-label">Document Type:</span>
+                  <span className={`file-type-badge ${isPdfFile(task.kwargs?.file_ext) ? 'pdf' : 'ppt'}`}>
+                    {getFileTypeDisplayName(task.kwargs?.file_ext)}
+                  </span>
+                </div>
+                
                 {/* Current Step or Status - Hide Status for completed tasks */}
                 {task.status !== 'completed' && task.state && (
                   <div className="task-info">
@@ -698,6 +726,13 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                       )}
                       Your browser does not support the video tag.
                     </video>
+                    
+                    {/* File type information in preview */}
+                    <div className="preview-file-info">
+                      <div className={`file-type-badge ${isPdfFile(selectedTaskForPreview.kwargs?.file_ext) ? 'pdf' : 'ppt'}`}>
+                        {getFileTypeDisplayName(selectedTaskForPreview.kwargs?.file_ext)}
+                      </div>
+                    </div>
                     
                     {/* Video loading and error states */}
                     {videoLoading && (

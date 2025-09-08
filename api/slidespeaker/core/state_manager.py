@@ -36,37 +36,56 @@ class RedisStateManager:
         generate_subtitles: bool = True,
     ) -> dict[str, Any]:
         """Create initial state for a file processing task"""
-        # Initialize steps - conditionally include subtitle script steps based on language needs
-        steps = {
-            "extract_slides": {"status": "pending", "data": None},
-            "convert_slides_to_images": {"status": "pending", "data": None},
-            "analyze_slide_images": {"status": "pending", "data": None},
-            "generate_scripts": {"status": "pending", "data": None},
-            "review_scripts": {"status": "pending", "data": None},
-            "generate_audio": {"status": "pending", "data": None},
-            "generate_avatar_videos": {
-                "status": "pending" if generate_avatar else "skipped",
-                "data": None,
-            },
-            "generate_subtitles": {
-                "status": "pending",  # Always generate subtitles
-                "data": None,
-            },
-            "compose_video": {"status": "pending", "data": None},
-        }
+        # Initialize steps based on file type
+        if file_ext.lower() == ".pdf":
+            # PDF-specific steps
+            steps = {
+                "segment_pdf_content": {"status": "pending", "data": None},
+                "analyze_pdf_content": {"status": "pending", "data": None},
+                "review_pdf_scripts": {"status": "pending", "data": None},
+                "generate_pdf_chapter_images": {"status": "pending", "data": None},
+                "generate_pdf_audio": {"status": "pending", "data": None},
+                "generate_pdf_subtitles": {
+                    "status": "pending" if generate_subtitles else "skipped",
+                    "data": None,
+                },
+                "compose_pdf_video": {"status": "pending", "data": None},
+            }
+        else:
+            # Presentation-specific steps (.ppt, .pptx, etc.)
+            steps = {
+                "extract_slides": {"status": "pending", "data": None},
+                "convert_slides_to_images": {"status": "pending", "data": None},
+                "analyze_slide_images": {"status": "pending", "data": None},
+                "generate_scripts": {"status": "pending", "data": None},
+                "review_scripts": {"status": "pending", "data": None},
+                "generate_audio": {"status": "pending", "data": None},
+                "generate_avatar_videos": {
+                    "status": "pending" if generate_avatar else "skipped",
+                    "data": None,
+                },
+                "generate_subtitles": {
+                    "status": "pending",  # Always generate subtitles
+                    "data": None,
+                },
+                "compose_video": {"status": "pending", "data": None},
+            }
 
-        # Only include subtitle script generation steps if languages are different
-        # Default to audio language if subtitle language is not specified
-        effective_subtitle_language = (
-            subtitle_language if subtitle_language is not None else voice_language
-        )
-        if voice_language != effective_subtitle_language:
-            steps.update(
-                {
-                    "generate_subtitle_scripts": {"status": "pending", "data": None},
-                    "review_subtitle_scripts": {"status": "pending", "data": None},
-                }
+            # Only include subtitle script generation steps if languages are different
+            # Default to audio language if subtitle language is not specified
+            effective_subtitle_language = (
+                subtitle_language if subtitle_language is not None else voice_language
             )
+            if voice_language != effective_subtitle_language:
+                steps.update(
+                    {
+                        "generate_subtitle_scripts": {
+                            "status": "pending",
+                            "data": None,
+                        },
+                        "review_subtitle_scripts": {"status": "pending", "data": None},
+                    }
+                )
 
         state: dict[str, Any] = {
             "file_id": file_id,
@@ -77,7 +96,9 @@ class RedisStateManager:
             "generate_avatar": generate_avatar,
             "generate_subtitles": generate_subtitles,
             "status": "uploaded",
-            "current_step": "extract_slides",
+            "current_step": "segment_pdf_content"
+            if file_ext.lower() == ".pdf"
+            else "extract_slides",
             "steps": steps,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),

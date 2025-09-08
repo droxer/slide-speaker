@@ -467,6 +467,40 @@ body {
   line-height: 1.5;
 }
 
+/* File type hints */
+.file-type-hint {
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+.file-type-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.file-type-badge.pdf {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+}
+
+.file-type-badge.ppt {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+}
+
+.file-type-description {
+  font-size: 0.85rem;
+  color: #64748b;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
 /* Language selector */
 .language-section {
   margin: 2.25rem 0;

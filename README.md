@@ -20,6 +20,7 @@ From slides to videos with AI voices and avatars.
 - **Enhanced UI**: Improved user experience with better error handling
 - **Task Monitoring**: Comprehensive task tracking and management with statistics
 - **Watermark Integration**: Automatic watermarking of generated videos
+- **Advanced PDF Processing**: Specialized handling for PDF files with chapter-based analysis and AI-generated content
 
 ## Quick Start
 

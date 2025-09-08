@@ -10,6 +10,7 @@ import gc
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlparse
 
 from moviepy import (
@@ -319,6 +320,208 @@ class VideoComposer:
             slide_images, avatar_videos, audio_files, output_path
         )
 
+    async def compose_video_from_segments(
+        self,
+        segments: list[dict[str, Any]],
+        output_path: str,
+    ) -> None:
+        """
+        Compose final video from segments with flexible format.
+
+        Args:
+            segments: List of segment dictionaries with image, audio, subtitle, and duration keys
+            output_path: Path to save the final video
+        """
+        await self._compose_video_from_segments(segments, output_path)
+
+    async def _compose_video_from_segments(
+        self,
+        segments: list[dict[str, Any]],
+        output_path: str,
+    ) -> None:
+        """
+        Internal method to compose video from segments.
+
+        Args:
+            segments: List of segment dictionaries
+            output_path: Path to save the final video
+        """
+
+        def _compose_video_from_segments_sync() -> None:
+            try:
+                logger.info(f"Starting video composition with {len(segments)} segments")
+
+                if not segments:
+                    raise ValueError("No segments provided for video composition")
+
+                # Process segments one at a time to avoid memory issues
+                video_clips = []
+
+                for i, segment in enumerate(segments):
+                    logger.info(f"Processing segment {i + 1}/{len(segments)}...")
+                    logger.info(f"Segment data: {segment}")
+
+                    try:
+                        # Create clip with audio
+                        if "audio" in segment and Path(segment["audio"]).exists():
+                            logger.info(f"Loading audio file: {segment['audio']}")
+                            audio_clip = AudioFileClip(segment["audio"])
+                            duration = audio_clip.duration
+                            logger.info(f"Audio duration: {duration} seconds")
+
+                            # Load slide image
+                            slide_clip = ImageClip(segment["image"]).with_duration(
+                                duration
+                            )
+                            safe_width, safe_height = self._get_memory_safe_size(
+                                slide_clip
+                            )
+                            slide_clip = slide_clip.with_effects(
+                                [Resize(width=safe_width, height=safe_height)]
+                            )
+                            slide_clip = slide_clip.with_position("center")
+
+                            logger.info(f"Attaching audio to clip: {segment['audio']}")
+                            clip = slide_clip.with_audio(audio_clip)
+                            logger.info("Audio attached to clip successfully")
+                        else:
+                            # Get duration from provided duration or use default
+                            duration = 5.0  # Default duration
+                            if "duration" in segment:
+                                duration = float(segment["duration"])
+                                logger.info(
+                                    f"Using provided duration: {duration} seconds"
+                                )
+                            else:
+                                logger.info(
+                                    f"Using default duration: {duration} seconds"
+                                )
+
+                            # Load slide image
+                            slide_clip = ImageClip(segment["image"]).with_duration(
+                                duration
+                            )
+                            safe_width, safe_height = self._get_memory_safe_size(
+                                slide_clip
+                            )
+                            slide_clip = slide_clip.with_effects(
+                                [Resize(width=safe_width, height=safe_height)]
+                            )
+                            slide_clip = slide_clip.with_position("center")
+
+                            logger.info("Creating clip without audio")
+                            clip = slide_clip
+
+                        video_clips.append(clip)
+
+                        # Force garbage collection after each segment
+                        gc.collect()
+
+                    except Exception as e:
+                        logger.error(f"Error processing segment {i + 1}: {e}")
+                        continue
+
+                if not video_clips:
+                    raise ValueError("No valid clips were created")
+
+                logger.info("Concatenating all clips...")
+                # Explicitly preserve audio during concatenation
+                final_clip = concatenate_videoclips(video_clips, method="chain")
+                watermark = self._create_watermark(final_clip)
+                if watermark:
+                    logger.info("✓ Watermark received from _create_watermark")
+                    logger.info("Adding watermark to final video...")
+
+                    try:
+                        # Preserve audio before compositing
+                        original_audio = final_clip.audio
+
+                        # Use memory-efficient composition
+                        final_clip = CompositeVideoClip(
+                            [final_clip, watermark], use_bgclip=True
+                        )
+
+                        # Restore audio after compositing
+                        if original_audio is not None:
+                            final_clip = final_clip.with_audio(original_audio)
+
+                        logger.info(
+                            "✓ Watermark successfully composited with final video"
+                        )
+                    except Exception as e:
+                        logger.error(f"Failed to composite watermark: {e}")
+                        logger.exception("Watermark composition traceback:")
+                else:
+                    logger.warning(
+                        "✗ No watermark created or watermark creation failed"
+                    )
+
+                logger.info("=== WATERMARK INTEGRATION COMPLETE ===")
+
+                logger.info("Writing final video...")
+                logger.info(f"Output path: {output_path}")
+                logger.info(f"Final clip has audio: {final_clip.audio is not None}")
+                logger.info(f"Number of video clips: {len(video_clips)}")
+
+                # Check if any clips have audio
+                clips_with_audio = 0
+                for i, clip in enumerate(video_clips):
+                    if clip.audio is not None:
+                        clips_with_audio += 1
+                        logger.info(f"Clip {i} has audio")
+                    else:
+                        logger.info(f"Clip {i} has no audio")
+
+                logger.info(
+                    f"Total clips with audio: {clips_with_audio}/{len(video_clips)}"
+                )
+
+                # Write with optimized settings
+                final_clip.write_videofile(
+                    output_path,
+                    fps=24,
+                    codec="libx264",
+                    audio_codec="aac",
+                    threads=2,  # Reduce threads to save memory
+                    preset="medium",  # Balance quality vs speed
+                    bitrate="2000k",  # Limit bitrate for memory
+                    audio_bitrate="128k",
+                    temp_audiofile=str(Path(output_path).parent / "temp_audio.m4a"),
+                    remove_temp=True,
+                    logger=None,  # Disable moviepy logging
+                )
+
+                logger.info("Final video written successfully")
+
+                logger.info(f"Video composition completed: {output_path}")
+
+            except Exception as e:
+                logger.error(f"Video composition error: {e}")
+                raise
+            finally:
+                # Clean up all clips
+                try:
+                    for clip in video_clips:
+                        clip.close()
+                    if "final_clip" in locals():
+                        final_clip.close()
+                except Exception:
+                    pass
+                gc.collect()
+
+        # Run with timeout to prevent hanging
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            try:
+                await asyncio.wait_for(
+                    loop.run_in_executor(executor, _compose_video_from_segments_sync),
+                    timeout=1800,  # 30 minutes timeout
+                )
+            except TimeoutError:
+                raise Exception(
+                    "Video composition timed out after 30 minutes"
+                ) from None
+
     async def _compose_video_with_local_files(
         self,
         slide_images: list[Path],
@@ -471,17 +674,26 @@ class VideoComposer:
                     raise ValueError("No valid clips were created")
 
                 logger.info("Concatenating all clips...")
-                final_clip = concatenate_videoclips(video_clips)
+                # Explicitly preserve audio during concatenation
+                final_clip = concatenate_videoclips(video_clips, method="chain")
                 watermark = self._create_watermark(final_clip)
                 if watermark:
                     logger.info("✓ Watermark received from _create_watermark")
                     logger.info("Adding watermark to final video...")
 
                     try:
+                        # Preserve audio before compositing
+                        original_audio = final_clip.audio
+
                         # Use memory-efficient composition
                         final_clip = CompositeVideoClip(
                             [final_clip, watermark], use_bgclip=True
                         )
+
+                        # Restore audio after compositing
+                        if original_audio is not None:
+                            final_clip = final_clip.with_audio(original_audio)
+
                         logger.info(
                             "✓ Watermark successfully composited with final video"
                         )

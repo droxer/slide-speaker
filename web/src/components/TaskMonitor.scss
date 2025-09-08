@@ -686,6 +686,42 @@
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
+.info-value.pdf {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.info-value.ppt {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+/* File type badge styling */
+.file-type-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.9);
+  color: #475569;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.file-type-badge.pdf {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border: none;
+}
+
+.file-type-badge.ppt {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border: none;
+}
+
 .task-actions {
   display: flex;
   gap: 10px;
@@ -1553,6 +1589,39 @@
       padding: 12px 16px;
     }
   }
+}
+
+/* Preview file info */
+.preview-file-info {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 20;
+}
+
+.file-type-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.9);
+  color: #475569;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.file-type-badge.pdf {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border: none;
+}
+
+.file-type-badge.ppt {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border: none;
 }
 
 

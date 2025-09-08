@@ -434,3 +434,533 @@ class SubtitleGenerator:
         milliseconds = int((total_seconds % 1) * 1000)
 
         return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{milliseconds:03d}"
+
+    async def generate_subtitles_for_text(
+        self,
+        text: str,
+        duration: float,
+        output_path: Path,
+        language: str = "english",
+    ) -> tuple[str, str]:
+        """
+        Generate SRT and VTT subtitle files for a single text with a given duration.
+
+        Args:
+            text: Text content for subtitles
+            duration: Duration in seconds for the subtitle
+            output_path: Path to save the subtitle files (without extension)
+            language: Language of the subtitles
+
+        Returns:
+            Tuple of (srt_path, vtt_path) paths to generated subtitle files
+        """
+        try:
+            if not text.strip():
+                logger.warning("Empty text provided for subtitle generation")
+                # Create empty subtitle files
+                srt_path = output_path.with_suffix(".srt")
+                vtt_path = output_path.with_suffix(".vtt")
+
+                # Write empty SRT file with header only
+                with open(srt_path, "w", encoding="utf-8") as f:
+                    f.write("")
+
+                # Write empty VTT file with header only
+                with open(vtt_path, "w", encoding="utf-8") as f:
+                    f.write("WEBVTT\n\n")
+
+                logger.info(f"Created empty subtitle files: {srt_path}, {vtt_path}")
+                return str(srt_path), str(vtt_path)
+
+            logger.info(f"Generating subtitles for text with duration {duration}s")
+
+            # Generate SRT content
+            srt_content = self._generate_srt_content_for_text(text, duration, language)
+            srt_path = output_path.with_suffix(".srt")
+
+            logger.info(f"Attempting to write SRT file to: {srt_path}")
+            logger.info(f"SRT content length: {len(srt_content)} characters")
+
+            # Write SRT file
+            with open(srt_path, "w", encoding="utf-8") as f:
+                f.write(srt_content)
+
+            # Generate VTT content
+            vtt_content = self._generate_vtt_content_for_text(text, duration, language)
+            vtt_path = output_path.with_suffix(".vtt")
+
+            logger.info(f"Attempting to write VTT file to: {vtt_path}")
+            logger.info(f"VTT content length: {len(vtt_content)} characters")
+
+            # Write VTT file
+            with open(vtt_path, "w", encoding="utf-8") as f:
+                f.write(vtt_content)
+
+            logger.info("Generated subtitles for text")
+            logger.info(f"SRT path: {srt_path}")
+            logger.info(f"VTT path: {vtt_path}")
+
+            # Verify files were created
+            import os
+
+            if os.path.exists(srt_path):
+                logger.info(
+                    f"SRT file created successfully, size: {os.path.getsize(srt_path)} bytes"
+                )
+            else:
+                logger.error(f"Failed to create SRT file at {srt_path}")
+
+            if os.path.exists(vtt_path):
+                logger.info(
+                    f"VTT file created successfully, size: {os.path.getsize(vtt_path)} bytes"
+                )
+            else:
+                logger.error(f"Failed to create VTT file at {vtt_path}")
+
+            return str(srt_path), str(vtt_path)
+
+        except Exception as e:
+            logger.error(f"Error generating subtitles for text: {e}")
+            raise
+
+    def _generate_srt_content_for_text(
+        self,
+        text: str,
+        duration: float,
+        language: str = "english",
+    ) -> str:
+        """
+        Generate SRT subtitle content for a single text with a given duration.
+
+        Args:
+            text: Text content for subtitles
+            duration: Duration in seconds
+            language: Language of the subtitles
+
+        Returns:
+            SRT formatted subtitle content as string
+        """
+        if not text.strip():
+            return ""
+
+        # Log the language being used for debugging
+        logger.info(f"Generating SRT content for language: {language}")
+
+        srt_lines = []
+
+        # Split long text into reasonable chunks
+        text_chunks = self._split_text_for_subtitles(text, max_chars=42)
+
+        # Calculate time per chunk
+        time_per_chunk = duration / len(text_chunks) if text_chunks else duration
+
+        start_time = timedelta(seconds=0)
+        subtitle_number = 1
+
+        for chunk in text_chunks:
+            chunk_start_time = start_time
+            chunk_end_time = start_time + timedelta(seconds=time_per_chunk)
+
+            # Format timestamps (SRT format: HH:MM:SS,mmm)
+            start_timestamp = self._format_srt_timestamp(chunk_start_time)
+            end_timestamp = self._format_srt_timestamp(chunk_end_time)
+
+            # Add subtitle entry
+            srt_lines.append(str(subtitle_number))
+            srt_lines.append(f"{start_timestamp} --> {end_timestamp}")
+            srt_lines.append(chunk)
+            srt_lines.append("")
+
+            # Update for next subtitle
+            subtitle_number += 1
+            start_time = chunk_end_time
+
+        return "\n".join(srt_lines)
+
+    def _generate_vtt_content_for_text(
+        self,
+        text: str,
+        duration: float,
+        language: str = "english",
+    ) -> str:
+        """
+        Generate VTT subtitle content for a single text with a given duration.
+
+        Args:
+            text: Text content for subtitles
+            duration: Duration in seconds
+            language: Language of the subtitles
+
+        Returns:
+            VTT formatted subtitle content as string
+        """
+        if not text.strip():
+            return "WEBVTT\n\n"
+
+        # Log the language being used for debugging
+        logger.info(f"Generating VTT content for language: {language}")
+
+        # Include language in VTT header for better compatibility
+        lang_code = locale_utils.get_locale_code(language)
+        vtt_lines = [f"WEBVTT Language: {lang_code}", ""]  # VTT header with language
+
+        # Split long text into reasonable chunks
+        text_chunks = self._split_text_for_subtitles(text, max_chars=42)
+
+        # Calculate time per chunk
+        time_per_chunk = duration / len(text_chunks) if text_chunks else duration
+
+        start_time = timedelta(seconds=0)
+
+        for chunk in text_chunks:
+            chunk_start_time = start_time
+            chunk_end_time = start_time + timedelta(seconds=time_per_chunk)
+
+            # Format timestamps (VTT format: HH:MM:SS.mmm)
+            start_timestamp = self._format_vtt_timestamp(chunk_start_time)
+            end_timestamp = self._format_vtt_timestamp(chunk_end_time)
+
+            # Add subtitle entry
+            vtt_lines.append(f"{start_timestamp} --> {end_timestamp}")
+            vtt_lines.append(chunk)
+            vtt_lines.append("")
+
+            # Update start time for next subtitle
+            start_time = chunk_end_time
+
+        return "\n".join(vtt_lines)
+
+    def combine_srt_files(self, srt_files: list[Path], output_path: Path) -> str:
+        """
+        Combine multiple SRT files into a single SRT file with adjusted timestamps.
+
+        Args:
+            srt_files: List of paths to SRT files to combine
+            output_path: Path where the combined SRT file will be saved
+
+        Returns:
+            Path to the combined SRT file
+        """
+        try:
+            combined_lines: list[str] = []
+            current_time_offset = timedelta(seconds=0)
+
+            for srt_file in srt_files:
+                if not srt_file.exists():
+                    logger.warning(f"SRT file not found: {srt_file}")
+                    continue
+
+                with open(srt_file, encoding="utf-8") as f:
+                    content = f.read().strip()
+
+                if not content:
+                    continue
+
+                # Parse SRT blocks and adjust timestamps
+                blocks = content.split("\n\n")
+                for block in blocks:
+                    if not block.strip():
+                        continue
+
+                    lines = block.split("\n")
+                    if len(lines) < 3:
+                        continue
+
+                    # First line is subtitle number (we'll renumber)
+                    # Second line is timestamp
+                    timestamp_line = lines[1]
+
+                    # Parse timestamps
+                    if " --> " in timestamp_line:
+                        start_time_str, end_time_str = timestamp_line.split(" --> ")
+                        start_time = self._parse_srt_timestamp(start_time_str.strip())
+                        end_time = self._parse_srt_timestamp(end_time_str.strip())
+
+                        # Adjust timestamps by current offset
+                        adjusted_start = start_time + current_time_offset
+                        adjusted_end = end_time + current_time_offset
+
+                        # Format adjusted timestamps
+                        formatted_start = self._format_srt_timestamp(adjusted_start)
+                        formatted_end = self._format_srt_timestamp(adjusted_end)
+
+                        # Renumber subtitle
+                        subtitle_number = len(combined_lines) // 4 + 1
+
+                        # Add to combined content
+                        combined_lines.append(str(subtitle_number))
+                        combined_lines.append(f"{formatted_start} --> {formatted_end}")
+                        combined_lines.extend(lines[2:])  # Add subtitle text
+                        combined_lines.append("")  # Empty line after each block
+
+                # Update time offset with duration of current file
+                file_duration = self._get_srt_file_duration(srt_file)
+                current_time_offset += timedelta(seconds=file_duration)
+
+            # Write combined content
+            combined_content = "\n".join(combined_lines).strip()
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(combined_content)
+
+            logger.info(f"Combined {len(srt_files)} SRT files into {output_path}")
+            return str(output_path)
+
+        except Exception as e:
+            logger.error(f"Error combining SRT files: {e}")
+            raise
+
+    def combine_vtt_files(self, vtt_files: list[Path], output_path: Path) -> str:
+        """
+        Combine multiple VTT files into a single VTT file with adjusted timestamps.
+
+        Args:
+            vtt_files: List of paths to VTT files to combine
+            output_path: Path where the combined VTT file will be saved
+
+        Returns:
+            Path to the combined VTT file
+        """
+        try:
+            combined_lines: list[str] = ["WEBVTT", ""]  # VTT header
+            current_time_offset = timedelta(seconds=0)
+
+            for vtt_file in vtt_files:
+                if not vtt_file.exists():
+                    logger.warning(f"VTT file not found: {vtt_file}")
+                    continue
+
+                with open(vtt_file, encoding="utf-8") as f:
+                    lines = f.readlines()
+
+                # Skip header lines
+                content_lines = []
+                in_header = True
+                for line in lines:
+                    if in_header and (line.strip() == "" or line.startswith("WEBVTT")):
+                        continue
+                    else:
+                        in_header = False
+                        content_lines.append(line.rstrip())
+
+                if not content_lines:
+                    continue
+
+                # Parse VTT blocks and adjust timestamps
+                i = 0
+                while i < len(content_lines):
+                    line = content_lines[i]
+
+                    # Skip empty lines
+                    if not line.strip():
+                        i += 1
+                        continue
+
+                    # Check if this is a timestamp line
+                    if " --> " in line:
+                        timestamp_line = line
+                        # Parse timestamps
+                        start_time_str, end_time_str = timestamp_line.split(" --> ")
+                        start_time = self._parse_vtt_timestamp(start_time_str.strip())
+                        end_time = self._parse_vtt_timestamp(end_time_str.strip())
+
+                        # Adjust timestamps by current offset
+                        adjusted_start = start_time + current_time_offset
+                        adjusted_end = end_time + current_time_offset
+
+                        # Format adjusted timestamps
+                        formatted_start = self._format_vtt_timestamp(adjusted_start)
+                        formatted_end = self._format_vtt_timestamp(adjusted_end)
+
+                        # Add to combined content
+                        combined_lines.append(f"{formatted_start} --> {formatted_end}")
+
+                        # Add subtitle text (next lines until empty line)
+                        i += 1
+                        while i < len(content_lines) and content_lines[i].strip():
+                            combined_lines.append(content_lines[i].rstrip())
+                            i += 1
+                        combined_lines.append("")  # Empty line after each block
+                    else:
+                        i += 1
+
+                # Update time offset with duration of current file
+                file_duration = self._get_vtt_file_duration(vtt_file)
+                current_time_offset += timedelta(seconds=file_duration)
+
+            # Write combined content
+            combined_content = "\n".join(combined_lines).strip() + "\n"
+            with open(output_path, "w", encoding="utf-8") as f:
+                f.write(combined_content)
+
+            logger.info(f"Combined {len(vtt_files)} VTT files into {output_path}")
+            return str(output_path)
+
+        except Exception as e:
+            logger.error(f"Error combining VTT files: {e}")
+            raise
+
+    def _parse_srt_timestamp(self, timestamp_str: str) -> timedelta:
+        """
+        Parse SRT timestamp format (HH:MM:SS,mmm) to timedelta.
+
+        Args:
+            timestamp_str: SRT timestamp string
+
+        Returns:
+            Timedelta object
+        """
+        try:
+            # Handle SRT format: HH:MM:SS,mmm
+            time_parts = timestamp_str.replace(",", ".").split(":")
+            if len(time_parts) == 3:
+                hours = int(time_parts[0])
+                minutes = int(time_parts[1])
+                seconds_milliseconds = time_parts[2].split(".")
+                seconds = int(seconds_milliseconds[0])
+                milliseconds = (
+                    int(seconds_milliseconds[1]) if len(seconds_milliseconds) > 1 else 0
+                )
+                return timedelta(
+                    hours=hours,
+                    minutes=minutes,
+                    seconds=seconds,
+                    milliseconds=milliseconds,
+                )
+            return timedelta(seconds=0)
+        except Exception:
+            return timedelta(seconds=0)
+
+    def _parse_vtt_timestamp(self, timestamp_str: str) -> timedelta:
+        """
+        Parse VTT timestamp format (HH:MM:SS.mmm) to timedelta.
+
+        Args:
+            timestamp_str: VTT timestamp string
+
+        Returns:
+            Timedelta object
+        """
+        try:
+            # Handle VTT format: HH:MM:SS.mmm
+            time_parts = timestamp_str.split(":")
+            if len(time_parts) == 3:
+                hours = int(time_parts[0])
+                minutes = int(time_parts[1])
+                seconds_milliseconds = time_parts[2].split(".")
+                seconds = int(seconds_milliseconds[0])
+                milliseconds = (
+                    int(seconds_milliseconds[1]) if len(seconds_milliseconds) > 1 else 0
+                )
+                return timedelta(
+                    hours=hours,
+                    minutes=minutes,
+                    seconds=seconds,
+                    milliseconds=milliseconds,
+                )
+            return timedelta(seconds=0)
+        except Exception:
+            return timedelta(seconds=0)
+
+    def _get_srt_file_duration(self, srt_file: Path) -> float:
+        """
+        Get the duration of an SRT file by parsing the last timestamp.
+
+        Args:
+            srt_file: Path to SRT file
+
+        Returns:
+            Duration in seconds
+        """
+        try:
+            with open(srt_file, encoding="utf-8") as f:
+                content = f.read().strip()
+
+            if not content:
+                return 0.0
+
+            # Parse SRT blocks and find the latest end time
+            blocks = content.split("\n\n")
+            max_end_time = timedelta(seconds=0)
+
+            for block in blocks:
+                if not block.strip():
+                    continue
+
+                lines = block.split("\n")
+                if len(lines) < 3:
+                    continue
+
+                # Second line is timestamp
+                timestamp_line = lines[1]
+
+                # Parse timestamps
+                if " --> " in timestamp_line:
+                    _start_time_str, end_time_str = timestamp_line.split(" --> ")
+                    end_time = self._parse_srt_timestamp(end_time_str.strip())
+                    if end_time > max_end_time:
+                        max_end_time = end_time
+
+            return max_end_time.total_seconds()
+        except Exception as e:
+            logger.warning(f"Could not determine SRT file duration for {srt_file}: {e}")
+            return 5.0  # Default to 5 seconds
+
+    def _get_vtt_file_duration(self, vtt_file: Path) -> float:
+        """
+        Get the duration of a VTT file by parsing the last timestamp.
+
+        Args:
+            vtt_file: Path to VTT file
+
+        Returns:
+            Duration in seconds
+        """
+        try:
+            with open(vtt_file, encoding="utf-8") as f:
+                lines = f.readlines()
+
+            # Skip header lines
+            content_lines = []
+            in_header = True
+            for line in lines:
+                if in_header and (line.strip() == "" or line.startswith("WEBVTT")):
+                    continue
+                else:
+                    in_header = False
+                    content_lines.append(line)
+
+            if not content_lines:
+                return 0.0
+
+            # Parse VTT blocks and find the latest end time
+            max_end_time = timedelta(seconds=0)
+            i = 0
+
+            while i < len(content_lines):
+                line = content_lines[i].strip()
+
+                # Skip empty lines
+                if not line:
+                    i += 1
+                    continue
+
+                # Check if this is a timestamp line
+                if " --> " in line:
+                    timestamp_line = line
+                    # Parse timestamps
+                    _start_time_str, end_time_str = timestamp_line.split(" --> ")
+                    end_time = self._parse_vtt_timestamp(end_time_str.strip())
+                    if end_time > max_end_time:
+                        max_end_time = end_time
+
+                    # Skip subtitle text lines
+                    i += 1
+                    while i < len(content_lines) and content_lines[i].strip():
+                        i += 1
+                else:
+                    i += 1
+
+            return max_end_time.total_seconds()
+        except Exception as e:
+            logger.warning(f"Could not determine VTT file duration for {vtt_file}: {e}")
+            return 5.0  # Default to 5 seconds

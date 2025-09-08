@@ -171,10 +171,18 @@ function App() {
     setStatus('uploading');
     
     try {
-      // Read file as array buffer for base64 encoding
-      const arrayBuffer = await file.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      const base64File = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
+      // Read file as array buffer for base64 encoding using FileReader for better performance
+      const base64File = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          // Remove the data URL prefix (e.g., "data:application/pdf;base64,")
+          const base64Data = result.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
       
       // Send as JSON
       const response = await axios.post('/api/upload', 
@@ -432,7 +440,11 @@ function App() {
               const retryTrack = document.createElement('track');
               retryTrack.kind = 'subtitles';
               retryTrack.src = `${API_BASE_URL}/api/subtitles/${fileId}/vtt`;
-              retryTrack.setAttribute('srclang', subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 'en');
+              retryTrack.setAttribute('srclang', subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 
+                             subtitleLanguage === 'traditional_chinese' ? 'zh-Hant' : 
+                             subtitleLanguage === 'japanese' ? 'ja' : 
+                             subtitleLanguage === 'korean' ? 'ko' : 
+                             subtitleLanguage === 'thai' ? 'th' : 'en');
               retryTrack.label = 'Subtitles';
               retryTrack.default = true;
               videoRef.current.appendChild(retryTrack);
@@ -460,6 +472,7 @@ function App() {
 
   const formatStepName = (step: string): string => {
     const stepNames: Record<string, string> = {
+      // Common steps
       'extract_slides': 'Extracting Content',
       'analyze_slide_images': 'Analyzing Visuals',
       'generate_scripts': 'Creating Narratives',
@@ -470,7 +483,16 @@ function App() {
       'generate_avatar_videos': 'Generating Avatars',
       'convert_slides_to_images': 'Converting Slides',
       'generate_subtitles': 'Generating subtitles',
-      'compose_video': 'Crafting Your Masterpiece',
+      'compose_video': 'Synthesizing Video',
+      
+      // PDF-specific steps
+      'segment_pdf_content': 'Segmenting Content',
+      'analyze_pdf_content': 'Analyzing Content',
+      'generate_pdf_chapter_images': 'Generating Chapter Images',
+      'generate_pdf_audio': 'Synthesizing Chapter Audio',
+      'generate_pdf_subtitles': 'Generating Subtitles',
+      'compose_pdf_video': 'Synthesizing Video',
+      
       'unknown': 'Initializing'
     };
     return stepNames[step] || step;
@@ -497,6 +519,7 @@ function App() {
     if (activeSteps.length > 0) {
       const stepName = formatStepName(activeSteps[0][0]);
       const statusMessages: Record<string, string> = {
+        // Presentation-specific messages
         'Extracting Content': 'Analyzing your presentation structure...',
         'Analyzing Visuals': 'Examining slide visuals and content...',
         'Creating Narratives': 'Crafting engaging AI narratives...',
@@ -506,12 +529,59 @@ function App() {
         'Synthesizing Audio': 'Creating natural voice narration...',
         'Generating Avatars': 'Bringing AI presenters to life...',
         'Converting Slides': 'Preparing slides for video composition...',
-        'Crafting Your Masterpiece': 'Bringing every element together in perfect harmony...'
+        'Crafting Your Masterpiece': 'Bringing every element together in perfect harmony...',
+        
+        // PDF-specific messages
+        'Segmenting PDF Content': 'Breaking your document into logical chapters...',
+        'Analyzing PDF Content': 'Understanding your document structure...',
+        'Generating Chapter Images': 'Creating visual representations for each chapter...',
+        'Synthesizing Chapter Audio': 'Generating narration for each chapter...',
+        'Generating PDF Subtitles': 'Creating subtitles for your document...',
+        'Composing PDF Video': 'Combining all elements into your final video...'
       };
       return statusMessages[stepName] || `Working on: ${stepName}`;
     }
     
     return 'Bringing Your Presentation to Life';
+  };
+
+  const isPdfFile = (filename: string | null): boolean => {
+    if (!filename) return false;
+    const ext = filename.toLowerCase().split('.').pop();
+    return ext === 'pdf';
+  };
+
+  const getFileTypeHint = (filename: string): JSX.Element => {
+    const ext = filename.toLowerCase().split('.').pop();
+    
+    if (ext === 'pdf') {
+      return (
+        <div className="file-type-hint pdf">
+          <span className="file-type-badge pdf">PDF Document</span>
+          <div className="file-type-description">
+            AI will analyze and convert your PDF into engaging video chapters with AI narration and subtitles.
+          </div>
+        </div>
+      );
+    } else if (ext === 'pptx' || ext === 'ppt') {
+      return (
+        <div className="file-type-hint ppt">
+          <span className="file-type-badge ppt">PowerPoint Presentation</span>
+          <div className="file-type-description">
+            AI will convert your slides into a video with AI narration and optional avatar presenter.
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="file-type-hint">
+        <span className="file-type-badge">Supported File</span>
+        <div className="file-type-description">
+          Supports PDF, PPTX, and PPT files
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -587,7 +657,11 @@ function App() {
                       {file ? file.name : 'Choose a file'}
                     </div>
                     <div className="upload-hint">
-                      Supports PDF, PPTX, and PPT files
+                      {file ? (
+                        getFileTypeHint(file.name)
+                      ) : (
+                        'Supports PDF, PPTX, and PPT files'
+                      )}
                     </div>
                   </label>
                 </div>
@@ -700,35 +774,64 @@ function App() {
                 
                 {processingDetails && (
                   <div className="steps-container">
-                    <h4>🌟 Creating Your Masterpiece</h4>
+                    <h4>🌟 Crafting Your Masterpiece</h4>
                     <div className="steps-grid">
-                      {[
-                        'extract_slides',
-                        'convert_slides_to_images', 
-                        'analyze_slide_images',
-                        'generate_scripts',
-                        'review_scripts',
-                        'generate_audio',
-                        'generate_avatar_videos',
-                        'generate_subtitles',
-                        'compose_video'
-                      ].map((stepName) => {
-                        const stepData = processingDetails.steps[stepName] || { status: 'pending' };
-                        // Hide skipped steps from UI
-                        if (stepData.status === 'skipped') {
-                          return null;
-                        }
-                        return (
-                          <div key={stepName} className={`step-item ${stepData.status}`}>
-                            <span className="step-icon">
-                              {stepData.status === 'completed' ? '✓' : 
-                               stepData.status === 'processing' || stepData.status === 'in_progress' ? '⏳' : 
-                               stepData.status === 'failed' ? '✗' : '○'}
-                            </span>
-                            <span className="step-name">{formatStepName(stepName)}</span>
-                          </div>
-                        );
-                      }).filter(Boolean)}
+                      {isPdfFile(file?.name || null) ? (
+                        // PDF-specific steps
+                        [
+                          'segment_pdf_content',
+                          'analyze_pdf_content',
+                          'generate_pdf_chapter_images', 
+                          'generate_pdf_audio',
+                          'generate_pdf_subtitles',
+                          'compose_pdf_video'
+                        ].map((stepName) => {
+                          const stepData = processingDetails.steps[stepName] || { status: 'pending' };
+                          // Hide skipped steps from UI
+                          if (stepData.status === 'skipped') {
+                            return null;
+                          }
+                          return (
+                            <div key={stepName} className={`step-item ${stepData.status}`}>
+                              <span className="step-icon">
+                                {stepData.status === 'completed' ? '✓' : 
+                                 stepData.status === 'processing' || stepData.status === 'in_progress' ? '⏳' : 
+                                 stepData.status === 'failed' ? '✗' : '○'}
+                              </span>
+                              <span className="step-name">{formatStepName(stepName)}</span>
+                            </div>
+                          );
+                        }).filter(Boolean)
+                      ) : (
+                        // PPT/PPTX-specific steps
+                        [
+                          'extract_slides',
+                          'convert_slides_to_images', 
+                          'analyze_slide_images',
+                          'generate_scripts',
+                          'review_scripts',
+                          'generate_audio',
+                          'generate_avatar_videos',
+                          'generate_subtitles',
+                          'compose_video'
+                        ].map((stepName) => {
+                          const stepData = processingDetails.steps[stepName] || { status: 'pending' };
+                          // Hide skipped steps from UI
+                          if (stepData.status === 'skipped') {
+                            return null;
+                          }
+                          return (
+                            <div key={stepName} className={`step-item ${stepData.status}`}>
+                              <span className="step-icon">
+                                {stepData.status === 'completed' ? '✓' : 
+                                 stepData.status === 'processing' || stepData.status === 'in_progress' ? '⏳' : 
+                                 stepData.status === 'failed' ? '✗' : '○'}
+                              </span>
+                              <span className="step-name">{formatStepName(stepName)}</span>
+                            </div>
+                          );
+                        }).filter(Boolean)
+                      )}
                     </div>
                     
                     {processingDetails.errors && processingDetails.errors.length > 0 && (
@@ -776,10 +879,17 @@ function App() {
                           <span className="info-label">Subtitle Language:</span>
                           <span className="info-value">{processingDetails?.subtitle_language ? getLanguageDisplayName(processingDetails.subtitle_language) : 'English'}</span>
                         </div>
-                        <div className="info-item">
-                          <span className="info-label">AI Avatar:</span>
-                          <span className="info-value">{generateAvatar ? '✓ Generated' : '✗ Disabled'}</span>
-                        </div>
+                        {isPdfFile(file?.name || null) ? (
+                          <div className="info-item">
+                            <span className="info-label">Document Type:</span>
+                            <span className="info-value">PDF Chapters</span>
+                          </div>
+                        ) : (
+                          <div className="info-item">
+                            <span className="info-label">AI Avatar:</span>
+                            <span className="info-value">{generateAvatar ? '✓ Generated' : '✗ Disabled'}</span>
+                          </div>
+                        )}
                       </div>
                       
                       {/* Resource URLs */}

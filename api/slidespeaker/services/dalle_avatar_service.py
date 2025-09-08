@@ -12,7 +12,7 @@ from typing import Any
 
 from loguru import logger
 
-from ..processing.image_generator import ImageGenerator
+from ..processing.image_generator import ImageGenerator as SharedImageGenerator
 from ..processing.video_composer import VideoComposer
 from .avatar_interface import AvatarInterface
 from .tts_factory import TTSFactory
@@ -23,7 +23,7 @@ class DalleAvatarService(AvatarInterface):
 
     def __init__(self) -> None:
         """Initialize the DALL-E avatar service with required components"""
-        self.image_service = ImageGenerator()
+        self.image_service = SharedImageGenerator()
         self.video_composer = VideoComposer()
 
     async def generate_avatar_video(

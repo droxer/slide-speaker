@@ -13,7 +13,7 @@ from fastapi import APIRouter, Query
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 
-router = APIRouter(prefix="/api", tags=["monitoring"])
+router = APIRouter(prefix="/api", tags=["stats"])
 
 
 @router.get("/tasks")

@@ -1,20 +1,41 @@
 """
 Pipeline steps for SlideSpeaker processing.
 
-This module contains individual processing steps for the presentation pipeline.
+This module contains individual processing steps for both presentation and PDF pipelines.
 """
 
-from .analyze_slides import analyze_slides_step
-from .compose_video import compose_video_step
-from .convert_slides import convert_slides_step
-from .extract_slides import extract_slides_step
-from .generate_audio import generate_audio_step
-from .generate_avatar import generate_avatar_step
-from .generate_scripts import generate_scripts_step
-from .generate_subtitles import generate_subtitles_step
-from .review_scripts import review_scripts_step
+# Presentation processing steps
+# PDF processing steps
+from .pdf import (
+    analyze_content_step as analyze_pdf_content_step,
+)
+from .pdf import (
+    compose_video_step as compose_pdf_video_step,
+)
+from .pdf import (
+    generate_audio_step as generate_pdf_audio_step,
+)
+from .pdf import (
+    generate_chapter_images_step as generate_pdf_chapter_images_step,
+)
+from .pdf import (
+    generate_subtitles_step as generate_pdf_subtitles_step,
+)
+from .pdf import (
+    segment_content_step as segment_pdf_content_step,
+)
+from .presentation.analyze_slides import analyze_slides_step
+from .presentation.compose_video import compose_video_step
+from .presentation.convert_slides import convert_slides_step
+from .presentation.extract_slides import extract_slides_step
+from .presentation.generate_audio import generate_audio_step
+from .presentation.generate_avatar import generate_avatar_step
+from .presentation.generate_scripts import generate_scripts_step
+from .presentation.generate_subtitles import generate_subtitles_step
+from .presentation.review_scripts import review_scripts_step
 
 __all__ = [
+    # Presentation processing steps
     "extract_slides_step",
     "convert_slides_step",
     "analyze_slides_step",
@@ -24,4 +45,11 @@ __all__ = [
     "generate_avatar_step",
     "generate_subtitles_step",
     "compose_video_step",
+    # PDF processing steps
+    "segment_pdf_content_step",
+    "analyze_pdf_content_step",
+    "generate_pdf_chapter_images_step",
+    "generate_pdf_audio_step",
+    "generate_pdf_subtitles_step",
+    "compose_pdf_video_step",
 ]
