@@ -45,7 +45,7 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
             if (
                 "translate_subtitle_scripts" in state["steps"]
                 and state["steps"]["translate_subtitle_scripts"]["data"] is not None
-                and state["steps"]["translate_subtitle_scripts"]["status"]
+                and state["steps"]["translate_subtitle_scripts"].get("status")
                 == "completed"
             ):
                 translated_scripts = state["steps"]["translate_subtitle_scripts"][
@@ -72,7 +72,8 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
             elif (
                 "translate_voice_scripts" in state["steps"]
                 and state["steps"]["translate_voice_scripts"]["data"] is not None
-                and state["steps"]["translate_voice_scripts"]["status"] == "completed"
+                and state["steps"]["translate_voice_scripts"].get("status")
+                == "completed"
             ):
                 translated_scripts = state["steps"]["translate_voice_scripts"]["data"]
                 # Get original chapters and update with translated scripts

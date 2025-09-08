@@ -125,7 +125,6 @@ Visual Analysis Context:
                     },
                     {"role": "user", "content": prompt},
                 ],
-                max_tokens=500,  # Increased for more detailed explanations
             )
 
             script_content = response.choices[0].message.content

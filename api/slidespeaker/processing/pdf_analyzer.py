@@ -301,17 +301,9 @@ class PDFAnalyzer:
         prompts = LANGUAGE_PROMPTS.get(language, LANGUAGE_PROMPTS["english"])
 
         try:
-            # For better token management, we'll process more text to capture comprehensive content
-            # But still try to provide as much context as possible without exceeding limits
-            max_tokens = 128 * 1000  # Increased for better content coverage
-            processed_text = (
-                full_text[:max_tokens] if len(full_text) > max_tokens else full_text
-            )
-
-            # Format the prompt with the document title and text
             formatted_prompt = prompts["prompt"].format(
                 doc_title=doc_title,
-                full_text=processed_text,
+                full_text=full_text,
             )
 
             response = self.client.chat.completions.create(
@@ -320,7 +312,6 @@ class PDFAnalyzer:
                     {"role": "system", "content": prompts["system"]},
                     {"role": "user", "content": formatted_prompt},
                 ],
-                temperature=0.3,
             )
 
             # Parse the response

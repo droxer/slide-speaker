@@ -136,3 +136,4 @@ OSS_REGION=cn-region
 - Improved logging configuration for better debugging
 - Updated Redis key namespace from "ai_slider" to "ss" for consistency
 - do NOT git commit
+- do NOT check the node_modules and .venv

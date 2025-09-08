@@ -286,7 +286,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
       'analyze_slide_images': 'Analyzing Content',
       'generate_scripts': 'Creating Script',
       'review_scripts': 'Reviewing Script',
-      'translate_voice_scripts': 'Translating Voice',
+      'translate_voice_scripts': 'Translating Voice Script',
       'translate_subtitle_scripts': 'Translating Subtitles',
       'generate_subtitle_scripts': 'Creating Subtitles',
       'review_subtitle_scripts': 'Reviewing Subtitles',

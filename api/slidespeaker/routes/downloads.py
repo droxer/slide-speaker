@@ -45,9 +45,13 @@ async def get_video(file_id: str, request: Request) -> Any:
         if config.storage_provider == "local":
             # For local storage, serve directly with range support using the actual file path
             # FastAPI's FileResponse handles range requests automatically
-            print(f"DEBUG: Serving range request directly from local file: {file_url}")
+            # Get the actual file path for local storage
+            actual_file_path = config.output_dir / object_key
+            print(
+                f"DEBUG: Serving range request directly from local file: {actual_file_path}"
+            )
             return FileResponse(
-                file_url,  # Use the actual file path from storage
+                str(actual_file_path),  # Use the actual file path from storage
                 media_type="video/mp4",
                 filename=f"presentation_{file_id}.mp4",
                 headers={
@@ -78,9 +82,13 @@ async def get_video(file_id: str, request: Request) -> Any:
     # For non-range requests, handle based on storage provider
     if config.storage_provider == "local":
         # Local storage: serve directly for better performance using the actual file path
-        print(f"DEBUG: Serving non-range request directly from local file: {file_url}")
+        # Get the actual file path for local storage
+        actual_file_path = config.output_dir / object_key
+        print(
+            f"DEBUG: Serving non-range request directly from local file: {actual_file_path}"
+        )
         return FileResponse(
-            file_url,  # Use the actual file path from storage
+            str(actual_file_path),  # Use the actual file path from storage
             media_type="video/mp4",
             filename=f"presentation_{file_id}.mp4",
             headers={

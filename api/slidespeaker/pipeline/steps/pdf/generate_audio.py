@@ -58,7 +58,7 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
             and "steps" in state
             and "translate_voice_scripts" in state["steps"]
             and state["steps"]["translate_voice_scripts"]["data"] is not None
-            and state["steps"]["translate_voice_scripts"]["status"] == "completed"
+            and state["steps"]["translate_voice_scripts"].get("status") == "completed"
         ):
             # Use translated scripts
             translated_scripts = state["steps"]["translate_voice_scripts"]["data"]

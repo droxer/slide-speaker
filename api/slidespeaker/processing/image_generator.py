@@ -66,9 +66,12 @@ class ImageGenerator:
             prompt = self._create_image_prompt(content, style)
             logger.info(f"Generating image with prompt: {prompt[:100]}...")
 
+            # Get model from environment variable, default to "gpt-image-1"
+            image_model = os.getenv("IMAGE_GENERATION_MODEL", "gpt-image-1")
+
             # Generate image using DALL-E
             response = self.openai_client.images.generate(
-                model="dall-e-3",
+                model=image_model,
                 prompt=prompt,
                 size="1024x1024",
                 quality="standard",
@@ -127,8 +130,11 @@ class ImageGenerator:
             )
             prompt = prompt_template.format(color=color)
 
+            # Get model from environment variable, default to "gpt-image-1"
+            image_model = os.getenv("IMAGE_GENERATION_MODEL", "gpt-image-1")
+
             response = self.openai_client.images.generate(
-                model="dall-e-3",
+                model=image_model,
                 prompt=prompt,
                 size="1024x1024",
                 quality="standard",
@@ -195,7 +201,7 @@ class ImageGenerator:
 
             # Create a slide-like image with chapter title and description
             try:
-                await self._create_chapter_slide_image(chapter, image_path)
+                await self._create_slide_image(chapter, image_path)
                 image_paths.append(image_path)
                 logger.info(f"Generated slide image for chapter {i + 1}: {image_path}")
             except Exception as e:
@@ -214,7 +220,7 @@ class ImageGenerator:
 
         return image_paths
 
-    async def _create_chapter_slide_image(
+    async def _create_slide_image(
         self, chapter: dict[str, Any], output_path: Path
     ) -> None:
         """

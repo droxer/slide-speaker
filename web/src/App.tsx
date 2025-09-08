@@ -10,7 +10,8 @@ const LOCAL_STORAGE_KEYS = {
   TASK_ID: 'slidespeaker_task_id',
   STATUS: 'slidespeaker_status',
   PROCESSING_DETAILS: 'slidespeaker_processing_details',
-  LATEST_TASK_TIMESTAMP: 'slidespeaker_latest_task_timestamp'
+  LATEST_TASK_TIMESTAMP: 'slidespeaker_latest_task_timestamp',
+  FILE_TYPE: 'slidespeaker_file_type' // Add file type tracking for PDF vs PPT handling
 };
 
 // API configuration
@@ -53,6 +54,7 @@ const localStorageUtils = {
     subtitleLanguage: string;
     generateAvatar: boolean;
     generateSubtitles: boolean;
+    fileName: string | null; // Add fileName to track file type
   }) => {
     try {
       const stateToSave = {
@@ -61,6 +63,11 @@ const localStorageUtils = {
       };
       localStorage.setItem(LOCAL_STORAGE_KEYS.TASK_STATE, JSON.stringify(stateToSave));
       localStorage.setItem(LOCAL_STORAGE_KEYS.LATEST_TASK_TIMESTAMP, new Date().toISOString());
+      // Save file type information
+      if (state.fileName) {
+        const fileType = state.fileName.toLowerCase().split('.').pop() || '';
+        localStorage.setItem(LOCAL_STORAGE_KEYS.FILE_TYPE, fileType);
+      }
     } catch (error) {
       console.warn('Failed to save task state to local storage:', error);
     }
@@ -77,7 +84,12 @@ const localStorageUtils = {
         const hoursDiff = (now.getTime() - timestamp.getTime()) / (1000 * 60 * 60);
         
         if (hoursDiff < 24) {
-          return parsed;
+          // Load file type information
+          const fileType = localStorage.getItem(LOCAL_STORAGE_KEYS.FILE_TYPE);
+          return {
+            ...parsed,
+            fileType
+          };
         } else {
           // Clean up old data
           localStorageUtils.clearTaskState();
@@ -138,6 +150,7 @@ const localStorageUtils = {
 
 function App() {
   const [file, setFile] = useState<File | null>(null);
+  const [fileType, setFileType] = useState<string | null>(null); // Track file type for PDF vs PPT handling
   const [uploading, setUploading] = useState<boolean>(false);
   const [fileId, setFileId] = useState<string | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
@@ -158,6 +171,7 @@ function App() {
       const ext = selectedFile.name.toLowerCase().split('.').pop();
       if (ext && ['pdf', 'pptx', 'ppt'].includes(ext)) {
         setFile(selectedFile);
+        setFileType(ext);
       } else {
         alert('Please select a PDF or PowerPoint file');
       }
@@ -242,6 +256,7 @@ function App() {
 
   const resetForm = () => {
     setFile(null);
+    setFileType(null);
     setFileId(null);
     setTaskId(null);
     setStatus('idle');
@@ -276,11 +291,13 @@ function App() {
         setSubtitleLanguage(savedState.subtitleLanguage);
         setGenerateAvatar(savedState.generateAvatar);
         setGenerateSubtitles(savedState.generateSubtitles);
+        setFileType(savedState.fileType || null);
         
         console.log('Resuming task from local storage:', {
           fileId: savedState.fileId,
           taskId: savedState.taskId,
-          status: savedState.status
+          status: savedState.status,
+          fileType: savedState.fileType
         });
         
         setIsResumingTask(false);
@@ -301,7 +318,8 @@ function App() {
         voiceLanguage,
         subtitleLanguage,
         generateAvatar,
-        generateSubtitles
+        generateSubtitles,
+        fileName: file?.name || null
       });
     }
   }, [
@@ -313,7 +331,8 @@ function App() {
     subtitleLanguage,
     generateAvatar,
     generateSubtitles,
-    isResumingTask
+    isResumingTask,
+    file
   ]);
 
   // Poll for status updates when processing
@@ -477,7 +496,7 @@ function App() {
       'analyze_slide_images': 'Analyzing Content',
       'generate_scripts': 'Creating Script',
       'review_scripts': 'Reviewing Script',
-      'translate_voice_scripts': 'Translating Voice',
+      'translate_voice_scripts': 'Translating Voice Script',
       'translate_subtitle_scripts': 'Translating Subtitles',
       'generate_subtitle_scripts': 'Creating Subtitles',
       'review_subtitle_scripts': 'Reviewing Subtitles',
@@ -514,17 +533,24 @@ function App() {
   };
 
   const getProcessingStatusMessage = (): string => {
-    if (!processingDetails) return 'Bringing Your Presentation to Life';
+    if (!processingDetails) {
+      return isPdfFile(file?.name || null) 
+        ? 'Bringing Your PDF Document to Life' 
+        : 'Bringing Your Presentation to Life';
+    }
     
     const activeSteps = Object.entries(processingDetails.steps || {})
       .filter(([_, step]) => step.status === 'in_progress' || step.status === 'processing');
+    
+    const isPdf = isPdfFile(file?.name || null);
+    const fileTypeText = isPdf ? 'PDF Document' : 'Presentation';
     
     if (activeSteps.length > 0) {
       const stepName = formatStepName(activeSteps[0][0]);
       const statusMessages: Record<string, string> = {
         // Common messages for all file types
-        'Extracting Slides': 'Analyzing your presentation structure...',
-        'Analyzing Content': 'Examining content...',
+        'Extracting Slides': `Analyzing your ${fileTypeText} structure...`,
+        'Analyzing Content': `Examining ${fileTypeText} content...`,
         'Creating Script': 'Crafting engaging AI script in English...',
         'Reviewing Script': 'Polishing the English script for perfect delivery...',
         'Translating Voice': 'Translating script to your selected voice language...',
@@ -533,20 +559,30 @@ function App() {
         'Reviewing Subtitles': 'Perfecting subtitle timing and accuracy...',
         'Generating Audio': 'Creating natural voice narration...',
         'Creating Avatar': 'Bringing AI presenter to life...',
-        'Converting Slides': 'Preparing slides for video composition...',
-        'Creating Chapter Images': 'Creating visual representations...',
+        'Converting Slides': `Preparing ${fileTypeText} for video composition...`,
+        'Creating Chapter Images': isPdf ? 'Creating visual representations for chapters...' : 'Creating visual representations for slides...',
         'Composing Video': 'Bringing all elements together...'
       };
       return statusMessages[stepName] || `Working on: ${stepName}`;
     }
     
-    return 'Bringing Your Presentation to Life';
+    return isPdf 
+      ? 'Bringing Your PDF Document to Life' 
+      : 'Bringing Your Presentation to Life';
   };
 
   const isPdfFile = (filename: string | null): boolean => {
-    if (!filename) return false;
-    const ext = filename.toLowerCase().split('.').pop();
-    return ext === 'pdf';
+    // If we have a filename, use it to determine file type
+    if (filename) {
+      const ext = filename.toLowerCase().split('.').pop();
+      return ext === 'pdf';
+    }
+    // If we don't have a filename but have fileType from state, use that
+    if (fileType) {
+      return fileType.toLowerCase() === 'pdf';
+    }
+    // Default to false if we can't determine
+    return false;
   };
 
   const getFileTypeHint = (filename: string): JSX.Element => {
@@ -753,6 +789,13 @@ function App() {
               <div className="processing-view">
                 <div className="spinner"></div>
                 <h3>{getProcessingStatusMessage()}</h3>
+                <div className="file-type-context">
+                  {isPdfFile(file?.name || null) ? (
+                    <p className="file-context-text">Processing PDF Document</p>
+                  ) : (
+                    <p className="file-context-text">Processing PowerPoint Presentation</p>
+                  )}
+                </div>
                 <div className="progress-container">
                   <div className="progress-bar">
                     <div 
@@ -773,6 +816,13 @@ function App() {
                 {processingDetails && (
                   <div className="steps-container">
                     <h4>🌟 Crafting Your Masterpiece</h4>
+                    <div className="file-type-indicator">
+                      {isPdfFile(file?.name || null) ? (
+                        <span className="file-type-badge pdf">PDF Document</span>
+                      ) : (
+                        <span className="file-type-badge ppt">PowerPoint Presentation</span>
+                      )}
+                    </div>
                     <div className="steps-grid">
                       {isPdfFile(file?.name || null) ? (
                         // PDF-specific steps

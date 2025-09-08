@@ -26,24 +26,6 @@ from .steps.pdf import (
 )
 
 
-async def _translate_scripts_step(
-    file_id: str, source_language: str, target_language: str, is_subtitle: bool = False
-) -> None:
-    """
-    Translate scripts from source language to target language.
-
-    Args:
-        file_id: Unique identifier for the file
-        source_language: Source language of the scripts
-        target_language: Target language for translation
-        is_subtitle: Whether this is for subtitle translation (default: False)
-    """
-    if is_subtitle:
-        await translate_subtitle_scripts_step(file_id, target_language)
-    else:
-        await translate_voice_scripts_step(file_id, target_language)
-
-
 def _get_pdf_processing_steps(
     voice_language: str, subtitle_language: str | None, generate_subtitles: bool
 ) -> list[str]:
@@ -176,13 +158,11 @@ async def _execute_pdf_step(
                 )  # Always review English scripts first
             elif step_name == "translate_voice_scripts":
                 # Translate English scripts to voice language
-                await _translate_scripts_step(file_id, "english", voice_language)
+                await translate_voice_scripts_step(file_id, voice_language)
             elif step_name == "translate_subtitle_scripts":
                 # Translate English scripts to subtitle language
                 subtitle_lang = subtitle_language or voice_language
-                await _translate_scripts_step(
-                    file_id, "english", subtitle_lang, is_subtitle=True
-                )
+                await translate_subtitle_scripts_step(file_id, subtitle_lang)
             elif step_name == "generate_pdf_chapter_images":
                 await generate_chapter_images_step(file_id, voice_language)
             elif step_name == "generate_pdf_audio":
