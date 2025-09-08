@@ -473,25 +473,28 @@ function App() {
   const formatStepName = (step: string): string => {
     const stepNames: Record<string, string> = {
       // Common steps
-      'extract_slides': 'Extracting Content',
-      'analyze_slide_images': 'Analyzing Visuals',
-      'generate_scripts': 'Creating Narratives',
-      'review_scripts': 'Refining Content',
-      'generate_subtitle_scripts': 'Generating subtitle narratives',
-      'review_subtitle_scripts': 'Reviewing subtitle scripts',
-      'generate_audio': 'Synthesizing Audio',
-      'generate_avatar_videos': 'Generating Avatars',
+      'extract_slides': 'Extracting Slides',
+      'analyze_slide_images': 'Analyzing Content',
+      'generate_scripts': 'Creating Script',
+      'review_scripts': 'Reviewing Script',
+      'translate_voice_scripts': 'Translating Voice',
+      'translate_subtitle_scripts': 'Translating Subtitles',
+      'generate_subtitle_scripts': 'Creating Subtitles',
+      'review_subtitle_scripts': 'Reviewing Subtitles',
+      'generate_audio': 'Generating Audio',
+      'generate_avatar_videos': 'Creating Avatar',
       'convert_slides_to_images': 'Converting Slides',
-      'generate_subtitles': 'Generating subtitles',
-      'compose_video': 'Synthesizing Video',
+      'generate_subtitles': 'Creating Subtitles',
+      'compose_video': 'Composing Video',
       
       // PDF-specific steps
       'segment_pdf_content': 'Segmenting Content',
       'analyze_pdf_content': 'Analyzing Content',
-      'generate_pdf_chapter_images': 'Generating Chapter Images',
-      'generate_pdf_audio': 'Synthesizing Chapter Audio',
-      'generate_pdf_subtitles': 'Generating Subtitles',
-      'compose_pdf_video': 'Synthesizing Video',
+      'review_pdf_scripts': 'Reviewing Script',
+      'generate_pdf_chapter_images': 'Creating Chapter Images',
+      'generate_pdf_audio': 'Generating Audio',
+      'generate_pdf_subtitles': 'Creating Subtitles',
+      'compose_pdf_video': 'Composing Video',
       
       'unknown': 'Initializing'
     };
@@ -519,25 +522,20 @@ function App() {
     if (activeSteps.length > 0) {
       const stepName = formatStepName(activeSteps[0][0]);
       const statusMessages: Record<string, string> = {
-        // Presentation-specific messages
-        'Extracting Content': 'Analyzing your presentation structure...',
-        'Analyzing Visuals': 'Examining slide visuals and content...',
-        'Creating Narratives': 'Crafting engaging AI narratives...',
-        'Refining Content': 'Polishing the script for perfect delivery...',
-        'Generating subtitle narratives': 'Creating subtitle translations...',
-        'Reviewing subtitle scripts': 'Perfecting subtitle timing and accuracy...',
-        'Synthesizing Audio': 'Creating natural voice narration...',
-        'Generating Avatars': 'Bringing AI presenters to life...',
+        // Common messages for all file types
+        'Extracting Slides': 'Analyzing your presentation structure...',
+        'Analyzing Content': 'Examining content...',
+        'Creating Script': 'Crafting engaging AI script in English...',
+        'Reviewing Script': 'Polishing the English script for perfect delivery...',
+        'Translating Voice': 'Translating script to your selected voice language...',
+        'Translating Subtitles': 'Translating script to your selected subtitle language...',
+        'Creating Subtitles': 'Generating subtitle content...',
+        'Reviewing Subtitles': 'Perfecting subtitle timing and accuracy...',
+        'Generating Audio': 'Creating natural voice narration...',
+        'Creating Avatar': 'Bringing AI presenter to life...',
         'Converting Slides': 'Preparing slides for video composition...',
-        'Crafting Your Masterpiece': 'Bringing every element together in perfect harmony...',
-        
-        // PDF-specific messages
-        'Segmenting PDF Content': 'Breaking your document into logical chapters...',
-        'Analyzing PDF Content': 'Understanding your document structure...',
-        'Generating Chapter Images': 'Creating visual representations for each chapter...',
-        'Synthesizing Chapter Audio': 'Generating narration for each chapter...',
-        'Generating PDF Subtitles': 'Creating subtitles for your document...',
-        'Composing PDF Video': 'Combining all elements into your final video...'
+        'Creating Chapter Images': 'Creating visual representations...',
+        'Composing Video': 'Bringing all elements together...'
       };
       return statusMessages[stepName] || `Working on: ${stepName}`;
     }
@@ -781,6 +779,9 @@ function App() {
                         [
                           'segment_pdf_content',
                           'analyze_pdf_content',
+                          'review_pdf_scripts',
+                          'translate_voice_scripts',
+                          'translate_subtitle_scripts',
                           'generate_pdf_chapter_images', 
                           'generate_pdf_audio',
                           'generate_pdf_subtitles',
@@ -803,13 +804,15 @@ function App() {
                           );
                         }).filter(Boolean)
                       ) : (
-                        // PPT/PPTX-specific steps
+                        // PPT/PPTX-specific steps with translation steps
                         [
                           'extract_slides',
                           'convert_slides_to_images', 
                           'analyze_slide_images',
                           'generate_scripts',
                           'review_scripts',
+                          'translate_voice_scripts',
+                          'translate_subtitle_scripts',
                           'generate_audio',
                           'generate_avatar_videos',
                           'generate_subtitles',

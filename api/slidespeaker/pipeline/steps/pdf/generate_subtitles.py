@@ -37,13 +37,70 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
         # Get chapters from state
         state = await state_manager.get_state(file_id)
         chapters: list[dict[str, Any]] = []
-        if (
-            state
-            and "steps" in state
-            and "segment_pdf_content" in state["steps"]
-            and state["steps"]["segment_pdf_content"]["data"] is not None
-        ):
-            chapters = state["steps"]["segment_pdf_content"]["data"]
+
+        # Determine which scripts to use for subtitles
+        chapters = []
+        if state and "steps" in state:
+            # Priority 1: Use translated subtitle scripts if available
+            if (
+                "translate_subtitle_scripts" in state["steps"]
+                and state["steps"]["translate_subtitle_scripts"]["data"] is not None
+                and state["steps"]["translate_subtitle_scripts"]["status"]
+                == "completed"
+            ):
+                translated_scripts = state["steps"]["translate_subtitle_scripts"][
+                    "data"
+                ]
+                # Get original chapters and update with translated scripts
+                if (
+                    "segment_pdf_content" in state["steps"]
+                    and state["steps"]["segment_pdf_content"]["data"] is not None
+                ):
+                    original_chapters = state["steps"]["segment_pdf_content"]["data"]
+                    for i, chapter in enumerate(original_chapters):
+                        updated_chapter = chapter.copy()
+                        if i < len(translated_scripts):
+                            updated_chapter["script"] = translated_scripts[i].get(
+                                "script", chapter.get("script", "")
+                            )
+                        chapters.append(updated_chapter)
+                logger.info(
+                    "Using translated subtitle scripts for PDF subtitle generation"
+                )
+
+            # Priority 2: Use translated voice scripts as fallback
+            elif (
+                "translate_voice_scripts" in state["steps"]
+                and state["steps"]["translate_voice_scripts"]["data"] is not None
+                and state["steps"]["translate_voice_scripts"]["status"] == "completed"
+            ):
+                translated_scripts = state["steps"]["translate_voice_scripts"]["data"]
+                # Get original chapters and update with translated scripts
+                if (
+                    "segment_pdf_content" in state["steps"]
+                    and state["steps"]["segment_pdf_content"]["data"] is not None
+                ):
+                    original_chapters = state["steps"]["segment_pdf_content"]["data"]
+                    for i, chapter in enumerate(original_chapters):
+                        updated_chapter = chapter.copy()
+                        if i < len(translated_scripts):
+                            updated_chapter["script"] = translated_scripts[i].get(
+                                "script", chapter.get("script", "")
+                            )
+                        chapters.append(updated_chapter)
+                logger.info(
+                    "Using translated voice scripts for PDF subtitle generation"
+                )
+
+            # Priority 3: Fall back to original chapters with English scripts
+            elif (
+                "segment_pdf_content" in state["steps"]
+                and state["steps"]["segment_pdf_content"]["data"] is not None
+            ):
+                chapters = state["steps"]["segment_pdf_content"]["data"]
+                logger.info(
+                    "Using original English scripts for PDF subtitle generation"
+                )
 
         if not chapters:
             raise ValueError("No chapter data available for subtitle generation")
@@ -53,89 +110,106 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
         subtitle_dir = work_dir / "subtitles"
         subtitle_dir.mkdir(exist_ok=True, parents=True)
 
-        # Generate subtitles for each chapter
+        # Initialize variables for storing subtitle paths
         subtitle_storage_urls = []
-        subtitle_local_paths = []
-        for i, chapter in enumerate(chapters):
-            script = chapter.get("script", "")
-            if script:
-                subtitle_path = subtitle_dir / f"chapter_{i + 1}"
-                (
-                    srt_path,
-                    vtt_path,
-                ) = await subtitle_generator.generate_subtitles_for_text(
-                    script,
-                    5.0,
-                    subtitle_path,
-                    language,  # Default duration of 5 seconds
-                )
+        final_local_paths = []
 
-                # Add local paths for subsequent processing (do not upload to storage)
-                subtitle_local_paths.extend([srt_path, vtt_path])
+        # Get audio files for timing if available
+        audio_files_data = []
+        if (
+            state
+            and "steps" in state
+            and "generate_pdf_audio" in state["steps"]
+            and state["steps"]["generate_pdf_audio"]["data"] is not None
+        ):
+            audio_data = state["steps"]["generate_pdf_audio"]["data"]
+            # Extract local paths from the stored data
+            if isinstance(audio_data, dict) and "local_paths" in audio_data:
+                audio_files_data = audio_data["local_paths"]
+            else:
+                # Fallback for old format or unexpected data structure
+                audio_files_data = audio_data if isinstance(audio_data, list) else []
 
-                # Note: Individual chapter subtitles are kept as local files only
-                # Only final combined subtitles will be uploaded to storage
+        # Convert to Path objects
+        audio_files = [Path(p) for p in audio_files_data] if audio_files_data else []
 
-        # Combine all chapter subtitles into final subtitle files
-        if subtitle_local_paths:
-            # Separate SRT and VTT files
-            srt_files = [Path(p) for p in subtitle_local_paths if p.endswith(".srt")]
-            vtt_files = [Path(p) for p in subtitle_local_paths if p.endswith(".vtt")]
+        # Generate subtitles using the main generate_subtitles method for proper audio sync
+        if chapters and audio_files and len(chapters) == len(audio_files):
+            # Use the proper generate_subtitles method that syncs with audio files
+            # This creates the final subtitle files directly
+            video_path = work_dir / f"{file_id}_final.mp4"
+            logger.info(
+                f"Starting subtitle generation for {file_id} with {len(chapters)} chapters"
+            )
+            logger.info(f"Video path: {video_path}")
+            logger.info(f"Language: {language}")
 
-            # Create final combined subtitle files with locale-aware naming
-            work_dir = Path("output") / file_id
+            srt_path, vtt_path = subtitle_generator.generate_subtitles(
+                chapters, audio_files, video_path, language
+            )
+
+            logger.info(
+                f"Completed subtitle generation for {file_id} - SRT: {srt_path}, VTT: {vtt_path}"
+            )
+
+            # These are the final subtitle files, no need to combine
+            subtitle_local_paths = [srt_path, vtt_path]
+
+            # Upload final subtitles to storage
             locale_code = locale_utils.get_locale_code(language)
-            final_srt_path = work_dir / f"{file_id}_final_{locale_code}.srt"
-            final_vtt_path = work_dir / f"{file_id}_final_{locale_code}.vtt"
+            logger.info(f"About to upload subtitles to storage - locale: {locale_code}")
 
-            # Combine SRT files
-            if srt_files:
-                final_srt_file = subtitle_generator.combine_srt_files(
-                    srt_files, final_srt_path
-                )
-                logger.info(f"Combined SRT files into final subtitle: {final_srt_file}")
+            # Upload final SRT to storage
+            try:
+                srt_key = f"{file_id}_final_{locale_code}.srt"
+                logger.info(f"Uploading SRT file: {srt_path} with key: {srt_key}")
+                srt_url = storage_provider.upload_file(srt_path, srt_key, "text/plain")
+                subtitle_storage_urls.append(srt_url)
+                logger.info(f"Uploaded final SRT subtitle to storage: {srt_url}")
+            except Exception as e:
+                logger.error(f"Failed to upload final SRT subtitle to storage: {e}")
+                # Fallback to local path if storage upload fails
+                subtitle_storage_urls.append(srt_path)
 
-                # Upload final SRT to storage
-                try:
-                    srt_key = f"{file_id}_final_{locale_code}.srt"
-                    srt_url = storage_provider.upload_file(
-                        final_srt_file, srt_key, "text/plain"
-                    )
-                    subtitle_storage_urls.append(srt_url)
-                    logger.info(f"Uploaded final SRT subtitle to storage: {srt_url}")
-                except Exception as e:
-                    logger.error(f"Failed to upload final SRT subtitle to storage: {e}")
-                    # Fallback to local path if storage upload fails
-                    subtitle_storage_urls.append(final_srt_file)
+            # Upload final VTT to storage
+            try:
+                vtt_key = f"{file_id}_final_{locale_code}.vtt"
+                logger.info(f"Uploading VTT file: {vtt_path} with key: {vtt_key}")
+                vtt_url = storage_provider.upload_file(vtt_path, vtt_key, "text/vtt")
+                subtitle_storage_urls.append(vtt_url)
+                logger.info(f"Uploaded final VTT subtitle to storage: {vtt_url}")
+            except Exception as e:
+                logger.error(f"Failed to upload final VTT subtitle to storage: {e}")
+                # Fallback to local path if storage upload fails
+                subtitle_storage_urls.append(vtt_path)
 
-            # Combine VTT files
-            if vtt_files:
-                final_vtt_file = subtitle_generator.combine_vtt_files(
-                    vtt_files, final_vtt_path
-                )
-                logger.info(f"Combined VTT files into final subtitle: {final_vtt_file}")
+            logger.info(
+                f"Completed subtitle storage uploads - {len(subtitle_storage_urls)} URLs"
+            )
 
-                # Upload final VTT to storage
-                try:
-                    vtt_key = f"{file_id}_final_{locale_code}.vtt"
-                    vtt_url = storage_provider.upload_file(
-                        final_vtt_file, vtt_key, "text/vtt"
-                    )
-                    subtitle_storage_urls.append(vtt_url)
-                    logger.info(f"Uploaded final VTT subtitle to storage: {vtt_url}")
-                except Exception as e:
-                    logger.error(f"Failed to upload final VTT subtitle to storage: {e}")
-                    # Fallback to local path if storage upload fails
-                    subtitle_storage_urls.append(final_vtt_file)
-
-            # Update local paths to include final combined subtitles
-            final_local_paths = []
-            if srt_files:
-                final_local_paths.append(final_srt_file)
-            if vtt_files:
-                final_local_paths.append(final_vtt_file)
+            # Set final local paths to the same files
+            final_local_paths = [srt_path, vtt_path]
         else:
-            final_local_paths = []
+            # If audio files are not available, we cannot generate meaningful subtitles
+            # This would result in incorrect timing that doesn't match the final video
+            # Fail fast and raise an exception to prevent incorrect video generation
+            error_msg = (
+                f"Cannot generate subtitles for file {file_id} - audio files not available. "
+                f"Chapters: {len(chapters)}, Audio files: {len(audio_files)}. "
+                f"Subtitle generation requires properly generated audio files for synchronization."
+            )
+            logger.error(error_msg)
+
+            # Log additional details for debugging
+            if chapters and (not audio_files or len(chapters) != len(audio_files)):
+                logger.error(
+                    f"Subtitle generation failed for file {file_id} due to missing or mismatched audio files. "
+                    f"This indicates a problem in the processing pipeline where audio generation failed "
+                    f"but subtitle generation was still attempted."
+                )
+
+            # Raise exception to stop processing and alert the system
+            raise ValueError(error_msg)
 
         # Store both local paths (for subsequent processing) and storage URLs (for reference)
         # Only final combined subtitles are uploaded to storage
@@ -151,14 +225,18 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
             else {},
         }
 
+        logger.info(f"About to update state with subtitle data for file: {file_id}")
         # Store subtitle data in state
         await state_manager.update_step_status(
             file_id, "generate_pdf_subtitles", "completed", storage_data
         )
 
         logger.info(
-            f"Generated {len(subtitle_local_paths)} chapter subtitle files and "
-            f"combined them into final subtitles for file: {file_id}"
+            f"Generated subtitles for file: {file_id} "
+            f"(final subtitles: {len(final_local_paths)}, total files: {len(subtitle_local_paths)})"
+        )
+        logger.info(
+            f"PDF subtitle generation completed successfully for file: {file_id}"
         )
 
     except Exception as e:

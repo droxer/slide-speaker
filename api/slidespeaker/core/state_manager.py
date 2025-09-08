@@ -51,6 +51,15 @@ class RedisStateManager:
                 },
                 "compose_pdf_video": {"status": "pending", "data": None},
             }
+
+            # Add translation steps if needed
+            if voice_language.lower() != "english":
+                steps["translate_voice_scripts"] = {"status": "pending", "data": None}
+            if subtitle_language and subtitle_language.lower() != "english":
+                steps["translate_subtitle_scripts"] = {
+                    "status": "pending",
+                    "data": None,
+                }
         else:
             # Presentation-specific steps (.ppt, .pptx, etc.)
             steps = {
@@ -70,6 +79,15 @@ class RedisStateManager:
                 },
                 "compose_video": {"status": "pending", "data": None},
             }
+
+            # Add translation steps
+            if voice_language.lower() != "english":
+                steps["translate_voice_scripts"] = {"status": "pending", "data": None}
+            if subtitle_language and subtitle_language.lower() != "english":
+                steps["translate_subtitle_scripts"] = {
+                    "status": "pending",
+                    "data": None,
+                }
 
             # Only include subtitle script generation steps if languages are different
             # Default to audio language if subtitle language is not specified

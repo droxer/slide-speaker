@@ -11,6 +11,8 @@ from .generate_chapter_images import generate_chapter_images_step
 from .generate_subtitles import generate_subtitles_step
 from .review_scripts import review_scripts_step
 from .segment_content import segment_content_step
+from .translate_subtitle_scripts import translate_subtitle_scripts_step
+from .translate_voice_scripts import translate_voice_scripts_step
 
 __all__ = [
     "analyze_content_step",
@@ -20,4 +22,6 @@ __all__ = [
     "generate_subtitles_step",
     "review_scripts_step",
     "segment_content_step",
+    "translate_subtitle_scripts_step",
+    "translate_voice_scripts_step",
 ]

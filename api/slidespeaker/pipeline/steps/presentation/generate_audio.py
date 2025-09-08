@@ -41,14 +41,28 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
             return
 
     # Comprehensive null checking for scripts data
+    # Check for translated scripts first, then fall back to reviewed English scripts
     scripts = []
+
+    # Check for translated voice scripts first (for non-English audio)
     if (
+        state
+        and "steps" in state
+        and "translate_voice_scripts" in state["steps"]
+        and state["steps"]["translate_voice_scripts"]["data"] is not None
+        and state["steps"]["translate_voice_scripts"]["status"] == "completed"
+    ):
+        scripts = state["steps"]["translate_voice_scripts"]["data"]
+        logger.info("Using translated voice scripts for audio generation")
+    # Fall back to reviewed English scripts
+    elif (
         state
         and "steps" in state
         and "review_scripts" in state["steps"]
         and state["steps"]["review_scripts"]["data"] is not None
     ):
         scripts = state["steps"]["review_scripts"]["data"]
+        logger.info("Using reviewed English scripts for audio generation")
 
     if not scripts:
         raise ValueError("No scripts data available for audio generation")
@@ -84,6 +98,46 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
                     await tts_service.generate_speech(
                         script_text, audio_path, language=language, voice=voice
                     )
+
+                    # Determine audio duration using ffprobe
+                    try:
+                        import json
+                        import subprocess
+
+                        cmd = [
+                            "ffprobe",
+                            "-v",
+                            "quiet",
+                            "-print_format",
+                            "json",
+                            "-show_format",
+                            "-show_streams",
+                            str(audio_path),
+                        ]
+                        result = subprocess.run(
+                            cmd, capture_output=True, text=True, timeout=10
+                        )
+                        if result.returncode == 0 and result.stdout.strip():
+                            data = json.loads(result.stdout)
+                            # Try to get duration from format first
+                            if "format" in data and "duration" in data["format"]:
+                                duration = float(data["format"]["duration"])
+                                logger.info(
+                                    f"Determined duration for slide {i + 1}: {duration} seconds"
+                                )
+                            # If not in format, check streams
+                            elif "streams" in data:
+                                for stream in data["streams"]:
+                                    if "duration" in stream:
+                                        duration = float(stream["duration"])
+                                        logger.info(
+                                            f"Determined duration for slide {i + 1}: {duration} seconds"
+                                        )
+                                        break
+                    except Exception as e:
+                        logger.warning(
+                            f"Could not determine duration for slide {i + 1}: {e}"
+                        )
 
                     # Keep audio files local - only final files should be uploaded to cloud storage
                     audio_files.append(str(audio_path))

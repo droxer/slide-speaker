@@ -21,29 +21,67 @@ from .steps.pdf import (
     generate_subtitles_step,
     review_scripts_step,
     segment_content_step,
+    translate_subtitle_scripts_step,
+    translate_voice_scripts_step,
 )
 
 
-def _get_pdf_processing_steps(generate_subtitles: bool) -> list[str]:
+async def _translate_scripts_step(
+    file_id: str, source_language: str, target_language: str, is_subtitle: bool = False
+) -> None:
+    """
+    Translate scripts from source language to target language.
+
+    Args:
+        file_id: Unique identifier for the file
+        source_language: Source language of the scripts
+        target_language: Target language for translation
+        is_subtitle: Whether this is for subtitle translation (default: False)
+    """
+    if is_subtitle:
+        await translate_subtitle_scripts_step(file_id, target_language)
+    else:
+        await translate_voice_scripts_step(file_id, target_language)
+
+
+def _get_pdf_processing_steps(
+    voice_language: str, subtitle_language: str | None, generate_subtitles: bool
+) -> list[str]:
     """
     Get the ordered list of processing steps for PDF files.
 
     The steps are:
     1. Segment PDF content into chapters
     2. Analyze PDF content
-    3. Review and refine chapter scripts for smooth transitions
-    4. Generate chapter images
-    5. Generate audio for chapters
-    6. Generate subtitles (if requested)
-    7. Compose final video
+    3. Generate and review English scripts first
+    4. Translate scripts if needed
+    5. Generate chapter images
+    6. Generate audio for chapters
+    7. Generate subtitles (if requested)
+    8. Compose final video
     """
+    # Always generate English scripts first
     steps_order = [
         "segment_pdf_content",
         "analyze_pdf_content",
-        "review_pdf_scripts",
-        "generate_pdf_chapter_images",
-        "generate_pdf_audio",
+        "review_pdf_scripts",  # Review English scripts first
     ]
+
+    # Add translation steps for voice if language is not English
+    if voice_language.lower() != "english":
+        steps_order.extend(["translate_voice_scripts"])
+
+    # Add translation steps for subtitles if subtitle language is specified and not English
+    if subtitle_language and subtitle_language.lower() != "english":
+        steps_order.extend(["translate_subtitle_scripts"])
+
+    # Continue with remaining steps
+    steps_order.extend(
+        [
+            "generate_pdf_chapter_images",
+            "generate_pdf_audio",
+        ]
+    )
 
     # Add subtitle generation step only if requested
     if generate_subtitles:
@@ -84,6 +122,8 @@ async def _execute_pdf_step(
             "segment_pdf_content": "Segmenting PDF content into chapters",
             "analyze_pdf_content": "Analyzing PDF content",
             "review_pdf_scripts": "Reviewing and refining chapter scripts",
+            "translate_voice_scripts": "Translating voice scripts",
+            "translate_subtitle_scripts": "Translating subtitle scripts",
             "generate_pdf_chapter_images": "Generating chapter images",
             "generate_pdf_audio": "Generating chapter audio",
             "generate_pdf_subtitles": "Generating subtitles",
@@ -103,6 +143,8 @@ async def _execute_pdf_step(
             "segment_pdf_content": "Segmenting PDF content into chapters",
             "analyze_pdf_content": "Analyzing PDF content",
             "review_pdf_scripts": "Reviewing and refining chapter scripts",
+            "translate_voice_scripts": "Translating voice scripts",
+            "translate_subtitle_scripts": "Translating subtitle scripts",
             "generate_pdf_chapter_images": "Generating chapter images",
             "generate_pdf_audio": "Generating chapter audio",
             "generate_pdf_subtitles": "Generating subtitles",
@@ -121,11 +163,26 @@ async def _execute_pdf_step(
 
             # Execute the appropriate step
             if step_name == "segment_pdf_content":
-                await segment_content_step(file_id, file_path, voice_language)
+                await segment_content_step(
+                    file_id, file_path, "english"
+                )  # Always use English first
             elif step_name == "analyze_pdf_content":
-                await analyze_content_step(file_id, voice_language)
+                await analyze_content_step(
+                    file_id, "english"
+                )  # Always use English first
             elif step_name == "review_pdf_scripts":
-                await review_scripts_step(file_id, voice_language)
+                await review_scripts_step(
+                    file_id, "english"
+                )  # Always review English scripts first
+            elif step_name == "translate_voice_scripts":
+                # Translate English scripts to voice language
+                await _translate_scripts_step(file_id, "english", voice_language)
+            elif step_name == "translate_subtitle_scripts":
+                # Translate English scripts to subtitle language
+                subtitle_lang = subtitle_language or voice_language
+                await _translate_scripts_step(
+                    file_id, "english", subtitle_lang, is_subtitle=True
+                )
             elif step_name == "generate_pdf_chapter_images":
                 await generate_chapter_images_step(file_id, voice_language)
             elif step_name == "generate_pdf_audio":
@@ -218,7 +275,9 @@ async def process_pdf_file(
         logger.info(f"=== Starting step-by-step processing for task {task_id} ===")
 
     # Define processing steps in order for PDF files
-    steps_order = _get_pdf_processing_steps(generate_subtitles)
+    steps_order = _get_pdf_processing_steps(
+        voice_language, subtitle_language, generate_subtitles
+    )
 
     try:
         # Process each step in order, skipping completed ones
@@ -322,7 +381,10 @@ async def _log_initial_pdf_state(file_id: str) -> None:
         for step_name, step_data in state["steps"].items():
             step_display_names = {
                 "segment_pdf_content": "Segmenting PDF content into chapters",
+                "analyze_pdf_content": "Analyzing PDF content",
                 "review_pdf_scripts": "Reviewing and refining chapter scripts",
+                "translate_voice_scripts": "Translating voice scripts",
+                "translate_subtitle_scripts": "Translating subtitle scripts",
                 "generate_pdf_chapter_images": "Generating chapter images",
                 "generate_pdf_audio": "Generating chapter audio",
                 "generate_pdf_subtitles": "Generating subtitles",

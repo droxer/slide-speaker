@@ -23,7 +23,27 @@ from .steps.presentation import (
     generate_scripts_step,
     generate_subtitles_step,
     review_scripts_step,
+    translate_subtitle_scripts_step,
+    translate_voice_scripts_step,
 )
+
+
+async def _translate_scripts_step(
+    file_id: str, source_language: str, target_language: str, is_subtitle: bool = False
+) -> None:
+    """
+    Translate scripts from source language to target language.
+
+    Args:
+        file_id: Unique identifier for the file
+        source_language: Source language of the scripts
+        target_language: Target language for translation
+        is_subtitle: Whether this is for subtitle translation (default: False)
+    """
+    if is_subtitle:
+        await translate_subtitle_scripts_step(file_id, target_language)
+    else:
+        await translate_voice_scripts_step(file_id, target_language)
 
 
 def _get_processing_steps(
@@ -34,20 +54,26 @@ def _get_processing_steps(
 
     The steps are dynamically determined based on user preferences such as
     language settings, avatar generation, and subtitle requirements.
+    For non-English languages, we first generate English scripts, then translate them.
     """
+    # Always generate English scripts first
     steps_order = [
         "extract_slides",
         "convert_slides_to_images",
         "analyze_slide_images",
-        "generate_scripts",
-        "review_scripts",  # Review scripts for audio language
+        "generate_scripts",  # Generate English scripts first
+        "review_scripts",  # Review English scripts first
     ]
 
-    # Add subtitle script generation steps only if languages are different
-    if voice_language != subtitle_language:
-        steps_order.extend(["generate_subtitle_scripts", "review_subtitle_scripts"])
+    # Add translation steps for voice if language is not English
+    if voice_language.lower() != "english":
+        steps_order.extend(["translate_voice_scripts"])
 
-    # Continue with audio and video generation
+    # Add translation steps for subtitles if subtitle language is specified and not English
+    if subtitle_language and subtitle_language.lower() != "english":
+        steps_order.extend(["translate_subtitle_scripts"])
+
+    # Continue with audio generation using translated scripts (if applicable)
     steps_order.extend(["generate_audio"])
 
     # Add avatar generation step only if enabled
@@ -104,6 +130,8 @@ async def _execute_step(
             "generate_subtitle_scripts": "Generating subtitle narratives",
             "review_scripts": "Reviewing and refining scripts",
             "review_subtitle_scripts": "Reviewing subtitle scripts",
+            "translate_voice_scripts": "Translating voice scripts",
+            "translate_subtitle_scripts": "Translating subtitle scripts",
             "generate_audio": "Synthesizing voice audio",
             "generate_avatar_videos": "Creating AI presenter videos",
             "generate_subtitles": "Generating subtitles",
@@ -127,6 +155,8 @@ async def _execute_step(
             "generate_subtitle_scripts": "Generating subtitle narratives",
             "review_scripts": "Reviewing and refining scripts",
             "review_subtitle_scripts": "Reviewing subtitle scripts",
+            "translate_voice_scripts": "Translating voice scripts",
+            "translate_subtitle_scripts": "Translating subtitle scripts",
             "generate_audio": "Synthesizing voice audio",
             "generate_avatar_videos": "Creating AI presenter videos",
             "generate_subtitles": "Generating subtitles",
@@ -149,17 +179,29 @@ async def _execute_step(
             elif step_name == "analyze_slide_images":
                 await analyze_slides_step(file_id)
             elif step_name == "generate_scripts":
-                await generate_scripts_step(file_id, voice_language)
+                # Always generate English scripts first
+                await generate_scripts_step(file_id, "english")
             elif step_name == "generate_subtitle_scripts":
                 await generate_scripts_step(
                     file_id, subtitle_language, is_subtitle=True
                 )
             elif step_name == "review_scripts":
-                await review_scripts_step(file_id, voice_language)
+                # Always review English scripts first
+                await review_scripts_step(file_id, "english")
             elif step_name == "review_subtitle_scripts":
                 await review_scripts_step(file_id, subtitle_language, is_subtitle=True)
+            elif step_name == "translate_voice_scripts":
+                # Translate English scripts to voice language
+                await _translate_scripts_step(file_id, "english", voice_language)
+            elif step_name == "translate_subtitle_scripts":
+                # Translate English scripts to subtitle language
+                await _translate_scripts_step(
+                    file_id, "english", subtitle_language, is_subtitle=True
+                )
             elif step_name == "generate_audio":
-                await generate_audio_step(file_id, voice_language)
+                # Use translated scripts if available, otherwise use English scripts
+                audio_language = voice_language
+                await generate_audio_step(file_id, audio_language)
             elif step_name == "generate_avatar_videos":
                 await generate_avatar_step(file_id)
             elif step_name == "generate_subtitles":
@@ -366,6 +408,8 @@ async def _log_initial_state(file_id: str) -> None:
                 "generate_subtitle_scripts": "Generating subtitle narratives",
                 "review_scripts": "Reviewing and refining scripts",
                 "review_subtitle_scripts": "Reviewing subtitle scripts",
+                "translate_voice_scripts": "Translating voice scripts",
+                "translate_subtitle_scripts": "Translating subtitle scripts",
                 "generate_audio": "Synthesizing voice audio",
                 "generate_avatar_videos": "Creating AI presenter videos",
                 "generate_subtitles": "Generating subtitles",

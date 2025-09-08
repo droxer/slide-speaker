@@ -19,9 +19,22 @@ class OpenAITTSService(TTSInterface):
 
     def __init__(self) -> None:
         """Initialize the OpenAI TTS service with API client and configuration"""
-        self.client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is not set")
+
+        self.client = openai.OpenAI(api_key=api_key)
         self.model = os.getenv("OPENAI_TTS_MODEL", "tts-1")
         self.default_voice = os.getenv("OPENAI_TTS_VOICE", "alloy")
+
+        # Validate model
+        valid_models = ["tts-1", "tts-1-hd", "gpt-4o-tts", "gpt-4o-mini-tts"]
+        if self.model not in valid_models:
+            logger.warning(
+                f"Invalid OpenAI TTS model '{self.model}'. "
+                f"Using default 'tts-1'. Valid models: {valid_models}"
+            )
+            self.model = "tts-1"
 
     async def generate_speech(
         self,
@@ -38,6 +51,8 @@ class OpenAITTSService(TTSInterface):
         voice_mapping: dict[str, str] = {
             "english": "alloy",
             "chinese": "onyx",
+            "simplified_chinese": "onyx",
+            "traditional_chinese": "onyx",
             "japanese": "nova",
             "korean": "shimmer",
             "thai": "alloy",
@@ -73,6 +88,8 @@ class OpenAITTSService(TTSInterface):
         language_voices = {
             "english": ["alloy", "echo", "fable", "onyx", "nova", "shimmer"],
             "chinese": ["onyx", "alloy"],
+            "simplified_chinese": ["onyx", "alloy"],
+            "traditional_chinese": ["onyx", "alloy"],
             "japanese": ["nova", "alloy"],
             "korean": ["shimmer", "alloy"],
             "thai": ["alloy", "echo"],

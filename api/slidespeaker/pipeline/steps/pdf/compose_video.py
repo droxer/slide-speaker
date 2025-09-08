@@ -115,38 +115,23 @@ async def compose_video_step(file_id: str) -> None:
         # Handle segments based on whether we have audio files or not
         if audio_paths:
             # We have audio files, so create segments with audio
-            # First segment is the title slide with no audio (5 seconds duration)
-            if image_paths:
-                title_segment = {
-                    "image": str(image_paths[0]),  # Title slide is first
-                    "duration": 5.0,  # 5 seconds for title slide
+            # Match each image with its corresponding audio file
+            for i, (image_path, audio_path) in enumerate(
+                zip(image_paths, audio_paths, strict=False)
+            ):
+                segment: dict[str, object] = {
+                    "image": str(image_path),
+                    "audio": str(audio_path),
                 }
-                segments.append(title_segment)
-
-            # Add segments for each chapter with audio
-            audio_index = 0
-            subtitle_index = 0
-            # Start from index 1 for chapter slides (0 is title slide)
-            for i in range(1, len(image_paths)):
-                if audio_index < len(audio_paths):
-                    segment: dict[str, object] = {
-                        "image": str(image_paths[i]),
-                        "audio": str(audio_paths[audio_index]),
-                    }
-                    if subtitle_paths and subtitle_index < len(subtitle_paths):
-                        segment["subtitle"] = str(subtitle_paths[subtitle_index])
-                    segments.append(segment)
-                    audio_index += 1
-                    subtitle_index += 1
+                # Add subtitle if available
+                if subtitle_paths and i < len(subtitle_paths):
+                    segment["subtitle"] = str(subtitle_paths[i])
+                segments.append(segment)
         else:
             # No audio files, create simple image-only segments
-            for i, image_path in enumerate(image_paths):
-                if i == 0:
-                    # Title slide with 5 seconds duration
-                    segment = {"image": str(image_path), "duration": 5.0}
-                else:
-                    # Chapter slides with default 5 seconds duration
-                    segment = {"image": str(image_path), "duration": 5.0}
+            for image_path in image_paths:
+                # All slides with default 5 seconds duration
+                segment = {"image": str(image_path), "duration": 5.0}
                 segments.append(segment)
 
         # Validate that we have segments to compose

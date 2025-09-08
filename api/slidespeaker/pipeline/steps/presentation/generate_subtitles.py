@@ -37,17 +37,33 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
 
     # Always generate subtitles
     # Get scripts for subtitle generation
-    # Use subtitle-specific scripts if they exist (when languages differ),
-    # otherwise use regular scripts
+    # Use translated subtitle scripts first, then subtitle-specific scripts,
+    # then translated voice scripts, and finally regular scripts as fallback
     scripts_data: list[dict[str, Any]] = []
     if state and "steps" in state:
-        # Check if subtitle scripts exist (languages are different)
+        # Check for translated subtitle scripts first
         if (
+            "translate_subtitle_scripts" in state["steps"]
+            and state["steps"]["translate_subtitle_scripts"]["data"] is not None
+            and state["steps"]["translate_subtitle_scripts"]["status"] == "completed"
+        ):
+            scripts_data = state["steps"]["translate_subtitle_scripts"]["data"]
+            logger.info("Using translated subtitle scripts for subtitle generation")
+        # Check if subtitle scripts exist (languages are different)
+        elif (
             "review_subtitle_scripts" in state["steps"]
             and state["steps"]["review_subtitle_scripts"]["data"] is not None
         ):
             scripts_data = state["steps"]["review_subtitle_scripts"]["data"]
             logger.info("Using subtitle-specific scripts for subtitle generation")
+        # Check for translated voice scripts
+        elif (
+            "translate_voice_scripts" in state["steps"]
+            and state["steps"]["translate_voice_scripts"]["data"] is not None
+            and state["steps"]["translate_voice_scripts"]["status"] == "completed"
+        ):
+            scripts_data = state["steps"]["translate_voice_scripts"]["data"]
+            logger.info("Using translated voice scripts for subtitle generation")
         # Fall back to regular scripts if subtitle scripts don't exist
         elif (
             "review_scripts" in state["steps"]

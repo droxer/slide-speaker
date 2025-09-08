@@ -33,6 +33,14 @@ async def segment_content_step(
         # Analyze and segment PDF content
         chapters = await analyzer.analyze_and_segment_pdf(str(file_path), language)
 
+        # Log chapter data for debugging
+        logger.debug(f"Generated {len(chapters)} chapters for file {file_id}")
+        if chapters:
+            logger.debug(
+                f"First chapter keys: {chapters[0].keys() if hasattr(chapters[0], 'keys') else type(chapters[0])}"
+            )
+            logger.debug(f"First chapter sample: {str(chapters[0])[:200]}...")
+
         # Store chapters in state
         await state_manager.update_step_status(
             file_id, "segment_pdf_content", "completed", chapters
@@ -41,4 +49,5 @@ async def segment_content_step(
 
     except Exception as e:
         logger.error(f"Failed to segment PDF content for file {file_id}: {e}")
+        logger.error(f"File path: {file_path}, exists: {file_path.exists()}")
         raise

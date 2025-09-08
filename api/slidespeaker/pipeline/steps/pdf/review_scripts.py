@@ -76,14 +76,9 @@ async def review_scripts_step(file_id: str, language: str = "english") -> None:
                 )
             updated_chapters.append(updated_chapter)
 
-        # Update state with reviewed chapters in the segment_pdf_content step
+        # Store reviewed chapters in the review_pdf_scripts step
         await state_manager.update_step_status(
-            file_id, "segment_pdf_content", "completed", updated_chapters
-        )
-
-        # Also mark this review step as completed
-        await state_manager.update_step_status(
-            file_id, "review_pdf_scripts", "completed", reviewed_scripts
+            file_id, "review_pdf_scripts", "completed", updated_chapters
         )
 
         logger.info(

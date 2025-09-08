@@ -18,7 +18,7 @@ from .pdf_coordinator import process_pdf_file
 from .presentation_coordinator import process_presentation_file
 
 
-async def process_presentation(
+async def accept_task(
     file_id: str,
     file_path: Path,
     file_ext: str,

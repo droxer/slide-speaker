@@ -281,17 +281,30 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
   // Format step name for better readability
   const formatStepName = (step: string): string => {
     const stepNames: Record<string, string> = {
-      'extract_slides': 'Extracting Content',
-      'analyze_slide_images': 'Analyzing Visuals',
-      'generate_scripts': 'Creating Narratives',
-      'review_scripts': 'Refining Content',
-      'generate_subtitle_scripts': 'Generating Subtitle Scripts',
-      'review_subtitle_scripts': 'Reviewing Subtitle Scripts',
-      'generate_audio': 'Synthesizing Audio',
-      'generate_avatar_videos': 'Generating Avatars',
+      // Common steps
+      'extract_slides': 'Extracting Slides',
+      'analyze_slide_images': 'Analyzing Content',
+      'generate_scripts': 'Creating Script',
+      'review_scripts': 'Reviewing Script',
+      'translate_voice_scripts': 'Translating Voice',
+      'translate_subtitle_scripts': 'Translating Subtitles',
+      'generate_subtitle_scripts': 'Creating Subtitles',
+      'review_subtitle_scripts': 'Reviewing Subtitles',
+      'generate_audio': 'Generating Audio',
+      'generate_avatar_videos': 'Creating Avatar',
       'convert_slides_to_images': 'Converting Slides',
-      'generate_subtitles': 'Generating Subtitles',
-      'compose_video': 'Composing Final Video',
+      'generate_subtitles': 'Creating Subtitles',
+      'compose_video': 'Composing Video',
+      
+      // PDF-specific steps
+      'segment_pdf_content': 'Segmenting Content',
+      'analyze_pdf_content': 'Analyzing Content',
+      'review_pdf_scripts': 'Reviewing Script',
+      'generate_pdf_chapter_images': 'Creating Chapter Images',
+      'generate_pdf_audio': 'Generating Audio',
+      'generate_pdf_subtitles': 'Creating Subtitles',
+      'compose_pdf_video': 'Composing Video',
+      
       'unknown': 'Initializing'
     };
     return stepNames[step] || step;

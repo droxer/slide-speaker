@@ -6,6 +6,7 @@ It can create both detailed presentation slides and simple background images.
 """
 
 import os
+import textwrap
 from pathlib import Path
 from typing import Any
 
@@ -13,7 +14,6 @@ import requests
 from loguru import logger
 from openai import OpenAI
 
-# Style prompts for DALL-E image generation
 STYLE_PROMPTS = {
     "professional": "clean, modern, corporate presentation slide with subtle gradient background, "
     "minimalist design, professional typography, business aesthetic",
@@ -23,7 +23,6 @@ STYLE_PROMPTS = {
     "tech": "tech-focused presentation slide with futuristic elements, circuit board patterns, blue color scheme, modern technology aesthetic",  # noqa: E501
 }
 
-# Base prompt template for DALL-E image generation
 IMAGE_PROMPT_TEMPLATE = """
 Create a presentation slide image that visually represents the following content:
 "{content}"
@@ -39,7 +38,6 @@ Requirements:
 - Suitable for educational/business context
 """
 
-# Simple background prompts
 SIMPLE_BACKGROUND_PROMPTS = {
     "gradient": "A smooth, subtle gradient background in {color}, "
     "professional presentation style, no text, clean design",
@@ -191,20 +189,18 @@ class ImageGenerator:
         # Create output directory if it doesn't exist
         output_dir.mkdir(exist_ok=True, parents=True)
 
-        # Generate a simple background image for each chapter
-        for i, _ in enumerate(chapters):
+        # Generate a slide-like image for each chapter
+        for i, chapter in enumerate(chapters):
             image_path = output_dir / f"chapter_{i + 1}.png"
 
-            # Create a simple background image as fallback
+            # Create a slide-like image with chapter title and description
             try:
-                await self.generate_simple_background(image_path, "blue", "gradient")
+                await self._create_chapter_slide_image(chapter, image_path)
                 image_paths.append(image_path)
-                logger.info(
-                    f"Generated simple background image for chapter {i + 1}: {image_path}"
-                )
+                logger.info(f"Generated slide image for chapter {i + 1}: {image_path}")
             except Exception as e:
-                logger.error(f"Failed to generate image for chapter {i + 1}: {e}")
-                # Create a fallback background if DALL-E fails
+                logger.error(f"Failed to generate slide image for chapter {i + 1}: {e}")
+                # Create a fallback background if slide creation fails
                 try:
                     await self._create_fallback_background(image_path, "#4287f5")
                     image_paths.append(image_path)
@@ -217,6 +213,152 @@ class ImageGenerator:
                     )
 
         return image_paths
+
+    async def _create_chapter_slide_image(
+        self, chapter: dict[str, Any], output_path: Path
+    ) -> None:
+        """
+        Create a slide-like image for a chapter with title, description, and key points.
+
+        Args:
+            chapter: Chapter dictionary with title, description, and key_points
+            output_path: Path to save the generated image
+        """
+        try:
+            from PIL import Image, ImageDraw, ImageFont
+
+            # Create a 16:9 slide image (1920x1080) - standard video resolution
+            width, height = 1920, 1080
+            img = Image.new("RGB", (width, height), "#ffffff")
+            draw = ImageDraw.Draw(img)
+
+            # Try to load system fonts, fallback to default if not available
+            title_font: ImageFont.FreeTypeFont | ImageFont.ImageFont
+            desc_font: ImageFont.FreeTypeFont | ImageFont.ImageFont
+            keypoint_font: ImageFont.FreeTypeFont | ImageFont.ImageFont
+            try:
+                # Try common system fonts
+                title_font = ImageFont.truetype("Arial.ttf", 60)
+                desc_font = ImageFont.truetype("Arial.ttf", 36)
+                keypoint_font = ImageFont.truetype("Arial.ttf", 28)
+            except Exception:
+                try:
+                    # Try alternative font names
+                    title_font = ImageFont.truetype("DejaVuSans.ttf", 60)
+                    desc_font = ImageFont.truetype("DejaVuSans.ttf", 36)
+                    keypoint_font = ImageFont.truetype("DejaVuSans.ttf", 28)
+                except Exception:
+                    # Fallback to default font
+                    title_font = ImageFont.load_default()
+                    desc_font = ImageFont.load_default()
+                    keypoint_font = ImageFont.load_default()
+
+            # Add a subtle gradient background
+            gradient = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+            gradient_draw = ImageDraw.Draw(gradient)
+
+            # Create a vertical gradient from light blue to white
+            for y in range(height):
+                # Calculate color intensity (0 at top, 255 at bottom)
+                intensity = int(200 * (y / height))
+                color = (240, 245, 255, 255 - intensity)  # Light blue to transparent
+                gradient_draw.line([(0, y), (width, y)], fill=color)
+
+            img = Image.alpha_composite(img.convert("RGBA"), gradient)
+            draw = ImageDraw.Draw(img)
+
+            # Add decorative elements
+            # Draw a subtle horizontal line
+            draw.line([(100, 200), (width - 100, 200)], fill="#4287f5", width=3)
+
+            # Add chapter title
+            title = chapter.get("title", f"Chapter {chapter.get('slide_number', 1)}")
+            # Ensure title is clean and concise (should already be from the analyzer)
+            title_lines = textwrap.wrap(title, width=40)  # Wrap text to fit
+
+            # Calculate vertical position for title (top of the slide)
+            title_y = 150
+            line_height = 70
+            total_title_height = len(title_lines) * line_height
+
+            for i, line in enumerate(title_lines):
+                # Get text dimensions for centering
+                bbox = draw.textbbox((0, 0), line, font=title_font)
+                text_width = bbox[2] - bbox[0]
+                x = (width - text_width) // 2
+                y = title_y + i * line_height
+                draw.text((x, y), line, fill="#2c3e50", font=title_font)
+
+            # Add chapter description
+            description = chapter.get("description", "")
+            if description:
+                desc_lines = textwrap.wrap(description, width=60)  # Wrap text to fit
+
+                # Start description below title
+                desc_y = title_y + total_title_height + 30
+
+                for i, line in enumerate(desc_lines[:3]):  # Limit to 3 lines
+                    # Get text dimensions for centering
+                    bbox = draw.textbbox((0, 0), line, font=desc_font)
+                    text_width = bbox[2] - bbox[0]
+                    x = (width - text_width) // 2
+                    y = desc_y + i * 45
+                    draw.text((x, y), line, fill="#34495e", font=desc_font)
+
+            # Add key points
+            key_points = chapter.get("key_points", [])
+            if key_points:
+                # Start key points below description
+                keypoints_y = desc_y + min(3, len(desc_lines)) * 45 + 40
+
+                # Draw "Key Points:" header
+                draw.text(
+                    (150, keypoints_y), "Key Points:", fill="#2c3e50", font=desc_font
+                )
+
+                # Draw each key point
+                for i, point in enumerate(key_points[:5]):  # Limit to 5 key points
+                    y_position = keypoints_y + 60 + i * 40
+                    if y_position < height - 100:  # Don't go beyond image bounds
+                        # Add bullet point and wrap text
+                        bullet_point = f"• {point}"
+                        wrapped_lines = textwrap.wrap(bullet_point, width=70)
+
+                        # Draw wrapped lines
+                        for j, line in enumerate(wrapped_lines):
+                            line_y = y_position + j * 35
+                            if line_y < height - 100:  # Don't go beyond image bounds
+                                draw.text(
+                                    (200, line_y),
+                                    line,
+                                    fill="#34495e",
+                                    font=keypoint_font,
+                                )
+
+            # Add a subtle decorative element in the corner
+            # Draw a small circle in bottom right corner
+            circle_x, circle_y = width - 50, height - 50
+            draw.ellipse(
+                [circle_x - 20, circle_y - 20, circle_x + 20, circle_y + 20],
+                fill="#4287f5",
+                outline="#2c3e50",
+                width=2,
+            )
+
+            # Save the image
+            img.convert("RGB").save(output_path)
+            logger.info(f"Created slide image: {output_path}")
+
+        except ImportError:
+            logger.warning(
+                "PIL not available for slide image generation, using fallback"
+            )
+            # Fallback to simple background
+            await self._create_fallback_background(output_path, "#4287f5")
+        except Exception as e:
+            logger.error(f"Error creating slide image: {e}")
+            # Fallback to simple background
+            await self._create_fallback_background(output_path, "#4287f5")
 
     async def convert_slides_to_images(
         self, file_path: str, file_ext: str, output_dir: Path

@@ -426,7 +426,7 @@ class VideoComposer:
 
                 logger.info("Concatenating all clips...")
                 # Explicitly preserve audio during concatenation
-                final_clip = concatenate_videoclips(video_clips, method="chain")
+                final_clip = concatenate_videoclips(video_clips, method="compose")
                 watermark = self._create_watermark(final_clip)
                 if watermark:
                     logger.info("✓ Watermark received from _create_watermark")

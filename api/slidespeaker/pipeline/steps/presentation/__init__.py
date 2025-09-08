@@ -13,6 +13,8 @@ from .generate_avatar import generate_avatar_step
 from .generate_scripts import generate_scripts_step
 from .generate_subtitles import generate_subtitles_step
 from .review_scripts import review_scripts_step
+from .translate_subtitle_scripts import translate_subtitle_scripts_step
+from .translate_voice_scripts import translate_voice_scripts_step
 
 __all__ = [
     "extract_slides_step",
@@ -24,4 +26,6 @@ __all__ = [
     "generate_avatar_step",
     "generate_subtitles_step",
     "compose_video_step",
+    "translate_subtitle_scripts_step",
+    "translate_voice_scripts_step",
 ]
