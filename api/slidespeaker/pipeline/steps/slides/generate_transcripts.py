@@ -1,31 +1,33 @@
 """
-Generate scripts step for the presentation pipeline.
+Generate transcripts step for the presentation pipeline.
 
-This module generates AI-powered presentation scripts for each slide.
+This module generates AI-powered presentation transcripts for each slide.
 It uses the extracted slide content and visual analysis to create
-natural, engaging scripts suitable for AI avatar presentation.
+natural, engaging transcripts suitable for AI avatar presentation.
 """
 
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.processing.script_generator import ScriptGenerator
+from slidespeaker.processing.transcript_generator import TranscriptGenerator
 
-script_generator = ScriptGenerator()
+transcript_generator = TranscriptGenerator()
 
 
-async def generate_scripts_step(
+async def generate_transcripts_step(
     file_id: str, language: str = "english", is_subtitle: bool = False
 ) -> None:
     """
-    Generate scripts for each slide using AI language models.
+    Generate transcripts for each slide using AI language models.
 
-    This function creates presentation scripts for each slide using OpenAI's GPT models.
+    This function creates presentation transcripts for each slide using OpenAI's GPT models.
     It combines the extracted slide text content with visual analysis to generate
-    engaging, natural-sounding scripts that are suitable for AI avatar presentation.
+    engaging, natural-sounding transcripts that are suitable for AI avatar presentation.
     The function includes periodic cancellation checks for responsive task management.
     """
-    step_name = "generate_subtitle_scripts" if is_subtitle else "generate_scripts"
+    step_name = (
+        "generate_subtitle_transcripts" if is_subtitle else "generate_transcripts"
+    )
     await state_manager.update_step_status(file_id, step_name, "processing")
     state = await state_manager.get_state(file_id)
 
@@ -50,9 +52,9 @@ async def generate_scripts_step(
         image_analyses = state["steps"]["analyze_slide_images"]["data"]
 
     if not slides:
-        raise ValueError("No slides data available for script generation")
+        raise ValueError("No slides data available for transcript generation")
 
-    scripts = []
+    transcripts = []
     for i, slide_content in enumerate(slides):
         # Check for task cancellation periodically
         if i % 3 == 0 and state and state.get("task_id"):  # Check every 3 slides
@@ -60,7 +62,7 @@ async def generate_scripts_step(
 
             if await task_queue.is_task_cancelled(state["task_id"]):
                 logger.info(
-                    f"Task {state['task_id']} was cancelled during script generation"
+                    f"Task {state['task_id']} was cancelled during transcript generation"
                 )
                 await state_manager.mark_cancelled(file_id, cancelled_step=step_name)
                 return
@@ -72,9 +74,9 @@ async def generate_scripts_step(
                 image_analyses[i].get("analysis") if image_analyses[i] else None
             )
 
-        script = await script_generator.generate_script(
+        transcript = await transcript_generator.generate_transcript(
             slide_content, image_analysis, language
         )
-        scripts.append({"slide_number": i + 1, "script": script})
+        transcripts.append({"slide_number": i + 1, "script": transcript})
 
-    await state_manager.update_step_status(file_id, step_name, "completed", scripts)
+    await state_manager.update_step_status(file_id, step_name, "completed", transcripts)

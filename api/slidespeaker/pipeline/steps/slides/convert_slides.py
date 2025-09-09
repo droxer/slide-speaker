@@ -62,6 +62,10 @@ async def convert_slides_step(file_id: str, file_path: Path, file_ext: str) -> N
     if not slides:
         raise ValueError("No slides data available for conversion to images")
 
+    # Prepare intermediate images directory: output/{file_id}/images
+    images_dir = config.output_dir / file_id / "images"
+    images_dir.mkdir(parents=True, exist_ok=True)
+
     for i in range(len(slides)):
         # Check for task cancellation periodically
         if i % 5 == 0 and state and state.get("task_id"):  # Check every 5 slides
@@ -76,7 +80,7 @@ async def convert_slides_step(file_id: str, file_path: Path, file_ext: str) -> N
                 )
                 return
 
-        image_path = config.output_dir / f"{file_id}_slide_{i + 1}.png"
+        image_path = images_dir / f"slide_{i + 1}.png"
         await slide_processor.convert_to_image(Path(file_path), file_ext, i, image_path)
 
         # Keep slide images local - only final files should be uploaded to cloud storage

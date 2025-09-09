@@ -28,9 +28,14 @@ help:
 install:
 	uv sync --extra=dev
 
+.PHONY: install_dev
+install_dev:
+	uv sync --extra=dev --extra=oss --extra=aws
+
+
 # Development server
 .PHONY: dev
-dev: install
+dev: install_dev
 	$(UVICORN) server:app --host 0.0.0.0 --port 8000 --reload
 
 # Production server
@@ -40,7 +45,7 @@ start: install
 
 # Master worker (automatically spawns/manages multiple worker processes)
 .PHONY: master-worker
-master-worker: install
+master-worker: install_dev
 	$(PYTHON) master_worker.py
 
 # CLI tool

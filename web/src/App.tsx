@@ -494,12 +494,12 @@ function App() {
       // Common steps
       'extract_slides': 'Extracting Slides',
       'analyze_slide_images': 'Analyzing Content',
-      'generate_scripts': 'Creating Script',
-      'review_scripts': 'Reviewing Script',
-      'translate_voice_scripts': 'Translating Voice Script',
-      'translate_subtitle_scripts': 'Translating Subtitles',
-      'generate_subtitle_scripts': 'Creating Subtitles',
-      'review_subtitle_scripts': 'Reviewing Subtitles',
+      'generate_transcripts': 'Generating Transcripts',
+      'revise_transcripts': 'Revising Transcripts',
+      'translate_voice_transcripts': 'Translating Voice Transcripts',
+      'translate_subtitle_transcripts': 'Translating Subtitle Transcripts',
+      'generate_subtitle_transcripts': 'Generating Subtitle Transcripts',
+      'revise_subtitle_transcripts': 'Revising Subtitle Transcripts',
       'generate_audio': 'Generating Audio',
       'generate_avatar_videos': 'Creating Avatar',
       'convert_slides_to_images': 'Converting Slides',
@@ -509,7 +509,7 @@ function App() {
       // PDF-specific steps
       'segment_pdf_content': 'Segmenting Content',
       'analyze_pdf_content': 'Analyzing Content',
-      'review_pdf_scripts': 'Reviewing Script',
+      'revise_pdf_transcripts': 'Revising Transcripts',
       'generate_pdf_chapter_images': 'Creating Chapter Images',
       'generate_pdf_audio': 'Generating Audio',
       'generate_pdf_subtitles': 'Creating Subtitles',
@@ -551,11 +551,11 @@ function App() {
         // Common messages for all file types
         'Extracting Slides': `Analyzing your ${fileTypeText} structure...`,
         'Analyzing Content': `Examining ${fileTypeText} content...`,
-        'Creating Script': 'Crafting engaging AI script in English...',
-        'Reviewing Script': 'Polishing the English script for perfect delivery...',
-        'Translating Voice': 'Translating script to your selected voice language...',
-        'Translating Subtitles': 'Translating script to your selected subtitle language...',
-        'Creating Subtitles': 'Generating subtitle content...',
+        'Generating Transcripts': 'Generating English transcripts...',
+        'Revising Transcripts': 'Polishing transcripts for delivery...',
+        'Translating Voice Transcripts': 'Translating transcripts to voice language...',
+        'Translating Subtitle Transcripts': 'Translating transcripts for subtitles...',
+        'Generating Subtitle Transcripts': 'Generating subtitle transcripts...',
         'Reviewing Subtitles': 'Perfecting subtitle timing and accuracy...',
         'Generating Audio': 'Creating natural voice narration...',
         'Creating Avatar': 'Bringing AI presenter to life...',
@@ -745,6 +745,8 @@ function App() {
                     id="generate-avatar"
                     checked={generateAvatar}
                     onChange={(e) => setGenerateAvatar(e.target.checked)}
+                    disabled
+                    title="AI Avatar is not available yet"
                   />
                   <label htmlFor="generate-avatar" className="minimal-label">AI Avatar</label>
                 </div>
@@ -822,61 +824,65 @@ function App() {
                         [
                           'segment_pdf_content',
                           'analyze_pdf_content',
-                          'review_pdf_scripts',
-                          'translate_voice_scripts',
-                          'translate_subtitle_scripts',
+                          'revise_pdf_transcripts',
+                          'translate_voice_transcripts',
+                          'translate_subtitle_transcripts',
                           'generate_pdf_chapter_images', 
                           'generate_pdf_audio',
                           'generate_pdf_subtitles',
                           'compose_pdf_video'
-                        ].map((stepName) => {
-                          const stepData = processingDetails.steps[stepName] || { status: 'pending' };
-                          // Hide skipped steps from UI
-                          if (stepData.status === 'skipped') {
-                            return null;
-                          }
-                          return (
-                            <div key={stepName} className={`step-item ${stepData.status}`}>
-                              <span className="step-icon">
-                                {stepData.status === 'completed' ? '✓' : 
-                                 stepData.status === 'processing' || stepData.status === 'in_progress' ? '⏳' : 
-                                 stepData.status === 'failed' ? '✗' : '○'}
-                              </span>
-                              <span className="step-name">{formatStepName(stepName)}</span>
-                            </div>
-                          );
-                        }).filter(Boolean)
+                        ]
+                          .map((stepName) => {
+                            const stepData = processingDetails.steps[stepName];
+                            // Hide steps that are not present or explicitly skipped
+                            if (!stepData || stepData.status === 'skipped') {
+                              return null;
+                            }
+                            return (
+                              <div key={stepName} className={`step-item ${stepData.status}`}>
+                                <span className="step-icon">
+                                  {stepData.status === 'completed' ? '✓' :
+                                   stepData.status === 'processing' || stepData.status === 'in_progress' ? '⏳' :
+                                   stepData.status === 'failed' ? '✗' : '○'}
+                                </span>
+                                <span className="step-name">{formatStepName(stepName)}</span>
+                              </div>
+                            );
+                          })
+                          .filter(Boolean)
                       ) : (
                         // PPT/PPTX-specific steps with translation steps
                         [
                           'extract_slides',
                           'convert_slides_to_images', 
                           'analyze_slide_images',
-                          'generate_scripts',
-                          'review_scripts',
-                          'translate_voice_scripts',
-                          'translate_subtitle_scripts',
+                          'generate_transcripts',
+                          'revise_transcripts',
+                          'translate_voice_transcripts',
+                          'translate_subtitle_transcripts',
                           'generate_audio',
                           'generate_avatar_videos',
                           'generate_subtitles',
                           'compose_video'
-                        ].map((stepName) => {
-                          const stepData = processingDetails.steps[stepName] || { status: 'pending' };
-                          // Hide skipped steps from UI
-                          if (stepData.status === 'skipped') {
-                            return null;
-                          }
-                          return (
-                            <div key={stepName} className={`step-item ${stepData.status}`}>
-                              <span className="step-icon">
-                                {stepData.status === 'completed' ? '✓' : 
-                                 stepData.status === 'processing' || stepData.status === 'in_progress' ? '⏳' : 
-                                 stepData.status === 'failed' ? '✗' : '○'}
-                              </span>
-                              <span className="step-name">{formatStepName(stepName)}</span>
-                            </div>
-                          );
-                        }).filter(Boolean)
+                        ]
+                          .map((stepName) => {
+                            const stepData = processingDetails.steps[stepName];
+                            // Hide steps that are not present or explicitly skipped
+                            if (!stepData || stepData.status === 'skipped') {
+                              return null;
+                            }
+                            return (
+                              <div key={stepName} className={`step-item ${stepData.status}`}>
+                                <span className="step-icon">
+                                  {stepData.status === 'completed' ? '✓' :
+                                   stepData.status === 'processing' || stepData.status === 'in_progress' ? '⏳' :
+                                   stepData.status === 'failed' ? '✗' : '○'}
+                                </span>
+                                <span className="step-name">{formatStepName(stepName)}</span>
+                              </div>
+                            );
+                          })
+                          .filter(Boolean)
                       )}
                     </div>
                     

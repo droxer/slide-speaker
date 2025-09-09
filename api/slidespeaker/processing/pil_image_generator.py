@@ -159,8 +159,11 @@ class PILImageGenerator:
             title, width=50
         )  # Adjusted width for better wrapping
 
-        title_y = 150
+        title_y = 170
         title_line_height = 70
+
+        # Move the title higher by reducing title_y
+        title_y = 110  # Was 170, now moved up by 60px
 
         for i, line in enumerate(title_lines):
             bbox = draw.textbbox((0, 0), line, font=title_font)
@@ -174,19 +177,49 @@ class PILImageGenerator:
 
         # Add chapter description
         description = chapter.get("description", "")
-        desc_y = title_y + total_title_height + 50  # Increased spacing
+        desc_y = title_y + total_title_height + 70  # Increased spacing
+
+        # Increase font size for description and keypoints
+        # We'll create larger fonts based on the originals
+        from PIL import ImageFont
+
+        # Try to get the font path and size from the original font objects
+        def get_larger_font(
+            orig_font: ImageFont.ImageFont, scale: float = 1.25
+        ) -> ImageFont.ImageFont:
+            try:
+                # Try to get the font size (this is a more reliable approach)
+                # We'll try to get the size by checking the font's attributes
+                if hasattr(orig_font, "size"):
+                    orig_size = orig_font.size
+                    # Since we can't easily get the font path, we'll try to create a new font
+                    # with the same size scaled up. This is a best-effort approach.
+                    from PIL import ImageFont
+
+                    # Try to create a new default font with larger size
+                    new_font = ImageFont.load_default(size=int(orig_size * scale))
+                    return new_font  # type: ignore[return-value]
+                else:
+                    # If we can't determine the size, return the original font
+                    return orig_font
+            except Exception:
+                # Fallback: just use the original font if we can't get path/size
+                return orig_font
+
+        larger_desc_font = get_larger_font(desc_font, scale=1.25)
+        larger_keypoint_font = get_larger_font(keypoint_font, scale=1.25)
 
         if description:
             # Use smaller width for better line control
             desc_lines = textwrap.wrap(description, width=80)
-            desc_line_height = 45
+            desc_line_height = 55  # Increased line height for larger font
 
             for i, line in enumerate(desc_lines[:4]):  # Limit to 4 lines for better fit
-                bbox = draw.textbbox((0, 0), line, font=desc_font)
+                bbox = draw.textbbox((0, 0), line, font=larger_desc_font)
                 text_width = bbox[2] - bbox[0]
                 x = (width - text_width) // 2
                 y = desc_y + i * desc_line_height
-                draw.text((x, y), line, fill="#34495e", font=desc_font)
+                draw.text((x, y), line, fill="#34495e", font=larger_desc_font)
 
             # Update description height for key points positioning
             desc_content_height = len(desc_lines[:4]) * desc_line_height
@@ -201,12 +234,17 @@ class PILImageGenerator:
             # Draw "Key Points:" header
             header_text = "Key Points:"
             draw.text(
-                (margin, keypoints_start_y), header_text, fill="#2c3e50", font=desc_font
+                (margin, keypoints_start_y),
+                header_text,
+                fill="#2c3e50",
+                font=larger_desc_font,
             )
 
             # Draw each key point with proper spacing
-            keypoint_line_height = 40
-            keypoint_y = keypoints_start_y + 50  # Space after header
+            keypoint_line_height = 55  # Increased line height for larger font
+            keypoint_y = (
+                keypoints_start_y + 60
+            )  # More space after header for larger font
 
             for i, point in enumerate(key_points[:6]):  # Limit to 6 key points
                 current_y = keypoint_y + i * keypoint_line_height
@@ -224,8 +262,8 @@ class PILImageGenerator:
                 # Draw each wrapped line of the key point
                 for j, line in enumerate(wrapped_lines):
                     line_y = (
-                        current_y + j * 30
-                    )  # Smaller line spacing for wrapped content
+                        current_y + j * 38
+                    )  # Slightly larger line spacing for larger font
 
                     # Ensure we don't exceed slide bounds
                     if line_y <= height - 120:
@@ -233,12 +271,12 @@ class PILImageGenerator:
                             (margin + 30, line_y),
                             line,
                             fill="#34495e",
-                            font=keypoint_font,
+                            font=larger_keypoint_font,
                         )
 
                     # If this is a wrapped line, don't increment the main key point counter
                     if j > 0:
                         # Adjust spacing for next key point if we had wrapping
                         keypoint_line_height = max(
-                            keypoint_line_height, (j + 1) * 30 + 10
+                            keypoint_line_height, (j + 1) * 38 + 12
                         )

@@ -1,7 +1,7 @@
 """
 PDF subtitle generation step for SlideSpeaker.
 
-This module handles the generation of subtitles for PDF chapters.
+This module handles the generation of subtitles for PDF chapters using transcripts.
 """
 
 from pathlib import Path
@@ -11,18 +11,17 @@ from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.processing.subtitle_generator import SubtitleGenerator
-from slidespeaker.utils.config import get_storage_provider
+from slidespeaker.utils.config import config, get_storage_provider
 from slidespeaker.utils.locales import locale_utils
 
 subtitle_generator = SubtitleGenerator()
 
-# Get storage provider instance
-storage_provider = get_storage_provider()
+# Resolve storage provider at upload time to reflect current config
 
 
 async def generate_subtitles_step(file_id: str, language: str = "english") -> None:
     """
-    Generate subtitles for PDF chapters.
+    Generate subtitles for PDF chapters using transcripts.
 
     Args:
         file_id: Unique identifier for the file
@@ -38,20 +37,47 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
         state = await state_manager.get_state(file_id)
         chapters: list[dict[str, Any]] = []
 
-        # Determine which scripts to use for subtitles
+        # Determine which transcripts to use for subtitles
         chapters = []
         if state and "steps" in state:
-            # Priority 1: Use translated subtitle scripts if available
+            # Priority 1: Use translated subtitle transcripts if available
             if (
-                "translate_subtitle_scripts" in state["steps"]
-                and state["steps"]["translate_subtitle_scripts"]["data"] is not None
-                and state["steps"]["translate_subtitle_scripts"].get("status")
+                "translate_subtitle_transcripts" in state["steps"]
+                and state["steps"]["translate_subtitle_transcripts"]["data"] is not None
+                and state["steps"]["translate_subtitle_transcripts"].get("status")
                 == "completed"
             ):
-                translated_scripts = state["steps"]["translate_subtitle_scripts"][
+                translated_transcripts = state["steps"][
+                    "translate_subtitle_transcripts"
+                ]["data"]
+                # Get original chapters and update with translated transcripts
+                if (
+                    "segment_pdf_content" in state["steps"]
+                    and state["steps"]["segment_pdf_content"]["data"] is not None
+                ):
+                    original_chapters = state["steps"]["segment_pdf_content"]["data"]
+                    for i, chapter in enumerate(original_chapters):
+                        updated_chapter = chapter.copy()
+                        if i < len(translated_transcripts):
+                            updated_chapter["script"] = translated_transcripts[i].get(
+                                "script", chapter.get("script", "")
+                            )
+                        chapters.append(updated_chapter)
+                logger.info(
+                    "Using translated subtitle transcripts for PDF subtitle generation"
+                )
+
+            # Priority 2: Use translated voice transcripts as fallback
+            elif (
+                "translate_voice_transcripts" in state["steps"]
+                and state["steps"]["translate_voice_transcripts"]["data"] is not None
+                and state["steps"]["translate_voice_transcripts"].get("status")
+                == "completed"
+            ):
+                translated_transcripts = state["steps"]["translate_voice_transcripts"][
                     "data"
                 ]
-                # Get original chapters and update with translated scripts
+                # Get original chapters and update with translated transcripts
                 if (
                     "segment_pdf_content" in state["steps"]
                     and state["steps"]["segment_pdf_content"]["data"] is not None
@@ -59,55 +85,30 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
                     original_chapters = state["steps"]["segment_pdf_content"]["data"]
                     for i, chapter in enumerate(original_chapters):
                         updated_chapter = chapter.copy()
-                        if i < len(translated_scripts):
-                            updated_chapter["script"] = translated_scripts[i].get(
+                        if i < len(translated_transcripts):
+                            updated_chapter["script"] = translated_transcripts[i].get(
                                 "script", chapter.get("script", "")
                             )
                         chapters.append(updated_chapter)
                 logger.info(
-                    "Using translated subtitle scripts for PDF subtitle generation"
+                    "Using translated voice transcripts for PDF subtitle generation"
                 )
 
-            # Priority 2: Use translated voice scripts as fallback
-            elif (
-                "translate_voice_scripts" in state["steps"]
-                and state["steps"]["translate_voice_scripts"]["data"] is not None
-                and state["steps"]["translate_voice_scripts"].get("status")
-                == "completed"
-            ):
-                translated_scripts = state["steps"]["translate_voice_scripts"]["data"]
-                # Get original chapters and update with translated scripts
-                if (
-                    "segment_pdf_content" in state["steps"]
-                    and state["steps"]["segment_pdf_content"]["data"] is not None
-                ):
-                    original_chapters = state["steps"]["segment_pdf_content"]["data"]
-                    for i, chapter in enumerate(original_chapters):
-                        updated_chapter = chapter.copy()
-                        if i < len(translated_scripts):
-                            updated_chapter["script"] = translated_scripts[i].get(
-                                "script", chapter.get("script", "")
-                            )
-                        chapters.append(updated_chapter)
-                logger.info(
-                    "Using translated voice scripts for PDF subtitle generation"
-                )
-
-            # Priority 3: Fall back to original chapters with English scripts
+            # Priority 3: Fall back to original chapters with English transcripts
             elif (
                 "segment_pdf_content" in state["steps"]
                 and state["steps"]["segment_pdf_content"]["data"] is not None
             ):
                 chapters = state["steps"]["segment_pdf_content"]["data"]
                 logger.info(
-                    "Using original English scripts for PDF subtitle generation"
+                    "Using original English transcripts for PDF subtitle generation"
                 )
 
         if not chapters:
             raise ValueError("No chapter data available for subtitle generation")
 
-        # Create working directory
-        work_dir = Path("output") / file_id
+        # Create working directory under configured output dir
+        work_dir = config.output_dir / file_id
         subtitle_dir = work_dir / "subtitles"
         subtitle_dir.mkdir(exist_ok=True, parents=True)
 
@@ -137,8 +138,9 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
         # Generate subtitles using the main generate_subtitles method for proper audio sync
         if chapters and audio_files and len(chapters) == len(audio_files):
             # Use the proper generate_subtitles method that syncs with audio files
-            # This creates the final subtitle files directly
-            video_path = work_dir / f"{file_id}_final.mp4"
+            # Write into intermediate subtitles folder for debugging
+            locale_code = locale_utils.get_locale_code(language)
+            video_path = subtitle_dir / f"{file_id}_subtitles_{locale_code}.mp4"
             logger.info(
                 f"Starting subtitle generation for {file_id} with {len(chapters)} chapters"
             )
@@ -161,6 +163,7 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
             logger.info(f"About to upload subtitles to storage - locale: {locale_code}")
 
             # Upload final SRT to storage
+            storage_provider = get_storage_provider()
             try:
                 srt_key = f"{file_id}_final_{locale_code}.srt"
                 logger.info(f"Uploading SRT file: {srt_path} with key: {srt_key}")

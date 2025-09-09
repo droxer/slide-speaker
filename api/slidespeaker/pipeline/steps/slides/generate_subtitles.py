@@ -1,7 +1,7 @@
 """
 Generate subtitles step for the presentation pipeline.
 
-This module generates subtitle files (SRT and VTT formats) from the scripts.
+This module generates subtitle files (SRT and VTT formats) from the transcripts.
 It creates timed subtitles that can be used with the final presentation video,
 supporting multiple languages and automatic timing based on audio durations.
 """
@@ -18,17 +18,16 @@ from slidespeaker.utils.locales import locale_utils
 
 subtitle_generator = SubtitleGenerator()
 
-# Get storage provider instance
-storage_provider = get_storage_provider()
+# Storage provider will be resolved at upload time to honor current config
 
 
 async def generate_subtitles_step(file_id: str, language: str = "english") -> None:
     """
-    Generate subtitles from scripts in SRT and VTT formats.
+    Generate subtitles from transcripts in SRT and VTT formats.
 
     This function creates timed subtitle files for the presentation video.
-    It uses either subtitle-specific scripts (when audio and subtitle languages differ)
-    or regular scripts, and synchronizes subtitles with audio durations when available.
+    It uses either subtitle-specific transcripts (when audio and subtitle languages differ)
+    or regular transcripts, and synchronizes subtitles with audio durations when available.
     The function supports multiple languages and generates both SRT and VTT formats.
     """
     await state_manager.update_step_status(file_id, "generate_subtitles", "processing")
@@ -36,45 +35,46 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
     state = await state_manager.get_state(file_id)
 
     # Always generate subtitles
-    # Get scripts for subtitle generation
-    # Use translated subtitle scripts first, then subtitle-specific scripts,
-    # then translated voice scripts, and finally regular scripts as fallback
-    scripts_data: list[dict[str, Any]] = []
+    # Get transcripts for subtitle generation
+    # Use translated subtitle transcripts first, then subtitle-specific transcripts,
+    # then translated voice transcripts, and finally regular transcripts as fallback
+    transcripts_data: list[dict[str, Any]] = []
     if state and "steps" in state:
-        # Check for translated subtitle scripts first
+        # Check for translated subtitle transcripts first
         if (
-            "translate_subtitle_scripts" in state["steps"]
-            and state["steps"]["translate_subtitle_scripts"]["data"] is not None
-            and state["steps"]["translate_subtitle_scripts"].get("status")
+            "translate_subtitle_transcripts" in state["steps"]
+            and state["steps"]["translate_subtitle_transcripts"]["data"] is not None
+            and state["steps"]["translate_subtitle_transcripts"].get("status")
             == "completed"
         ):
-            scripts_data = state["steps"]["translate_subtitle_scripts"]["data"]
-            logger.info("Using translated subtitle scripts for subtitle generation")
-        # Check if subtitle scripts exist (languages are different)
+            transcripts_data = state["steps"]["translate_subtitle_transcripts"]["data"]
+            logger.info("Using translated subtitle transcripts for subtitle generation")
+        # Check if subtitle transcripts exist (languages are different)
         elif (
-            "review_subtitle_scripts" in state["steps"]
-            and state["steps"]["review_subtitle_scripts"]["data"] is not None
+            "revise_subtitle_transcripts" in state["steps"]
+            and state["steps"]["revise_subtitle_transcripts"]["data"] is not None
         ):
-            scripts_data = state["steps"]["review_subtitle_scripts"]["data"]
-            logger.info("Using subtitle-specific scripts for subtitle generation")
-        # Check for translated voice scripts
+            transcripts_data = state["steps"]["revise_subtitle_transcripts"]["data"]
+            logger.info("Using subtitle-specific transcripts for subtitle generation")
+        # Check for translated voice transcripts
         elif (
-            "translate_voice_scripts" in state["steps"]
-            and state["steps"]["translate_voice_scripts"]["data"] is not None
-            and state["steps"]["translate_voice_scripts"].get("status") == "completed"
+            "translate_voice_transcripts" in state["steps"]
+            and state["steps"]["translate_voice_transcripts"]["data"] is not None
+            and state["steps"]["translate_voice_transcripts"].get("status")
+            == "completed"
         ):
-            scripts_data = state["steps"]["translate_voice_scripts"]["data"]
-            logger.info("Using translated voice scripts for subtitle generation")
-        # Fall back to regular scripts if subtitle scripts don't exist
+            transcripts_data = state["steps"]["translate_voice_transcripts"]["data"]
+            logger.info("Using translated voice transcripts for subtitle generation")
+        # Fall back to regular transcripts if subtitle transcripts don't exist
         elif (
-            "review_scripts" in state["steps"]
-            and state["steps"]["review_scripts"]["data"] is not None
+            "revise_transcripts" in state["steps"]
+            and state["steps"]["revise_transcripts"]["data"] is not None
         ):
-            scripts_data = state["steps"]["review_scripts"]["data"]
-            logger.info("Using regular scripts for subtitle generation")
+            transcripts_data = state["steps"]["revise_transcripts"]["data"]
+            logger.info("Using regular transcripts for subtitle generation")
 
-    if not scripts_data:
-        logger.warning("No scripts data available for subtitle generation")
+    if not transcripts_data:
+        logger.warning("No transcripts data available for subtitle generation")
         await state_manager.update_step_status(
             file_id, "generate_subtitles", "completed", []
         )
@@ -90,9 +90,16 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
     ):
         audio_files_data = state["steps"]["generate_audio"]["data"]
 
-    # Generate subtitle files
+    # Generate subtitle files into intermediate debug folder
     try:
-        video_path = config.output_dir / f"{file_id}_final.mp4"
+        # Use a stable intermediate folder structure: output/{file_id}/subtitles/
+        work_dir = config.output_dir / file_id
+        subtitle_dir = work_dir / "subtitles"
+        subtitle_dir.mkdir(exist_ok=True, parents=True)
+
+        # Include locale code in intermediate filenames for clarity
+        locale_code = locale_utils.get_locale_code(language)
+        intermediate_base = subtitle_dir / f"{file_id}_subtitles_{locale_code}.mp4"
 
         # If we have no audio files, we need to provide estimated durations
         if not audio_files_data:
@@ -101,26 +108,26 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
             )
             # Create a list of dummy paths for estimated durations (5 seconds each)
             estimated_audio_files = [
-                Path(f"/tmp/dummy_audio_{i}.mp3") for i in range(len(scripts_data))
+                Path(f"/tmp/dummy_audio_{i}.mp3") for i in range(len(transcripts_data))
             ]
             srt_path, vtt_path = subtitle_generator.generate_subtitles(
-                scripts_data,
+                transcripts_data,
                 estimated_audio_files,
-                video_path,
+                intermediate_base,
                 language,
             )
         else:
             audio_files = [Path(p) for p in audio_files_data]
             srt_path, vtt_path = subtitle_generator.generate_subtitles(
-                scripts_data, audio_files, video_path, language
+                transcripts_data, audio_files, intermediate_base, language
             )
         logger.info(f"Generated subtitles: {srt_path}, {vtt_path}")
 
         # Upload subtitle files to storage provider
-        subtitle_urls = []
+        subtitle_urls: list[str] = []
+        storage_provider = get_storage_provider()
         try:
-            # Include locale/language in filename to distinguish different language variants
-            locale_code = locale_utils.get_locale_code(language)
+            # Include locale/language in storage filename to distinguish variants
             srt_key = f"{file_id}_final_{locale_code}.srt"
             vtt_key = f"{file_id}_final_{locale_code}.vtt"
 
@@ -134,9 +141,18 @@ async def generate_subtitles_step(file_id: str, language: str = "english") -> No
             # Fallback to local paths if storage upload fails
             subtitle_urls = [str(srt_path), str(vtt_path)]
 
-        # Store the subtitle file URLs in the state
+        # Store both local paths and storage URLs (mirror PDF structure for consistency)
+        storage_data = {
+            "local_paths": [str(srt_path), str(vtt_path)],
+            "storage_urls": subtitle_urls,
+            "final_subtitles": {
+                "local_paths": [str(srt_path), str(vtt_path)],
+                "storage_urls": subtitle_urls,
+            },
+        }
+
         await state_manager.update_step_status(
-            file_id, "generate_subtitles", "completed", subtitle_urls
+            file_id, "generate_subtitles", "completed", storage_data
         )
         logger.info("Stage 'Generating subtitles' completed successfully")
 

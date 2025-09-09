@@ -554,7 +554,7 @@
     0 4px 20px rgba(0, 0, 0, 0.08),
     0 1px 3px rgba(0, 0, 0, 0.05);
   border-left: 6px solid #e2e8f0;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, box-shadow 0.3s ease, margin 0.28s ease, padding 0.28s ease, height 0.28s ease;
   position: relative;
   overflow: hidden;
   
@@ -574,6 +574,15 @@
       0 2px 6px rgba(0, 0, 0, 0.08);
     transform: translateY(-2px);
   }
+}
+
+.task-item.removing {
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+  margin-bottom: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  height: 0;
 }
 
 .task-item.status-completed {
@@ -768,6 +777,38 @@
   
   &:active {
     transform: translateY(0);
+  }
+}
+
+/* Minimal icon-only delete button */
+.delete-button {
+  background: transparent;
+  border: none;
+  color: #64748b; /* slate-500 */
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.15s ease, background-color 0.15s ease;
+
+  .icon {
+    width: 18px;
+    height: 18px;
+    display: block;
+  }
+
+  &:hover {
+    color: #dc2626; /* red-600 */
+    background-color: rgba(220, 38, 38, 0.08);
+  }
+
+  &:active {
+    transform: none;
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.2);
   }
 }
 
@@ -1281,8 +1322,8 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.1); /* Much lighter overlay */
-  backdrop-filter: blur(5px); /* Reduced blur */
+  background: rgba(0, 0, 0, 0.6); /* Darker backdrop for stronger focus */
+  backdrop-filter: none; /* Keep video bright */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1291,34 +1332,17 @@
   padding: 10px; /* Reduced padding for mobile */
   
   /* Subtle vignette mask for the entire modal backdrop */
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: radial-gradient(
-      ellipse at center,
-      transparent 0%,
-      rgba(0, 0, 0, 0.15) 100%
-    );
-    pointer-events: none;
-    z-index: -1;
-  }
+  &::before { content: none; }
   
   @media (max-width: 768px) {
     padding: 5px;
     
-    &::before {
-      background: radial-gradient(
-        ellipse at center,
-        transparent 10%,
-        rgba(0, 0, 0, 0.12) 100%
-      );
-    }
+    &::before { content: none; }
   }
 }
+
+/* Optional dimmed mode for users who prefer darker focus */
+/* Removed toggle-based dim variant */
 
 .video-preview-content {
   background: transparent; /* Match processing view */
@@ -1363,6 +1387,9 @@
     }
   }
 }
+
+/* Toggle button for background dimming */
+/* Removed overlay toggle button */
 
 .video-close-button {
   position: absolute;
@@ -1457,14 +1484,14 @@
   bottom: 60px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.6); /* Lighter subtitle background */
+  background: rgba(0, 0, 0, 0.3); /* Lighter subtitle background to avoid dimming video */
   color: #ffffff;
   padding: 8px 16px;
   border-radius: 20px;
   font-size: 14px;
   font-weight: 500;
   z-index: 25; /* Above video player but below controls and overlays */
-  backdrop-filter: blur(5px); /* Reduced blur */
+  backdrop-filter: none; /* Keep text crisp without darkening */
   border: 1px solid rgba(255, 255, 255, 0.2);
   animation: fadeIn 0.5s ease;
   pointer-events: none;
@@ -1473,14 +1500,14 @@
   line-height: 1.4;
   
   &.loading {
-    background: rgba(59, 130, 246, 0.15); /* Lighter loading state */
+    background: rgba(59, 130, 246, 0.12); /* Very light loading state */
     border-color: rgba(59, 130, 246, 0.2);
     color: #dbeafe;
     animation: pulse 1.5s infinite;
   }
   
   &.not-available {
-    background: rgba(239, 68, 68, 0.15); /* Lighter error state */
+    background: rgba(239, 68, 68, 0.12); /* Very light error state */
     border-color: rgba(239, 68, 68, 0.2);
     color: #fecaca;
   }
@@ -1664,7 +1691,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.1); /* Much lighter overlay */
+  background: transparent; /* Do not dim video */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1674,7 +1701,7 @@
   pointer-events: none; /* Don't block user interaction with video controls */
   
   &.loading {
-    background: rgba(0, 0, 0, 0.15); /* Much lighter loading overlay */
+    background: transparent; /* Do not dim during loading */
     pointer-events: none; /* don't block user interaction with the video */
     
     .loading-spinner {

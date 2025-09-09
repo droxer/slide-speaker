@@ -19,10 +19,12 @@ from .steps.pdf import (
     generate_audio_step,
     generate_chapter_images_step,
     generate_subtitles_step,
-    review_scripts_step,
+    revise_transcripts_step,
     segment_content_step,
-    translate_subtitle_scripts_step,
-    translate_voice_scripts_step,
+)
+from .steps.pdf.translate_transcripts import (
+    translate_subtitle_transcripts_step,
+    translate_voice_transcripts_step,
 )
 
 
@@ -35,27 +37,27 @@ def _get_pdf_processing_steps(
     The steps are:
     1. Segment PDF content into chapters
     2. Analyze PDF content
-    3. Generate and review English scripts first
-    4. Translate scripts if needed
+    3. Generate and revise English transcripts first
+    4. Translate transcripts if needed
     5. Generate chapter images
     6. Generate audio for chapters
     7. Generate subtitles (if requested)
     8. Compose final video
     """
-    # Always generate English scripts first
+    # Always generate English transcripts first
     steps_order = [
         "segment_pdf_content",
         "analyze_pdf_content",
-        "review_pdf_scripts",  # Review English scripts first
+        "revise_pdf_transcripts",  # Revise English transcripts first
     ]
 
     # Add translation steps for voice if language is not English
     if voice_language.lower() != "english":
-        steps_order.extend(["translate_voice_scripts"])
+        steps_order.extend(["translate_voice_transcripts"])
 
     # Add translation steps for subtitles if subtitle language is specified and not English
     if subtitle_language and subtitle_language.lower() != "english":
-        steps_order.extend(["translate_subtitle_scripts"])
+        steps_order.extend(["translate_subtitle_transcripts"])
 
     # Continue with remaining steps
     steps_order.extend(
@@ -103,9 +105,9 @@ async def _execute_pdf_step(
         step_display_names = {
             "segment_pdf_content": "Segmenting PDF content into chapters",
             "analyze_pdf_content": "Analyzing PDF content",
-            "review_pdf_scripts": "Reviewing and refining chapter scripts",
-            "translate_voice_scripts": "Translating voice scripts",
-            "translate_subtitle_scripts": "Translating subtitle scripts",
+            "revise_pdf_transcripts": "Revising and refining chapter transcripts",
+            "translate_voice_transcripts": "Translating voice transcripts",
+            "translate_subtitle_transcripts": "Translating subtitle transcripts",
             "generate_pdf_chapter_images": "Generating chapter images",
             "generate_pdf_audio": "Generating chapter audio",
             "generate_pdf_subtitles": "Generating subtitles",
@@ -124,9 +126,9 @@ async def _execute_pdf_step(
         step_display_names = {
             "segment_pdf_content": "Segmenting PDF content into chapters",
             "analyze_pdf_content": "Analyzing PDF content",
-            "review_pdf_scripts": "Reviewing and refining chapter scripts",
-            "translate_voice_scripts": "Translating voice scripts",
-            "translate_subtitle_scripts": "Translating subtitle scripts",
+            "revise_pdf_transcripts": "Revising and refining chapter transcripts",
+            "translate_voice_transcripts": "Translating voice transcripts",
+            "translate_subtitle_transcripts": "Translating subtitle transcripts",
             "generate_pdf_chapter_images": "Generating chapter images",
             "generate_pdf_audio": "Generating chapter audio",
             "generate_pdf_subtitles": "Generating subtitles",
@@ -152,17 +154,17 @@ async def _execute_pdf_step(
                 await analyze_content_step(
                     file_id, "english"
                 )  # Always use English first
-            elif step_name == "review_pdf_scripts":
-                await review_scripts_step(
+            elif step_name == "revise_pdf_transcripts":
+                await revise_transcripts_step(
                     file_id, "english"
-                )  # Always review English scripts first
-            elif step_name == "translate_voice_scripts":
-                # Translate English scripts to voice language
-                await translate_voice_scripts_step(file_id, voice_language)
-            elif step_name == "translate_subtitle_scripts":
-                # Translate English scripts to subtitle language
+                )  # Always revise English transcripts first
+            elif step_name == "translate_voice_transcripts":
+                # Translate English transcripts to voice language
+                await translate_voice_transcripts_step(file_id, voice_language)
+            elif step_name == "translate_subtitle_transcripts":
+                # Translate English transcripts to subtitle language
                 subtitle_lang = subtitle_language or voice_language
-                await translate_subtitle_scripts_step(file_id, subtitle_lang)
+                await translate_subtitle_transcripts_step(file_id, subtitle_lang)
             elif step_name == "generate_pdf_chapter_images":
                 await generate_chapter_images_step(file_id, voice_language)
             elif step_name == "generate_pdf_audio":
@@ -226,6 +228,7 @@ async def process_pdf_file(
             file_id,
             file_path,
             ".pdf",
+            file_path.name,
             voice_language,
             subtitle_language,
             False,  # generate_avatar (not applicable for PDF)
@@ -362,9 +365,9 @@ async def _log_initial_pdf_state(file_id: str) -> None:
             step_display_names = {
                 "segment_pdf_content": "Segmenting PDF content into chapters",
                 "analyze_pdf_content": "Analyzing PDF content",
-                "review_pdf_scripts": "Reviewing and refining chapter scripts",
-                "translate_voice_scripts": "Translating voice scripts",
-                "translate_subtitle_scripts": "Translating subtitle scripts",
+                "revise_pdf_transcripts": "Revising and refining chapter transcripts",
+                "translate_voice_transcripts": "Translating voice transcripts",
+                "translate_subtitle_transcripts": "Translating subtitle transcripts",
                 "generate_pdf_chapter_images": "Generating chapter images",
                 "generate_pdf_audio": "Generating chapter audio",
                 "generate_pdf_subtitles": "Generating subtitles",

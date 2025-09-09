@@ -151,6 +151,7 @@ async def compose_video_step(file_id: str) -> None:
         # Upload final video to storage provider
         try:
             object_key = f"{file_id}_final.mp4"
+            storage_provider = get_storage_provider()
             storage_url = storage_provider.upload_file(
                 str(output_path), object_key, "video/mp4"
             )

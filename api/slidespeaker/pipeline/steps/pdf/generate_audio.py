@@ -1,17 +1,16 @@
 """
 PDF audio generation step for SlideSpeaker.
 
-This module handles the generation of audio for PDF chapters.
+This module handles the generation of audio for PDF chapters using transcripts.
 """
 
-from pathlib import Path
 from typing import Any
 
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.processing.audio_generator import AudioGenerator
-from slidespeaker.utils.config import get_storage_provider
+from slidespeaker.utils.config import config, get_storage_provider
 
 # Initialize audio generator
 audio_generator: AudioGenerator | None
@@ -27,7 +26,7 @@ storage_provider = get_storage_provider()
 
 async def generate_audio_step(file_id: str, language: str = "english") -> None:
     """
-    Generate audio for PDF chapters.
+    Generate audio for PDF chapters using transcripts.
 
     Args:
         file_id: Unique identifier for the file
@@ -52,17 +51,20 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
         state = await state_manager.get_state(file_id)
         chapters: list[dict[str, Any]] = []
 
-        # Check for translated voice scripts first
+        # Check for translated voice transcripts first
         if (
             state
             and "steps" in state
-            and "translate_voice_scripts" in state["steps"]
-            and state["steps"]["translate_voice_scripts"]["data"] is not None
-            and state["steps"]["translate_voice_scripts"].get("status") == "completed"
+            and "translate_voice_transcripts" in state["steps"]
+            and state["steps"]["translate_voice_transcripts"]["data"] is not None
+            and state["steps"]["translate_voice_transcripts"].get("status")
+            == "completed"
         ):
-            # Use translated scripts
-            translated_scripts = state["steps"]["translate_voice_scripts"]["data"]
-            # Get original chapters and update with translated scripts
+            # Use translated transcripts
+            translated_transcripts = state["steps"]["translate_voice_transcripts"][
+                "data"
+            ]
+            # Get original chapters and update with translated transcripts
             if (
                 state
                 and "steps" in state
@@ -73,13 +75,13 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
                 chapters = []
                 for i, chapter in enumerate(original_chapters):
                     updated_chapter = chapter.copy()
-                    if i < len(translated_scripts):
-                        updated_chapter["script"] = translated_scripts[i].get(
+                    if i < len(translated_transcripts):
+                        updated_chapter["script"] = translated_transcripts[i].get(
                             "script", chapter.get("script", "")
                         )
                     chapters.append(updated_chapter)
-            logger.info("Using translated voice scripts for PDF audio generation")
-        # Fall back to original chapters with English scripts
+            logger.info("Using translated voice transcripts for PDF audio generation")
+        # Fall back to original chapters with English transcripts
         elif (
             state
             and "steps" in state
@@ -87,13 +89,13 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
             and state["steps"]["segment_pdf_content"]["data"] is not None
         ):
             chapters = state["steps"]["segment_pdf_content"]["data"]
-            logger.info("Using original English scripts for PDF audio generation")
+            logger.info("Using original English transcripts for PDF audio generation")
 
         if not chapters:
             raise ValueError("No chapter data available for audio generation")
 
-        # Create working directory
-        work_dir = Path("output") / file_id
+        # Create working directory under configured output dir
+        work_dir = config.output_dir / file_id
         audio_dir = work_dir / "audio"
         audio_dir.mkdir(exist_ok=True, parents=True)
 
@@ -115,7 +117,7 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
             else:
                 failed_chapters.append(i + 1)
                 logger.warning(
-                    f"Skipping audio generation for chapter {i + 1} due to empty script"
+                    f"Skipping audio generation for chapter {i + 1} due to empty transcript"
                 )
 
         # If any chapters failed, raise an exception to prevent downstream issues

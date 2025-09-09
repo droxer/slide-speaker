@@ -1,34 +1,36 @@
 """
-PDF script review step for SlideSpeaker.
+PDF transcript revise step for SlideSpeaker.
 
-This module handles the review and refinement of PDF chapter scripts for consistency,
+This module handles the revise and refinement of PDF chapter transcripts for consistency,
 flow, and quality. It ensures that the presentation has a coherent narrative
-and that scripts are appropriately formatted for AI avatar delivery with smooth transitions.
+and that transcripts are appropriately formatted for AI avatar delivery with smooth transitions.
 """
 
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.processing.script_reviewer import ScriptReviewer
+from slidespeaker.processing.transcript_reviewer import TranscriptReviewer
 
-script_reviewer = ScriptReviewer()
+transcript_reviewer = TranscriptReviewer()
 
 
-async def review_scripts_step(file_id: str, language: str = "english") -> None:
+async def revise_transcripts_step(file_id: str, language: str = "english") -> None:
     """
-    Review and refine PDF chapter scripts for consistency and smooth flow.
+    Revise and refine PDF chapter transcripts for consistency and smooth flow.
 
-    This function uses AI language models to review and improve the generated scripts.
+    This function uses AI language models to revise and improve the generated transcripts.
     It ensures consistent tone, proper transitions between chapters, and appropriate
-    formatting for AI avatar delivery. The review process also handles
+    formatting for AI avatar delivery. The revise process also handles
     positioning of opening/closing statements correctly for smooth transitions.
 
     Args:
         file_id: Unique identifier for the file
-        language: Language for script review
+        language: Language for transcript revise
     """
-    await state_manager.update_step_status(file_id, "review_pdf_scripts", "processing")
-    logger.info(f"Reviewing PDF chapter scripts for file: {file_id}")
+    await state_manager.update_step_status(
+        file_id, "revise_pdf_transcripts", "processing"
+    )
+    logger.info(f"Revising PDF chapter transcripts for file: {file_id}")
 
     try:
         # Get current state to retrieve chapters
@@ -54,41 +56,41 @@ async def review_scripts_step(file_id: str, language: str = "english") -> None:
         if not chapters:
             raise ValueError(f"No chapters found for file {file_id}")
 
-        # Convert chapters to the format expected by script reviewer
-        scripts_to_review = []
+        # Convert chapters to the format expected by transcript reviewer
+        transcripts_to_review = []
         for i, chapter in enumerate(chapters):
-            scripts_to_review.append(
+            transcripts_to_review.append(
                 {"slide_number": str(i + 1), "script": chapter.get("script", "")}
             )
 
-        # Review scripts using the shared script reviewer for smooth transitions
-        reviewed_scripts = await script_reviewer.revise_scripts(
-            scripts_to_review, language
+        # Revise transcripts using the shared transcript reviewer for smooth transitions
+        revised_transcripts = await transcript_reviewer.revise_transcripts(
+            transcripts_to_review, language
         )
 
-        # Update chapters with reviewed scripts
+        # Update chapters with revised transcripts
         updated_chapters = []
         for i, chapter in enumerate(chapters):
             updated_chapter = chapter.copy()
-            if i < len(reviewed_scripts):
-                updated_chapter["script"] = reviewed_scripts[i].get(
+            if i < len(revised_transcripts):
+                updated_chapter["script"] = revised_transcripts[i].get(
                     "script", chapter.get("script", "")
                 )
             updated_chapters.append(updated_chapter)
 
-        # Store reviewed chapters in the review_pdf_scripts step
+        # Store revised chapters in the revise_pdf_transcripts step
         await state_manager.update_step_status(
-            file_id, "review_pdf_scripts", "completed", updated_chapters
+            file_id, "revise_pdf_transcripts", "completed", updated_chapters
         )
 
         logger.info(
-            f"Reviewed scripts for {len(updated_chapters)} chapters for file: {file_id} with smooth transitions"
+            f"Revised transcripts for {len(updated_chapters)} chapters for file: {file_id} with smooth transitions"
         )
 
     except Exception as e:
-        logger.error(f"Failed to review PDF scripts for file {file_id}: {e}")
+        logger.error(f"Failed to revise PDF transcripts for file {file_id}: {e}")
         # Mark step as failed
         await state_manager.update_step_status(
-            file_id, "review_pdf_scripts", "failed", {"error": str(e)}
+            file_id, "revise_pdf_transcripts", "failed", {"error": str(e)}
         )
         raise

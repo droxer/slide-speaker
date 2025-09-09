@@ -4,7 +4,6 @@ PDF chapter image generation step for SlideSpeaker.
 This module handles the generation of slide-like images for PDF chapters.
 """
 
-from pathlib import Path
 from typing import Any
 
 from loguru import logger
@@ -13,7 +12,7 @@ from slidespeaker.core.state_manager import state_manager
 from slidespeaker.processing.image_generator import (
     ImageGenerator as SharedImageGenerator,
 )
-from slidespeaker.utils.config import get_storage_provider
+from slidespeaker.utils.config import config, get_storage_provider
 
 image_generator = SharedImageGenerator()
 
@@ -53,8 +52,8 @@ async def generate_chapter_images_step(file_id: str, language: str = "english") 
         if not chapters:
             raise ValueError("No chapter data available for image generation")
 
-        # Create working directory
-        work_dir = Path("output") / file_id
+        # Create working directory under configured output dir
+        work_dir = config.output_dir / file_id
         images_dir = work_dir / "images"
         images_dir.mkdir(exist_ok=True, parents=True)
         logger.info(f"Created images directory: {images_dir}")

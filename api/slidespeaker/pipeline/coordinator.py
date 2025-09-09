@@ -66,6 +66,7 @@ async def accept_task(
             file_id,
             file_path,
             file_ext,
+            file_path.name,
             voice_language,
             subtitle_language,
             generate_avatar,

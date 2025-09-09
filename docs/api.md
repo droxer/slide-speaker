@@ -58,8 +58,8 @@ Get detailed progress information for a presentation processing task.
     "extract_slides": {"status": "pending|processing|completed|failed", "data": null|object},
     "convert_slides_to_images": {"status": "pending|processing|completed|failed", "data": null|object},
     "analyze_slide_images": {"status": "pending|processing|completed|failed", "data": null|object},
-    "generate_scripts": {"status": "pending|processing|completed|failed", "data": null|object},
-    "review_scripts": {"status": "pending|processing|completed|failed", "data": null|object},
+    "generate_transcripts": {"status": "pending|processing|completed|failed", "data": null|object},
+    "revise_transcripts": {"status": "pending|processing|completed|failed", "data": null|object},
     "generate_audio": {"status": "pending|processing|completed|failed", "data": null|object},
     "generate_avatar_videos": {"status": "pending|processing|completed|failed", "data": null|object},
     "compose_video": {"status": "pending|processing|completed|failed", "data": null|object}
@@ -269,8 +269,8 @@ Get detailed information about a specific task.
       "extract_slides": {"status": "pending|processing|completed|failed|skipped|cancelled", "data": null|object},
       "convert_slides_to_images": {"status": "pending|processing|completed|failed|skipped|cancelled", "data": null|object},
       "analyze_slide_images": {"status": "pending|processing|completed|failed|skipped|cancelled", "data": null|object},
-      "generate_scripts": {"status": "pending|processing|completed|failed|skipped|cancelled", "data": null|object},
-      "review_scripts": {"status": "pending|processing|completed|failed|skipped|cancelled", "data": null|object},
+      "generate_transcripts": {"status": "pending|processing|completed|failed|skipped|cancelled", "data": null|object},
+      "revise_transcripts": {"status": "pending|processing|completed|failed|skipped|cancelled", "data": null|object},
       "generate_audio": {"status": "pending|processing|completed|failed|skipped|cancelled", "data": null|object},
       "generate_avatar_videos": {"status": "pending|processing|completed|failed|skipped|cancelled", "data": null|object},
       "generate_subtitles": {"status": "pending|processing|completed|failed|skipped|cancelled", "data": null|object},
@@ -310,8 +310,8 @@ Cancel a specific task if it's still running.
 1. **extract_slides** - Extract content from the presentation file
 2. **convert_slides_to_images** - Convert slides to image format
 3. **analyze_slide_images** - Analyze visual content using AI
-4. **generate_scripts** - Generate AI narratives for each slide
-5. **review_scripts** - Review and refine scripts for consistency
+4. **generate_transcripts** - Generate AI narratives for each slide
+5. **revise_transcripts** - Revise and refine transcripts for consistency
 6. **generate_audio** - Create text-to-speech audio files
 7. **generate_avatar_videos** - Generate AI avatar videos (skipped if generate_avatar=false)
 8. **generate_subtitles** - Generate subtitle files for the video

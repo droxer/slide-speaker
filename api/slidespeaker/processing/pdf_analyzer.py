@@ -13,8 +13,8 @@ from loguru import logger
 from openai import OpenAI
 from PyPDF2 import PdfReader
 
-# Import the shared script generator
-from slidespeaker.processing.script_generator import ScriptGenerator
+# Import the shared transcript generator
+from slidespeaker.processing.transcript_generator import TranscriptGenerator
 
 # Language-specific prompts for PDF analysis
 LANGUAGE_PROMPTS = {
@@ -24,8 +24,9 @@ LANGUAGE_PROMPTS = {
         + "chapters for presentation purposes. Focus on identifying key themes, concepts, and logical "
         + "breakpoints in the content to create meaningful, coherent chapters.",
         "prompt": """
-                Carefully analyze the following document titled "{doc_title}" and segment it into 3-7
-        logical chapters that would work well for a presentation. Your analysis should cover
+                Carefully analyze the following document titled "{doc_title}" and segment it into
+                less than {max_num_of_segments} logical chapters that would work well for a presentation.
+                Your analysis should cover
         the entire document content to ensure comprehensive coverage.
 
         For each chapter, provide:
@@ -71,7 +72,7 @@ LANGUAGE_PROMPTS = {
     "simplified_chinese": {
         "system": "您是一位专业的文档内容分析师和演示文稿设计师。您的任务是仔细分析整个文档内容并将其分割成适合演示的逻辑章节。重点是识别关键主题、概念和内容中的逻辑断点，以创建有意义、连贯的章节。",  # noqa: E501
         "prompt": """
-        请仔细分析以下名为"{doc_title}"的文档，并将其分割成3-7个适合演示的逻辑章节。您的分析应涵盖整个文档内容以确保全面覆盖。
+        请仔细分析以下名为"{doc_title}"的文档，并将其分割成不超过{max_num_of_segments}个适合演示的逻辑章节。您的分析应涵盖整个文档内容以确保全面覆盖。
 
         每个章节需要提供：
         1. 清晰简洁的标题（3-8个字）概括主要主题 - 不要包含副标题或冒号
@@ -113,7 +114,7 @@ LANGUAGE_PROMPTS = {
     "traditional_chinese": {
         "system": "您是一位專業的文件內容分析師和簡報設計師。您的任務是仔細分析整個文件內容並將其分割成適合簡報的邏輯章節。重點是識別關鍵主題、概念和內容中的邏輯斷點，以創建有意義、連貫的章節。",  # noqa: E501
         "prompt": """
-        請仔細分析以下名為"{doc_title}"的文件，並將其分割成3-7個適合簡報的邏輯章節。您的分析應涵蓋整個文件內容以確保全面覆蓋。
+        請仔細分析以下名為"{doc_title}"的文件，並將其分割成不超過{max_num_of_segments}個適合簡報的邏輯章節。您的分析應涵蓋整個文件內容以確保全面覆蓋。
 
         每個章節需要提供：
         1. 清晰簡潔的標題（3-8個字）概括主要主題 - 不要包含副標題或冒號
@@ -229,10 +230,10 @@ class PDFAnalyzer:
         """Initialize the PDF analyzer with OpenAI client and script generator"""
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.model: str = os.getenv("PDF_ANALYZER_MODEL", "gpt-4o-mini")
-        self.script_generator = ScriptGenerator()
+        self.transcript_generator = TranscriptGenerator()
 
-    async def analyze_and_segment_pdf(
-        self, file_path: str, language: str = "english"
+    async def analyze_and_segment(
+        self, file_path: str, language: str = "english", max_num_of_segments: int = 10
     ) -> list[dict[str, Any]]:
         """
         Analyze PDF content and segment into chapters.
@@ -243,6 +244,7 @@ class PDFAnalyzer:
         Args:
             file_path: Path to the PDF file
             language: Target language for chapter content
+            max_num_of_segments: Maximum number of segments/chapters to create (default: 10)
 
         Returns:
             List of chapters with title, description, and script for each
@@ -280,11 +282,17 @@ class PDFAnalyzer:
             doc_title = "Document Content"
 
         # Use AI to analyze content and create chapters
-        chapters = await self._generate_chapters(full_text, doc_title, language)
+        chapters = await self._generate_chapters(
+            full_text, doc_title, language, max_num_of_segments
+        )
         return chapters
 
     async def _generate_chapters(
-        self, full_text: str, doc_title: str, language: str
+        self,
+        full_text: str,
+        doc_title: str,
+        language: str,
+        max_num_of_segments: int = 5,
     ) -> list[dict[str, Any]]:
         """
         Use AI to segment PDF content into chapters.
@@ -293,6 +301,7 @@ class PDFAnalyzer:
             full_text: Complete text content of the PDF
             doc_title: Extracted title of the document
             language: Target language for chapter content
+            max_num_of_segments: Maximum number of segments/chapters to create (default: 5)
 
         Returns:
             List of chapters with title, description, key_points, and script
@@ -304,6 +313,7 @@ class PDFAnalyzer:
             formatted_prompt = prompts["prompt"].format(
                 doc_title=doc_title,
                 full_text=full_text,
+                max_num_of_segments=max_num_of_segments,
             )
 
             response = self.client.chat.completions.create(
@@ -355,8 +365,10 @@ class PDFAnalyzer:
                                 "thoroughly covering all key points with relevant examples where appropriate."
                             )
 
-                            script = await self.script_generator.generate_script(
-                                content_for_script, language=language
+                            script = (
+                                await self.transcript_generator.generate_transcript(
+                                    content_for_script, language=language
+                                )
                             )
                         chapter["script"] = script
 
@@ -365,15 +377,19 @@ class PDFAnalyzer:
                     return chapters_with_scripts
 
             # Fallback if parsing fails
-            return await self._create_default_chapters(full_text, language)
+            return await self._create_default_chapters(
+                full_text, language, max_num_of_segments
+            )
 
         except Exception as e:
             print(f"Error generating chapters: {e}")
             # Fallback to default chapters
-            return await self._create_default_chapters(full_text, language)
+            return await self._create_default_chapters(
+                full_text, language, max_num_of_segments
+            )
 
     async def _create_default_chapters(
-        self, full_text: str, language: str
+        self, full_text: str, language: str, max_num_of_segments: int = 5
     ) -> list[dict[str, Any]]:
         """
         Create default chapters if AI analysis fails.
@@ -381,6 +397,7 @@ class PDFAnalyzer:
         Args:
             full_text: Complete text content of the PDF
             language: Target language for chapter content
+            max_num_of_segments: Maximum number of segments/chapters to create (default: 5)
 
         Returns:
             List of default chapters with title, description, key_points, and script
@@ -389,6 +406,24 @@ class PDFAnalyzer:
 
         # Use the global DEFAULT_CHAPTERS
         base_chapters = DEFAULT_CHAPTERS.get(language, DEFAULT_CHAPTERS["english"])
+
+        # Limit the number of chapters to max_num_of_segments
+        if len(base_chapters) > max_num_of_segments:
+            base_chapters = base_chapters[:max_num_of_segments]
+        elif len(base_chapters) < max_num_of_segments:
+            # If we need more chapters, duplicate the existing ones
+            while len(base_chapters) < max_num_of_segments:
+                for chapter in DEFAULT_CHAPTERS.get(
+                    language, DEFAULT_CHAPTERS["english"]
+                ):
+                    if len(base_chapters) >= max_num_of_segments:
+                        break
+                    # Create a copy with modified title to differentiate
+                    new_chapter = chapter.copy()
+                    new_chapter["title"] = (
+                        f"{chapter['title']} (Part {len(base_chapters) + 1})"
+                    )
+                    base_chapters.append(new_chapter)
 
         # Generate comprehensive scripts using the shared script generator
         # to ensure detailed explanations of the topic and key points
@@ -409,7 +444,7 @@ class PDFAnalyzer:
                 "thoroughly covering all key points with relevant examples where appropriate."
             )
 
-            script = await self.script_generator.generate_script(
+            script = await self.transcript_generator.generate_transcript(
                 content_for_script, language=language
             )
 

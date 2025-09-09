@@ -30,6 +30,7 @@ class RedisStateManager:
         file_id: str,
         file_path: Path,
         file_ext: str,
+        filename: str | None = None,
         voice_language: str = "english",
         subtitle_language: str | None = None,
         generate_avatar: bool = True,
@@ -42,7 +43,7 @@ class RedisStateManager:
             steps = {
                 "segment_pdf_content": {"status": "pending", "data": None},
                 "analyze_pdf_content": {"status": "pending", "data": None},
-                "review_pdf_scripts": {"status": "pending", "data": None},
+                "revise_pdf_transcripts": {"status": "pending", "data": None},
                 "generate_pdf_chapter_images": {"status": "pending", "data": None},
                 "generate_pdf_audio": {"status": "pending", "data": None},
                 "generate_pdf_subtitles": {
@@ -54,9 +55,12 @@ class RedisStateManager:
 
             # Add translation steps if needed
             if voice_language.lower() != "english":
-                steps["translate_voice_scripts"] = {"status": "pending", "data": None}
+                steps["translate_voice_transcripts"] = {
+                    "status": "pending",
+                    "data": None,
+                }
             if subtitle_language and subtitle_language.lower() != "english":
-                steps["translate_subtitle_scripts"] = {
+                steps["translate_subtitle_transcripts"] = {
                     "status": "pending",
                     "data": None,
                 }
@@ -66,8 +70,8 @@ class RedisStateManager:
                 "extract_slides": {"status": "pending", "data": None},
                 "convert_slides_to_images": {"status": "pending", "data": None},
                 "analyze_slide_images": {"status": "pending", "data": None},
-                "generate_scripts": {"status": "pending", "data": None},
-                "review_scripts": {"status": "pending", "data": None},
+                "generate_transcripts": {"status": "pending", "data": None},
+                "revise_transcripts": {"status": "pending", "data": None},
                 "generate_audio": {"status": "pending", "data": None},
                 "generate_avatar_videos": {
                     "status": "pending" if generate_avatar else "skipped",
@@ -82,9 +86,12 @@ class RedisStateManager:
 
             # Add translation steps
             if voice_language.lower() != "english":
-                steps["translate_voice_scripts"] = {"status": "pending", "data": None}
+                steps["translate_voice_transcripts"] = {
+                    "status": "pending",
+                    "data": None,
+                }
             if subtitle_language and subtitle_language.lower() != "english":
-                steps["translate_subtitle_scripts"] = {
+                steps["translate_subtitle_transcripts"] = {
                     "status": "pending",
                     "data": None,
                 }
@@ -97,11 +104,14 @@ class RedisStateManager:
             if voice_language != effective_subtitle_language:
                 steps.update(
                     {
-                        "generate_subtitle_scripts": {
+                        "generate_subtitle_transcripts": {
                             "status": "pending",
                             "data": None,
                         },
-                        "review_subtitle_scripts": {"status": "pending", "data": None},
+                        "revise_subtitle_transcripts": {
+                            "status": "pending",
+                            "data": None,
+                        },
                     }
                 )
 
@@ -109,6 +119,7 @@ class RedisStateManager:
             "file_id": file_id,
             "file_path": str(file_path),
             "file_ext": file_ext,
+            "filename": filename,
             "voice_language": voice_language,
             "subtitle_language": subtitle_language,
             "generate_avatar": generate_avatar,

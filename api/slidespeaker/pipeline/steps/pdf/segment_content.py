@@ -31,7 +31,7 @@ async def segment_content_step(
         analyzer = PDFAnalyzer()
 
         # Analyze and segment PDF content
-        chapters = await analyzer.analyze_and_segment_pdf(str(file_path), language)
+        chapters = await analyzer.analyze_and_segment(str(file_path), language)
 
         # Log chapter data for debugging
         logger.debug(f"Generated {len(chapters)} chapters for file {file_id}")

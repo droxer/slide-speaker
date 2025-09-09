@@ -18,8 +18,7 @@ from slidespeaker.utils.config import config, get_storage_provider
 video_composer = VideoComposer()
 video_previewer = VideoPreviewer()
 
-# Get storage provider instance
-storage_provider = get_storage_provider()
+# Resolve storage provider during upload to honor current config
 
 
 async def compose_video_step(file_id: str, file_path: Path) -> None:
@@ -198,6 +197,7 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
     # Upload final video to storage provider
     try:
         object_key = f"{file_id}_final.mp4"
+        storage_provider = get_storage_provider()
         storage_url = storage_provider.upload_file(
             str(final_video_path), object_key, "video/mp4"
         )

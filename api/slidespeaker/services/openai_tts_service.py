@@ -69,7 +69,12 @@ class OpenAITTSService(TTSInterface):
 
             # Ensure output directory exists
             output_path.parent.mkdir(parents=True, exist_ok=True)
-            response.stream_to_file(output_path)
+
+            # Write response content to file
+            with open(output_path, "wb") as f:
+                for chunk in response.iter_bytes():
+                    f.write(chunk)
+
             logger.info(f"Generated OpenAI TTS: {output_path}")
 
         except Exception as e:

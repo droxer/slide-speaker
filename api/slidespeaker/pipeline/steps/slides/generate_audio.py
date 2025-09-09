@@ -1,7 +1,7 @@
 """
 Generate audio step for the presentation pipeline.
 
-This module generates text-to-speech audio files from the reviewed scripts.
+This module generates text-to-speech audio files from the reviewed transcripts.
 It uses configurable TTS services (OpenAI, ElevenLabs) to create natural-sounding
 voice audio for each slide in the presentation.
 """
@@ -18,9 +18,9 @@ storage_provider = get_storage_provider()
 
 async def generate_audio_step(file_id: str, language: str = "english") -> None:
     """
-    Generate audio from scripts using TTS services.
+    Generate audio from transcripts using TTS services.
 
-    This function converts the reviewed presentation scripts into audio files
+    This function converts the reviewed presentation transcripts into audio files
     using text-to-speech technology. It supports multiple TTS providers through
     a factory pattern and includes error handling for individual slide processing.
     The function includes periodic cancellation checks for responsive task management.
@@ -40,35 +40,39 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
             await state_manager.mark_cancelled(file_id, cancelled_step="generate_audio")
             return
 
-    # Comprehensive null checking for scripts data
-    # Check for translated scripts first, then fall back to reviewed English scripts
-    scripts = []
+    # Comprehensive null checking for transcripts data
+    # Check for translated transcripts first, then fall back to reviewed English transcripts
+    transcripts = []
 
-    # Check for translated voice scripts first (for non-English audio)
+    # Check for translated voice transcripts first (for non-English audio)
     if (
         state
         and "steps" in state
-        and "translate_voice_scripts" in state["steps"]
-        and state["steps"]["translate_voice_scripts"]["data"] is not None
-        and state["steps"]["translate_voice_scripts"].get("status") == "completed"
+        and "translate_voice_transcripts" in state["steps"]
+        and state["steps"]["translate_voice_transcripts"]["data"] is not None
+        and state["steps"]["translate_voice_transcripts"].get("status") == "completed"
     ):
-        scripts = state["steps"]["translate_voice_scripts"]["data"]
-        logger.info("Using translated voice scripts for audio generation")
-    # Fall back to reviewed English scripts
+        transcripts = state["steps"]["translate_voice_transcripts"]["data"]
+        logger.info("Using translated voice transcripts for audio generation")
+    # Fall back to revised English transcripts
     elif (
         state
         and "steps" in state
-        and "review_scripts" in state["steps"]
-        and state["steps"]["review_scripts"]["data"] is not None
+        and "revise_transcripts" in state["steps"]
+        and state["steps"]["revise_transcripts"]["data"] is not None
     ):
-        scripts = state["steps"]["review_scripts"]["data"]
-        logger.info("Using reviewed English scripts for audio generation")
+        transcripts = state["steps"]["revise_transcripts"]["data"]
+        logger.info("Using revised English transcripts for audio generation")
 
-    if not scripts:
-        raise ValueError("No scripts data available for audio generation")
+    if not transcripts:
+        raise ValueError("No transcripts data available for audio generation")
+
+    # Prepare intermediate audio directory: output/{file_id}/audio
+    audio_dir = config.output_dir / file_id / "audio"
+    audio_dir.mkdir(parents=True, exist_ok=True)
 
     audio_files = []
-    for i, script_data in enumerate(scripts):
+    for i, transcript_data in enumerate(transcripts):
         # Check for task cancellation periodically
         if i % 2 == 0 and state and state.get("task_id"):  # Check every 2 slides
             from slidespeaker.core.task_queue import task_queue
@@ -82,11 +86,15 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
                 )
                 return
 
-        # Additional null check for individual script data
-        if script_data and "script" in script_data and script_data["script"]:
-            script_text = script_data["script"].strip()
-            if script_text:  # Only generate audio if script is not empty
-                audio_path = config.output_dir / f"{file_id}_slide_{i + 1}.mp3"
+        # Additional null check for individual transcript data
+        if (
+            transcript_data
+            and "script" in transcript_data
+            and transcript_data["script"]
+        ):
+            script_text = transcript_data["script"].strip()
+            if script_text:  # Only generate audio if transcript is not empty
+                audio_path = audio_dir / f"slide_{i + 1}.mp3"
                 try:
                     # Create TTS service using factory
                     tts_service = TTSFactory.create_service()
@@ -148,12 +156,12 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
                     raise
             else:
                 logger.warning(
-                    f"Skipping audio generation for slide {i + 1} due to empty script"
+                    f"Skipping audio generation for slide {i + 1} due to empty transcript"
                 )
         else:
             logger.warning(
                 f"Skipping audio generation for slide {i + 1} due to "
-                f"missing or empty script data"
+                f"missing or empty transcript data"
             )
 
     await state_manager.update_step_status(

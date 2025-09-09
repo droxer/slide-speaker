@@ -30,17 +30,17 @@ from .slides.convert_slides import convert_slides_step
 from .slides.extract_slides import extract_slides_step
 from .slides.generate_audio import generate_audio_step
 from .slides.generate_avatar import generate_avatar_step
-from .slides.generate_scripts import generate_scripts_step
 from .slides.generate_subtitles import generate_subtitles_step
-from .slides.review_scripts import review_scripts_step
+from .slides.generate_transcripts import generate_transcripts_step
+from .slides.revise_transcripts import revise_transcripts_step
 
 __all__ = [
     # Presentation processing steps
     "extract_slides_step",
     "convert_slides_step",
     "analyze_slides_step",
-    "generate_scripts_step",
-    "review_scripts_step",
+    "generate_transcripts_step",
+    "revise_transcripts_step",
     "generate_audio_step",
     "generate_avatar_step",
     "generate_subtitles_step",

@@ -20,11 +20,13 @@ from .steps.slides import (
     extract_slides_step,
     generate_audio_step,
     generate_avatar_step,
-    generate_scripts_step,
     generate_subtitles_step,
-    review_scripts_step,
-    translate_subtitle_scripts_step,
-    translate_voice_scripts_step,
+    generate_transcripts_step,
+    revise_transcripts_step,
+)
+from .steps.slides.translate_transcripts import (
+    translate_subtitle_transcripts_step,
+    translate_voice_transcripts_step,
 )
 
 
@@ -38,24 +40,24 @@ def _get_processing_steps(
     language settings, avatar generation, and subtitle requirements.
     For non-English languages, we first generate English scripts, then translate them.
     """
-    # Always generate English scripts first
+    # Always generate English transcripts first
     steps_order = [
         "extract_slides",
         "convert_slides_to_images",
         "analyze_slide_images",
-        "generate_scripts",  # Generate English scripts first
-        "review_scripts",  # Review English scripts first
+        "generate_transcripts",  # Generate English transcripts first
+        "revise_transcripts",  # Revise English transcripts first
     ]
 
     # Add translation steps for voice if language is not English
     if voice_language.lower() != "english":
-        steps_order.extend(["translate_voice_scripts"])
+        steps_order.extend(["translate_voice_transcripts"])
 
     # Add translation steps for subtitles if subtitle language is specified and not English
     if subtitle_language and subtitle_language.lower() != "english":
-        steps_order.extend(["translate_subtitle_scripts"])
+        steps_order.extend(["translate_subtitle_transcripts"])
 
-    # Continue with audio generation using translated scripts (if applicable)
+    # Continue with audio generation using translated transcripts (if applicable)
     steps_order.extend(["generate_audio"])
 
     # Add avatar generation step only if enabled
@@ -108,12 +110,12 @@ async def _execute_step(
             "extract_slides": "Extracting presentation content",
             "convert_slides_to_images": "Converting slides to images",
             "analyze_slide_images": "Analyzing visual content",
-            "generate_scripts": "Generating AI narratives",
-            "generate_subtitle_scripts": "Generating subtitle narratives",
-            "review_scripts": "Reviewing and refining scripts",
-            "review_subtitle_scripts": "Reviewing subtitle scripts",
-            "translate_voice_scripts": "Translating voice scripts",
-            "translate_subtitle_scripts": "Translating subtitle scripts",
+            "generate_transcripts": "Generating AI narratives",
+            "generate_subtitle_transcripts": "Generating subtitle narratives",
+            "revise_transcripts": "Revising and refining transcripts",
+            "revise_subtitle_transcripts": "Revising subtitle transcripts",
+            "translate_voice_transcripts": "Translating voice transcripts",
+            "translate_subtitle_transcripts": "Translating subtitle transcripts",
             "generate_audio": "Synthesizing voice audio",
             "generate_avatar_videos": "Creating AI presenter videos",
             "generate_subtitles": "Generating subtitles",
@@ -133,12 +135,12 @@ async def _execute_step(
             "extract_slides": "Extracting presentation content",
             "convert_slides_to_images": "Converting slides to images",
             "analyze_slide_images": "Analyzing visual content",
-            "generate_scripts": "Generating AI narratives",
-            "generate_subtitle_scripts": "Generating subtitle narratives",
-            "review_scripts": "Reviewing and refining scripts",
-            "review_subtitle_scripts": "Reviewing subtitle scripts",
-            "translate_voice_scripts": "Translating voice scripts",
-            "translate_subtitle_scripts": "Translating subtitle scripts",
+            "generate_transcripts": "Generating AI narratives",
+            "generate_subtitle_transcripts": "Generating subtitle narratives",
+            "revise_transcripts": "Revising and refining transcripts",
+            "revise_subtitle_transcripts": "Revising subtitle transcripts",
+            "translate_voice_transcripts": "Translating voice transcripts",
+            "translate_subtitle_transcripts": "Translating subtitle transcripts",
             "generate_audio": "Synthesizing voice audio",
             "generate_avatar_videos": "Creating AI presenter videos",
             "generate_subtitles": "Generating subtitles",
@@ -160,26 +162,28 @@ async def _execute_step(
                 await extract_slides_step(file_id, file_path, file_ext)
             elif step_name == "analyze_slide_images":
                 await analyze_slides_step(file_id)
-            elif step_name == "generate_scripts":
-                # Always generate English scripts first
-                await generate_scripts_step(file_id, "english")
-            elif step_name == "generate_subtitle_scripts":
-                await generate_scripts_step(
+            elif step_name == "generate_transcripts":
+                # Always generate English transcripts first
+                await generate_transcripts_step(file_id, "english")
+            elif step_name == "generate_subtitle_transcripts":
+                await generate_transcripts_step(
                     file_id, subtitle_language, is_subtitle=True
                 )
-            elif step_name == "review_scripts":
-                # Always review English scripts first
-                await review_scripts_step(file_id, "english")
-            elif step_name == "review_subtitle_scripts":
-                await review_scripts_step(file_id, subtitle_language, is_subtitle=True)
-            elif step_name == "translate_voice_scripts":
-                # Translate English scripts to voice language
-                await translate_voice_scripts_step(file_id, voice_language)
-            elif step_name == "translate_subtitle_scripts":
-                # Translate English scripts to subtitle language
-                await translate_subtitle_scripts_step(file_id, subtitle_language)
+            elif step_name == "revise_transcripts":
+                # Always revise English transcripts first
+                await revise_transcripts_step(file_id, "english")
+            elif step_name == "revise_subtitle_transcripts":
+                await revise_transcripts_step(
+                    file_id, subtitle_language, is_subtitle=True
+                )
+            elif step_name == "translate_voice_transcripts":
+                # Translate English transcripts to voice language
+                await translate_voice_transcripts_step(file_id, voice_language)
+            elif step_name == "translate_subtitle_transcripts":
+                # Translate English transcripts to subtitle language
+                await translate_subtitle_transcripts_step(file_id, subtitle_language)
             elif step_name == "generate_audio":
-                # Use translated scripts if available, otherwise use English scripts
+                # Use translated transcripts if available, otherwise use English transcripts
                 audio_language = voice_language
                 await generate_audio_step(file_id, audio_language)
             elif step_name == "generate_avatar_videos":
@@ -252,6 +256,7 @@ async def process_slide_file(
             file_id,
             file_path,
             file_ext,
+            None,  # filename
             voice_language,
             subtitle_language,
             generate_avatar,
@@ -384,12 +389,12 @@ async def _log_initial_state(file_id: str) -> None:
                 "extract_slides": "Extracting slide content",
                 "convert_slides_to_images": "Converting slides to images",
                 "analyze_slide_images": "Analyzing visual content",
-                "generate_scripts": "Generating AI narratives",
-                "generate_subtitle_scripts": "Generating subtitle narratives",
-                "review_scripts": "Reviewing and refining scripts",
-                "review_subtitle_scripts": "Reviewing subtitle scripts",
-                "translate_voice_scripts": "Translating voice scripts",
-                "translate_subtitle_scripts": "Translating subtitle scripts",
+                "generate_transcripts": "Generating AI narratives",
+                "generate_subtitle_transcripts": "Generating subtitle narratives",
+                "revise_transcripts": "Revising and refining transcripts",
+                "revise_subtitle_transcripts": "Revising subtitle transcripts",
+                "translate_voice_transcripts": "Translating voice transcripts",
+                "translate_subtitle_transcripts": "Translating subtitle transcripts",
                 "generate_audio": "Synthesizing voice audio",
                 "generate_avatar_videos": "Creating AI presenter videos",
                 "generate_subtitles": "Generating subtitles",
