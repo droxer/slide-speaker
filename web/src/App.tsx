@@ -159,6 +159,7 @@ function App() {
   const [processingDetails, setProcessingDetails] = useState<ProcessingDetails | null>(null);
   const [voiceLanguage, setVoiceLanguage] = useState<string>('english');
   const [subtitleLanguage, setSubtitleLanguage] = useState<string>('english');
+  const [videoResolution, setVideoResolution] = useState<string>('hd'); // hd as default
   const [generateAvatar, setGenerateAvatar] = useState<boolean>(false);
   const [generateSubtitles, setGenerateSubtitles] = useState<boolean>(true);
   const [isResumingTask, setIsResumingTask] = useState<boolean>(false);
@@ -205,6 +206,7 @@ function App() {
           file_data: base64File,
           voice_language: voiceLanguage,
           subtitle_language: subtitleLanguage,
+          video_resolution: videoResolution,
           generate_avatar: generateAvatar,
           generate_subtitles: generateSubtitles
         },
@@ -700,40 +702,63 @@ function App() {
                   </label>
                 </div>
                 
-                <div className="language-section">
-                  <h3 className="language-section-title">Language Settings</h3>
-                  <div className="language-group">
-                    <div className="language-selector">
-                      <label htmlFor="language-select">Voice Language</label>
+                <div className="video-options-section">
+                  <h3 className="video-options-title">Video Settings</h3>
+                  <div className="video-options-grid">
+                    <div className="video-option-card">
+                      <div className="video-option-header">
+                        <span className="video-option-icon">🔊</span>
+                        <span className="video-option-title">Audio Language</span>
+                      </div>
                       <select 
                         id="language-select" 
                         value={voiceLanguage} 
                         onChange={(e) => setVoiceLanguage(e.target.value)}
-                        className="language-select"
+                        className="video-option-select"
                       >
                         <option value="english">English</option>
-                        <option value="simplified_chinese">简体中文 (Simplified Chinese)</option>
-                        <option value="traditional_chinese">繁體中文 (Traditional Chinese)</option>
-                        <option value="japanese">日本語 (Japanese)</option>
-                        <option value="korean">한국어 (Korean)</option>
-                        <option value="thai">ไทย (Thai)</option>
+                        <option value="simplified_chinese">简体中文</option>
+                        <option value="traditional_chinese">繁體中文</option>
+                        <option value="japanese">日本語</option>
+                        <option value="korean">한국어</option>
+                        <option value="thai">ไทย</option>
                       </select>
                     </div>
                     
-                    <div className="language-selector">
-                      <label htmlFor="subtitle-language-select">Subtitle Language</label>
+                    <div className="video-option-card">
+                      <div className="video-option-header">
+                        <span className="video-option-icon">📝</span>
+                        <span className="video-option-title">Subtitles</span>
+                      </div>
                       <select 
                         id="subtitle-language-select" 
                         value={subtitleLanguage} 
                         onChange={(e) => setSubtitleLanguage(e.target.value)}
-                        className="language-select"
+                        className="video-option-select"
                       >
                         <option value="english">English</option>
-                        <option value="simplified_chinese">简体中文 (Simplified Chinese)</option>
-                        <option value="traditional_chinese">繁體中文 (Traditional Chinese)</option>
-                        <option value="japanese">日本語 (Japanese)</option>
-                        <option value="korean">한국어 (Korean)</option>
-                        <option value="thai">ไทย (Thai)</option>
+                        <option value="simplified_chinese">简体中文</option>
+                        <option value="traditional_chinese">繁體中文</option>
+                        <option value="japanese">日本語</option>
+                        <option value="korean">한국어</option>
+                        <option value="thai">ไทย</option>
+                      </select>
+                    </div>
+                    
+                    <div className="video-option-card">
+                      <div className="video-option-header">
+                        <span className="video-option-icon">📺</span>
+                        <span className="video-option-title">Quality</span>
+                      </div>
+                      <select 
+                        id="video-resolution-select" 
+                        value={videoResolution} 
+                        onChange={(e) => setVideoResolution(e.target.value)}
+                        className="video-option-select"
+                      >
+                        <option value="sd">SD (640×480)</option>
+                        <option value="hd">HD (1280×720)</option>
+                        <option value="fullhd">Full HD (1920×1080)</option>
                       </select>
                     </div>
                   </div>

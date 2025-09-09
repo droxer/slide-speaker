@@ -231,6 +231,7 @@ async def process_pdf_file(
             file_path.name,
             voice_language,
             subtitle_language,
+            "hd",  # video_resolution (default to HD)
             False,  # generate_avatar (not applicable for PDF)
             generate_subtitles,
         )

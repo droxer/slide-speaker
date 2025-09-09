@@ -33,6 +33,7 @@ class RedisStateManager:
         filename: str | None = None,
         voice_language: str = "english",
         subtitle_language: str | None = None,
+        video_resolution: str = "hd",
         generate_avatar: bool = True,
         generate_subtitles: bool = True,
     ) -> dict[str, Any]:
@@ -122,6 +123,7 @@ class RedisStateManager:
             "filename": filename,
             "voice_language": voice_language,
             "subtitle_language": subtitle_language,
+            "video_resolution": video_resolution,
             "generate_avatar": generate_avatar,
             "generate_subtitles": generate_subtitles,
             "status": "uploaded",

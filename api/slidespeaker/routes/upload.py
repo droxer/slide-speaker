@@ -36,6 +36,7 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         subtitle_language = body.get(
             "subtitle_language"
         )  # Don't default to audio language
+        video_resolution = body.get("video_resolution", "hd")  # Default to HD
         generate_avatar = body.get("generate_avatar", True)  # Default to True
         generate_subtitles = True  # Always generate subtitles by default
 
@@ -65,6 +66,15 @@ async def upload_file(request: Request) -> dict[str, str | None]:
                 detail=f"Unsupported subtitle language: {subtitle_language}",
             )
 
+        # Validate video resolution
+        valid_resolutions = ["sd", "hd", "fullhd"]
+        if video_resolution not in valid_resolutions:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported video resolution: {video_resolution}. "
+                f"Valid options: {', '.join(valid_resolutions)}",
+            )
+
         # Generate hash-based ID
         file_hash = hashlib.sha256(file_bytes).hexdigest()
         file_id = file_hash[:16]  # Use first 16 chars of hash
@@ -82,6 +92,7 @@ async def upload_file(request: Request) -> dict[str, str | None]:
             filename,
             voice_language,
             subtitle_language,
+            video_resolution,
             generate_avatar,
             generate_subtitles,
         )
@@ -95,6 +106,7 @@ async def upload_file(request: Request) -> dict[str, str | None]:
             filename=filename,
             voice_language=voice_language,
             subtitle_language=subtitle_language,
+            video_resolution=video_resolution,
             generate_avatar=generate_avatar,
             generate_subtitles=generate_subtitles,
         )

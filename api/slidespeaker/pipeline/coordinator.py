@@ -69,6 +69,7 @@ async def accept_task(
             file_path.name,
             voice_language,
             subtitle_language,
+            "hd",  # video_resolution (default to HD)
             generate_avatar,
             generate_subtitles,
         )

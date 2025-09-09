@@ -90,6 +90,23 @@ class VideoComposer:
         except Exception as e:
             return False, f"Audio file is corrupted: {audio_path} - {str(e)}"
 
+    def _get_resolution_dimensions(self, video_resolution: str) -> tuple[int, int]:
+        """
+        Get width and height for the specified video resolution
+
+        Args:
+            video_resolution: Resolution string ("sd", "hd", "fullhd")
+
+        Returns:
+            Tuple of (width, height) for the resolution
+        """
+        resolution_map = {
+            "sd": (640, 480),  # SD 640x480
+            "hd": (1280, 720),  # HD 1280x720
+            "fullhd": (1920, 1080),  # Full HD 1920x1080
+        }
+        return resolution_map.get(video_resolution, (1280, 720))  # Default to HD
+
     def _get_memory_safe_size(
         self, original_clip: object, max_width: int = 1920, max_height: int = 1080
     ) -> tuple[int, int]:
@@ -285,24 +302,30 @@ class VideoComposer:
         self.temp_files.clear()
 
     async def create_images_only_video(
-        self, slide_images: list[Path], output_path: Path
+        self, slide_images: list[Path], output_path: Path, video_resolution: str = "hd"
     ) -> None:
         """
         Create a video with only images and no audio.
         Now only handles local files - intermediate files stay local.
         """
         # Directly use local files - no cloud download needed for intermediate files
-        await self._create_video(slide_images, [], output_path)
+        await self._create_video(slide_images, [], output_path, video_resolution)
 
     async def create_video_with_audio(
-        self, slide_images: list[Path], audio_files: list[Path], output_path: Path
+        self,
+        slide_images: list[Path],
+        audio_files: list[Path],
+        output_path: Path,
+        video_resolution: str = "hd",
     ) -> None:
         """
         Create a video with images and audio.
         Now only handles local files - intermediate files stay local.
         """
         # Directly use local files - no cloud download needed for intermediate files
-        await self._create_video(slide_images, audio_files, output_path)
+        await self._create_video(
+            slide_images, audio_files, output_path, video_resolution
+        )
 
     async def compose_video(
         self,
@@ -310,6 +333,7 @@ class VideoComposer:
         avatar_videos: list[Path],
         audio_files: list[Path],
         output_path: Path,
+        video_resolution: str = "hd",
     ) -> None:
         """
         Compose final video with slide images as background and AI avatar presenting.
@@ -317,13 +341,14 @@ class VideoComposer:
         """
         # Directly use local files - no cloud download needed for intermediate files
         await self._compose_video_with_local_files(
-            slide_images, avatar_videos, audio_files, output_path
+            slide_images, avatar_videos, audio_files, output_path, video_resolution
         )
 
     async def compose_video_from_segments(
         self,
         segments: list[dict[str, Any]],
         output_path: str,
+        video_resolution: str = "hd",
     ) -> None:
         """
         Compose final video from segments with flexible format.
@@ -331,13 +356,15 @@ class VideoComposer:
         Args:
             segments: List of segment dictionaries with image, audio, subtitle, and duration keys
             output_path: Path to save the final video
+            video_resolution: Target video resolution ("sd", "hd", "fullhd")
         """
-        await self._compose_video_from_segments(segments, output_path)
+        await self._compose_video_from_segments(segments, output_path, video_resolution)
 
     async def _compose_video_from_segments(
         self,
         segments: list[dict[str, Any]],
         output_path: str,
+        video_resolution: str = "hd",
     ) -> None:
         """
         Internal method to compose video from segments.
@@ -373,11 +400,23 @@ class VideoComposer:
                             slide_clip = ImageClip(segment["image"]).with_duration(
                                 duration
                             )
-                            safe_width, safe_height = self._get_memory_safe_size(
-                                slide_clip
+
+                            # Get target resolution dimensions
+                            target_width, target_height = (
+                                self._get_resolution_dimensions(video_resolution)
                             )
+
+                            # Resize slide to target resolution while maintaining aspect ratio
+                            slide_width, slide_height = slide_clip.size
+                            width_ratio = target_width / slide_width
+                            height_ratio = target_height / slide_height
+                            scale_ratio = min(width_ratio, height_ratio)
+
+                            new_width = int(slide_width * scale_ratio)
+                            new_height = int(slide_height * scale_ratio)
+
                             slide_clip = slide_clip.with_effects(
-                                [Resize(width=safe_width, height=safe_height)]
+                                [Resize(width=new_width, height=new_height)]
                             )
                             slide_clip = slide_clip.with_position("center")
 
@@ -401,11 +440,23 @@ class VideoComposer:
                             slide_clip = ImageClip(segment["image"]).with_duration(
                                 duration
                             )
-                            safe_width, safe_height = self._get_memory_safe_size(
-                                slide_clip
+
+                            # Get target resolution dimensions
+                            target_width, target_height = (
+                                self._get_resolution_dimensions(video_resolution)
                             )
+
+                            # Resize slide to target resolution while maintaining aspect ratio
+                            slide_width, slide_height = slide_clip.size
+                            width_ratio = target_width / slide_width
+                            height_ratio = target_height / slide_height
+                            scale_ratio = min(width_ratio, height_ratio)
+
+                            new_width = int(slide_width * scale_ratio)
+                            new_height = int(slide_height * scale_ratio)
+
                             slide_clip = slide_clip.with_effects(
-                                [Resize(width=safe_width, height=safe_height)]
+                                [Resize(width=new_width, height=new_height)]
                             )
                             slide_clip = slide_clip.with_position("center")
 
@@ -458,6 +509,19 @@ class VideoComposer:
 
                 logger.info("=== WATERMARK INTEGRATION COMPLETE ===")
 
+                # Apply target resolution
+                target_width, target_height = self._get_resolution_dimensions(
+                    video_resolution
+                )
+                logger.info(
+                    f"Resizing final video to {target_width}x{target_height} ({video_resolution})"
+                )
+
+                # Resize final clip to target resolution
+                final_clip_resized = final_clip.with_effects(
+                    [Resize(width=target_width, height=target_height)]
+                )
+
                 logger.info("Writing final video...")
                 logger.info(f"Output path: {output_path}")
                 logger.info(f"Final clip has audio: {final_clip.audio is not None}")
@@ -477,7 +541,7 @@ class VideoComposer:
                 )
 
                 # Write with optimized settings
-                final_clip.write_videofile(
+                final_clip_resized.write_videofile(
                     output_path,
                     fps=24,
                     codec="libx264",
@@ -505,6 +569,8 @@ class VideoComposer:
                         clip.close()
                     if "final_clip" in locals():
                         final_clip.close()
+                    if "final_clip_resized" in locals():
+                        final_clip_resized.close()
                 except Exception:
                     pass
                 gc.collect()
@@ -528,6 +594,7 @@ class VideoComposer:
         avatar_videos: list[Path],
         audio_files: list[Path],
         output_path: Path,
+        video_resolution: str = "hd",
     ) -> None:
         """
         Internal method to compose video with local file paths only.
@@ -632,9 +699,23 @@ class VideoComposer:
 
                         # Load slide image
                         slide_clip = ImageClip(str(slide_image)).with_duration(duration)
-                        safe_width, safe_height = self._get_memory_safe_size(slide_clip)
+
+                        # Get target resolution dimensions
+                        target_width, target_height = self._get_resolution_dimensions(
+                            video_resolution
+                        )
+
+                        # Resize slide to target resolution while maintaining aspect ratio
+                        slide_width, slide_height = slide_clip.size
+                        width_ratio = target_width / slide_width
+                        height_ratio = target_height / slide_height
+                        scale_ratio = min(width_ratio, height_ratio)
+
+                        new_width = int(slide_width * scale_ratio)
+                        new_height = int(slide_height * scale_ratio)
+
                         slide_clip = slide_clip.with_effects(
-                            [Resize(width=safe_width, height=safe_height)]
+                            [Resize(width=new_width, height=new_height)]
                         )
                         slide_clip = slide_clip.with_position("center")
 
@@ -707,10 +788,23 @@ class VideoComposer:
 
                 logger.info("=== WATERMARK INTEGRATION COMPLETE ===")
 
+                # Apply target resolution
+                target_width, target_height = self._get_resolution_dimensions(
+                    video_resolution
+                )
+                logger.info(
+                    f"Resizing final video to {target_width}x{target_height} ({video_resolution})"
+                )
+
+                # Resize final clip to target resolution
+                final_clip_resized = final_clip.with_effects(
+                    [Resize(width=target_width, height=target_height)]
+                )
+
                 logger.info("Writing final video...")
 
                 # Write with optimized settings
-                final_clip.write_videofile(
+                final_clip_resized.write_videofile(
                     str(output_path),
                     fps=24,
                     codec="libx264",
@@ -754,7 +848,11 @@ class VideoComposer:
                 ) from None
 
     async def _create_video(
-        self, slide_images: list[Path], audio_files: list[Path], output_path: Path
+        self,
+        slide_images: list[Path],
+        audio_files: list[Path],
+        output_path: Path,
+        video_resolution: str = "hd",
     ) -> None:
         """
         Common method for creating basic videos with or without audio
@@ -796,6 +894,25 @@ class VideoComposer:
                             slide_clip = ImageClip(str(slide_image)).with_duration(
                                 duration
                             )
+
+                            # Get target resolution dimensions
+                            target_width, target_height = (
+                                self._get_resolution_dimensions(video_resolution)
+                            )
+
+                            # Resize slide to target resolution while maintaining aspect ratio
+                            slide_width, slide_height = slide_clip.size
+                            width_ratio = target_width / slide_width
+                            height_ratio = target_height / slide_height
+                            scale_ratio = min(width_ratio, height_ratio)
+
+                            new_width = int(slide_width * scale_ratio)
+                            new_height = int(slide_height * scale_ratio)
+
+                            slide_clip = slide_clip.with_effects(
+                                [Resize(width=new_width, height=new_height)]
+                            )
+
                             slide_clip = slide_clip.with_audio(audio_clip)
                             video_clips.append(slide_clip)
                         except Exception as e:
@@ -806,6 +923,25 @@ class VideoComposer:
                     for slide_image in slide_images:
                         # Default duration of 5 seconds per slide if no audio
                         slide_clip = ImageClip(str(slide_image)).with_duration(5.0)
+
+                        # Get target resolution dimensions
+                        target_width, target_height = self._get_resolution_dimensions(
+                            video_resolution
+                        )
+
+                        # Resize slide to target resolution while maintaining aspect ratio
+                        slide_width, slide_height = slide_clip.size
+                        width_ratio = target_width / slide_width
+                        height_ratio = target_height / slide_height
+                        scale_ratio = min(width_ratio, height_ratio)
+
+                        new_width = int(slide_width * scale_ratio)
+                        new_height = int(slide_height * scale_ratio)
+
+                        slide_clip = slide_clip.with_effects(
+                            [Resize(width=new_width, height=new_height)]
+                        )
+
                         video_clips.append(slide_clip)
 
                 if not video_clips:
@@ -817,7 +953,20 @@ class VideoComposer:
                 if watermark:
                     final_clip = CompositeVideoClip([final_clip, watermark])
 
-                final_clip.write_videofile(
+                # Apply target resolution
+                target_width, target_height = self._get_resolution_dimensions(
+                    video_resolution
+                )
+                logger.info(
+                    f"Resizing final video to {target_width}x{target_height} ({video_resolution})"
+                )
+
+                # Resize final clip to target resolution
+                final_clip_resized = final_clip.with_effects(
+                    [Resize(width=target_width, height=target_height)]
+                )
+
+                final_clip_resized.write_videofile(
                     str(output_path),
                     fps=24,
                     codec="libx264",
@@ -841,6 +990,8 @@ class VideoComposer:
                         clip.close()
                     if "final_clip" in locals():
                         final_clip.close()
+                    if "final_clip_resized" in locals():
+                        final_clip_resized.close()
                     if "watermark" in locals() and watermark:
                         watermark.close()
                 except Exception:

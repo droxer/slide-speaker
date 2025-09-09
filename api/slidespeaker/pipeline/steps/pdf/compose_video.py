@@ -144,9 +144,15 @@ async def compose_video_step(file_id: str) -> None:
                 f"Subtitle paths: {len(subtitle_paths)}"
             )
             raise ValueError("No segments provided for video composition")
+
+        # Get video resolution from state
+        video_resolution = state.get("video_resolution", "hd") if state else "hd"
+
         work_dir = Path("output") / file_id
         output_path = work_dir / f"{file_id}_final.mp4"
-        await video_composer.compose_video_from_segments(segments, str(output_path))
+        await video_composer.compose_video_from_segments(
+            segments, str(output_path), video_resolution
+        )
 
         # Upload final video to storage provider
         try:

@@ -35,6 +35,7 @@ interface TaskState {
   filename?: string;
   voice_language: string;
   subtitle_language?: string;
+  video_resolution?: string;
   generate_avatar: boolean;
   generate_subtitles: boolean;
   created_at: string;
@@ -55,6 +56,7 @@ interface Task {
     filename?: string;
     voice_language: string;
     subtitle_language?: string;
+    video_resolution?: string;
     generate_avatar: boolean;
     generate_subtitles: boolean;
   };
@@ -316,6 +318,16 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     return languageNames[languageCode] || languageCode || 'Unknown';
   };
 
+  // Get video resolution display name
+  const getVideoResolutionDisplayName = (resolution: string): string => {
+    const resolutionNames: Record<string, string> = {
+      'sd': 'SD (640×480)',
+      'hd': 'HD (1280×720)',
+      'fullhd': 'Full HD (1920×1080)'
+    };
+    return resolutionNames[resolution] || resolution || 'Unknown';
+  };
+
   // Format step name for better readability
   const formatStepName = (step: string): string => {
     const stepNames: Record<string, string> = {
@@ -338,7 +350,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
       'segment_pdf_content': 'Segmenting Content',
       'analyze_pdf_content': 'Analyzing Content',
       'revise_pdf_transcripts': 'Revising Transcripts',
-      'generate_pdf_chapter_images': 'Creating Chapter Images',
+      'generate_pdf_chapter_images': 'Creating Video Frames',
       'generate_pdf_audio': 'Generating Audio',
       'generate_pdf_subtitles': 'Creating Subtitles',
       'compose_pdf_video': 'Composing Video',
@@ -502,26 +514,6 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
             </div>
           </div>
           
-          <div className="stat-section">
-            <h3 className="stat-section-title">📈 Activity Insights</h3>
-            <div className="stat-cards-row">
-              <div className="stat-card activity">
-                <div className="stat-icon">📅</div>
-                <div className="stat-content">
-                  <div className="stat-value">{statistics.recent_activity.last_24h}</div>
-                  <div className="stat-label">Last 24 Hours</div>
-                </div>
-              </div>
-              
-              <div className="stat-card activity">
-                <div className="stat-icon">📊</div>
-                <div className="stat-content">
-                  <div className="stat-value">{statistics.recent_activity.last_7d}</div>
-                  <div className="stat-label">Last 7 Days</div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
@@ -588,6 +580,22 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                       <span className="info-label">Subtitle Language:</span>
                       <span className="info-value">
                         {getLanguageDisplayName(subtitleLang)}
+                      </span>
+                    </div>
+                  );
+                })()}
+                
+                {/* Video Resolution */}
+                {(() => {
+                  const videoResolution =
+                    task.kwargs?.video_resolution ||
+                    task.state?.video_resolution ||
+                    'hd'; // Default to HD if not specified
+                  return (
+                    <div className="task-info">
+                      <span className="info-label">Video Resolution:</span>
+                      <span className="info-value">
+                        {getVideoResolutionDisplayName(videoResolution)}
                       </span>
                     </div>
                   );
