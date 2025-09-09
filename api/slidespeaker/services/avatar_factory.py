@@ -10,7 +10,6 @@ service availability checking and configuration validation.
 import os
 
 from .avatar_interface import AvatarInterface
-from .dalle_avatar_service import DalleAvatarService
 from .heygen_avatar_service import HeyGenAvatarService
 
 
@@ -19,7 +18,7 @@ class AvatarFactory:
 
     _services: dict[str, type[AvatarInterface]] = {
         "heygen": HeyGenAvatarService,
-        "dalle": DalleAvatarService,
+        # "dalle": DalleAvatarService,
     }
 
     @classmethod
@@ -37,7 +36,7 @@ class AvatarFactory:
             ValueError: If service name is invalid or service is not available
         """
         if service_name is None:
-            service_name = os.getenv("AVATAR_SERVICE", "dalle").lower()
+            service_name = os.getenv("AVATAR_SERVICE", "heygen").lower()
 
         if service_name not in cls._services:
             raise ValueError(
@@ -86,4 +85,4 @@ class AvatarFactory:
         Returns:
             AvatarInterface instance that's always available
         """
-        return DalleAvatarService()
+        return HeyGenAvatarService()

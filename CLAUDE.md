@@ -14,6 +14,7 @@ uv sync --extra=oss          # Install with Aliyun OSS support (oss2)
 uv sync --extra=dev --extra=aws --extra=oss  # Install all optional dependencies
 python server.py             # Start API server (port 8000)
 python master_worker.py      # Start master worker for background tasks
+python cli.py --help         # Show CLI tool help
 make lint                    # Run ruff linter
 make format                  # Run ruff formatter  
 make typecheck               # Run mypy type checker
@@ -35,13 +36,13 @@ make check                  # Run both linting and type checking
 **SlideSpeaker** converts PDF/PPTX presentations into AI-generated videos using:
 - **Frontend**: React + TypeScript + Sass (port 3000)
 - **Backend**: FastAPI + Redis + Python workers (port 8000)
-- **Services**: OpenAI/Qwen (scripts), ElevenLabs/OpenAI TTS (audio), HeyGen/DALL-E (avatars), FFmpeg (video composition)
+- **Services**: OpenAI/Qwen (transcripts), ElevenLabs/OpenAI TTS (audio), HeyGen/DALL-E (avatars), FFmpeg (video composition)
 
 ### Processing Pipeline
 1. **Upload**: PDF/PPTX → `uploads/` directory
 2. **Extraction**: PDF/PPTX → slide images + text content
-3. **Script Generation**: OpenAI/Qwen creates presentation scripts per slide
-4. **Script Review**: AI reviews and refines scripts for better flow
+3. **Transcript Generation**: OpenAI/Qwen creates presentation transcripts per slide
+4. **Transcript Revision**: AI revises transcripts for better flow
 5. **Audio Generation**: Text-to-speech with ElevenLabs, OpenAI, or local TTS
 6. **Avatar Generation**: HeyGen/DALL-E creates AI presenter videos (optional)
 7. **Video Composition**: FFmpeg combines slides + avatar + audio into final MP4
@@ -53,7 +54,7 @@ make check                  # Run both linting and type checking
 - `api/slidespeaker/core/` - State management, task queue, pipeline coordination
 - `api/slidespeaker/processing/` - Video composition, subtitle generation, image processing
 - `api/slidespeaker/services/` - External API integrations (OpenAI, Qwen, ElevenLabs, HeyGen, DALL-E)
-- `api/slidespeaker/pipeline/` - Individual processing steps (extract slides, generate scripts, etc.)
+- `api/slidespeaker/pipeline/` - Individual processing steps (extract slides, generate transcripts, etc.)
 
 **State Management**:
 - Redis-based task queue with cancellation support
@@ -129,9 +130,10 @@ OSS_REGION=cn-region
 - Fixed video preview modal darkness issues with optimized overlay styling
 
 **Code Quality Improvements**:
-- Fixed E402 import order errors in script_reviewer.py by moving imports to the top of the file
+- Fixed E402 import order errors in transcript_reviewer.py by moving imports to the top of the file
 - Consolidated documentation into single CLAUDE.md file (removed separate docs/ directory)
 - Added more descriptive comments throughout codebase
 - Improved logging configuration for better debugging
 - Updated Redis key namespace from "ai_slider" to "ss" for consistency
 - do NOT git commit
+- do NOT check the node_modules and .venv

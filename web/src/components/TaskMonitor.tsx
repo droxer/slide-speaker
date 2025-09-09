@@ -32,8 +32,10 @@ const checkSubtitleExists = async (url: string): Promise<{exists: boolean, error
 interface TaskState {
   status: string;
   current_step: string;
+  filename?: string;
   voice_language: string;
   subtitle_language?: string;
+  video_resolution?: string;
   generate_avatar: boolean;
   generate_subtitles: boolean;
   created_at: string;
@@ -51,8 +53,10 @@ interface Task {
   kwargs: {
     file_id: string;
     file_ext: string;
+    filename?: string;
     voice_language: string;
     subtitle_language?: string;
+    video_resolution?: string;
     generate_avatar: boolean;
     generate_subtitles: boolean;
   };
@@ -96,6 +100,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
   const [videoLoading, setVideoLoading] = useState<boolean>(true);
   const [videoError, setVideoError] = useState<string | null>(null);
   const modalVideoRef = React.useRef<HTMLVideoElement | null>(null);
+  const [removingTaskIds, setRemovingTaskIds] = useState<Set<string>>(new Set());
 
   // Debug log for preview state
   useEffect(() => {
@@ -135,7 +140,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
         modalVideoRef.current.src = url;
         // Force a load cycle to ensure network request is issued
         modalVideoRef.current.load();
-        // Attempt autoplay (muted)
+        // Attempt autoplay (may be blocked with sound until interaction)
         const p = modalVideoRef.current.play();
         if (p && typeof p.then === 'function') {
           p.catch((err) => console.log('Autoplay blocked (expected until user interaction):', err));
@@ -203,6 +208,41 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     } catch (err) {
       console.error('Error cancelling task:', err);
       alert('Failed to cancel task');
+    }
+  };
+
+  // Delete task (purge from backend)
+  const deleteTask = async (taskId: string) => {
+    if (!window.confirm('This will permanently remove the task and its state. Continue?')) {
+      return;
+    }
+    try {
+      // Trigger removal animation first
+      setRemovingTaskIds((prev) => new Set(prev).add(taskId));
+
+      // Perform deletion request in parallel
+      const doDelete = axios.delete(`${apiBaseUrl}/api/tasks/${taskId}/purge`);
+
+      // Allow CSS transition to play before we refresh the list
+      setTimeout(async () => {
+        try {
+          await doDelete;
+        } catch (e) {
+          console.error('Error deleting task:', e);
+          alert('Failed to delete task');
+        } finally {
+          // Refresh task list and clear removing flag
+          await fetchTasks();
+          setRemovingTaskIds((prev) => {
+            const next = new Set(prev);
+            next.delete(taskId);
+            return next;
+          });
+        }
+      }, 280);
+    } catch (err) {
+      console.error('Error deleting task:', err);
+      alert('Failed to delete task');
     }
   };
 
@@ -278,23 +318,66 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     return languageNames[languageCode] || languageCode || 'Unknown';
   };
 
+  // Get video resolution display name
+  const getVideoResolutionDisplayName = (resolution: string): string => {
+    const resolutionNames: Record<string, string> = {
+      'sd': 'SD (640×480)',
+      'hd': 'HD (1280×720)',
+      'fullhd': 'Full HD (1920×1080)'
+    };
+    return resolutionNames[resolution] || resolution || 'Unknown';
+  };
+
   // Format step name for better readability
   const formatStepName = (step: string): string => {
     const stepNames: Record<string, string> = {
-      'extract_slides': 'Extracting Content',
-      'analyze_slide_images': 'Analyzing Visuals',
-      'generate_scripts': 'Creating Narratives',
-      'review_scripts': 'Refining Content',
-      'generate_subtitle_scripts': 'Generating Subtitle Scripts',
-      'review_subtitle_scripts': 'Reviewing Subtitle Scripts',
-      'generate_audio': 'Synthesizing Audio',
-      'generate_avatar_videos': 'Generating Avatars',
+      // Common steps
+      'extract_slides': 'Extracting Slides',
+      'analyze_slide_images': 'Analyzing Content',
+      'generate_transcripts': 'Generating Transcripts',
+      'revise_transcripts': 'Revising Transcripts',
+      'translate_voice_transcripts': 'Translating Voice Transcripts',
+      'translate_subtitle_transcripts': 'Translating Subtitle Transcripts',
+      'generate_subtitle_transcripts': 'Generating Subtitle Transcripts',
+      'revise_subtitle_transcripts': 'Revising Subtitle Transcripts',
+      'generate_audio': 'Generating Audio',
+      'generate_avatar_videos': 'Creating Avatar',
       'convert_slides_to_images': 'Converting Slides',
-      'generate_subtitles': 'Generating Subtitles',
-      'compose_video': 'Composing Final Video',
+      'generate_subtitles': 'Creating Subtitles',
+      'compose_video': 'Composing Video',
+      
+      // PDF-specific steps
+      'segment_pdf_content': 'Segmenting Content',
+      'analyze_pdf_content': 'Analyzing Content',
+      'revise_pdf_transcripts': 'Revising Transcripts',
+      'generate_pdf_chapter_images': 'Creating Video Frames',
+      'generate_pdf_audio': 'Generating Audio',
+      'generate_pdf_subtitles': 'Creating Subtitles',
+      'compose_pdf_video': 'Composing Video',
+      
       'unknown': 'Initializing'
     };
     return stepNames[step] || step;
+  };
+
+  // Get file type display name
+  const getFileTypeDisplayName = (fileExt: string): string => {
+    const ext = fileExt?.toLowerCase();
+    switch (ext) {
+      case '.pdf':
+        return 'PDF Document';
+      case '.pptx':
+        return 'PowerPoint Presentation';
+      case '.ppt':
+        return 'PowerPoint 97-2003 Presentation';
+      default:
+        return `${ext?.toUpperCase() || 'Unknown'} File`;
+    }
+  };
+
+  // Check if file is PDF
+  const isPdfFile = (fileExt: string): boolean => {
+    return fileExt?.toLowerCase() === '.pdf';
   };
 
   // Handle search
@@ -431,26 +514,6 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
             </div>
           </div>
           
-          <div className="stat-section">
-            <h3 className="stat-section-title">📈 Activity Insights</h3>
-            <div className="stat-cards-row">
-              <div className="stat-card activity">
-                <div className="stat-icon">📅</div>
-                <div className="stat-content">
-                  <div className="stat-value">{statistics.recent_activity.last_24h}</div>
-                  <div className="stat-label">Last 24 Hours</div>
-                </div>
-              </div>
-              
-              <div className="stat-card activity">
-                <div className="stat-icon">📊</div>
-                <div className="stat-content">
-                  <div className="stat-value">{statistics.recent_activity.last_7d}</div>
-                  <div className="stat-label">Last 7 Days</div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
@@ -460,7 +523,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
           <div className="no-tasks">No tasks found</div>
         ) : (
           tasks.map((task) => (
-            <div key={task.task_id} className={`task-item ${getStatusColor(task.status)}`}>
+            <div key={task.task_id} className={`task-item ${getStatusColor(task.status)} ${removingTaskIds.has(task.task_id) ? 'removing' : ''}`}>
               <div className="task-header">
                 <div className="task-id">Task: {task.task_id}</div>
                 <div className={`task-status ${getStatusColor(task.status)}`}>
@@ -477,6 +540,17 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                   <span className="info-label">File ID:</span>
                   <span className="info-value">{task.file_id}</span>
                 </div>
+
+                {/* Original filename */}
+                {(() => {
+                  const originalName = task.kwargs?.filename || task.state?.filename;
+                  return originalName ? (
+                    <div className="task-info">
+                      <span className="info-label">Filename:</span>
+                      <span className="info-value" title={originalName}>{originalName}</span>
+                    </div>
+                  ) : null;
+                })()}
                 
                 {/* Language Information - Consistent with other fields */}
                 <div className="task-info">
@@ -510,6 +584,30 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                     </div>
                   );
                 })()}
+                
+                {/* Video Resolution */}
+                {(() => {
+                  const videoResolution =
+                    task.kwargs?.video_resolution ||
+                    task.state?.video_resolution ||
+                    'hd'; // Default to HD if not specified
+                  return (
+                    <div className="task-info">
+                      <span className="info-label">Video Resolution:</span>
+                      <span className="info-value">
+                        {getVideoResolutionDisplayName(videoResolution)}
+                      </span>
+                    </div>
+                  );
+                })()}
+                
+                {/* File type information */}
+                <div className="task-info">
+                  <span className="info-label">Document Type:</span>
+                  <span className={`file-type-badge ${isPdfFile(task.kwargs?.file_ext) ? 'pdf' : 'ppt'}`}>
+                    {getFileTypeDisplayName(task.kwargs?.file_ext)}
+                  </span>
+                </div>
                 
                 {/* Current Step or Status - Hide Status for completed tasks */}
                 {task.status !== 'completed' && task.state && (
@@ -562,6 +660,29 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                     Cancel
                   </button>
                 )}
+                <button
+                  onClick={() => deleteTask(task.task_id)}
+                  className="delete-button"
+                  title="Delete task"
+                  type="button"
+                  aria-label="Delete task"
+                >
+                  <svg
+                    className="icon"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.343.052.682.106 1.018.162m-1.018-.162L19.5 19.5A2.25 2.25 0 0 1 17.25 21H6.75A2.25 2.25 0 0 1 4.5 19.5L5.77 5.79m13.458 0a48.108 48.108 0 0 0-3.478-.397m-12 .559c.336-.056.675-.11 1.018-.162m0 0A48.11 48.11 0 0 1 9.25 5.25m5.5 0a48.11 48.11 0 0 1 3.482.342m-8.982-.342V4.5A1.5 1.5 0 0 1 10.25 3h3.5A1.5 1.5 0 0 1 15.25 4.5v.75m-8.982 0a48.667 48.667 0 0 0-3.538.397"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </button>
               </div>
             </div>
           ))
@@ -637,7 +758,6 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                       ref={modalVideoRef}
                       controls 
                       autoPlay
-                      muted
                       playsInline
                       preload="auto"
                       className="video-player"
@@ -698,6 +818,13 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                       )}
                       Your browser does not support the video tag.
                     </video>
+                    
+                    {/* File type information in preview */}
+                    <div className="preview-file-info">
+                      <div className={`file-type-badge ${isPdfFile(selectedTaskForPreview.kwargs?.file_ext) ? 'pdf' : 'ppt'}`}>
+                        {getFileTypeDisplayName(selectedTaskForPreview.kwargs?.file_ext)}
+                      </div>
+                    </div>
                     
                     {/* Video loading and error states */}
                     {videoLoading && (

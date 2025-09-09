@@ -12,7 +12,7 @@ From slides to videos with AI voices and avatars.
 - **Multi-language Support**: Generate content in English, Chinese, Japanese, Korean, and Thai
 - **Multiple AI Services**: OpenAI and Qwen for script generation, HeyGen and DALL-E for avatars
 - **Flexible TTS Options**: OpenAI TTS, ElevenLabs, and local TTS providers
-- **Script Review**: AI-powered script refinement for better presentation flow
+- **Transcript Revision**: AI-powered transcript refinement for better presentation flow
 - **Subtitle Generation**: Automatic subtitle creation in multiple languages with locale-aware filenames
 - **Responsive Web Interface**: Modern React frontend with real-time feedback
 - **Video Validation**: Automatic validation of avatar videos before processing
@@ -20,6 +20,7 @@ From slides to videos with AI voices and avatars.
 - **Enhanced UI**: Improved user experience with better error handling
 - **Task Monitoring**: Comprehensive task tracking and management with statistics
 - **Watermark Integration**: Automatic watermarking of generated videos
+- **Advanced PDF Processing**: Specialized handling for PDF files with chapter-based analysis and AI-generated content
 
 ## Quick Start
 

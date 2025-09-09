@@ -1,169 +1,89 @@
-"""
-Image generation module for SlideSpeaker.
+"""Unified image generation module for SlideSpeaker.
 
-This module generates presentation-style images using DALL-E based on slide content.
-It can create both detailed presentation slides and simple background images.
+This module provides a unified interface for generating presentation-style images
+using both LLM-based (DALL-E) and PIL-based approaches.
 """
 
 import os
 from pathlib import Path
+from typing import Any
 
-import requests
 from loguru import logger
-from openai import OpenAI
 
-# Style prompts for DALL-E image generation
-STYLE_PROMPTS = {
-    "professional": "clean, modern, corporate presentation slide with subtle gradient background, "
-    "minimalist design, professional typography, business aesthetic",
-    "creative": "creative, colorful presentation slide with abstract shapes, vibrant colors, "
-    "modern design elements, inspirational aesthetic",
-    "academic": "academic presentation slide with clean layout, serif typography, research-oriented design, formal appearance",  # noqa: E501
-    "tech": "tech-focused presentation slide with futuristic elements, circuit board patterns, blue color scheme, modern technology aesthetic",  # noqa: E501
-}
-
-# Base prompt template for DALL-E image generation
-IMAGE_PROMPT_TEMPLATE = """
-Create a presentation slide image that visually represents the following content:
-"{content}"
-
-Style: {base_style}
-
-Requirements:
-- 16:9 aspect ratio (will be cropped to 1024x1024)
-- No text on the image (purely visual)
-- Professional presentation style
-- Relevant imagery and metaphors for the content
-- Clean, modern design
-- Suitable for educational/business context
-"""
-
-# Simple background prompts
-SIMPLE_BACKGROUND_PROMPTS = {
-    "gradient": "A smooth, subtle gradient background in {color}, "
-    "professional presentation style, no text, clean design",
-    "solid": "A clean, solid {color} background for presentation slides, minimalist design",
-}
+from .llm_image_generator import LLMImageGenerator
+from .pil_image_generator import PILImageGenerator
 
 
 class ImageGenerator:
-    """Generator for presentation-style images using DALL-E"""
+    """Unified generator for presentation-style images using both LLM and PIL approaches"""
 
     def __init__(self) -> None:
-        """Initialize the image generator with OpenAI client"""
-        self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        """Initialize the image generator with both LLM and PIL backends"""
+        self.llm_generator = LLMImageGenerator()
+        self.pil_generator = PILImageGenerator()
 
-    async def generate_presentation_image(
-        self, content: str, output_path: Path, style: str = "professional"
-    ) -> bool:
+    async def generate_images(
+        self,
+        chapters: list[dict[str, Any]],
+        output_dir: Path,
+    ) -> list[Path]:
+        if os.getenv("SLIDE_IMAGE_PROVIDER") == "llm":
+            return await self._generate_slide_images_by_llm(chapters, output_dir)
+        else:
+            return await self._generate_slide_images_by_pil(chapters, output_dir)
+
+    async def _generate_slide_images_by_pil(
+        self,
+        chapters: list[dict[str, Any]],
+        output_dir: Path,
+    ) -> list[Path]:
+        output_dir.mkdir(exist_ok=True, parents=True)
+        image_paths: list[Path] = []
+
+        for i, chapter in enumerate(chapters):
+            image_path = output_dir / f"chapter_{i + 1}.png"
+
+            await self.pil_generator.generate_slide_image(chapter, image_path)
+            image_paths.append(image_path)
+            logger.info(f"Generated slide image for chapter {i + 1}: {image_path}")
+
+        return image_paths
+
+    async def _generate_slide_images_by_llm(
+        self,
+        chapters: list[dict[str, Any]],
+        output_dir: Path,
+    ) -> list[Path]:
         """
-        Generate a presentation-style image using DALL-E based on slide content
+        Generate slide-like images for PDF chapters using LLM-based image generation.
 
-        This method creates visually appealing presentation slides by converting
-        slide content into descriptive prompts for DALL-E image generation.
+        Args:
+            chapters: List of chapter dictionaries with title, description, and script
+            output_dir: Directory to save the generated images
+            language: Language for image generation (used for style selection)
+
+        Returns:
+            List of paths to the generated images
         """
-        try:
-            # Create a prompt for presentation image
-            prompt = self._create_image_prompt(content, style)
-            logger.info(f"Generating image with prompt: {prompt[:100]}...")
+        output_dir.mkdir(exist_ok=True, parents=True)
+        image_paths: list[Path] = []
 
-            # Generate image using DALL-E
-            response = self.openai_client.images.generate(
-                model="dall-e-3",
-                prompt=prompt,
-                size="1024x1024",
-                quality="standard",
-                n=1,
+        # Determine style based on language
+        style = "professional"  # Default style
+        for i, chapter in enumerate(chapters):
+            image_path = output_dir / f"chapter_{i + 1}.png"
+
+            title = chapter.get("title", f"Chapter {i + 1}")
+            description = chapter.get("description", "")
+            key_points = chapter.get("key_points", [])
+
+            # Generate slide image using LLM-based approach
+            await self.llm_generator.generate_slide_image(
+                title=title,
+                description=description,
+                key_points=key_points,
+                output_path=image_path,
+                style=style,
             )
 
-            # Download the image
-            if response.data and len(response.data) > 0:
-                image_url = response.data[0].url
-                if image_url:
-                    await self._download_image(image_url, output_path)
-                else:
-                    raise ValueError("No image URL returned from DALL-E")
-            else:
-                raise ValueError("No image data returned from DALL-E")
-
-            logger.info(f"Image generated successfully: {output_path}")
-            return True
-
-        except Exception as e:
-            logger.error(f"DALL-E image generation error: {e}")
-            raise
-
-    def _create_image_prompt(self, content: str, style: str) -> str:
-        """Create a detailed prompt for presentation image generation"""
-
-        base_style = STYLE_PROMPTS.get(style, STYLE_PROMPTS["professional"])
-
-        prompt = IMAGE_PROMPT_TEMPLATE.format(content=content, base_style=base_style)
-
-        return prompt.strip()
-
-    async def _download_image(self, image_url: str, output_path: Path) -> None:
-        """Download image from URL"""
-        try:
-            response = requests.get(image_url, timeout=30)
-            response.raise_for_status()
-
-            with open(output_path, "wb") as f:
-                f.write(response.content)
-
-        except Exception as e:
-            logger.error(f"Image download error: {e}")
-            raise
-
-    async def generate_simple_background(
-        self, output_path: Path, color: str = "#f0f4f8", style: str = "gradient"
-    ) -> None:
-        """Generate a simple background image (fallback option)"""
-        try:
-            # For simple backgrounds, we can create programmatic images
-            # or use very simple DALL-E prompts
-
-            prompt_template = SIMPLE_BACKGROUND_PROMPTS.get(
-                style, SIMPLE_BACKGROUND_PROMPTS["gradient"]
-            )
-            prompt = prompt_template.format(color=color)
-
-            response = self.openai_client.images.generate(
-                model="dall-e-3",
-                prompt=prompt,
-                size="1024x1024",
-                quality="standard",
-                n=1,
-            )
-
-            if response.data and len(response.data) > 0:
-                image_url = response.data[0].url
-                if image_url:
-                    await self._download_image(image_url, output_path)
-                else:
-                    raise ValueError("No image URL returned from DALL-E")
-            else:
-                raise ValueError("No image data returned from DALL-E")
-
-            logger.info(f"Background image generated: {output_path}")
-
-        except Exception as e:
-            logger.error(f"Background generation error: {e}")
-            # Fallback: create a simple colored background programmatically
-            await self._create_fallback_background(output_path, color)
-
-    async def _create_fallback_background(self, output_path: Path, color: str) -> None:
-        """Create a simple fallback background using PIL"""
-        try:
-            from PIL import Image
-
-            # Create a simple solid color image
-            img = Image.new("RGB", (1024, 1024), color)
-            img.save(output_path)
-            logger.info(f"Created fallback background: {output_path}")
-
-        except ImportError:
-            logger.warning("PIL not available for fallback backgrounds")
-            raise Exception(
-                "Image generation requires PIL for fallback backgrounds"
-            ) from None
+        return image_paths

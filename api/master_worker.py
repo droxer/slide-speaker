@@ -25,7 +25,13 @@ sys.path.insert(0, str(Path(__file__).parent))
 from slidespeaker.utils.logging_config import setup_logging  # noqa: E402
 
 log_level = os.getenv("LOG_LEVEL", "INFO")
-setup_logging(log_level)
+log_file = os.getenv("LOG_FILE")
+setup_logging(
+    log_level,
+    log_file,
+    enable_file_logging=log_file is not None,
+    component="master_worker",
+)
 
 from slidespeaker.core.task_queue import task_queue  # noqa: E402
 
@@ -51,11 +57,10 @@ class MasterWorker:
         env = os.environ.copy()
         env["TASK_ID"] = task_id
 
+        # Start worker process with stdout/stderr inherited from parent for real-time logging
         process = subprocess.Popen(
             [sys.executable, str(worker_script)],
             env=env,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
         )
 
         self.worker_processes[task_id] = process
@@ -179,13 +184,6 @@ class MasterWorker:
         completed_tasks = []
         for task_id, process in list(self.worker_processes.items()):
             if process.poll() is not None:  # Process has completed
-                # Get output
-                stdout, stderr = process.communicate()
-                if stdout:
-                    logger.info(f"Worker stdout for task {task_id}: {stdout.decode()}")
-                if stderr:
-                    logger.error(f"Worker stderr for task {task_id}: {stderr.decode()}")
-
                 logger.info(
                     f"Worker for task {task_id} completed with "
                     f"return code {process.returncode}"

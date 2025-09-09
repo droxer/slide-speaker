@@ -30,54 +30,106 @@ class RedisStateManager:
         file_id: str,
         file_path: Path,
         file_ext: str,
+        filename: str | None = None,
         voice_language: str = "english",
         subtitle_language: str | None = None,
+        video_resolution: str = "hd",
         generate_avatar: bool = True,
         generate_subtitles: bool = True,
     ) -> dict[str, Any]:
         """Create initial state for a file processing task"""
-        # Initialize steps - conditionally include subtitle script steps based on language needs
-        steps = {
-            "extract_slides": {"status": "pending", "data": None},
-            "convert_slides_to_images": {"status": "pending", "data": None},
-            "analyze_slide_images": {"status": "pending", "data": None},
-            "generate_scripts": {"status": "pending", "data": None},
-            "review_scripts": {"status": "pending", "data": None},
-            "generate_audio": {"status": "pending", "data": None},
-            "generate_avatar_videos": {
-                "status": "pending" if generate_avatar else "skipped",
-                "data": None,
-            },
-            "generate_subtitles": {
-                "status": "pending",  # Always generate subtitles
-                "data": None,
-            },
-            "compose_video": {"status": "pending", "data": None},
-        }
+        # Initialize steps based on file type
+        if file_ext.lower() == ".pdf":
+            # PDF-specific steps
+            steps = {
+                "segment_pdf_content": {"status": "pending", "data": None},
+                "analyze_pdf_content": {"status": "pending", "data": None},
+                "revise_pdf_transcripts": {"status": "pending", "data": None},
+                "generate_pdf_chapter_images": {"status": "pending", "data": None},
+                "generate_pdf_audio": {"status": "pending", "data": None},
+                "generate_pdf_subtitles": {
+                    "status": "pending" if generate_subtitles else "skipped",
+                    "data": None,
+                },
+                "compose_pdf_video": {"status": "pending", "data": None},
+            }
 
-        # Only include subtitle script generation steps if languages are different
-        # Default to audio language if subtitle language is not specified
-        effective_subtitle_language = (
-            subtitle_language if subtitle_language is not None else voice_language
-        )
-        if voice_language != effective_subtitle_language:
-            steps.update(
-                {
-                    "generate_subtitle_scripts": {"status": "pending", "data": None},
-                    "review_subtitle_scripts": {"status": "pending", "data": None},
+            # Add translation steps if needed
+            if voice_language.lower() != "english":
+                steps["translate_voice_transcripts"] = {
+                    "status": "pending",
+                    "data": None,
                 }
+            if subtitle_language and subtitle_language.lower() != "english":
+                steps["translate_subtitle_transcripts"] = {
+                    "status": "pending",
+                    "data": None,
+                }
+        else:
+            # Presentation-specific steps (.ppt, .pptx, etc.)
+            steps = {
+                "extract_slides": {"status": "pending", "data": None},
+                "convert_slides_to_images": {"status": "pending", "data": None},
+                "analyze_slide_images": {"status": "pending", "data": None},
+                "generate_transcripts": {"status": "pending", "data": None},
+                "revise_transcripts": {"status": "pending", "data": None},
+                "generate_audio": {"status": "pending", "data": None},
+                "generate_avatar_videos": {
+                    "status": "pending" if generate_avatar else "skipped",
+                    "data": None,
+                },
+                "generate_subtitles": {
+                    "status": "pending",  # Always generate subtitles
+                    "data": None,
+                },
+                "compose_video": {"status": "pending", "data": None},
+            }
+
+            # Add translation steps
+            if voice_language.lower() != "english":
+                steps["translate_voice_transcripts"] = {
+                    "status": "pending",
+                    "data": None,
+                }
+            if subtitle_language and subtitle_language.lower() != "english":
+                steps["translate_subtitle_transcripts"] = {
+                    "status": "pending",
+                    "data": None,
+                }
+
+            # Only include subtitle script generation steps if languages are different
+            # Default to audio language if subtitle language is not specified
+            effective_subtitle_language = (
+                subtitle_language if subtitle_language is not None else voice_language
             )
+            if voice_language != effective_subtitle_language:
+                steps.update(
+                    {
+                        "generate_subtitle_transcripts": {
+                            "status": "pending",
+                            "data": None,
+                        },
+                        "revise_subtitle_transcripts": {
+                            "status": "pending",
+                            "data": None,
+                        },
+                    }
+                )
 
         state: dict[str, Any] = {
             "file_id": file_id,
             "file_path": str(file_path),
             "file_ext": file_ext,
+            "filename": filename,
             "voice_language": voice_language,
             "subtitle_language": subtitle_language,
+            "video_resolution": video_resolution,
             "generate_avatar": generate_avatar,
             "generate_subtitles": generate_subtitles,
             "status": "uploaded",
-            "current_step": "extract_slides",
+            "current_step": "segment_pdf_content"
+            if file_ext.lower() == ".pdf"
+            else "extract_slides",
             "steps": steps,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),

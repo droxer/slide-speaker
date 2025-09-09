@@ -99,6 +99,14 @@ class ElevenLabsTTSService(TTSInterface):
                 "g5CIjZEefAph4nQFvHAz",  # Chinese Female
                 "CYw3kZ02Hs0563khs1Fj",  # Chinese Male
             ],
+            "simplified_chinese": [
+                "g5CIjZEefAph4nQFvHAz",  # Chinese Female
+                "CYw3kZ02Hs0563khs1Fj",  # Chinese Male
+            ],
+            "traditional_chinese": [
+                "g5CIjZEefAph4nQFvHAz",  # Chinese Female
+                "CYw3kZ02Hs0563khs1Fj",  # Chinese Male
+            ],
             "japanese": [
                 "pFZP5JQG7iQjIQuC4Bku",  # Japanese Female
                 "VR6AewLTigWG4xSOukaG",  # Japanese Male

@@ -211,8 +211,8 @@ All API endpoints are relative to: `http://localhost:8000/api`
 1. extract_slides - Extract content from the presentation file
 2. convert_slides_to_images - Convert slides to image format
 3. analyze_slide_images - Analyze visual content using AI
-4. generate_scripts - Generate AI narratives for each slide
-5. review_scripts - Review and refine scripts for consistency
+4. generate_transcripts - Generate AI narratives for each slide
+5. revise_transcripts - Revise and refine transcripts for consistency
 6. generate_audio - Create text-to-speech audio files
 7. generate_avatar_videos - Generate AI avatar videos
 8. compose_video - Compose final video presentation
@@ -314,8 +314,8 @@ If you encounter issues with task processing, check the following:
 
 ## Common Syntax Errors
 
-### Script Reviewer Syntax Error
-If you encounter a syntax error in `slidespeaker/processing/script_reviewer.py`:
+### Transcript Reviewer Syntax Error
+If you encounter a syntax error in `slidespeaker/processing/transcript_reviewer.py`:
 ```
 SyntaxError: '{' was never closed
 ```
@@ -325,7 +325,7 @@ This is typically caused by malformed dictionary syntax in the `INSTRUCTION_PROM
 2. Verify that all multi-line strings are properly formatted
 3. Check that the dictionary has a closing brace `}`
 
-See `docs/script-reviewer-fix.md` for detailed information about this specific issue.
+See `docs/transcript-reviewer-fix.md` for detailed information about this specific issue.
 
 ## Development Priorities
 

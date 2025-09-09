@@ -10,7 +10,8 @@ const LOCAL_STORAGE_KEYS = {
   TASK_ID: 'slidespeaker_task_id',
   STATUS: 'slidespeaker_status',
   PROCESSING_DETAILS: 'slidespeaker_processing_details',
-  LATEST_TASK_TIMESTAMP: 'slidespeaker_latest_task_timestamp'
+  LATEST_TASK_TIMESTAMP: 'slidespeaker_latest_task_timestamp',
+  FILE_TYPE: 'slidespeaker_file_type' // Add file type tracking for PDF vs PPT handling
 };
 
 // API configuration
@@ -53,6 +54,7 @@ const localStorageUtils = {
     subtitleLanguage: string;
     generateAvatar: boolean;
     generateSubtitles: boolean;
+    fileName: string | null; // Add fileName to track file type
   }) => {
     try {
       const stateToSave = {
@@ -61,6 +63,11 @@ const localStorageUtils = {
       };
       localStorage.setItem(LOCAL_STORAGE_KEYS.TASK_STATE, JSON.stringify(stateToSave));
       localStorage.setItem(LOCAL_STORAGE_KEYS.LATEST_TASK_TIMESTAMP, new Date().toISOString());
+      // Save file type information
+      if (state.fileName) {
+        const fileType = state.fileName.toLowerCase().split('.').pop() || '';
+        localStorage.setItem(LOCAL_STORAGE_KEYS.FILE_TYPE, fileType);
+      }
     } catch (error) {
       console.warn('Failed to save task state to local storage:', error);
     }
@@ -77,7 +84,12 @@ const localStorageUtils = {
         const hoursDiff = (now.getTime() - timestamp.getTime()) / (1000 * 60 * 60);
         
         if (hoursDiff < 24) {
-          return parsed;
+          // Load file type information
+          const fileType = localStorage.getItem(LOCAL_STORAGE_KEYS.FILE_TYPE);
+          return {
+            ...parsed,
+            fileType
+          };
         } else {
           // Clean up old data
           localStorageUtils.clearTaskState();
@@ -138,6 +150,7 @@ const localStorageUtils = {
 
 function App() {
   const [file, setFile] = useState<File | null>(null);
+  const [fileType, setFileType] = useState<string | null>(null); // Track file type for PDF vs PPT handling
   const [uploading, setUploading] = useState<boolean>(false);
   const [fileId, setFileId] = useState<string | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
@@ -146,6 +159,7 @@ function App() {
   const [processingDetails, setProcessingDetails] = useState<ProcessingDetails | null>(null);
   const [voiceLanguage, setVoiceLanguage] = useState<string>('english');
   const [subtitleLanguage, setSubtitleLanguage] = useState<string>('english');
+  const [videoResolution, setVideoResolution] = useState<string>('hd'); // hd as default
   const [generateAvatar, setGenerateAvatar] = useState<boolean>(false);
   const [generateSubtitles, setGenerateSubtitles] = useState<boolean>(true);
   const [isResumingTask, setIsResumingTask] = useState<boolean>(false);
@@ -158,6 +172,7 @@ function App() {
       const ext = selectedFile.name.toLowerCase().split('.').pop();
       if (ext && ['pdf', 'pptx', 'ppt'].includes(ext)) {
         setFile(selectedFile);
+        setFileType(ext);
       } else {
         alert('Please select a PDF or PowerPoint file');
       }
@@ -171,10 +186,18 @@ function App() {
     setStatus('uploading');
     
     try {
-      // Read file as array buffer for base64 encoding
-      const arrayBuffer = await file.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      const base64File = btoa(String.fromCharCode.apply(null, Array.from(uint8Array)));
+      // Read file as array buffer for base64 encoding using FileReader for better performance
+      const base64File = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          // Remove the data URL prefix (e.g., "data:application/pdf;base64,")
+          const base64Data = result.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
       
       // Send as JSON
       const response = await axios.post('/api/upload', 
@@ -183,6 +206,7 @@ function App() {
           file_data: base64File,
           voice_language: voiceLanguage,
           subtitle_language: subtitleLanguage,
+          video_resolution: videoResolution,
           generate_avatar: generateAvatar,
           generate_subtitles: generateSubtitles
         },
@@ -234,6 +258,7 @@ function App() {
 
   const resetForm = () => {
     setFile(null);
+    setFileType(null);
     setFileId(null);
     setTaskId(null);
     setStatus('idle');
@@ -268,11 +293,13 @@ function App() {
         setSubtitleLanguage(savedState.subtitleLanguage);
         setGenerateAvatar(savedState.generateAvatar);
         setGenerateSubtitles(savedState.generateSubtitles);
+        setFileType(savedState.fileType || null);
         
         console.log('Resuming task from local storage:', {
           fileId: savedState.fileId,
           taskId: savedState.taskId,
-          status: savedState.status
+          status: savedState.status,
+          fileType: savedState.fileType
         });
         
         setIsResumingTask(false);
@@ -293,7 +320,8 @@ function App() {
         voiceLanguage,
         subtitleLanguage,
         generateAvatar,
-        generateSubtitles
+        generateSubtitles,
+        fileName: file?.name || null
       });
     }
   }, [
@@ -305,7 +333,8 @@ function App() {
     subtitleLanguage,
     generateAvatar,
     generateSubtitles,
-    isResumingTask
+    isResumingTask,
+    file
   ]);
 
   // Poll for status updates when processing
@@ -432,7 +461,11 @@ function App() {
               const retryTrack = document.createElement('track');
               retryTrack.kind = 'subtitles';
               retryTrack.src = `${API_BASE_URL}/api/subtitles/${fileId}/vtt`;
-              retryTrack.setAttribute('srclang', subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 'en');
+              retryTrack.setAttribute('srclang', subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 
+                             subtitleLanguage === 'traditional_chinese' ? 'zh-Hant' : 
+                             subtitleLanguage === 'japanese' ? 'ja' : 
+                             subtitleLanguage === 'korean' ? 'ko' : 
+                             subtitleLanguage === 'thai' ? 'th' : 'en');
               retryTrack.label = 'Subtitles';
               retryTrack.default = true;
               videoRef.current.appendChild(retryTrack);
@@ -460,17 +493,30 @@ function App() {
 
   const formatStepName = (step: string): string => {
     const stepNames: Record<string, string> = {
-      'extract_slides': 'Extracting Content',
-      'analyze_slide_images': 'Analyzing Visuals',
-      'generate_scripts': 'Creating Narratives',
-      'review_scripts': 'Refining Content',
-      'generate_subtitle_scripts': 'Generating subtitle narratives',
-      'review_subtitle_scripts': 'Reviewing subtitle scripts',
-      'generate_audio': 'Synthesizing Audio',
-      'generate_avatar_videos': 'Generating Avatars',
+      // Common steps
+      'extract_slides': 'Extracting Slides',
+      'analyze_slide_images': 'Analyzing Content',
+      'generate_transcripts': 'Generating Transcripts',
+      'revise_transcripts': 'Revising Transcripts',
+      'translate_voice_transcripts': 'Translating Voice Transcripts',
+      'translate_subtitle_transcripts': 'Translating Subtitle Transcripts',
+      'generate_subtitle_transcripts': 'Generating Subtitle Transcripts',
+      'revise_subtitle_transcripts': 'Revising Subtitle Transcripts',
+      'generate_audio': 'Generating Audio',
+      'generate_avatar_videos': 'Creating Avatar',
       'convert_slides_to_images': 'Converting Slides',
-      'generate_subtitles': 'Generating subtitles',
-      'compose_video': 'Crafting Your Masterpiece',
+      'generate_subtitles': 'Creating Subtitles',
+      'compose_video': 'Composing Video',
+      
+      // PDF-specific steps
+      'segment_pdf_content': 'Segmenting Content',
+      'analyze_pdf_content': 'Analyzing Content',
+      'revise_pdf_transcripts': 'Revising Transcripts',
+      'generate_pdf_chapter_images': 'Creating Chapter Images',
+      'generate_pdf_audio': 'Generating Audio',
+      'generate_pdf_subtitles': 'Creating Subtitles',
+      'compose_pdf_video': 'Composing Video',
+      
       'unknown': 'Initializing'
     };
     return stepNames[step] || step;
@@ -489,29 +535,89 @@ function App() {
   };
 
   const getProcessingStatusMessage = (): string => {
-    if (!processingDetails) return 'Bringing Your Presentation to Life';
+    if (!processingDetails) {
+      return isPdfFile(file?.name || null) 
+        ? 'Bringing Your PDF Document to Life' 
+        : 'Bringing Your Presentation to Life';
+    }
     
     const activeSteps = Object.entries(processingDetails.steps || {})
       .filter(([_, step]) => step.status === 'in_progress' || step.status === 'processing');
     
+    const isPdf = isPdfFile(file?.name || null);
+    const fileTypeText = isPdf ? 'PDF Document' : 'Presentation';
+    
     if (activeSteps.length > 0) {
       const stepName = formatStepName(activeSteps[0][0]);
       const statusMessages: Record<string, string> = {
-        'Extracting Content': 'Analyzing your presentation structure...',
-        'Analyzing Visuals': 'Examining slide visuals and content...',
-        'Creating Narratives': 'Crafting engaging AI narratives...',
-        'Refining Content': 'Polishing the script for perfect delivery...',
-        'Generating subtitle narratives': 'Creating subtitle translations...',
-        'Reviewing subtitle scripts': 'Perfecting subtitle timing and accuracy...',
-        'Synthesizing Audio': 'Creating natural voice narration...',
-        'Generating Avatars': 'Bringing AI presenters to life...',
-        'Converting Slides': 'Preparing slides for video composition...',
-        'Crafting Your Masterpiece': 'Bringing every element together in perfect harmony...'
+        // Common messages for all file types
+        'Extracting Slides': `Analyzing your ${fileTypeText} structure...`,
+        'Analyzing Content': `Examining ${fileTypeText} content...`,
+        'Generating Transcripts': 'Generating English transcripts...',
+        'Revising Transcripts': 'Polishing transcripts for delivery...',
+        'Translating Voice Transcripts': 'Translating transcripts to voice language...',
+        'Translating Subtitle Transcripts': 'Translating transcripts for subtitles...',
+        'Generating Subtitle Transcripts': 'Generating subtitle transcripts...',
+        'Reviewing Subtitles': 'Perfecting subtitle timing and accuracy...',
+        'Generating Audio': 'Creating natural voice narration...',
+        'Creating Avatar': 'Bringing AI presenter to life...',
+        'Converting Slides': `Preparing ${fileTypeText} for video composition...`,
+        'Creating Chapter Images': isPdf ? 'Creating visual representations for chapters...' : 'Creating visual representations for slides...',
+        'Composing Video': 'Bringing all elements together...'
       };
       return statusMessages[stepName] || `Working on: ${stepName}`;
     }
     
-    return 'Bringing Your Presentation to Life';
+    return isPdf 
+      ? 'Bringing Your PDF Document to Life' 
+      : 'Bringing Your Presentation to Life';
+  };
+
+  const isPdfFile = (filename: string | null): boolean => {
+    // If we have a filename, use it to determine file type
+    if (filename) {
+      const ext = filename.toLowerCase().split('.').pop();
+      return ext === 'pdf';
+    }
+    // If we don't have a filename but have fileType from state, use that
+    if (fileType) {
+      return fileType.toLowerCase() === 'pdf';
+    }
+    // Default to false if we can't determine
+    return false;
+  };
+
+  const getFileTypeHint = (filename: string): JSX.Element => {
+    const ext = filename.toLowerCase().split('.').pop();
+    
+    if (ext === 'pdf') {
+      return (
+        <div className="file-type-hint pdf">
+          <span className="file-type-badge pdf">PDF Document</span>
+          <div className="file-type-description">
+            AI will analyze and convert your PDF into engaging video chapters with AI narration and subtitles.
+          </div>
+        </div>
+      );
+    } else if (ext === 'pptx' || ext === 'ppt') {
+      return (
+        <div className="file-type-hint ppt">
+          <span className="file-type-badge ppt">PowerPoint Presentation</span>
+          <div className="file-type-description">
+            AI will convert your slides into a video with AI narration and optional avatar presenter.
+          </div>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="file-type-hint">
+        <span className="file-type-badge">Supported File</span>
+        <div className="file-type-description">
+          Supports PDF, PPTX, and PPT files
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -587,45 +693,72 @@ function App() {
                       {file ? file.name : 'Choose a file'}
                     </div>
                     <div className="upload-hint">
-                      Supports PDF, PPTX, and PPT files
+                      {file ? (
+                        getFileTypeHint(file.name)
+                      ) : (
+                        'Supports PDF, PPTX, and PPT files'
+                      )}
                     </div>
                   </label>
                 </div>
                 
-                <div className="language-section">
-                  <h3 className="language-section-title">Language Settings</h3>
-                  <div className="language-group">
-                    <div className="language-selector">
-                      <label htmlFor="language-select">Voice Language</label>
+                <div className="video-options-section">
+                  <h3 className="video-options-title">Video Settings</h3>
+                  <div className="video-options-grid">
+                    <div className="video-option-card">
+                      <div className="video-option-header">
+                        <span className="video-option-icon">🔊</span>
+                        <span className="video-option-title">Audio Language</span>
+                      </div>
                       <select 
                         id="language-select" 
                         value={voiceLanguage} 
                         onChange={(e) => setVoiceLanguage(e.target.value)}
-                        className="language-select"
+                        className="video-option-select"
                       >
                         <option value="english">English</option>
-                        <option value="simplified_chinese">简体中文 (Simplified Chinese)</option>
-                        <option value="traditional_chinese">繁體中文 (Traditional Chinese)</option>
-                        <option value="japanese">日本語 (Japanese)</option>
-                        <option value="korean">한국어 (Korean)</option>
-                        <option value="thai">ไทย (Thai)</option>
+                        <option value="simplified_chinese">简体中文</option>
+                        <option value="traditional_chinese">繁體中文</option>
+                        <option value="japanese">日本語</option>
+                        <option value="korean">한국어</option>
+                        <option value="thai">ไทย</option>
                       </select>
                     </div>
                     
-                    <div className="language-selector">
-                      <label htmlFor="subtitle-language-select">Subtitle Language</label>
+                    <div className="video-option-card">
+                      <div className="video-option-header">
+                        <span className="video-option-icon">📝</span>
+                        <span className="video-option-title">Subtitles</span>
+                      </div>
                       <select 
                         id="subtitle-language-select" 
                         value={subtitleLanguage} 
                         onChange={(e) => setSubtitleLanguage(e.target.value)}
-                        className="language-select"
+                        className="video-option-select"
                       >
                         <option value="english">English</option>
-                        <option value="simplified_chinese">简体中文 (Simplified Chinese)</option>
-                        <option value="traditional_chinese">繁體中文 (Traditional Chinese)</option>
-                        <option value="japanese">日本語 (Japanese)</option>
-                        <option value="korean">한국어 (Korean)</option>
-                        <option value="thai">ไทย (Thai)</option>
+                        <option value="simplified_chinese">简体中文</option>
+                        <option value="traditional_chinese">繁體中文</option>
+                        <option value="japanese">日本語</option>
+                        <option value="korean">한국어</option>
+                        <option value="thai">ไทย</option>
+                      </select>
+                    </div>
+                    
+                    <div className="video-option-card">
+                      <div className="video-option-header">
+                        <span className="video-option-icon">📺</span>
+                        <span className="video-option-title">Quality</span>
+                      </div>
+                      <select 
+                        id="video-resolution-select" 
+                        value={videoResolution} 
+                        onChange={(e) => setVideoResolution(e.target.value)}
+                        className="video-option-select"
+                      >
+                        <option value="sd">SD (640×480)</option>
+                        <option value="hd">HD (1280×720)</option>
+                        <option value="fullhd">Full HD (1920×1080)</option>
                       </select>
                     </div>
                   </div>
@@ -637,6 +770,8 @@ function App() {
                     id="generate-avatar"
                     checked={generateAvatar}
                     onChange={(e) => setGenerateAvatar(e.target.checked)}
+                    disabled
+                    title="AI Avatar is not available yet"
                   />
                   <label htmlFor="generate-avatar" className="minimal-label">AI Avatar</label>
                 </div>
@@ -680,7 +815,7 @@ function App() {
             {status === 'processing' && (
               <div className="processing-view">
                 <div className="spinner"></div>
-                <h3>{getProcessingStatusMessage()}</h3>
+                <h3>{getProcessingStatusMessage()}</h3>                
                 <div className="progress-container">
                   <div className="progress-bar">
                     <div 
@@ -700,35 +835,80 @@ function App() {
                 
                 {processingDetails && (
                   <div className="steps-container">
-                    <h4>🌟 Creating Your Masterpiece</h4>
+                    <h4>🌟 Crafting Your Masterpiece</h4>
+                    <div className="file-type-indicator">
+                      {isPdfFile(file?.name || null) ? (
+                        <span className="file-type-badge pdf">PDF Document</span>
+                      ) : (
+                        <span className="file-type-badge ppt">PowerPoint Presentation</span>
+                      )}
+                    </div>
                     <div className="steps-grid">
-                      {[
-                        'extract_slides',
-                        'convert_slides_to_images', 
-                        'analyze_slide_images',
-                        'generate_scripts',
-                        'review_scripts',
-                        'generate_audio',
-                        'generate_avatar_videos',
-                        'generate_subtitles',
-                        'compose_video'
-                      ].map((stepName) => {
-                        const stepData = processingDetails.steps[stepName] || { status: 'pending' };
-                        // Hide skipped steps from UI
-                        if (stepData.status === 'skipped') {
-                          return null;
-                        }
-                        return (
-                          <div key={stepName} className={`step-item ${stepData.status}`}>
-                            <span className="step-icon">
-                              {stepData.status === 'completed' ? '✓' : 
-                               stepData.status === 'processing' || stepData.status === 'in_progress' ? '⏳' : 
-                               stepData.status === 'failed' ? '✗' : '○'}
-                            </span>
-                            <span className="step-name">{formatStepName(stepName)}</span>
-                          </div>
-                        );
-                      }).filter(Boolean)}
+                      {isPdfFile(file?.name || null) ? (
+                        // PDF-specific steps
+                        [
+                          'segment_pdf_content',
+                          'analyze_pdf_content',
+                          'revise_pdf_transcripts',
+                          'translate_voice_transcripts',
+                          'translate_subtitle_transcripts',
+                          'generate_pdf_chapter_images', 
+                          'generate_pdf_audio',
+                          'generate_pdf_subtitles',
+                          'compose_pdf_video'
+                        ]
+                          .map((stepName) => {
+                            const stepData = processingDetails.steps[stepName];
+                            // Hide steps that are not present or explicitly skipped
+                            if (!stepData || stepData.status === 'skipped') {
+                              return null;
+                            }
+                            return (
+                              <div key={stepName} className={`step-item ${stepData.status}`}>
+                                <span className="step-icon">
+                                  {stepData.status === 'completed' ? '✓' :
+                                   stepData.status === 'processing' || stepData.status === 'in_progress' ? '⏳' :
+                                   stepData.status === 'failed' ? '✗' : '○'}
+                                </span>
+                                <span className="step-name">{formatStepName(stepName)}</span>
+                              </div>
+                            );
+                          })
+                          .filter(Boolean)
+                      ) : (
+                        // PPT/PPTX-specific steps with translation steps
+                        [
+                          'extract_slides',
+                          'convert_slides_to_images', 
+                          'analyze_slide_images',
+                          'generate_transcripts',
+                          'revise_transcripts',
+                          'translate_voice_transcripts',
+                          'translate_subtitle_transcripts',
+                          'generate_audio',
+                          'generate_avatar_videos',
+                          'generate_subtitles',
+                          'compose_video'
+                        ]
+                          .map((stepName) => {
+                            const stepData = processingDetails.steps[stepName];
+                            // Hide steps that are not present or explicitly skipped
+                            if (!stepData || stepData.status === 'skipped') {
+                              return null;
+                            }
+                            return (
+                              <div key={stepName} className={`step-item ${stepData.status}`}>
+                                <span className="step-icon">
+                                  {stepData.status === 'completed' ? '✓' :
+                                   stepData.status === 'processing' || stepData.status === 'in_progress' ? '⏳' :
+                                   stepData.status === 'failed' ? '✗' : '○'}
+                                </span>
+                                <span className="step-name">{formatStepName(stepName)}</span>
+                              </div>
+                            );
+                          })
+                          .filter(Boolean)
+                      )}
                     </div>
                     
                     {processingDetails.errors && processingDetails.errors.length > 0 && (
@@ -776,10 +956,17 @@ function App() {
                           <span className="info-label">Subtitle Language:</span>
                           <span className="info-value">{processingDetails?.subtitle_language ? getLanguageDisplayName(processingDetails.subtitle_language) : 'English'}</span>
                         </div>
-                        <div className="info-item">
-                          <span className="info-label">AI Avatar:</span>
-                          <span className="info-value">{generateAvatar ? '✓ Generated' : '✗ Disabled'}</span>
-                        </div>
+                        {isPdfFile(file?.name || null) ? (
+                          <div className="info-item">
+                            <span className="info-label">Document Type:</span>
+                            <span className="info-value">PDF Chapters</span>
+                          </div>
+                        ) : (
+                          <div className="info-item">
+                            <span className="info-label disabled">AI Avatar:</span>
+                            <span className="info-value">{generateAvatar ? '✓ Generated' : '✗ Disabled'}</span>
+                          </div>
+                        )}
                       </div>
                       
                       {/* Resource URLs */}

@@ -58,18 +58,18 @@ async def generate_avatar_step(file_id: str) -> None:
         logger.info("Stage 'Creating AI presenter videos' skipped (disabled)")
         return
 
-    # Comprehensive null checking for scripts data
+    # Comprehensive null checking for transcripts data
     scripts = []
     if (
         state
         and "steps" in state
-        and "review_scripts" in state["steps"]
-        and state["steps"]["review_scripts"]["data"] is not None
+        and "revise_transcripts" in state["steps"]
+        and state["steps"]["revise_transcripts"]["data"] is not None
     ):
-        scripts = state["steps"]["review_scripts"]["data"]
+        scripts = state["steps"]["revise_transcripts"]["data"]
 
     if not scripts:
-        raise ValueError("No scripts data available for avatar video generation")
+        raise ValueError("No transcripts data available for avatar video generation")
 
     avatar_videos = []
     failed_slides = []

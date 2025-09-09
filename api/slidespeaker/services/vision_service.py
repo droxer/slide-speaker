@@ -108,7 +108,6 @@ Use this extracted text to enhance your analysis and ensure consistency between 
                         ],
                     },
                 ],
-                max_tokens=2000,
             )
 
             analysis_text = response.choices[0].message.content

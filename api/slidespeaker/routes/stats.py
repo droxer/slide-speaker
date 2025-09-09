@@ -13,7 +13,7 @@ from fastapi import APIRouter, Query
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 
-router = APIRouter(prefix="/api", tags=["monitoring"])
+router = APIRouter(prefix="/api", tags=["stats"])
 
 
 @router.get("/tasks")
@@ -52,8 +52,10 @@ async def get_tasks(
                     task["state"] = {
                         "status": state["status"],
                         "current_step": state["current_step"],
+                        "filename": state.get("filename"),
                         "voice_language": state["voice_language"],
                         "subtitle_language": state.get("subtitle_language"),
+                        "video_resolution": state.get("video_resolution", "hd"),
                         "generate_avatar": state["generate_avatar"],
                         "generate_subtitles": state["generate_subtitles"],
                         "created_at": state["created_at"],
@@ -90,6 +92,7 @@ async def get_tasks(
                         "current_step": state["current_step"],
                         "voice_language": state["voice_language"],
                         "subtitle_language": state.get("subtitle_language"),
+                        "video_resolution": state.get("video_resolution", "hd"),
                         "generate_avatar": state["generate_avatar"],
                         "generate_subtitles": state["generate_subtitles"],
                         "created_at": state["created_at"],
@@ -99,8 +102,10 @@ async def get_tasks(
                     "kwargs": {
                         "file_id": file_id,
                         "file_ext": state["file_ext"],
+                        "filename": state.get("filename"),
                         "voice_language": state["voice_language"],
                         "subtitle_language": state.get("subtitle_language"),
+                        "video_resolution": state.get("video_resolution", "hd"),
                         "generate_avatar": state["generate_avatar"],
                         "generate_subtitles": state["generate_subtitles"],
                     },
@@ -385,3 +390,73 @@ async def cancel_task(task_id: str) -> dict[str, Any]:
         "task_id": task_id,
         "file_id": file_id,
     }
+
+
+@router.delete("/tasks/{task_id}/purge")
+async def purge_task(task_id: str) -> dict[str, Any]:
+    """Permanently delete a task and its state from the system.
+
+    This removes the task entry, queue references, cancellation flags, and associated state.
+    """
+    # Fetch task to get file_id, but proceed even if not found
+    task = await task_queue.get_task(task_id)
+    file_id = task.get("kwargs", {}).get("file_id") if task else None
+
+    # Build keys
+    task_key = f"{task_queue.task_prefix}:{task_id}"
+    cancellation_key = f"{task_queue.task_prefix}:{task_id}:cancelled"
+    state_key = f"ss:state:{file_id}" if file_id else None
+
+    removed = {
+        "queue": 0,
+        "task": 0,
+        "cancel_flag": 0,
+        "state": 0,
+    }
+
+    try:
+        # Remove from queue (all occurrences)
+        try:
+            removed_count = await task_queue.redis_client.lrem(
+                task_queue.queue_key,
+                0,
+                task_id,  # type: ignore
+            )
+            removed["queue"] = int(removed_count) if removed_count is not None else 0
+        except Exception:
+            pass
+
+        # Delete task key
+        try:
+            del_count = await task_queue.redis_client.delete(task_key)
+            removed["task"] = int(del_count) if del_count is not None else 0
+        except Exception:
+            pass
+
+        # Delete cancellation flag
+        try:
+            del_count = await task_queue.redis_client.delete(cancellation_key)
+            removed["cancel_flag"] = int(del_count) if del_count is not None else 0
+        except Exception:
+            pass
+
+        # Delete state key
+        if state_key:
+            try:
+                del_count = await state_manager.redis_client.delete(state_key)
+                removed["state"] = int(del_count) if del_count is not None else 0
+            except Exception:
+                pass
+
+        return {
+            "message": "Task purged successfully",
+            "task_id": task_id,
+            "file_id": file_id,
+            "removed": removed,
+        }
+    except Exception as e:
+        return {
+            "error": f"Failed to purge task: {e}",
+            "task_id": task_id,
+            "file_id": file_id,
+        }

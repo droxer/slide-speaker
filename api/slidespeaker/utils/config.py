@@ -100,15 +100,15 @@ class Config:
                 provider=self.storage_provider, **self.storage_config
             )
             return create_storage_provider(storage_config)
-        except ImportError as e:
-            # If optional dependencies are missing, fall back to local storage
+        except ImportError:
+            # Surface configuration errors explicitly for non-local providers
             if self.storage_provider != "local":
-                print(f"Warning: {e}. Falling back to local storage.")
-                local_config = StorageConfig(
-                    provider="local", base_path=str(self.output_dir), base_url="/"
-                )
-                return create_storage_provider(local_config)
-            raise
+                raise
+            # Local provider should still work
+            local_config = StorageConfig(
+                provider="local", base_path=str(self.output_dir), base_url="/"
+            )
+            return create_storage_provider(local_config)
 
 
 # Global configuration instance

@@ -7,7 +7,7 @@
 - Redis server
 - FFmpeg
 - API keys for:
-  - OpenAI or Qwen (for script generation)
+  - OpenAI or Qwen (for transcript generation)
   - ElevenLabs or OpenAI TTS (for audio generation)
   - HeyGen or DALL-E (for avatar generation)
 
@@ -222,8 +222,8 @@ Recent improvements include memory-efficient video composition to prevent hangin
 ### AI Service Selection
 The application supports multiple AI service providers. You can configure which services to use:
 
-**Script Generation:**
-- OpenAI: Set `OPENAI_API_KEY` for GPT-based script generation
+**Transcript Generation:**
+- OpenAI: Set `OPENAI_API_KEY` for GPT-based transcript generation
 - Qwen: Set `QWEN_API_KEY` for Alibaba's Qwen model (good for Chinese content)
 
 **Text-to-Speech:**

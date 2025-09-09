@@ -30,7 +30,7 @@ class RedisConfig:
         return redis.Redis(
             host=os.getenv("REDIS_HOST", "localhost"),
             port=int(os.getenv("REDIS_PORT", 6379)),
-            db=int(os.getenv("REDIS_DB", 7)),
+            db=int(os.getenv("REDIS_DB", 0)),
             password=os.getenv("REDIS_PASSWORD", None),
             decode_responses=True,
             socket_timeout=5.0,
@@ -44,7 +44,7 @@ class RedisConfig:
         return sync_redis.Redis(
             host=os.getenv("REDIS_HOST", "localhost"),
             port=int(os.getenv("REDIS_PORT", 6379)),
-            db=int(os.getenv("REDIS_DB", 7)),
+            db=int(os.getenv("REDIS_DB", 0)),
             password=os.getenv("REDIS_PASSWORD", None) or None,
             decode_responses=True,
             socket_timeout=5.0,

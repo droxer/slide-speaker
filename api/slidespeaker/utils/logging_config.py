@@ -18,6 +18,7 @@ def setup_logging(
     enable_file_logging: bool = False,
     log_file: str = "slidespeaker.log",
     log_dir: str = "logs",
+    component: str = "default",
 ) -> None:
     """
     Configure logging for the SlideSpeaker application.
@@ -28,9 +29,21 @@ def setup_logging(
         enable_file_logging: Whether to write logs to file
         log_file: Log file name
         log_dir: Directory for log files
+        component: Component name (api, master_worker, worker) for separate logging
     """
     if log_level is None:
         log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+
+    # Set component-specific log file if not explicitly provided
+    if enable_file_logging and log_file == "slidespeaker.log":
+        if component == "api":
+            log_file = "api.log"
+        elif component == "master_worker":
+            log_file = "master_worker.log"
+        elif component == "worker":
+            log_file = "worker.log"
+        else:
+            log_file = f"{component}.log"
 
     if log_format is None:
         log_format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"

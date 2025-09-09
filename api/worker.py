@@ -23,10 +23,12 @@ from slidespeaker.utils.logging_config import setup_logging  # noqa: E402
 
 log_level = os.getenv("LOG_LEVEL", "INFO")
 log_file = os.getenv("LOG_FILE")
-setup_logging(log_level, log_file, enable_file_logging=log_file is not None)
+setup_logging(
+    log_level, log_file, enable_file_logging=log_file is not None, component="worker"
+)
 
 from slidespeaker.core.task_queue import task_queue  # noqa: E402
-from slidespeaker.pipeline.coordinator import process_presentation  # noqa: E402
+from slidespeaker.pipeline.coordinator import accept_task  # noqa: E402
 
 
 class TaskProgressMonitor:
@@ -157,7 +159,7 @@ async def process_task(task_id: str) -> bool:
         logger.info(
             f"Task {task_id} starting presentation processing for file {file_id}"
         )
-        await process_presentation(
+        await accept_task(
             file_id,
             Path(file_path),
             file_ext,

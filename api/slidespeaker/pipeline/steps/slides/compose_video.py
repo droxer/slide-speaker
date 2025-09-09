@@ -18,8 +18,7 @@ from slidespeaker.utils.config import config, get_storage_provider
 video_composer = VideoComposer()
 video_previewer = VideoPreviewer()
 
-# Get storage provider instance
-storage_provider = get_storage_provider()
+# Resolve storage provider during upload to honor current config
 
 
 async def compose_video_step(file_id: str, file_path: Path) -> None:
@@ -129,8 +128,15 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
                 f"Composing video with {len(slide_images)} slides, {len(avatar_videos)} avatars, "
                 f"{len(audio_files)} audio files"
             )
+            # Get video resolution from state
+            video_resolution = state.get("video_resolution", "hd") if state else "hd"
+
             await video_composer.compose_video(
-                slide_images, avatar_videos, audio_files, final_video_path
+                slide_images,
+                avatar_videos,
+                audio_files,
+                final_video_path,
+                video_resolution,
             )
         else:
             if avatar_generation_enabled:
@@ -174,22 +180,40 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
                         f"Creating simple video with {len(slide_images)} slides and "
                         f"{len(valid_audio_files)} valid audio files"
                     )
+                    # Get video resolution from state
+                    video_resolution = (
+                        state.get("video_resolution", "hd") if state else "hd"
+                    )
+
                     await video_composer.create_video_with_audio(
-                        slide_images, valid_audio_files, final_video_path
+                        slide_images,
+                        valid_audio_files,
+                        final_video_path,
+                        video_resolution,
                     )
                 else:
                     logger.warning(
                         "No valid audio files found, creating images-only video"
                     )
+                    # Get video resolution from state
+                    video_resolution = (
+                        state.get("video_resolution", "hd") if state else "hd"
+                    )
+
                     await video_composer.create_images_only_video(
-                        slide_images, final_video_path
+                        slide_images, final_video_path, video_resolution
                     )
             else:
                 logger.info(
                     f"Creating images-only video with {len(slide_images)} slides"
                 )
+                # Get video resolution from state
+                video_resolution = (
+                    state.get("video_resolution", "hd") if state else "hd"
+                )
+
                 await video_composer.create_images_only_video(
-                    slide_images, final_video_path
+                    slide_images, final_video_path, video_resolution
                 )
     except Exception as e:
         logger.error(f"Video composition failed: {e}")
@@ -198,6 +222,7 @@ async def compose_video_step(file_id: str, file_path: Path) -> None:
     # Upload final video to storage provider
     try:
         object_key = f"{file_id}_final.mp4"
+        storage_provider = get_storage_provider()
         storage_url = storage_provider.upload_file(
             str(final_video_path), object_key, "video/mp4"
         )

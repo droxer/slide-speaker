@@ -10,13 +10,15 @@ from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from slidespeaker.routes.downloads import router as downloads_router
 from slidespeaker.routes.languages import router as languages_router
-from slidespeaker.routes.monitoring import router as monitoring_router
 from slidespeaker.routes.progress import router as progress_router
+from slidespeaker.routes.stats import router as stats_router
 from slidespeaker.routes.tasks import router as tasks_router
 from slidespeaker.routes.upload import router as upload_router
+from slidespeaker.utils.config import config
 from slidespeaker.utils.logging_config import setup_logging
 
 app = FastAPI(title="AI Slider API")
@@ -27,7 +29,16 @@ async def startup_event() -> None:
     """Initialize logging configuration on application startup"""
     log_level = os.getenv("LOG_LEVEL", "INFO")
     log_file = os.getenv("LOG_FILE")
-    setup_logging(log_level, log_file, enable_file_logging=log_file is not None)
+    setup_logging(
+        log_level, log_file, enable_file_logging=log_file is not None, component="api"
+    )
+
+    # Mount static files for local storage if using local storage provider
+    if config.storage_provider == "local":
+        # Ensure the storage directory exists
+        config.output_dir.mkdir(parents=True, exist_ok=True)
+        # Mount the storage directory at /files/ path
+        app.mount("/files", StaticFiles(directory=config.output_dir), name="files")
 
 
 app.add_middleware(
@@ -44,13 +55,13 @@ app.include_router(tasks_router)
 app.include_router(progress_router)
 app.include_router(downloads_router)
 app.include_router(languages_router)
-app.include_router(monitoring_router)
+app.include_router(stats_router)
 
 
 @app.get("/")
 async def root() -> dict[str, str]:
     """Root endpoint that returns a welcome message"""
-    return {"message": "AI Slider Backend API"}
+    return {"message": "SlideSpeaker Backend API"}
 
 
 if __name__ == "__main__":
