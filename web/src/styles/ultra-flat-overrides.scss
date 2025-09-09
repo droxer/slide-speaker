@@ -100,7 +100,6 @@ body.ultra-flat .retry-button,
 body.ultra-flat .preview-button,
 body.ultra-flat .cancel-button,
 body.ultra-flat .delete-button,
-body.ultra-flat .page-button,
 body.ultra-flat .advanced-options-button,
 body.ultra-flat button {
   background: var(--uf-btn-bg) !important; /* primary */
@@ -297,4 +296,26 @@ body.ultra-flat .footer-note {
   body.ultra-flat .retry-button {
     width: 100% !important;
   }
+}
+/* Lightweight pagination overrides */
+body.ultra-flat .pagination {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+body.ultra-flat .pagination .page-button {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border: 1px solid var(--uf-border) !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+body.ultra-flat .pagination .page-button:hover:not(:disabled) {
+  background: #f3f4f6 !important;
+  border-color: #d1d5db !important;
+}
+body.ultra-flat .pagination .page-button:disabled {
+  background: #f3f4f6 !important;
+  color: #9ca3af !important;
+  border-color: var(--uf-border) !important;
 }

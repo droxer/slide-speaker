@@ -42,6 +42,14 @@ body {
   position: relative;
 }
 
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column;
+    gap: 12px;
+    align-items: stretch;
+  }
+}
+
 .header-left,
 .header-right {
   flex: 1;
@@ -380,6 +388,25 @@ body:not(.ultra-flat) .app-footer {
   margin: 0;
   font-size: 0.9rem;
   opacity: 0.9;
+}
+
+/* Ensure footer theme switcher is visible and sized well */
+.theme-toggle {
+  margin-left: 12px;
+}
+
+@media (max-width: 768px) {
+  .theme-toggle {
+    width: 100%;
+    margin-left: 0;
+    margin-top: 6px;
+  }
+  .theme-toggle .toggle-btn {
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 12px;
+    font-size: 0.95rem;
+  }
 }
 
 @media (max-width: 768px) {

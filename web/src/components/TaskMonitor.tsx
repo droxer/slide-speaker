@@ -468,7 +468,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                 <div className="stat-icon">📋</div>
                 <div className="stat-content">
                   <div className="stat-value">{statistics.total_tasks}</div>
-                  <div className="stat-label">Total Tasks</div>
+                  <div className="stat-label"><span className="full">Total Tasks</span><span className="short">Total</span></div>
                 </div>
               </div>
               
@@ -476,7 +476,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                 <div className="stat-icon">✅</div>
                 <div className="stat-content">
                   <div className="stat-value">{statistics.processing_stats.success_rate.toFixed(1)}%</div>
-                  <div className="stat-label">Success Rate</div>
+                  <div className="stat-label"><span className="full">Success Rate</span><span className="short">Success</span></div>
                 </div>
               </div>
             </div>
@@ -489,7 +489,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                 <div className="stat-icon">⚡</div>
                 <div className="stat-content">
                   <div className="stat-value">{statistics.status_breakdown.processing || 0}</div>
-                  <div className="stat-label">Currently Running</div>
+                  <div className="stat-label"><span className="full">Currently Running</span><span className="short">Running</span></div>
                   <div className="stat-description">Tasks in progress</div>
                 </div>
               </div>
@@ -498,7 +498,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                 <div className="stat-icon">⏸️</div>
                 <div className="stat-content">
                   <div className="stat-value">{statistics.status_breakdown.queued || 0}</div>
-                  <div className="stat-label">In Queue</div>
+                  <div className="stat-label"><span className="full">In Queue</span><span className="short">Queue</span></div>
                   <div className="stat-description">Waiting to start</div>
                 </div>
               </div>
@@ -507,7 +507,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                 <div className="stat-icon">❌</div>
                 <div className="stat-content">
                   <div className="stat-value">{statistics.status_breakdown.failed || 0}</div>
-                  <div className="stat-label">Failed Tasks</div>
+                  <div className="stat-label"><span className="full">Failed Tasks</span><span className="short">Failed</span></div>
                   <div className="stat-description">Need attention</div>
                 </div>
               </div>

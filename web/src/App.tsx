@@ -1104,22 +1104,22 @@ function App() {
             <button
               onClick={() => setUiTheme('flat')}
               className={`toggle-btn ${uiTheme === 'flat' ? 'active' : ''}`}
-              title="Ultra Flat Theme"
+              title="Flat Theme"
               role="tab"
               aria-selected={uiTheme === 'flat'}
-              aria-controls="ultra-flat-theme-panel"
+              aria-controls="flat-theme-panel"
             >
-              <span className="toggle-text">Ultra Flat</span>
+              <span className="toggle-text">Flat</span>
             </button>
             <button
               onClick={() => setUiTheme('material')}
               className={`toggle-btn ${uiTheme === 'material' ? 'active' : ''}`}
-              title="Subtle Material Theme"
+              title="Material Theme"
               role="tab"
               aria-selected={uiTheme === 'material'}
-              aria-controls="subtle-material-theme-panel"
+              aria-controls="material-theme-panel"
             >
-              <span className="toggle-text">Subtle Material</span>
+              <span className="toggle-text">Material</span>
             </button>
           </div>
         </div>
