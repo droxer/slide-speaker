@@ -5,6 +5,16 @@
 body.ultra-flat {
   background: #ffffff !important;
   color: #111827; /* neutral-900 */
+  /* Theme tokens */
+  --uf-border: #e5e7eb;
+  --uf-accent: #6366f1; /* indigo-500 to match Material */
+  --uf-btn-bg: #111827;
+  --uf-btn-text: #ffffff;
+  --uf-btn-bg-hover: #000000;
+  --uf-secondary-bg: #f3f4f6;
+  --uf-secondary-text: #111827;
+  --uf-icon-bg: #111827;
+  --uf-icon-text: #ffffff;
 }
 
 body.ultra-flat * {
@@ -17,7 +27,7 @@ body.ultra-flat * {
 body.ultra-flat .app-header {
   background: #ffffff !important;
   color: #111827 !important;
-  border-bottom: 1px solid #e5e7eb !important; /* neutral-200 */
+  border-bottom: 1px solid var(--uf-border) !important; /* neutral-200 */
 }
 
 body.ultra-flat .app-header h1,
@@ -35,7 +45,7 @@ body.ultra-flat .statistics-summary,
 body.ultra-flat .stat-card,
 body.ultra-flat .monitor-header {
   background: #ffffff !important;
-  border: 1px solid #e5e7eb !important;
+  border: 1px solid var(--uf-border) !important;
   border-radius: 4px !important;
 }
 
@@ -48,7 +58,7 @@ body.ultra-flat .stat-card::before {
 /* Toggle (Process/Monitor) */
 body.ultra-flat .view-toggle {
   background: transparent !important;
-  border: 1px solid #e5e7eb !important;
+  border: 1px solid var(--uf-border) !important;
   border-radius: 4px !important;
   padding: 2px !important;
 }
@@ -60,8 +70,8 @@ body.ultra-flat .toggle-btn {
 }
 
 body.ultra-flat .toggle-btn.active {
-  background: #111827 !important;
-  color: #ffffff !important;
+  background: var(--uf-icon-bg) !important;
+  color: var(--uf-icon-text) !important;
 }
 
 /* Inputs */
@@ -72,14 +82,14 @@ body.ultra-flat textarea,
 body.ultra-flat .search-input,
 body.ultra-flat .status-filter {
   background: #ffffff !important;
-  border: 1px solid #e5e7eb !important;
+  border: 1px solid var(--uf-border) !important;
   border-radius: 2px !important;
 }
 
 body.ultra-flat .search-input:focus,
 body.ultra-flat .status-filter:focus {
   outline: none !important;
-  border-color: #0ea5e9 !important; /* cyan-500 accent */
+  border-color: var(--uf-accent) !important; /* accent */
   box-shadow: none !important;
 }
 
@@ -93,9 +103,9 @@ body.ultra-flat .delete-button,
 body.ultra-flat .page-button,
 body.ultra-flat .advanced-options-button,
 body.ultra-flat button {
-  background: #111827 !important; /* neutral-900 */
-  color: #ffffff !important;
-  border: 1px solid #111827 !important;
+  background: var(--uf-btn-bg) !important; /* primary */
+  color: var(--uf-btn-text) !important;
+  border: 1px solid var(--uf-btn-bg) !important;
   border-radius: 2px !important;
 }
 
@@ -108,15 +118,15 @@ body.ultra-flat .delete-button:hover,
 body.ultra-flat .page-button:hover,
 body.ultra-flat .advanced-options-button:hover,
 body.ultra-flat button:hover {
-  background: #000000 !important;
-  border-color: #000000 !important;
+  background: var(--uf-btn-bg-hover) !important;
+  border-color: var(--uf-btn-bg-hover) !important;
 }
 
 /* Secondary variants if present */
 body.ultra-flat .cancel-button {
-  background: #f3f4f6 !important; /* neutral-100 */
-  color: #111827 !important;
-  border-color: #e5e7eb !important;
+  background: var(--uf-secondary-bg) !important; /* neutral-100 */
+  color: var(--uf-secondary-text) !important;
+  border-color: var(--uf-border) !important;
 }
 
 body.ultra-flat .cancel-button:hover {
@@ -141,7 +151,7 @@ body.ultra-flat .delete-button {
 
 body.ultra-flat .delete-button:hover {
   background: #f3f4f6 !important;
-  border-color: #e5e7eb !important;
+  border-color: var(--uf-border) !important;
   color: #dc2626 !important; /* red-600 */
 }
 
@@ -149,7 +159,7 @@ body.ultra-flat .delete-button:hover {
 body.ultra-flat .preview-button {
   background: #ffffff !important;
   color: #111827 !important;
-  border: 1px solid #e5e7eb !important;
+  border: 1px solid var(--uf-border) !important;
 }
 
 body.ultra-flat .preview-button:hover {
@@ -200,36 +210,43 @@ body.ultra-flat .stat-card.processing,
 body.ultra-flat .stat-card.queued,
 body.ultra-flat .stat-card.failed {
   background: #ffffff !important;
-  border-color: #e5e7eb !important;
+  border-color: var(--uf-border) !important;
 }
 
 body.ultra-flat .stat-icon {
-  background: #111827 !important;
-  color: #ffffff !important;
+  background: var(--uf-icon-bg) !important;
+  color: var(--uf-icon-text) !important;
 }
 
 /* Progress bars and meters */
 body.ultra-flat .progress,
 body.ultra-flat progress {
-  background: #e5e7eb !important;
+  background: var(--uf-border) !important;
   border-radius: 2px !important;
 }
 
 body.ultra-flat .progress::-webkit-progress-value,
 body.ultra-flat progress::-webkit-progress-value {
-  background: #111827 !important;
+  background: var(--uf-btn-bg) !important;
 }
 
 /* Video preview container */
 body.ultra-flat .video-modal,
 body.ultra-flat .video-container {
   background: #ffffff !important;
-  border: 1px solid #e5e7eb !important;
+  border: 1px solid var(--uf-border) !important;
 }
 
 /* Links */
-body.ultra-flat a { color: #0ea5e9 !important; text-decoration: none; }
+body.ultra-flat a { color: var(--uf-accent) !important; text-decoration: none; }
 body.ultra-flat a:hover { text-decoration: underline; }
+
+/* Footer text contrast */
+body.ultra-flat .app-footer,
+body.ultra-flat .app-footer p,
+body.ultra-flat .footer-note {
+  color: #111827 !important;
+}
 
 /* Responsive tweaks to preserve RWD */
 @media (max-width: 768px) {

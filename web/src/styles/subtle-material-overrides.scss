@@ -1,0 +1,183 @@
+/* Subtle Material Theme Overrides */
+/* Applied when body has class `subtle-material` */
+
+/* Base */
+body.subtle-material {
+  background: #f6f8fb !important; /* soft surface background */
+  color: #0f172a; /* neutral-900 */
+  /* Theme tokens */
+  --sm-surface: #ffffff;
+  --sm-border: #e5e7eb;
+  --sm-primary: #6366f1; /* indigo-500 */
+  --sm-primary-hover: #4f46e5; /* indigo-600 */
+  --sm-on-primary: #ffffff;
+  --sm-secondary: #f3f4f6; /* neutral-100 */
+  --sm-on-secondary: #0f172a;
+}
+
+body.subtle-material * {
+  text-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+/* Header */
+body.subtle-material .app-header {
+  background: var(--sm-surface) !important;
+  color: #0f172a !important;
+  border-bottom: 1px solid var(--sm-border) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+}
+
+body.subtle-material .app-header h1,
+body.subtle-material .app-header p {
+  -webkit-text-fill-color: initial !important;
+  background: none !important;
+  color: #0f172a !important;
+}
+
+/* Surfaces */
+body.subtle-material .card-container,
+body.subtle-material .content-card,
+body.subtle-material .video-option-card,
+body.subtle-material .statistics-summary,
+body.subtle-material .stat-card,
+body.subtle-material .monitor-header,
+body.subtle-material .pagination {
+  background: var(--sm-surface) !important;
+  border: 1px solid var(--sm-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04) !important;
+}
+
+/* Remove decorative overlays */
+body.subtle-material .stat-card::before,
+body.subtle-material .task-monitor { background: transparent !important; }
+
+/* View Toggle */
+body.subtle-material .view-toggle {
+  background: var(--sm-surface) !important;
+  border: 1px solid var(--sm-border) !important;
+  border-radius: 8px !important;
+  padding: 3px !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+}
+
+body.subtle-material .view-toggle .toggle-btn {
+  color: #334155 !important;
+  border-radius: 6px !important;
+}
+
+body.subtle-material .view-toggle .toggle-btn.active {
+  background: var(--sm-primary) !important;
+  color: var(--sm-on-primary) !important;
+}
+
+body.subtle-material .view-toggle .toggle-btn.active .toggle-icon { color: var(--sm-on-primary) !important; }
+
+/* Inputs */
+body.subtle-material input[type="text"],
+body.subtle-material input[type="file"],
+body.subtle-material select,
+body.subtle-material textarea,
+body.subtle-material .search-input,
+body.subtle-material .status-filter,
+body.subtle-material .video-option-select {
+  background: var(--sm-secondary) !important; /* neutral-100 */
+  border: 1px solid var(--sm-border) !important;
+  border-radius: 8px !important;
+}
+
+body.subtle-material .search-input:focus,
+body.subtle-material .status-filter:focus,
+body.subtle-material .video-option-select:focus {
+  outline: none !important;
+  border-color: var(--sm-primary) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25) !important;
+}
+
+/* Buttons */
+body.subtle-material .primary-btn,
+body.subtle-material .search-button,
+body.subtle-material .retry-button,
+body.subtle-material .page-button,
+body.subtle-material .advanced-options-button {
+  background: var(--sm-primary) !important;
+  color: var(--sm-on-primary) !important;
+  border: 1px solid var(--sm-primary) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+}
+
+body.subtle-material .primary-btn:hover,
+body.subtle-material .search-button:hover,
+body.subtle-material .retry-button:hover,
+body.subtle-material .page-button:hover,
+body.subtle-material .advanced-options-button:hover {
+  background: var(--sm-primary-hover) !important;
+  border-color: var(--sm-primary-hover) !important;
+}
+
+/* Secondary/neutral buttons */
+body.subtle-material .cancel-button,
+body.subtle-material .delete-button {
+  background: var(--sm-surface) !important;
+  color: var(--sm-on-secondary) !important;
+  border: 1px solid var(--sm-border) !important;
+  border-radius: 8px !important;
+}
+
+body.subtle-material .delete-button:hover { color: #dc2626 !important; border-color: #fecaca !important; background: #fff1f2 !important; }
+
+/* Watch (preview) button: keep light for emoji visibility */
+body.subtle-material .preview-button {
+  background: var(--sm-surface) !important;
+  color: var(--sm-on-secondary) !important;
+  border: 1px solid var(--sm-border) !important;
+  border-radius: 8px !important;
+}
+
+/* Video close */
+body.subtle-material .video-close-button {
+  background: var(--sm-primary) !important;
+  color: var(--sm-on-primary) !important;
+  border-color: var(--sm-primary) !important;
+}
+
+/* Stat icons */
+body.subtle-material .stat-icon {
+  background: var(--sm-primary) !important;
+  color: var(--sm-on-primary) !important;
+}
+
+/* Footer: standard surface with slight elevation (not glass) */
+body.subtle-material .app-footer {
+  background: var(--sm-surface) !important;
+  border-top: 1px solid var(--sm-border) !important;
+  box-shadow: 0 -1px 2px rgba(0,0,0,0.04) !important;
+}
+
+/* Footer text contrast */
+body.subtle-material .app-footer,
+body.subtle-material .app-footer p,
+body.subtle-material .footer-note {
+  color: #0f172a !important;
+}
+
+/* Focus visibility */
+body.subtle-material .primary-btn:focus,
+body.subtle-material .search-button:focus,
+body.subtle-material .retry-button:focus,
+body.subtle-material .preview-button:focus,
+body.subtle-material .cancel-button:focus,
+body.subtle-material .delete-button:focus,
+body.subtle-material .page-button:focus,
+body.subtle-material button:focus {
+  outline: 2px solid #3b82f6 !important;
+  outline-offset: 2px !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  body.subtle-material .view-toggle { width: 100% !important; }
+  body.subtle-material .view-toggle .toggle-btn { flex: 1 1 0 !important; justify-content: center !important; }
+}
