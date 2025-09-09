@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import './App.scss';
+// Ultra-flat design styles
+import './styles/ultra-flat-overrides.scss';
+import './styles/subtle-material-overrides.scss';
 import TaskMonitor from './components/TaskMonitor';
 
 // Constants for local storage keys
@@ -16,6 +19,9 @@ const LOCAL_STORAGE_KEYS = {
 
 // API configuration
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8000`;
+
+// UI Theme key
+const THEME_STORAGE_KEY = 'slidespeaker_ui_theme'; // 'flat' | 'classic' | 'material'
 
 // Define TypeScript interfaces
 interface StepDetails {
@@ -149,6 +155,26 @@ const localStorageUtils = {
 };
 
 function App() {
+  // UI theme: 'flat' (default) or 'classic'
+  const [uiTheme, setUiTheme] = useState<'flat' | 'classic' | 'material'>(() => {
+    try {
+      const saved = localStorage.getItem(THEME_STORAGE_KEY);
+      if (saved === 'classic' || saved === 'flat' || saved === 'material') return saved as 'flat' | 'classic' | 'material';
+    } catch {}
+    return 'flat';
+  });
+
+  // Apply/remove ultra-flat class based on theme
+  useEffect(() => {
+    const isFlat = uiTheme === 'flat';
+    const isMaterial = uiTheme === 'material';
+    document.body.classList.toggle('ultra-flat', isFlat);
+    document.body.classList.toggle('subtle-material', isMaterial);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, uiTheme);
+    } catch {}
+  }, [uiTheme]);
+
   const [file, setFile] = useState<File | null>(null);
   const [fileType, setFileType] = useState<string | null>(null); // Track file type for PDF vs PPT handling
   const [uploading, setUploading] = useState<boolean>(false);
@@ -1060,8 +1086,43 @@ function App() {
         )}
       </main>
 
-      <footer className="app-footer">
-        <p>Powered by SlideSpeaker AI • Where presentations become your masterpiece</p>
+      {/* Footer with note + Theme toggle at the bottom */}
+      <footer className="app-footer" role="contentinfo">
+        <div className="footer-content">
+          <p className="footer-note">Powered by SlideSpeaker AI • Where presentations become your masterpiece</p>
+          <div className="view-toggle theme-toggle" role="tablist" aria-label="Theme Toggle">
+            <button
+              onClick={() => setUiTheme('classic')}
+              className={`toggle-btn ${uiTheme === 'classic' ? 'active' : ''}`}
+              title="Modern Theme"
+              role="tab"
+              aria-selected={uiTheme === 'classic'}
+              aria-controls="modern-theme-panel"
+            >
+              <span className="toggle-text">Modern</span>
+            </button>
+            <button
+              onClick={() => setUiTheme('flat')}
+              className={`toggle-btn ${uiTheme === 'flat' ? 'active' : ''}`}
+              title="Flat Theme"
+              role="tab"
+              aria-selected={uiTheme === 'flat'}
+              aria-controls="flat-theme-panel"
+            >
+              <span className="toggle-text">Flat</span>
+            </button>
+            <button
+              onClick={() => setUiTheme('material')}
+              className={`toggle-btn ${uiTheme === 'material' ? 'active' : ''}`}
+              title="Material Theme"
+              role="tab"
+              aria-selected={uiTheme === 'material'}
+              aria-controls="material-theme-panel"
+            >
+              <span className="toggle-text">Material</span>
+            </button>
+          </div>
+        </div>
       </footer>
     </div>
   );
