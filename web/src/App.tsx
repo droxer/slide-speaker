@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
 import './App.scss';
+// Ultra-flat design styles
+import './styles/ultra-flat-overrides.scss';
 import TaskMonitor from './components/TaskMonitor';
 
 // Constants for local storage keys
@@ -16,6 +18,9 @@ const LOCAL_STORAGE_KEYS = {
 
 // API configuration
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8000`;
+
+// UI Theme key
+const THEME_STORAGE_KEY = 'slidespeaker_ui_theme'; // 'flat' | 'classic'
 
 // Define TypeScript interfaces
 interface StepDetails {
@@ -149,6 +154,24 @@ const localStorageUtils = {
 };
 
 function App() {
+  // UI theme: 'flat' (default) or 'classic'
+  const [uiTheme, setUiTheme] = useState<'flat' | 'classic'>(() => {
+    try {
+      const saved = localStorage.getItem(THEME_STORAGE_KEY);
+      if (saved === 'classic' || saved === 'flat') return saved;
+    } catch {}
+    return 'flat';
+  });
+
+  // Apply/remove ultra-flat class based on theme
+  useEffect(() => {
+    const isFlat = uiTheme === 'flat';
+    document.body.classList.toggle('ultra-flat', isFlat);
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, uiTheme);
+    } catch {}
+  }, [uiTheme]);
+
   const [file, setFile] = useState<File | null>(null);
   const [fileType, setFileType] = useState<string | null>(null); // Track file type for PDF vs PPT handling
   const [uploading, setUploading] = useState<boolean>(false);
@@ -1059,6 +1082,34 @@ function App() {
           </div>
         )}
       </main>
+
+      {/* Footer with Theme toggle at the bottom */}
+      <footer className="app-footer" role="contentinfo">
+        <div className="footer-content">
+          <div className="view-toggle theme-toggle" role="tablist" aria-label="Theme Toggle">
+            <button
+              onClick={() => setUiTheme('classic')}
+              className={`toggle-btn ${uiTheme === 'classic' ? 'active' : ''}`}
+              title="Classic Theme"
+              role="tab"
+              aria-selected={uiTheme === 'classic'}
+              aria-controls="classic-theme-panel"
+            >
+              <span className="toggle-text">Classic</span>
+            </button>
+            <button
+              onClick={() => setUiTheme('flat')}
+              className={`toggle-btn ${uiTheme === 'flat' ? 'active' : ''}`}
+              title="Ultra Flat Theme"
+              role="tab"
+              aria-selected={uiTheme === 'flat'}
+              aria-controls="flat-theme-panel"
+            >
+              <span className="toggle-text">Flat</span>
+            </button>
+          </div>
+        </div>
+      </footer>
 
       <footer className="app-footer">
         <p>Powered by SlideSpeaker AI • Where presentations become your masterpiece</p>

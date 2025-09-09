@@ -351,6 +351,38 @@ body {
   width: 100%;
 }
 
+/* Footer */
+.app-footer {
+  border-top: 1px solid #e5e7eb;
+  background: #ffffff;
+  /* not fixed; sits in normal flow */
+}
+
+/* Classic theme: subtle glass footer (sticky retained) */
+body:not(.ultra-flat) .app-footer {
+  background: rgba(255, 255, 255, 0.08);
+  border-top-color: rgba(255, 255, 255, 0.2);
+  backdrop-filter: saturate(160%) blur(12px);
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: var(--footer-height);
+}
+
+@media (max-width: 768px) {
+  .footer-content {
+    padding: 0.75rem 1rem;
+  }
+}
+
+/* Footer is not fixed; no extra bottom padding needed */
+
 .card-container {
   display: flex;
   justify-content: center;
@@ -2158,6 +2190,9 @@ body {
 .ai-notice-subtle {
   text-align: center;
   margin: 0.75rem 0;
+:root {
+  --footer-height: 56px;
+}
   font-size: 0.75rem;
   color: #6b7280;
   font-weight: 400;
