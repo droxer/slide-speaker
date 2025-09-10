@@ -1106,7 +1106,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.6); /* Darker backdrop for stronger focus */
+  background: rgba(0, 0, 0, 0.6); /* Dim background for focused viewing */
   backdrop-filter: none; /* Keep video bright */
   display: flex;
   align-items: center;
@@ -1192,7 +1192,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  backdrop-filter: blur(10px);
+  backdrop-filter: none;
   
   &:hover {
     background: rgba(255, 255, 255, 0.25);
@@ -1234,12 +1234,16 @@
   padding: 0;
   margin: 0;
   position: relative;
-  background: transparent;
+  background: #000; /* neutral backdrop behind video */
   width: 100%;
   min-height: 300px;
   max-height: calc(90vh - 60px);
   overflow: hidden;
-  border-radius: 0;
+  border-radius: 12px; /* soften edges */
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  opacity: 1 !important;
   
   @media (max-width: 768px) {
     min-height: 200px;
@@ -1261,6 +1265,9 @@
   justify-content: center;
   align-items: center;
   overflow: visible; /* Allow controls to overflow if needed */
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  opacity: 1 !important;
 }
 
 .subtitle-indicator {
@@ -1268,15 +1275,15 @@
   bottom: 60px;
   left: 50%;
   transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.3); /* Lighter subtitle background to avoid dimming video */
+  background: rgba(0, 0, 0, 0.18); /* Subtle pill for a clean look */
   color: #ffffff;
   padding: 8px 16px;
-  border-radius: 20px;
+  border-radius: 16px;
   font-size: 14px;
   font-weight: 500;
   z-index: 25; /* Above video player but below controls and overlays */
   backdrop-filter: none; /* Keep text crisp without darkening */
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  border: 0;
   animation: fadeIn 0.5s ease;
   pointer-events: none;
   text-align: center;
@@ -1308,9 +1315,13 @@
   max-width: 100%;
   height: 100%;
   max-height: 100%;
-  border-radius: 0;
+  border-radius: 12px;
   object-fit: contain;
   z-index: 10;
+  background: transparent !important;
+  filter: none !important;
+  mix-blend-mode: normal !important;
+  opacity: 1 !important;
   
   /* Ensure native controls are visible */
   &::-webkit-media-controls {
@@ -1484,26 +1495,7 @@
   z-index: 30; /* Above video player but below controls */
   pointer-events: none; /* Don't block user interaction with video controls */
   
-  &.loading {
-    background: transparent; /* Do not dim during loading */
-    pointer-events: none; /* don't block user interaction with the video */
-    
-    .loading-spinner {
-      width: 40px;
-      height: 40px;
-      border: 3px solid rgba(255, 255, 255, 0.3);
-      border-top: 3px solid #ffffff;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 16px;
-    }
-    
-    p {
-      font-size: 16px;
-      margin: 0;
-      opacity: 0.9;
-    }
-  }
+  &.loading { display: none !important; }
   
   &.error {
     background: rgba(239, 68, 68, 0.8);
@@ -1538,3 +1530,5 @@
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* indeterminate animation removed with loading overlay */

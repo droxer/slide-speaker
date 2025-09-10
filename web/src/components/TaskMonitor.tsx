@@ -97,6 +97,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
   const [selectedTaskForPreview, setSelectedTaskForPreview] = useState<Task | null>(null);
   const [subtitleAvailable, setSubtitleAvailable] = useState<boolean>(false);
   const [subtitleLoading, setSubtitleLoading] = useState<boolean>(false);
+  const [subtitleObjectUrl, setSubtitleObjectUrl] = useState<string | null>(null);
   const [videoLoading, setVideoLoading] = useState<boolean>(true);
   const [videoError, setVideoError] = useState<string | null>(null);
   const modalVideoRef = React.useRef<HTMLVideoElement | null>(null);
@@ -112,18 +113,43 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     console.log('TaskMonitor apiBaseUrl:', apiBaseUrl);
   }, [apiBaseUrl]);
 
-  // Check subtitle availability when task is selected for preview
+  // Load subtitles when task is selected for preview (GET -> Blob URL)
   useEffect(() => {
     const checkSubtitles = async () => {
-      if (selectedTaskForPreview) {
-        setSubtitleLoading(true);
-        const subtitleUrl = `${apiBaseUrl}/api/subtitles/${selectedTaskForPreview.file_id}/vtt`;
-        const result = await checkSubtitleExists(subtitleUrl);
-        setSubtitleAvailable(result.exists);
-        console.log('Subtitle availability check:', { url: subtitleUrl, ...result });
-        setSubtitleLoading(false);
-      } else {
+      if (!selectedTaskForPreview) {
         setSubtitleAvailable(false);
+        setSubtitleLoading(false);
+        if (subtitleObjectUrl) {
+          URL.revokeObjectURL(subtitleObjectUrl);
+          setSubtitleObjectUrl(null);
+        }
+        return;
+      }
+
+      setSubtitleLoading(true);
+      const url = `${apiBaseUrl}/api/subtitles/${selectedTaskForPreview.file_id}/vtt`;
+      try {
+        const resp = await fetch(url, { headers: { Accept: 'text/vtt,*/*' } });
+        if (resp.ok) {
+          const text = await resp.text();
+          const blob = new Blob([text], { type: 'text/vtt' });
+          const obj = URL.createObjectURL(blob);
+          if (subtitleObjectUrl) URL.revokeObjectURL(subtitleObjectUrl);
+          setSubtitleObjectUrl(obj);
+          setSubtitleAvailable(true);
+          console.log('✅ Subtitles loaded via API proxy');
+        } else {
+          console.warn('Subtitle GET failed', resp.status);
+          if (subtitleObjectUrl) URL.revokeObjectURL(subtitleObjectUrl);
+          setSubtitleObjectUrl(null);
+          setSubtitleAvailable(false);
+        }
+      } catch (e) {
+        console.warn('Subtitle GET error', e);
+        if (subtitleObjectUrl) URL.revokeObjectURL(subtitleObjectUrl);
+        setSubtitleObjectUrl(null);
+        setSubtitleAvailable(false);
+      } finally {
         setSubtitleLoading(false);
       }
     };
@@ -131,25 +157,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     checkSubtitles();
   }, [selectedTaskForPreview, apiBaseUrl]);
 
-  // Ensure the modal video actually loads and plays when a task is selected
-  useEffect(() => {
-    if (selectedTaskForPreview && modalVideoRef.current) {
-      const url = `${apiBaseUrl}/api/video/${selectedTaskForPreview.file_id}`;
-      try {
-        console.log('Assigning modal video src:', url);
-        modalVideoRef.current.src = url;
-        // Force a load cycle to ensure network request is issued
-        modalVideoRef.current.load();
-        // Attempt autoplay (may be blocked with sound until interaction)
-        const p = modalVideoRef.current.play();
-        if (p && typeof p.then === 'function') {
-          p.catch((err) => console.log('Autoplay blocked (expected until user interaction):', err));
-        }
-      } catch (e) {
-        console.warn('Failed to initialize modal video element:', e);
-      }
-    }
-  }, [selectedTaskForPreview, apiBaseUrl]);
+  // No imperative src assignment; <video src> handles local and S3 redirect
 
   // Fetch tasks and statistics
   const fetchTasks = React.useCallback(async () => {
@@ -761,7 +769,9 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                       playsInline
                       preload="auto"
                       className="video-player"
-                      crossOrigin="anonymous"
+                      // Avoid forcing CORS preflight for OSS/S3 video playback
+                      // by not setting crossOrigin; let the browser fetch normally
+                      src={videoUrl}
                       onLoadStart={() => {
                         console.log('Video loading started:', videoUrl, 'ref exists?', !!modalVideoRef.current);
                         setVideoLoading(true);
@@ -805,7 +815,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                       {subtitleAvailable && !subtitleLoading && (
                         <track
                           kind="subtitles"
-                          src={subtitleUrl}
+                          src={subtitleObjectUrl || subtitleUrl}
                           srcLang={subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 
                                    subtitleLanguage === 'traditional_chinese' ? 'zh-Hant' : 
                                    subtitleLanguage === 'japanese' ? 'ja' : 
@@ -827,12 +837,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                     </div>
                     
                     {/* Video loading and error states */}
-                    {videoLoading && (
-                      <div className="video-status-overlay loading">
-                        <div className="loading-spinner"></div>
-                        <p>Loading video...</p>
-                      </div>
-                    )}
+                    {/* Loading overlay removed per request */}
                     
                     {videoError && (
                       <div className="video-status-overlay error">
