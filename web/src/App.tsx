@@ -17,8 +17,18 @@ const LOCAL_STORAGE_KEYS = {
   FILE_TYPE: 'slidespeaker_file_type' // Add file type tracking for PDF vs PPT handling
 };
 
-// API configuration
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || `${window.location.protocol}//${window.location.hostname}:8000`;
+// API configuration – prefer same-origin when served over HTTPS to avoid mixed-content blocks
+const API_BASE_URL = (() => {
+  const env = process.env.REACT_APP_API_BASE_URL;
+  if (env !== undefined) return env;
+  const { protocol, hostname } = window.location;
+  if (protocol === 'https:') {
+    // Use same-origin '/api' paths; rely on reverse proxy in production
+    return '';
+  }
+  // Local dev over HTTP
+  return `${protocol}//${hostname}:8000`;
+})();
 
 // UI Theme key
 const THEME_STORAGE_KEY = 'slidespeaker_ui_theme'; // 'flat' | 'classic' | 'material'
@@ -161,7 +171,7 @@ function App() {
       const saved = localStorage.getItem(THEME_STORAGE_KEY);
       if (saved === 'classic' || saved === 'flat' || saved === 'material') return saved as 'flat' | 'classic' | 'material';
     } catch {}
-    return 'flat';
+    return 'classic';
   });
 
   // Apply/remove ultra-flat class based on theme
@@ -538,7 +548,7 @@ function App() {
       'segment_pdf_content': 'Segmenting Content',
       'analyze_pdf_content': 'Analyzing Content',
       'revise_pdf_transcripts': 'Revising Transcripts',
-      'generate_pdf_chapter_images': 'Creating Chapter Images',
+      'generate_pdf_chapter_images': 'Creating Video Frames',
       'generate_pdf_audio': 'Generating Audio',
       'generate_pdf_subtitles': 'Creating Subtitles',
       'compose_pdf_video': 'Composing Video',
@@ -588,7 +598,7 @@ function App() {
         'Generating Audio': 'Creating natural voice narration...',
         'Creating Avatar': 'Bringing AI presenter to life...',
         'Converting Slides': `Preparing ${fileTypeText} for video composition...`,
-        'Creating Chapter Images': isPdf ? 'Creating visual representations for chapters...' : 'Creating visual representations for slides...',
+        'Creating Video Frames': isPdf ? 'Creating visual representations for chapters...' : 'Creating visual representations for slides...',
         'Composing Video': 'Bringing all elements together...'
       };
       return statusMessages[stepName] || `Working on: ${stepName}`;

@@ -28,7 +28,7 @@ class OpenAITTSService(TTSInterface):
         self.default_voice = os.getenv("OPENAI_TTS_VOICE", "alloy")
 
         # Validate model
-        valid_models = ["tts-1", "tts-1-hd", "gpt-4o-tts", "gpt-4o-mini-tts"]
+        valid_models = ["tts-1", "tts-1-hd", "gpt-4o-mini-tts"]
         if self.model not in valid_models:
             logger.warning(
                 f"Invalid OpenAI TTS model '{self.model}'. "
@@ -50,7 +50,6 @@ class OpenAITTSService(TTSInterface):
         # Language-specific voice mapping
         voice_mapping: dict[str, str] = {
             "english": "alloy",
-            "chinese": "onyx",
             "simplified_chinese": "onyx",
             "traditional_chinese": "onyx",
             "japanese": "nova",
