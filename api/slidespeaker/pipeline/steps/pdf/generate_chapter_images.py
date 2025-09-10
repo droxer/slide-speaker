@@ -20,7 +20,7 @@ image_generator = SharedImageGenerator()
 storage_provider = get_storage_provider()
 
 
-async def generate_chapter_images_step(file_id: str, language: str = "english") -> None:
+async def generate_frames_step(file_id: str, language: str = "english") -> None:
     """
     Generate slide-like images for PDF chapters.
 

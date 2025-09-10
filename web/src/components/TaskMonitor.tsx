@@ -2,32 +2,6 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import './TaskMonitor.scss';
 
-// Function to check if subtitle file exists with better error handling
-const checkSubtitleExists = async (url: string): Promise<{exists: boolean, error?: string}> => {
-  try {
-    const response = await fetch(url, { 
-      method: 'HEAD',
-      headers: {
-        'Accept': 'text/vtt,text/plain,*/*'
-      }
-    });
-    
-    if (response.ok) {
-      console.log('✅ Subtitle file found:', url);
-      return { exists: true };
-    } else if (response.status === 404) {
-      console.log('❌ Subtitle file not found (404):', url);
-      return { exists: false, error: 'Subtitle file not found' };
-    } else {
-      console.log('⚠️ Subtitle file check failed:', response.status, url);
-      return { exists: false, error: `HTTP ${response.status}` };
-    }
-  } catch (error) {
-    console.log('❌ Subtitle file check error:', error, url);
-    return { exists: false, error: 'Network error' };
-  }
-};
-
 // Types for task monitoring
 interface TaskState {
   status: string;
@@ -98,7 +72,6 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
   const [subtitleAvailable, setSubtitleAvailable] = useState<boolean>(false);
   const [subtitleLoading, setSubtitleLoading] = useState<boolean>(false);
   const [subtitleObjectUrl, setSubtitleObjectUrl] = useState<string | null>(null);
-  const [videoLoading, setVideoLoading] = useState<boolean>(true);
   const [videoError, setVideoError] = useState<string | null>(null);
   const modalVideoRef = React.useRef<HTMLVideoElement | null>(null);
   const [removingTaskIds, setRemovingTaskIds] = useState<Set<string>>(new Set());
@@ -134,13 +107,11 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
           const text = await resp.text();
           const blob = new Blob([text], { type: 'text/vtt' });
           const obj = URL.createObjectURL(blob);
-          if (subtitleObjectUrl) URL.revokeObjectURL(subtitleObjectUrl);
           setSubtitleObjectUrl(obj);
           setSubtitleAvailable(true);
-          console.log('✅ Subtitles loaded via API proxy');
+          // subtitles loaded
         } else {
           console.warn('Subtitle GET failed', resp.status);
-          if (subtitleObjectUrl) URL.revokeObjectURL(subtitleObjectUrl);
           setSubtitleObjectUrl(null);
           setSubtitleAvailable(false);
         }
@@ -155,9 +126,16 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     };
     
     checkSubtitles();
-  }, [selectedTaskForPreview, apiBaseUrl]);
+  }, [selectedTaskForPreview, apiBaseUrl, subtitleObjectUrl]);
 
   // No imperative src assignment; <video src> handles local and S3 redirect
+
+  // Cleanup subtitle Blob URL on unmount/changes
+  useEffect(() => {
+    return () => {
+      if (subtitleObjectUrl) URL.revokeObjectURL(subtitleObjectUrl);
+    };
+  }, [subtitleObjectUrl]);
 
   // Fetch tasks and statistics
   const fetchTasks = React.useCallback(async () => {
@@ -356,7 +334,6 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
       
       // PDF-specific steps
       'segment_pdf_content': 'Segmenting Content',
-      'analyze_pdf_content': 'Analyzing Content',
       'revise_pdf_transcripts': 'Revising Transcripts',
       'generate_pdf_chapter_images': 'Creating Video Frames',
       'generate_pdf_audio': 'Generating Audio',
@@ -750,14 +727,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                 const voiceLanguage = selectedTaskForPreview.kwargs?.voice_language || selectedTaskForPreview.state?.voice_language || 'english';
                 const subtitleLanguage = selectedTaskForPreview.kwargs?.subtitle_language || selectedTaskForPreview.state?.subtitle_language || voiceLanguage;
                 
-                console.log('Video preview debug:', {
-                  hasSubtitlesFlag: selectedTaskForPreview.kwargs?.generate_subtitles,
-                  subtitleLanguage: subtitleLanguage,
-                  subtitleAvailable: subtitleAvailable,
-                  subtitleLoading: subtitleLoading,
-                  subtitleUrl: subtitleUrl,
-                  fileId: selectedTaskForPreview.file_id
-                });
+                
                 
                 return (
                   <div className="modal-video-wrapper">
@@ -772,43 +742,19 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                       // Avoid forcing CORS preflight for OSS/S3 video playback
                       // by not setting crossOrigin; let the browser fetch normally
                       src={videoUrl}
-                      onLoadStart={() => {
-                        console.log('Video loading started:', videoUrl, 'ref exists?', !!modalVideoRef.current);
-                        setVideoLoading(true);
-                        setVideoError(null);
-                      }}
-                      onLoadedData={() => {
-                        console.log('Video data loaded successfully');
-                        setVideoLoading(false);
-                      }}
-                      onCanPlay={() => {
-                        console.log('Video can play');
-                        setVideoLoading(false);
-                      }}
-                      onCanPlayThrough={() => {
-                        console.log('Video can play through');
-                        setVideoLoading(false);
-                      }}
-                      onStalled={() => {
-                        console.warn('Video stalled');
-                      }}
-                      onWaiting={() => {
-                        console.log('Video waiting (buffering)');
-                      }}
+                      onLoadStart={() => setVideoError(null)}
+                      
                       onError={(e) => {
                         console.error('Video loading error:', e);
                         setVideoError('Failed to load video');
-                        setVideoLoading(false);
+                        
                       }}
-                      onPlay={() => console.log('Video playback started')}
-                      onPause={() => console.log('Video playback paused')}
+                      onPlay={() => void 0}
+                      onPause={() => void 0}
                       onLoadedMetadata={(e) => {
-                        console.log('Video metadata loaded');
                         const video = e.currentTarget as HTMLVideoElement;
                         // Attempt playback; browsers may require interaction if audio is unmuted
-                        video.play().catch(error => {
-                          console.log('Autoplay prevented, user interaction may be required:', error);
-                        });
+                        video.play().catch(() => {/* Autoplay may be blocked until user interaction */});
                       }}
                     >
                       {/* No <source> tag needed; using src on <video> */}
@@ -845,7 +791,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                         <button 
                           onClick={() => {
                             setVideoError(null);
-                            setVideoLoading(true);
+                            // reload video without tracking loading state
                             // Force video reload by changing src slightly
                             const video = document.querySelector('.video-player') as HTMLVideoElement;
                             if (video) {
@@ -860,19 +806,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                       </div>
                     )}
                     
-                    {/* Subtitle status indicator */}
-                    {subtitleLoading && (
-                      <div className="subtitle-indicator loading">
-                        💬 Checking subtitles...
-                      </div>
-                    )}
-                    
-                    
-                    {!subtitleAvailable && !subtitleLoading && selectedTaskForPreview.kwargs?.generate_subtitles && (
-                      <div className="subtitle-indicator not-available">
-                        💬 Subtitles not found for this video
-                      </div>
-                    )}
+                    {/* Subtitle indicator removed per request */}
                   </div>
                 );
               })()}

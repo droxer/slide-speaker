@@ -51,25 +51,35 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
         state = await state_manager.get_state(file_id)
         chapters: list[dict[str, Any]] = []
 
-        # Check for translated voice transcripts first
+        # Preferred: use revised transcripts if available (ensures best quality)
+        if (
+            state
+            and "steps" in state
+            and "revise_pdf_transcripts" in state["steps"]
+            and state["steps"]["revise_pdf_transcripts"].get("status") == "completed"
+            and state["steps"]["revise_pdf_transcripts"].get("data") is not None
+        ):
+            chapters = state["steps"]["revise_pdf_transcripts"]["data"]
+            logger.info("Using revised transcripts for PDF audio generation")
+
+        # Next: use translated voice transcripts if present (overrides revised if applicable)
         if (
             state
             and "steps" in state
             and "translate_voice_transcripts" in state["steps"]
-            and state["steps"]["translate_voice_transcripts"]["data"] is not None
             and state["steps"]["translate_voice_transcripts"].get("status")
             == "completed"
+            and state["steps"]["translate_voice_transcripts"].get("data") is not None
         ):
-            # Use translated transcripts
             translated_transcripts = state["steps"]["translate_voice_transcripts"][
                 "data"
             ]
-            # Get original chapters and update with translated transcripts
+            # Start from original chapters to preserve structure and metadata
             if (
                 state
                 and "steps" in state
                 and "segment_pdf_content" in state["steps"]
-                and state["steps"]["segment_pdf_content"]["data"] is not None
+                and state["steps"]["segment_pdf_content"].get("data") is not None
             ):
                 original_chapters = state["steps"]["segment_pdf_content"]["data"]
                 chapters = []
@@ -80,13 +90,17 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
                             "script", chapter.get("script", "")
                         )
                     chapters.append(updated_chapter)
-            logger.info("Using translated voice transcripts for PDF audio generation")
-        # Fall back to original chapters with English transcripts
-        elif (
-            state
+                logger.info(
+                    "Using translated voice transcripts for PDF audio generation"
+                )
+
+        # Fallback: original chapters with English transcripts
+        if (
+            not chapters
+            and state
             and "steps" in state
             and "segment_pdf_content" in state["steps"]
-            and state["steps"]["segment_pdf_content"]["data"] is not None
+            and state["steps"]["segment_pdf_content"].get("data") is not None
         ):
             chapters = state["steps"]["segment_pdf_content"]["data"]
             logger.info("Using original English transcripts for PDF audio generation")
@@ -104,20 +118,25 @@ async def generate_audio_step(file_id: str, language: str = "english") -> None:
         failed_chapters = []
         for i, chapter in enumerate(chapters):
             script = chapter.get("script", "")
-            if script:
-                audio_path = audio_dir / f"chapter_{i + 1}.mp3"
-                success = await audio_generator.generate_audio(
-                    script, str(audio_path), language
-                )
-                if success:
-                    audio_local_paths.append(audio_path)
-                else:
-                    failed_chapters.append(i + 1)
-                    logger.error(f"Failed to generate audio for chapter {i + 1}")
-            else:
+            if not script or not str(script).strip():
                 failed_chapters.append(i + 1)
                 logger.warning(
                     f"Skipping audio generation for chapter {i + 1} due to empty transcript"
+                )
+                continue
+
+            audio_path = audio_dir / f"chapter_{i + 1}.mp3"
+            success = await audio_generator.generate_audio(
+                script, str(audio_path), language
+            )
+
+            # Treat missing file as failure even if the generator returned success
+            if success and audio_path.exists():
+                audio_local_paths.append(audio_path)
+            else:
+                failed_chapters.append(i + 1)
+                logger.error(
+                    f"Failed to generate audio for chapter {i + 1} (exists={audio_path.exists()})"
                 )
 
         # If any chapters failed, raise an exception to prevent downstream issues

@@ -43,7 +43,6 @@ class RedisStateManager:
             # PDF-specific steps
             steps = {
                 "segment_pdf_content": {"status": "pending", "data": None},
-                "analyze_pdf_content": {"status": "pending", "data": None},
                 "revise_pdf_transcripts": {"status": "pending", "data": None},
                 "generate_pdf_chapter_images": {"status": "pending", "data": None},
                 "generate_pdf_audio": {"status": "pending", "data": None},

@@ -14,10 +14,9 @@ from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 
 from .steps.pdf import (
-    analyze_content_step,
     compose_video_step,
     generate_audio_step,
-    generate_chapter_images_step,
+    generate_frames_step,
     generate_subtitles_step,
     revise_transcripts_step,
     segment_content_step,
@@ -36,18 +35,16 @@ def _get_pdf_processing_steps(
 
     The steps are:
     1. Segment PDF content into chapters
-    2. Analyze PDF content
-    3. Generate and revise English transcripts first
-    4. Translate transcripts if needed
-    5. Generate chapter images
-    6. Generate audio for chapters
-    7. Generate subtitles (if requested)
-    8. Compose final video
+    2. Generate and revise English transcripts first
+    3. Translate transcripts if needed
+    4. Generate chapter images
+    5. Generate audio for chapters
+    6. Generate subtitles (if requested)
+    7. Compose final video
     """
     # Always generate English transcripts first
     steps_order = [
         "segment_pdf_content",
-        "analyze_pdf_content",
         "revise_pdf_transcripts",  # Revise English transcripts first
     ]
 
@@ -104,7 +101,6 @@ async def _execute_pdf_step(
     if state and state["steps"][step_name]["status"] == "completed":
         step_display_names = {
             "segment_pdf_content": "Segmenting PDF content into chapters",
-            "analyze_pdf_content": "Analyzing PDF content",
             "revise_pdf_transcripts": "Revising and refining chapter transcripts",
             "translate_voice_transcripts": "Translating voice transcripts",
             "translate_subtitle_transcripts": "Translating subtitle transcripts",
@@ -125,7 +121,6 @@ async def _execute_pdf_step(
     ]:
         step_display_names = {
             "segment_pdf_content": "Segmenting PDF content into chapters",
-            "analyze_pdf_content": "Analyzing PDF content",
             "revise_pdf_transcripts": "Revising and refining chapter transcripts",
             "translate_voice_transcripts": "Translating voice transcripts",
             "translate_subtitle_transcripts": "Translating subtitle transcripts",
@@ -150,10 +145,6 @@ async def _execute_pdf_step(
                 await segment_content_step(
                     file_id, file_path, "english"
                 )  # Always use English first
-            elif step_name == "analyze_pdf_content":
-                await analyze_content_step(
-                    file_id, "english"
-                )  # Always use English first
             elif step_name == "revise_pdf_transcripts":
                 await revise_transcripts_step(
                     file_id, "english"
@@ -166,7 +157,7 @@ async def _execute_pdf_step(
                 subtitle_lang = subtitle_language or voice_language
                 await translate_subtitle_transcripts_step(file_id, subtitle_lang)
             elif step_name == "generate_pdf_chapter_images":
-                await generate_chapter_images_step(file_id, voice_language)
+                await generate_frames_step(file_id, voice_language)
             elif step_name == "generate_pdf_audio":
                 await generate_audio_step(file_id, voice_language)
             elif step_name == "generate_pdf_subtitles":
@@ -365,7 +356,6 @@ async def _log_initial_pdf_state(file_id: str) -> None:
         for step_name, step_data in state["steps"].items():
             step_display_names = {
                 "segment_pdf_content": "Segmenting PDF content into chapters",
-                "analyze_pdf_content": "Analyzing PDF content",
                 "revise_pdf_transcripts": "Revising and refining chapter transcripts",
                 "translate_voice_transcripts": "Translating voice transcripts",
                 "translate_subtitle_transcripts": "Translating subtitle transcripts",

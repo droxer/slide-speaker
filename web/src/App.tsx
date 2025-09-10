@@ -546,7 +546,6 @@ function App() {
       
       // PDF-specific steps
       'segment_pdf_content': 'Segmenting Content',
-      'analyze_pdf_content': 'Analyzing Content',
       'revise_pdf_transcripts': 'Revising Transcripts',
       'generate_pdf_chapter_images': 'Creating Video Frames',
       'generate_pdf_audio': 'Generating Audio',
@@ -884,7 +883,6 @@ function App() {
                         // PDF-specific steps
                         [
                           'segment_pdf_content',
-                          'analyze_pdf_content',
                           'revise_pdf_transcripts',
                           'translate_voice_transcripts',
                           'translate_subtitle_transcripts',
