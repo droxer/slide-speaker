@@ -9,7 +9,8 @@ from pathlib import Path
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.processing.pdf_analyzer import PDFAnalyzer
+from slidespeaker.document import PDFAnalyzer
+from slidespeaker.transcript.markdown import transcripts_to_markdown
 
 
 async def segment_content_step(
@@ -45,6 +46,17 @@ async def segment_content_step(
         await state_manager.update_step_status(
             file_id, "segment_pdf_content", "completed", chapters
         )
+        # Persist Markdown view for segmented chapters
+        try:
+            state = await state_manager.get_state(file_id)
+            if state and "steps" in state and "segment_pdf_content" in state["steps"]:
+                md = transcripts_to_markdown(
+                    chapters, section_label="Chapter", filename=state.get("filename")
+                )
+                state["steps"]["segment_pdf_content"]["markdown"] = md
+                await state_manager._save_state(file_id, state)
+        except Exception:
+            pass
         logger.info(f"Segmented PDF into {len(chapters)} chapters for file: {file_id}")
 
     except Exception as e:

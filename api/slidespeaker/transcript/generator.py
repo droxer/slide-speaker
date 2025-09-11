@@ -38,7 +38,11 @@ class TranscriptGenerator:
 
     def __init__(self) -> None:
         """Initialize the transcript generator with OpenAI client"""
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        # Get API key from environment (this is a special case that's not in config)
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is required")
+        self.client = OpenAI(api_key=api_key)
         self.model: str = os.getenv("SCRIPT_GENERATOR_MODEL", "gpt-4o-mini")
 
     async def generate_transcript(

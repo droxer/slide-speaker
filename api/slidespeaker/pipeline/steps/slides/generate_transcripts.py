@@ -9,7 +9,8 @@ natural, engaging transcripts suitable for AI avatar presentation.
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.processing.transcript_generator import TranscriptGenerator
+from slidespeaker.transcript import TranscriptGenerator
+from slidespeaker.transcript.markdown import transcripts_to_markdown
 
 transcript_generator = TranscriptGenerator()
 
@@ -80,3 +81,15 @@ async def generate_transcripts_step(
         transcripts.append({"slide_number": i + 1, "script": transcript})
 
     await state_manager.update_step_status(file_id, step_name, "completed", transcripts)
+    # Persist Markdown representation as intermediate metadata without altering data shape
+    try:
+        state = await state_manager.get_state(file_id)
+        if state and "steps" in state and step_name in state["steps"]:
+            md = transcripts_to_markdown(
+                transcripts, section_label="Slide", filename=state.get("filename")
+            )
+            state["steps"][step_name]["markdown"] = md
+            await state_manager._save_state(file_id, state)
+    except Exception:
+        # Non-fatal: markdown persistence should not break the pipeline
+        pass

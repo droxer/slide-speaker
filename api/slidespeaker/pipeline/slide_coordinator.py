@@ -49,13 +49,22 @@ def _get_processing_steps(
         "revise_transcripts",  # Revise English transcripts first
     ]
 
-    # Add translation steps for voice if language is not English
-    if voice_language.lower() != "english":
+    # Add translation steps, dedupe when voice/subtitle languages match
+    add_voice = voice_language.lower() != "english"
+    add_sub = bool(subtitle_language and subtitle_language.lower() != "english")
+    if (
+        add_voice
+        and add_sub
+        and subtitle_language
+        and (voice_language.lower() == subtitle_language.lower())
+    ):
+        # Same target language for both; schedule one step
         steps_order.extend(["translate_voice_transcripts"])
-
-    # Add translation steps for subtitles if subtitle language is specified and not English
-    if subtitle_language and subtitle_language.lower() != "english":
-        steps_order.extend(["translate_subtitle_transcripts"])
+    else:
+        if add_voice:
+            steps_order.extend(["translate_voice_transcripts"])
+        if add_sub:
+            steps_order.extend(["translate_subtitle_transcripts"])
 
     # Continue with audio generation using translated transcripts (if applicable)
     steps_order.extend(["generate_audio"])
@@ -71,6 +80,38 @@ def _get_processing_steps(
     steps_order.append("compose_video")
 
     return steps_order
+
+
+def _format_step_display_name(
+    step_name: str, voice_language: str | None, subtitle_language: str | None
+) -> str:
+    """Return a human-friendly name for a pipeline step.
+
+    When voice and subtitle languages match (and are non-English), collapse
+    translation steps into a unified "Translating transcripts" label.
+    """
+    base_names: dict[str, str] = {
+        "extract_slides": "Extracting presentation content",
+        "convert_slides_to_images": "Converting slides to images",
+        "analyze_slide_images": "Analyzing visual content",
+        "generate_transcripts": "Generating AI narratives",
+        "generate_subtitle_transcripts": "Generating subtitle narratives",
+        "revise_transcripts": "Revising and refining transcripts",
+        "translate_voice_transcripts": "Translating voice transcripts",
+        "translate_subtitle_transcripts": "Translating subtitle transcripts",
+        "generate_audio": "Synthesizing voice audio",
+        "generate_avatar_videos": "Creating AI presenter videos",
+        "generate_subtitles": "Generating subtitles",
+        "compose_video": "Composing final presentation",
+    }
+
+    if step_name in ("translate_voice_transcripts", "translate_subtitle_transcripts"):
+        vl = (voice_language or "english").lower()
+        sl = (subtitle_language or vl).lower()
+        # Collapse only when translation is actually needed and targets match
+        if vl == sl and vl != "english":
+            return "Translating transcripts"
+    return base_names.get(step_name, step_name)
 
 
 async def _execute_step(
@@ -106,22 +147,9 @@ async def _execute_step(
 
     # Skip completed steps
     if state and state["steps"][step_name]["status"] == "completed":
-        step_display_names = {
-            "extract_slides": "Extracting presentation content",
-            "convert_slides_to_images": "Converting slides to images",
-            "analyze_slide_images": "Analyzing visual content",
-            "generate_transcripts": "Generating AI narratives",
-            "generate_subtitle_transcripts": "Generating subtitle narratives",
-            "revise_transcripts": "Revising and refining transcripts",
-            "revise_subtitle_transcripts": "Revising subtitle transcripts",
-            "translate_voice_transcripts": "Translating voice transcripts",
-            "translate_subtitle_transcripts": "Translating subtitle transcripts",
-            "generate_audio": "Synthesizing voice audio",
-            "generate_avatar_videos": "Creating AI presenter videos",
-            "generate_subtitles": "Generating subtitles",
-            "compose_video": "Composing final presentation",
-        }
-        display_name = step_display_names.get(step_name, step_name)
+        display_name = _format_step_display_name(
+            step_name, voice_language, subtitle_language
+        )
         logger.info(f"=== Task {task_id} - Stage already completed: {display_name} ===")
         return
 
@@ -131,22 +159,9 @@ async def _execute_step(
         "failed",
         "in_progress",
     ]:
-        step_display_names = {
-            "extract_slides": "Extracting presentation content",
-            "convert_slides_to_images": "Converting slides to images",
-            "analyze_slide_images": "Analyzing visual content",
-            "generate_transcripts": "Generating AI narratives",
-            "generate_subtitle_transcripts": "Generating subtitle narratives",
-            "revise_transcripts": "Revising and refining transcripts",
-            "revise_subtitle_transcripts": "Revising subtitle transcripts",
-            "translate_voice_transcripts": "Translating voice transcripts",
-            "translate_subtitle_transcripts": "Translating subtitle transcripts",
-            "generate_audio": "Synthesizing voice audio",
-            "generate_avatar_videos": "Creating AI presenter videos",
-            "generate_subtitles": "Generating subtitles",
-            "compose_video": "Composing final presentation",
-        }
-        display_name = step_display_names.get(step_name, step_name)
+        display_name = _format_step_display_name(
+            step_name, voice_language, subtitle_language
+        )
         logger.info(f"=== Task {task_id} - Executing stage: {display_name} ===")
 
         # Update step status to in_progress
@@ -172,16 +187,18 @@ async def _execute_step(
             elif step_name == "revise_transcripts":
                 # Always revise English transcripts first
                 await revise_transcripts_step(file_id, "english")
-            elif step_name == "revise_subtitle_transcripts":
-                await revise_transcripts_step(
-                    file_id, subtitle_language, is_subtitle=True
-                )
             elif step_name == "translate_voice_transcripts":
-                # Translate English transcripts to voice language
-                await translate_voice_transcripts_step(file_id, voice_language)
+                await translate_voice_transcripts_step(
+                    file_id,
+                    source_language="english",
+                    target_language=voice_language,
+                )
             elif step_name == "translate_subtitle_transcripts":
-                # Translate English transcripts to subtitle language
-                await translate_subtitle_transcripts_step(file_id, subtitle_language)
+                await translate_subtitle_transcripts_step(
+                    file_id,
+                    source_language="english",
+                    target_language=(subtitle_language or voice_language),
+                )
             elif step_name == "generate_audio":
                 # Use translated transcripts if available, otherwise use English transcripts
                 audio_language = voice_language
@@ -324,10 +341,7 @@ async def process_slide_file(
                     file_id, file_path, file_ext, step_name, voice_language, task_id
                 )
 
-                # Mark step as completed
-                await state_manager.update_step_status(
-                    file_id, step_name, "completed", data=None
-                )
+                # Step marked completed in _execute_step; just track progress here
                 completed_steps += 1
                 logger.info(f"Completed step: {step_name} ({step_index}/{total_steps})")
 
@@ -386,22 +400,11 @@ async def _log_initial_state(file_id: str) -> None:
     if state:
         logger.info(f"Current processing status: {state['status']}")
         for step_name, step_data in state["steps"].items():
-            step_display_names = {
-                "extract_slides": "Extracting slide content",
-                "convert_slides_to_images": "Converting slides to images",
-                "analyze_slide_images": "Analyzing visual content",
-                "generate_transcripts": "Generating AI narratives",
-                "generate_subtitle_transcripts": "Generating subtitle narratives",
-                "revise_transcripts": "Revising and refining transcripts",
-                "revise_subtitle_transcripts": "Revising subtitle transcripts",
-                "translate_voice_transcripts": "Translating voice transcripts",
-                "translate_subtitle_transcripts": "Translating subtitle transcripts",
-                "generate_audio": "Synthesizing voice audio",
-                "generate_avatar_videos": "Creating AI presenter videos",
-                "generate_subtitles": "Generating subtitles",
-                "compose_video": "Composing final presentation",
-            }
-            display_name = step_display_names.get(step_name, step_name)
+            display_name = _format_step_display_name(
+                step_name,
+                state.get("voice_language"),
+                state.get("subtitle_language"),
+            )
             status_text = step_data["status"]
             if status_text == "skipped":
                 status_text = "Skipped (disabled)"

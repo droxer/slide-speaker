@@ -9,7 +9,7 @@ that should be considered when generating presentation scripts.
 from pathlib import Path
 
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.services.vision_service import VisionService
+from slidespeaker.image.vision_service import VisionService
 
 vision_service = VisionService()
 

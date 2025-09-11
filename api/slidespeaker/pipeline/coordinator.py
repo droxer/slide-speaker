@@ -37,6 +37,16 @@ async def accept_task(
     # Don't default subtitle language to audio language - preserve user selection
     # subtitle_language remains as provided (could be None)
 
+    # Normalize languages early for consistent downstream behavior
+    from slidespeaker.utils.locales import locale_utils
+
+    voice_language = locale_utils.normalize_language(voice_language)
+    subtitle_language = (
+        locale_utils.normalize_language(subtitle_language)
+        if subtitle_language is not None
+        else None
+    )
+
     logger.info(
         f"Initiating AI presentation generation for file: {file_id}, format: {file_ext}"
     )

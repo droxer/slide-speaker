@@ -363,7 +363,7 @@
   font-weight: 700;
   color: #0f172a;
   margin-bottom: 8px;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   letter-spacing: -0.5px;
   background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
   -webkit-background-clip: text;
@@ -378,6 +378,7 @@
   letter-spacing: 1px;
   font-weight: 600;
   opacity: 0.8;
+  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .loading, .error, .no-tasks {
@@ -393,7 +394,7 @@
   border: 1px solid rgba(255, 255, 255, 0.6);
   max-width: 500px;
   margin: 40px auto;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .error {
@@ -456,15 +457,15 @@
   height: 0;
 }
 
-.task-item.status-completed { border-left-color: #22c55e; }
+.task-item.status-completed { border-left-color: #86efac; } /* green-300 */
 
-.task-item.status-processing { border-left-color: #3b82f6; }
+.task-item.status-processing { border-left-color: #bfdbfe; } /* blue-200 */
 
-.task-item.status-queued { border-left-color: #f59e0b; }
+.task-item.status-queued { border-left-color: #fde68a; } /* amber-200 */
 
-.task-item.status-failed { border-left-color: #ef4444; }
+.task-item.status-failed { border-left-color: #fecaca; } /* red-200 */
 
-.task-item.status-cancelled { border-left-color: #9ca3af; }
+.task-item.status-cancelled { border-left-color: #e5e7eb; } /* gray-200 */
 
 .task-header {
   display: flex;
@@ -483,6 +484,14 @@
   border-radius: 6px;
   font-weight: 600;
   border: 1px solid #e5e7eb;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.task-id[role="button"] { cursor: pointer; }
+.task-id[role="button"]:hover { background: #e5e7eb; }
+
+.task-id:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
 }
 
 .task-status {
@@ -490,23 +499,51 @@
   border-radius: 9999px;
   font-size: 12px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
+  text-transform: none;
+  letter-spacing: 0.2px;
   font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   box-shadow: none;
   border: 1px solid #e5e7eb;
   background: #ffffff;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  cursor: default;
 }
 
-.task-status.status-completed { color: #166534; border-color: #86efac; }
+/* Soft backgrounds and colored dots for status */
+.task-status::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
 
-.task-status.status-processing { color: #1e3a8a; border-color: #bfdbfe; }
+.task-status.status-completed { color: #166534; border-color: #86efac; background: #ecfdf5; }
+.task-status.status-completed:hover { background: #dcfce7; }
+.task-status.status-completed::before { background-color: #16a34a; }
 
-.task-status.status-queued { color: #92400e; border-color: #fde68a; }
+.task-status.status-processing { color: #1e3a8a; border-color: #bfdbfe; background: #eff6ff; }
+.task-status.status-processing:hover { background: #dbeafe; }
+.task-status.status-processing::before { background-color: #2563eb; }
 
-.task-status.status-failed { color: #b91c1c; border-color: #fecaca; }
+.task-status.status-queued { color: #92400e; border-color: #fde68a; background: #fffbeb; }
+.task-status.status-queued:hover { background: #fef3c7; }
+.task-status.status-queued::before { background-color: #f59e0b; }
 
-.task-status.status-cancelled { color: #475569; border-color: #e5e7eb; }
+.task-status.status-failed { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
+.task-status.status-failed:hover { background: #fee2e2; }
+.task-status.status-failed::before { background-color: #ef4444; }
+
+.task-status.status-cancelled { color: #475569; border-color: #e5e7eb; background: #f8fafc; }
+.task-status.status-cancelled:hover { background: #f1f5f9; }
+.task-status.status-cancelled::before { background-color: #94a3b8; }
+
+/* Keyboard focus (visible) */
+.task-status:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
 
 .task-details { margin-bottom: 12px; }
 
@@ -554,6 +591,66 @@
 
 .task-actions { display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
 
+/* Simple, clean task details */
+.simple-details {
+  padding-top: 6px;
+}
+.task-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.task-title {
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -0.2px;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.chip {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1f2937;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 3px 8px;
+  letter-spacing: 0.2px;
+}
+.id-chip { color: #334155; }
+.id-mono { font-family: 'SF Mono', Menlo, Consolas, monospace; font-weight: 600; }
+.step-progress { margin-top: 8px; }
+.step-line { font-size: 12px; color: #334155; font-weight: 600; }
+.progress-rail {
+  margin-top: 6px;
+  width: 100%;
+  height: 6px;
+  background: #e5e7eb;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #6366f1);
+  border-radius: 999px;
+}
+.timestamps-row {
+  margin-top: 8px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.timestamp { color: #64748b; font-size: 11px; font-weight: 600; }
+
 .preview-button {
   padding: 6px 12px;
   background: linear-gradient(135deg, #3b82f6, #2563eb);
@@ -573,6 +670,76 @@
   &:active {
     transform: translateY(0);
   }
+}
+
+/* Chevron icon next to More */
+.chevron {
+  display: inline-block;
+  width: 0;
+  height: 0;
+  margin-left: 6px;
+  vertical-align: middle;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid currentColor;
+  transition: transform 0.2s ease;
+}
+.chevron.open {
+  transform: rotate(180deg);
+}
+
+/* Smooth expand/collapse for downloads */
+.downloads-collapse {
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0.02;
+  transition: max-height 0.28s ease, opacity 0.22s ease;
+}
+.downloads-collapse.open {
+  max-height: 900px; /* large enough to show content */
+  opacity: 1;
+}
+
+/* Compact badges summary when collapsed */
+.resource-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.resource-badges .badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1e293b;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  padding: 3px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.2px;
+}
+
+/* Link-style button for More */
+.link-button {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: #2563eb; /* blue-600 */
+  font-size: 13px;
+  font-weight: 700;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.link-button:hover {
+  color: #1d4ed8; /* blue-700 */
+  text-decoration: underline;
+}
+.link-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
 }
 
 .cancel-button {
@@ -1271,43 +1438,7 @@
 }
 
 .subtitle-indicator {
-  position: absolute;
-  bottom: 60px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.18); /* Subtle pill for a clean look */
-  color: #ffffff;
-  padding: 8px 16px;
-  border-radius: 16px;
-  font-size: 14px;
-  font-weight: 500;
-  z-index: 25; /* Above video player but below controls and overlays */
-  backdrop-filter: none; /* Keep text crisp without darkening */
-  border: 0;
-  animation: fadeIn 0.5s ease;
-  pointer-events: none;
-  text-align: center;
-  max-width: 80%;
-  line-height: 1.4;
-  
-  &.loading {
-    background: rgba(59, 130, 246, 0.12); /* Very light loading state */
-    border-color: rgba(59, 130, 246, 0.2);
-    color: #dbeafe;
-    animation: pulse 1.5s infinite;
-  }
-  
-  &.not-available {
-    background: rgba(239, 68, 68, 0.12); /* Very light error state */
-    border-color: rgba(239, 68, 68, 0.2);
-    color: #fecaca;
-  }
-  
-  @media (max-width: 768px) {
-    bottom: 55px;
-    font-size: 13px;
-    padding: 6px 12px;
-  }
+  display: none !important;
 }
 
 .video-player {
@@ -1371,7 +1502,7 @@
   
   // Ensure video controls are visible and styled properly
   &::-webkit-media-controls {
-    background: rgba(0, 0, 0, 0.8);
+    // background: rgba(0, 0, 0, 0.8);
     border-radius: 8px;
     z-index: 15;
   }

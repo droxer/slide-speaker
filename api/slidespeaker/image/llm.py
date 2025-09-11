@@ -69,7 +69,11 @@ class LLMImageGenerator:
 
     def __init__(self) -> None:
         """Initialize the image generator with OpenAI client"""
-        self.openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        # Get API key from environment (this is a special case that's not in config)
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is required")
+        self.openai_client = OpenAI(api_key=api_key)
 
     async def generate_slide_image(
         self,

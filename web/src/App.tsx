@@ -51,6 +51,7 @@ interface ProcessingDetails {
   current_step: string;
   steps: Record<string, StepDetails>;
   errors: ProcessingError[];
+  filename?: string;
   voice_language?: string;
   subtitle_language?: string;
   created_at: string;
@@ -165,13 +166,13 @@ const localStorageUtils = {
 };
 
 function App() {
-  // UI theme: 'flat' (default) or 'classic'
+  // UI theme: 'flat' (default), 'classic', or 'material'
   const [uiTheme, setUiTheme] = useState<'flat' | 'classic' | 'material'>(() => {
     try {
       const saved = localStorage.getItem(THEME_STORAGE_KEY);
       if (saved === 'classic' || saved === 'flat' || saved === 'material') return saved as 'flat' | 'classic' | 'material';
     } catch {}
-    return 'classic';
+    return 'flat';
   });
 
   // Apply/remove ultra-flat class based on theme
@@ -193,6 +194,7 @@ function App() {
   const [status, setStatus] = useState<AppStatus>('idle');
   const [progress, setProgress] = useState<number>(0);
   const [processingDetails, setProcessingDetails] = useState<ProcessingDetails | null>(null);
+  // Using final audio endpoint; no need to fetch per-track list
   const [voiceLanguage, setVoiceLanguage] = useState<string>('english');
   const [subtitleLanguage, setSubtitleLanguage] = useState<string>('english');
   const [videoResolution, setVideoResolution] = useState<string>('hd'); // hd as default
@@ -345,6 +347,8 @@ function App() {
     loadSavedState();
   }, []);
 
+  // No-op: final audio is served via a single endpoint
+
   // Save task state to local storage whenever relevant state changes
   useEffect(() => {
     if (status !== 'idle' && !isResumingTask) {
@@ -387,10 +391,8 @@ function App() {
             setStatus('completed');
             setUploading(false);
             setProgress(100);
-            setTaskId(null);
-            
-            // Clear local storage when completed
-            localStorageUtils.clearTaskState();
+            // Preserve taskId so task-based endpoints remain valid in the completed view
+            // Do not clear local storage here to keep task metadata available
             
           } else if (response.data.status === 'processing' || response.data.status === 'uploaded') {
             setStatus('processing');
@@ -444,9 +446,47 @@ function App() {
     };
   }, [status, fileId]);
 
+  // Ensure taskId is populated in completed view (fallback via stats search)
+  useEffect(() => {
+    const hydrateTaskId = async () => {
+      if (status === 'completed' && fileId && (!taskId || taskId === 'null')) {
+        try {
+          const res = await axios.get(`/api/tasks/search?query=${encodeURIComponent(fileId)}`);
+          const tasks = Array.isArray(res.data?.tasks) ? res.data.tasks : [];
+          const match = tasks.find((t: any) => t?.file_id === fileId && typeof t?.task_id === 'string' && !t.task_id.startsWith('state_'));
+          if (match?.task_id) {
+            setTaskId(match.task_id);
+          }
+        } catch (e) {
+          console.warn('Failed to hydrate taskId for completed view', e);
+        }
+      }
+    };
+    hydrateTaskId();
+  }, [status, fileId, taskId]);
+
+  // Ensure taskId is populated during processing view as well
+  useEffect(() => {
+    const hydrateTaskIdWhileProcessing = async () => {
+      if ((status === 'processing' || status === 'uploading') && fileId && (!taskId || taskId === 'null')) {
+        try {
+          const res = await axios.get(`/api/tasks/search?query=${encodeURIComponent(fileId)}`);
+          const tasks = Array.isArray(res.data?.tasks) ? res.data.tasks : [];
+          const match = tasks.find((t: any) => t?.file_id === fileId && typeof t?.task_id === 'string' && !t.task_id.startsWith('state_'));
+          if (match?.task_id) {
+            setTaskId(match.task_id);
+          }
+        } catch (e) {
+          console.warn('Failed to hydrate taskId for processing view', e);
+        }
+      }
+    };
+    hydrateTaskIdWhileProcessing();
+  }, [status, fileId, taskId]);
+
   // Add subtitle tracks when video is loaded
   useEffect(() => {
-    if (status === 'completed' && generateSubtitles && fileId && videoRef.current) {
+    if (status === 'completed' && generateSubtitles && taskId && videoRef.current) {
       const addSubtitles = () => {
         if (videoRef.current) {
           // Remove existing tracks
@@ -462,7 +502,8 @@ function App() {
           // Add VTT subtitle track if subtitles are enabled
           const track = document.createElement('track');
           track.kind = 'subtitles';
-          track.src = `/api/subtitles/${fileId}/vtt`;
+          // Always use absolute URL with explicit language to avoid mismatches
+          track.src = `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(subtitleLanguage)}`;
           track.setAttribute('srclang', subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 
                          subtitleLanguage === 'traditional_chinese' ? 'zh-Hant' : 
                          subtitleLanguage === 'japanese' ? 'ja' : 
@@ -482,10 +523,10 @@ function App() {
           
           track.addEventListener('error', (e) => {
             console.error('Subtitle track loading error:', e);
-            // Fallback: try loading with absolute URL
-            const absoluteUrl = `${API_BASE_URL}/api/subtitles/${fileId}/vtt`;
-            console.log('Trying absolute URL:', absoluteUrl);
-            track.src = absoluteUrl;
+            // Fallback: try without explicit language (server infers from state)
+            const fallbackUrl = `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt`;
+            console.log('Trying fallback URL:', fallbackUrl);
+            track.src = fallbackUrl;
           });
           
           videoRef.current.appendChild(track);
@@ -496,7 +537,7 @@ function App() {
               console.log('Retrying subtitle loading...');
               const retryTrack = document.createElement('track');
               retryTrack.kind = 'subtitles';
-              retryTrack.src = `${API_BASE_URL}/api/subtitles/${fileId}/vtt`;
+              retryTrack.src = `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(subtitleLanguage)}`;
               retryTrack.setAttribute('srclang', subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 
                              subtitleLanguage === 'traditional_chinese' ? 'zh-Hant' : 
                              subtitleLanguage === 'japanese' ? 'ja' : 
@@ -525,7 +566,7 @@ function App() {
         videoRef.current.addEventListener('loadeddata', addSubtitles, { once: true });
       }
     }
-  }, [status, generateSubtitles, subtitleLanguage, fileId]);
+  }, [status, generateSubtitles, subtitleLanguage, taskId]);
 
   const formatStepName = (step: string): string => {
     const stepNames: Record<string, string> = {
@@ -537,7 +578,6 @@ function App() {
       'translate_voice_transcripts': 'Translating Voice Transcripts',
       'translate_subtitle_transcripts': 'Translating Subtitle Transcripts',
       'generate_subtitle_transcripts': 'Generating Subtitle Transcripts',
-      'revise_subtitle_transcripts': 'Revising Subtitle Transcripts',
       'generate_audio': 'Generating Audio',
       'generate_avatar_videos': 'Creating Avatar',
       'convert_slides_to_images': 'Converting Slides',
@@ -546,7 +586,6 @@ function App() {
       
       // PDF-specific steps
       'segment_pdf_content': 'Segmenting Content',
-      'analyze_pdf_content': 'Analyzing Content',
       'revise_pdf_transcripts': 'Revising Transcripts',
       'generate_pdf_chapter_images': 'Creating Video Frames',
       'generate_pdf_audio': 'Generating Audio',
@@ -556,6 +595,23 @@ function App() {
       'unknown': 'Initializing'
     };
     return stepNames[step] || step;
+  };
+
+  const formatStepNameWithLanguages = (
+    step: string,
+    voiceLang: string,
+    subtitleLang?: string
+  ): string => {
+    const vl = (voiceLang || 'english').toLowerCase();
+    const sl = (subtitleLang || vl).toLowerCase();
+    const same = vl === sl;
+    if (
+      same &&
+      (step === 'translate_voice_transcripts' || step === 'translate_subtitle_transcripts')
+    ) {
+      return 'Translating Transcripts';
+    }
+    return formatStepName(step);
   };
 
   const getLanguageDisplayName = (languageCode: string): string => {
@@ -573,7 +629,7 @@ function App() {
   const getProcessingStatusMessage = (): string => {
     if (!processingDetails) {
       return isPdfFile(file?.name || null) 
-        ? 'Bringing Your PDF Document to Life' 
+        ? 'Bringing Your PDF to Life' 
         : 'Bringing Your Presentation to Life';
     }
     
@@ -581,18 +637,24 @@ function App() {
       .filter(([_, step]) => step.status === 'in_progress' || step.status === 'processing');
     
     const isPdf = isPdfFile(file?.name || null);
-    const fileTypeText = isPdf ? 'PDF Document' : 'Presentation';
+    const fileTypeText = isPdf ? 'PDF' : 'PPT';
     
     if (activeSteps.length > 0) {
-      const stepName = formatStepName(activeSteps[0][0]);
+      const currentStepKey = activeSteps[0][0];
+      const stepName = formatStepNameWithLanguages(
+        currentStepKey,
+        processingDetails.voice_language || 'english',
+        processingDetails.subtitle_language || processingDetails.voice_language || 'english'
+      );
       const statusMessages: Record<string, string> = {
         // Common messages for all file types
         'Extracting Slides': `Analyzing your ${fileTypeText} structure...`,
         'Analyzing Content': `Examining ${fileTypeText} content...`,
-        'Generating Transcripts': 'Generating English transcripts...',
+        'Generating Transcripts': 'Generating transcripts...',
         'Revising Transcripts': 'Polishing transcripts for delivery...',
-        'Translating Voice Transcripts': 'Translating transcripts to voice language...',
-        'Translating Subtitle Transcripts': 'Translating transcripts for subtitles...',
+        'Translating Voice Transcripts': 'Translating transcripts...',
+        'Translating Subtitle Transcripts': 'Translating transcripts...',
+        'Translating Transcripts': 'Translating transcripts...',
         'Generating Subtitle Transcripts': 'Generating subtitle transcripts...',
         'Reviewing Subtitles': 'Perfecting subtitle timing and accuracy...',
         'Generating Audio': 'Creating natural voice narration...',
@@ -605,7 +667,7 @@ function App() {
     }
     
     return isPdf 
-      ? 'Bringing Your PDF Document to Life' 
+      ? 'Bringing Your PDF to Life' 
       : 'Bringing Your Presentation to Life';
   };
 
@@ -629,7 +691,7 @@ function App() {
     if (ext === 'pdf') {
       return (
         <div className="file-type-hint pdf">
-          <span className="file-type-badge pdf">PDF Document</span>
+          <span className="file-type-badge pdf">PDF</span>
           <div className="file-type-description">
             AI will analyze and convert your PDF into engaging video chapters with AI narration and subtitles.
           </div>
@@ -638,7 +700,7 @@ function App() {
     } else if (ext === 'pptx' || ext === 'ppt') {
       return (
         <div className="file-type-hint ppt">
-          <span className="file-type-badge ppt">PowerPoint Presentation</span>
+          <span className="file-type-badge ppt">PPT</span>
           <div className="file-type-description">
             AI will convert your slides into a video with AI narration and optional avatar presenter.
           </div>
@@ -851,7 +913,57 @@ function App() {
             {status === 'processing' && (
               <div className="processing-view">
                 <div className="spinner"></div>
-                <h3>{getProcessingStatusMessage()}</h3>                
+                <h3>{getProcessingStatusMessage()}</h3>
+                {/* Meta header: filename + task id */}
+                <div className="processing-meta" role="group" aria-label="Task Meta">
+                  <div className="meta-card file" title={processingDetails?.filename || file?.name || fileId || ''}>
+                    <div className="meta-title">
+                      <span className="meta-icon">📄</span>
+                      <span className="meta-text">
+                        {processingDetails?.filename || file?.name || 'Untitled'}
+                      </span>
+                    </div>
+                    <div className="meta-badge">
+                      {isPdfFile(file?.name || processingDetails?.filename || null) ? (
+                        <span className="file-type-badge pdf">PDF</span>
+                      ) : (
+                        <span className="file-type-badge ppt">PPT</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="meta-card task" title={taskId || fileId || ''}>
+                    <div className="meta-title">
+                      <span className="meta-icon">🆔</span>
+                    </div>
+                    <div className="meta-actions">
+                      <code
+                        className={`meta-code ${taskId ? 'clickable' : ''}`}
+                        aria-label={`Task ID: ${taskId || 'locating'} (press Enter to copy)`}
+                        role="button"
+                        tabIndex={taskId ? 0 : -1}
+                        onClick={() => { if (taskId) { navigator.clipboard.writeText(taskId); alert('Task ID copied!'); } }}
+                        onKeyDown={(e) => {
+                          if (!taskId) return;
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            try {
+                              navigator.clipboard.writeText(taskId);
+                              alert('Task ID copied!');
+                            } catch (err) {
+                              console.error('Failed to copy task id', err);
+                            }
+                          }
+                        }}
+                        title={taskId || undefined}
+                      >
+                        {taskId || '(locating…)'}
+                      </code>
+                      {!taskId && (
+                        <span className="meta-hint">from file {fileId?.slice(0, 8) || '…'}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
                 <div className="progress-container">
                   <div className="progress-bar">
                     <div 
@@ -872,32 +984,32 @@ function App() {
                 {processingDetails && (
                   <div className="steps-container">
                     <h4>🌟 Crafting Your Masterpiece</h4>
-                    <div className="file-type-indicator">
-                      {isPdfFile(file?.name || null) ? (
-                        <span className="file-type-badge pdf">PDF Document</span>
-                      ) : (
-                        <span className="file-type-badge ppt">PowerPoint Presentation</span>
-                      )}
-                    </div>
+                    {/* Meta moved into header */}
                     <div className="steps-grid">
                       {isPdfFile(file?.name || null) ? (
                         // PDF-specific steps
                         [
                           'segment_pdf_content',
-                          'analyze_pdf_content',
                           'revise_pdf_transcripts',
                           'translate_voice_transcripts',
                           'translate_subtitle_transcripts',
                           'generate_pdf_chapter_images', 
                           'generate_pdf_audio',
                           'generate_pdf_subtitles',
-                          'compose_pdf_video'
+                          // Backend uses 'compose_video' for the PDF compose step
+                          'compose_video'
                         ]
                           .map((stepName) => {
                             const stepData = processingDetails.steps[stepName];
                             // Hide steps that are not present or explicitly skipped
                             if (!stepData || stepData.status === 'skipped') {
                               return null;
+                            }
+                            const vl = (processingDetails.voice_language || 'english').toLowerCase();
+                            const sl = (processingDetails.subtitle_language || vl).toLowerCase();
+                            const same = vl === sl;
+                            if (same && stepName === 'translate_subtitle_transcripts') {
+                              return null; // collapse duplicate translate step
                             }
                             return (
                               <div key={stepName} className={`step-item ${stepData.status}`}>
@@ -906,7 +1018,7 @@ function App() {
                                    stepData.status === 'processing' || stepData.status === 'in_progress' ? '⏳' :
                                    stepData.status === 'failed' ? '✗' : '○'}
                                 </span>
-                                <span className="step-name">{formatStepName(stepName)}</span>
+                                <span className="step-name">{formatStepNameWithLanguages(stepName, vl, sl)}</span>
                               </div>
                             );
                           })
@@ -932,6 +1044,12 @@ function App() {
                             if (!stepData || stepData.status === 'skipped') {
                               return null;
                             }
+                            const vl = (processingDetails.voice_language || 'english').toLowerCase();
+                            const sl = (processingDetails.subtitle_language || vl).toLowerCase();
+                            const same = vl === sl;
+                            if (same && stepName === 'translate_subtitle_transcripts') {
+                              return null; // collapse duplicate translate step
+                            }
                             return (
                               <div key={stepName} className={`step-item ${stepData.status}`}>
                                 <span className="step-icon">
@@ -939,7 +1057,7 @@ function App() {
                                    stepData.status === 'processing' || stepData.status === 'in_progress' ? '⏳' :
                                    stepData.status === 'failed' ? '✗' : '○'}
                                 </span>
-                                <span className="step-name">{formatStepName(stepName)}</span>
+                                <span className="step-name">{formatStepNameWithLanguages(stepName, vl, sl)}</span>
                               </div>
                             );
                           })
@@ -951,11 +1069,15 @@ function App() {
                       <div className="error-section">
                         <h4>Errors Encountered</h4>
                         <div className="error-list">
-                          {processingDetails.errors.map((error, index) => (
-                            <div key={index} className="error-item">
-                              <strong>{formatStepName(error.step)}:</strong> {error.error}
-                            </div>
-                          ))}
+                          {processingDetails.errors.map((error, index) => {
+                            const vl = (processingDetails.voice_language || 'english').toLowerCase();
+                            const sl = (processingDetails.subtitle_language || vl).toLowerCase();
+                            return (
+                              <div key={index} className="error-item">
+                                <strong>{formatStepNameWithLanguages(error.step, vl, sl)}:</strong> {error.error}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -967,7 +1089,7 @@ function App() {
             {status === 'completed' && (
               <div className="completed-view">
                 <div className="success-icon">✓</div>
-                <h3>Your AI Presentation is Ready!</h3>
+                <h3>Your Masterpiece is Ready!</h3>
                 <p className="success-message">Congratulations! Your presentation has been transformed into an engaging AI-powered video.</p>
                 
                 <div className="preview-container">
@@ -976,7 +1098,8 @@ function App() {
                       <video 
                         ref={videoRef}
                         controls
-                        src={`${API_BASE_URL}/api/video/${fileId}`}
+                        src={`${API_BASE_URL}/api/tasks/${taskId}/video`}
+                        crossOrigin="anonymous"
                         className="preview-video-large"
                       >
                         {/* Video tracks will be added dynamically via useEffect */}
@@ -1007,17 +1130,18 @@ function App() {
                       
                       {/* Resource URLs */}
                       <div className="resource-links">
+                        {/* Video */}
                         <div className="url-copy-row">
                           <span className="resource-label-inline">Video</span>
                           <input 
                             type="text" 
-                            value={`${API_BASE_URL}/api/video/${fileId}`}
+                            value={`${API_BASE_URL}/api/tasks/${taskId}/video`}
                             readOnly 
                             className="url-input-enhanced"
                           />
                           <button 
                             onClick={() => {
-                              navigator.clipboard.writeText(`${API_BASE_URL}/api/video/${fileId}`);
+                              navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/video`);
                               alert('Video URL copied!');
                             }}
                             className="copy-btn-enhanced"
@@ -1025,47 +1149,89 @@ function App() {
                             Copy
                           </button>
                         </div>
-                        
+
+                        {/* Audio */}
+                        <div className="url-copy-row">
+                          <span className="resource-label-inline">Audio</span>
+                          <input 
+                            type="text" 
+                            value={`${API_BASE_URL}/api/tasks/${taskId}/audio`}
+                            readOnly 
+                            className="url-input-enhanced"
+                          />
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/audio`);
+                              alert(`Audio URL copied!`);
+                            }}
+                            className="copy-btn-enhanced"
+                          >
+                            Copy
+                          </button>
+                        </div>
+
+                        {/* Transcript */}
+                        {fileId && (
+                          <div className="url-copy-row">
+                            <span className="resource-label-inline">Transcript</span>
+                            <input 
+                              type="text" 
+                              value={`${API_BASE_URL}/api/tasks/${taskId}/transcripts/markdown`}
+                              readOnly 
+                              className="url-input-enhanced"
+                            />
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/transcripts/markdown`);
+                                alert('Transcript URL copied!');
+                              }}
+                              className="copy-btn-enhanced"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        )}
+
+                        {/* VTT */}
+                        <div className="url-copy-row">
+                          <span className="resource-label-inline">VTT</span>
+                          <input 
+                            type="text" 
+                            value={`${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt`}
+                            readOnly 
+                            className="url-input-enhanced"
+                          />
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt`);
+                              alert('VTT URL copied!');
+                            }}
+                            className="copy-btn-enhanced"
+                          >
+                            Copy
+                          </button>
+                        </div>
+
+                        {/* SRT */}
                         {generateSubtitles && fileId && (
-                          <>
-                            <div className="url-copy-row">
-                              <span className="resource-label-inline">SRT</span>
-                              <input 
-                                type="text" 
-                                value={`${API_BASE_URL}/api/subtitles/${fileId}/srt`}
-                                readOnly 
-                                className="url-input-enhanced"
-                              />
-                              <button 
-                                onClick={() => {
-                                  navigator.clipboard.writeText(`${API_BASE_URL}/api/subtitles/${fileId}/srt`);
-                                  alert('SRT URL copied!');
-                                }}
-                                className="copy-btn-enhanced"
-                              >
-                                Copy
-                              </button>
-                            </div>
-                            
-                            <div className="url-copy-row">
-                              <span className="resource-label-inline">VTT</span>
-                              <input 
-                                type="text" 
-                                value={`${API_BASE_URL}/api/subtitles/${fileId}/vtt`}
-                                readOnly 
-                                className="url-input-enhanced"
-                              />
-                              <button 
-                                onClick={() => {
-                                  navigator.clipboard.writeText(`${API_BASE_URL}/api/subtitles/${fileId}/vtt`);
-                                  alert('VTT URL copied!');
-                                }}
-                                className="copy-btn-enhanced"
-                              >
-                                Copy
-                              </button>
-                            </div>
-                          </>
+                          <div className="url-copy-row">
+                            <span className="resource-label-inline">SRT</span>
+                            <input 
+                              type="text" 
+                              value={`${API_BASE_URL}/api/tasks/${taskId}/subtitles/srt`}
+                              readOnly 
+                              className="url-input-enhanced"
+                            />
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/subtitles/srt`);
+                                alert('SRT URL copied!');
+                              }}
+                              className="copy-btn-enhanced"
+                            >
+                              Copy
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>

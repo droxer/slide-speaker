@@ -12,6 +12,7 @@ from fastapi import APIRouter, Query
 
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
+from slidespeaker.utils.redis_config import RedisConfig
 
 router = APIRouter(prefix="/api", tags=["stats"])
 
@@ -32,6 +33,8 @@ async def get_tasks(
 
     # Get all task IDs from Redis
     task_keys = await task_queue.redis_client.keys("ss:task:*")
+    # Exclude transient cancelled flags
+    task_keys = [k for k in task_keys if not str(k).endswith(":cancelled")]
     state_keys = await state_manager.redis_client.keys("ss:state:*")
 
     tasks = []
@@ -78,10 +81,22 @@ async def get_tasks(
 
         state = await state_manager.get_state(file_id)
         if state:
+            # Prefer persisted task_id if present in state or Redis mapping
+            task_id_from_state = (
+                state.get("task_id") if isinstance(state, dict) else None
+            )
+            if not task_id_from_state:
+                try:
+                    redis = RedisConfig.get_redis_client()
+                    mapped_task = await redis.get(f"ss:file2task:{file_id}")
+                    if mapped_task:
+                        task_id_from_state = str(mapped_task)
+                except Exception:
+                    task_id_from_state = None
             # Create a synthetic task entry for state-only items
             tasks.append(
                 {
-                    "task_id": f"state_{file_id}",
+                    "task_id": task_id_from_state or f"state_{file_id}",
                     "file_id": file_id,
                     "task_type": "process_presentation",
                     "status": state["status"],
@@ -406,6 +421,7 @@ async def purge_task(task_id: str) -> dict[str, Any]:
     task_key = f"{task_queue.task_prefix}:{task_id}"
     cancellation_key = f"{task_queue.task_prefix}:{task_id}:cancelled"
     state_key = f"ss:state:{file_id}" if file_id else None
+    mapping_key = f"ss:task2file:{task_id}"
 
     removed = {
         "queue": 0,
@@ -447,6 +463,13 @@ async def purge_task(task_id: str) -> dict[str, Any]:
                 removed["state"] = int(del_count) if del_count is not None else 0
             except Exception:
                 pass
+
+        # Delete task→file mapping
+        try:
+            del_count = await task_queue.redis_client.delete(mapping_key)
+            removed["task2file"] = int(del_count) if del_count is not None else 0
+        except Exception:
+            pass
 
         return {
             "message": "Task purged successfully",

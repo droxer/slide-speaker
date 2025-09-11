@@ -59,20 +59,35 @@ body.subtle-material .view-toggle {
   border: 1px solid var(--sm-border) !important;
   border-radius: 8px !important;
   padding: 3px !important;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
 }
 
 body.subtle-material .view-toggle .toggle-btn {
   color: #334155 !important;
   border-radius: 6px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 body.subtle-material .view-toggle .toggle-btn.active {
   background: var(--sm-primary) !important;
   color: var(--sm-on-primary) !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
 
 body.subtle-material .view-toggle .toggle-btn.active .toggle-icon { color: var(--sm-on-primary) !important; }
+
+body.subtle-material .view-toggle .toggle-btn:hover:not(.active) {
+  background: var(--sm-secondary) !important;
+}
+
+body.subtle-material .view-toggle .toggle-btn:focus-visible {
+  outline: 2px solid var(--sm-primary) !important;
+  outline-offset: 2px !important;
+}
 
 /* Inputs */
 body.subtle-material input[type="text"],
@@ -119,6 +134,7 @@ body.subtle-material .advanced-options-button:hover {
 
 /* Secondary/neutral buttons */
 body.subtle-material .cancel-button,
+body.subtle-material .cancel-btn,
 body.subtle-material .delete-button {
   background: var(--sm-surface) !important;
   color: var(--sm-on-secondary) !important;
@@ -143,11 +159,63 @@ body.subtle-material .video-close-button {
   border-color: var(--sm-primary) !important;
 }
 
+/* File type badges (PDF/PPT): subtle, no gradients */
+body.subtle-material .file-type-badge {
+  background: var(--sm-surface) !important;
+  color: #0f172a !important;
+  border: 1px solid var(--sm-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+}
+body.subtle-material .file-type-badge.pdf {
+  background: #ef4444 !important; /* Material red */
+  color: #ffffff !important;
+  border-color: #ef4444 !important;
+}
+body.subtle-material .file-type-badge.ppt {
+  background: var(--sm-primary) !important; /* Use theme primary */
+  color: var(--sm-on-primary) !important;
+  border-color: var(--sm-primary) !important;
+}
+
+/* Link-style buttons in material theme */
+body.subtle-material .link-button {
+  color: var(--sm-primary) !important;
+}
+
 /* Stat icons */
 body.subtle-material .stat-icon {
   background: var(--sm-primary) !important;
   color: var(--sm-on-primary) !important;
 }
+
+/* Steps (processing view): soft elevation, material colors */
+body.subtle-material .steps-container {
+  background: var(--sm-surface) !important;
+  border: 1px solid var(--sm-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+}
+body.subtle-material .step-item {
+  background: var(--sm-surface) !important;
+  border: 1px solid var(--sm-border) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+body.subtle-material .step-item.processing,
+body.subtle-material .step-item.in_progress {
+  background: #eef2ff !important; /* indigo-50 */
+  border-color: #c7d2fe !important; /* indigo-200 */
+}
+body.subtle-material .step-item.processing::before,
+body.subtle-material .step-item.in_progress::before {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.65), transparent) !important;
+}
+body.subtle-material .step-item.completed { background: #ecfdf5 !important; border-color: #a7f3d0 !important; }
+body.subtle-material .step-item.failed { background: #fef2f2 !important; border-color: #fecaca !important; }
+body.subtle-material .step-item.pending { background: #f8fafc !important; border-color: var(--sm-border) !important; }
+body.subtle-material .step-item.skipped { background: #f1f5f9 !important; border-color: #e2e8f0 !important; }
+body.subtle-material .step-name { color: #0f172a !important; }
 
 /* Footer: standard surface with slight elevation (not glass) */
 body.subtle-material .app-footer {
@@ -173,6 +241,78 @@ body.subtle-material .pagination .page-button:disabled {
   color: #9ca3af !important;
   border-color: var(--sm-border) !important;
 }
+
+/* Task status pills in Task Monitor */
+body.subtle-material .task-item.status-completed { border-left-color: #a7f3d0 !important; }
+body.subtle-material .task-status.status-completed {
+  color: #166534 !important; /* green-800 */
+  border-color: #a7f3d0 !important; /* emerald-200 */
+  background: #ecfdf5 !important; /* emerald-50 */
+}
+body.subtle-material .task-status.status-completed::before { background-color: #10b981 !important; /* emerald-500 */ }
+body.subtle-material .task-status.status-completed:hover { background: #d1fae5 !important; }
+body.subtle-material .task-status:focus-visible { outline: 2px solid var(--sm-primary) !important; outline-offset: 2px !important; }
+body.subtle-material .task-id:focus-visible { outline: 2px solid var(--sm-primary) !important; outline-offset: 2px !important; }
+
+/* Processing */
+body.subtle-material .task-item.status-processing { border-left-color: #c7d2fe !important; } /* indigo-200 */
+body.subtle-material .task-status.status-processing {
+  color: #1e3a8a !important; /* indigo-900 */
+  border-color: #c7d2fe !important; /* indigo-200 */
+  background: #eef2ff !important; /* indigo-50 */
+}
+body.subtle-material .task-status.status-processing::before { background-color: #6366f1 !important; /* indigo-500 */ }
+body.subtle-material .task-status.status-processing:hover { background: #e0e7ff !important; }
+
+/* Queued */
+body.subtle-material .task-item.status-queued { border-left-color: #fde68a !important; } /* amber-200 */
+body.subtle-material .task-status.status-queued {
+  color: #92400e !important; /* amber-900 */
+  border-color: #fde68a !important; /* amber-200 */
+  background: #fffbeb !important; /* amber-50 */
+}
+body.subtle-material .task-status.status-queued::before { background-color: #f59e0b !important; /* amber-500 */ }
+body.subtle-material .task-status.status-queued:hover { background: #fef3c7 !important; }
+
+/* Failed */
+body.subtle-material .task-item.status-failed { border-left-color: #fecaca !important; } /* red-200 */
+body.subtle-material .task-status.status-failed {
+  color: #b91c1c !important; /* red-700 */
+  border-color: #fecaca !important; /* red-200 */
+  background: #fef2f2 !important; /* red-50 */
+}
+body.subtle-material .task-status.status-failed::before { background-color: #ef4444 !important; /* red-500 */ }
+body.subtle-material .task-status.status-failed:hover { background: #fee2e2 !important; }
+
+/* Cancelled */
+body.subtle-material .task-item.status-cancelled { border-left-color: var(--sm-border) !important; }
+body.subtle-material .task-status.status-cancelled {
+  color: #475569 !important; /* slate-600 */
+  border-color: var(--sm-border) !important;
+  background: #f8fafc !important; /* slate-50 */
+}
+body.subtle-material .task-status.status-cancelled::before { background-color: #94a3b8 !important; /* slate-400 */ }
+body.subtle-material .task-status.status-cancelled:hover { background: #f1f5f9 !important; }
+
+/* Neutralize fancy STOP button styling in Material theme */
+body.subtle-material .cancel-btn {
+  animation: none !important;
+  background: var(--sm-surface) !important;
+  color: var(--sm-on-secondary) !important;
+  border: 1px solid var(--sm-border) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+body.subtle-material .cancel-btn::before { display: none !important; }
+body.subtle-material .cancel-btn:hover {
+  background: #f3f4f6 !important;
+  color: #0f172a !important;
+  border-color: #d1d5db !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+body.subtle-material .cancel-btn:active { transform: none !important; }
 
 /* Cleaner grouping for System Overview and Real-time Status */
 body.subtle-material .statistics-summary {
@@ -232,6 +372,7 @@ body.subtle-material .search-button:focus,
 body.subtle-material .retry-button:focus,
 body.subtle-material .preview-button:focus,
 body.subtle-material .cancel-button:focus,
+body.subtle-material .cancel-btn:focus,
 body.subtle-material .delete-button:focus,
 body.subtle-material .page-button:focus,
 body.subtle-material button:focus {

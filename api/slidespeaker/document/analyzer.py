@@ -14,7 +14,7 @@ from openai import OpenAI
 from PyPDF2 import PdfReader
 
 # Import the shared transcript generator
-from slidespeaker.processing.transcript_generator import TranscriptGenerator
+from slidespeaker.transcript import TranscriptGenerator
 
 # Language-specific prompts for PDF analysis
 LANGUAGE_PROMPTS = {
@@ -228,7 +228,11 @@ class PDFAnalyzer:
 
     def __init__(self) -> None:
         """Initialize the PDF analyzer with OpenAI client and script generator"""
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        # Get API key from environment (this is a special case that's not in config)
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is required")
+        self.client = OpenAI(api_key=api_key)
         self.model: str = os.getenv("PDF_ANALYZER_MODEL", "gpt-4o-mini")
         self.transcript_generator = TranscriptGenerator()
 
@@ -344,22 +348,22 @@ class PDFAnalyzer:
                         if "key_points" not in chapter:
                             chapter["key_points"] = []
 
-                        # Always generate a comprehensive script using the shared script generator
-                        # to ensure detailed explanations of the topic and key points
-                        # Combine title, description, and key points for comprehensive script generation
-                        content_for_script = (
-                            f"Chapter Topic: {chapter.get('title', '')}\n"
-                        )
-                        content_for_script += (
-                            f"Chapter Description: {chapter.get('description', '')}\n"
-                        )
-                        if chapter.get("key_points"):
-                            key_points_text = "\n".join(
-                                [f"- {point}" for point in chapter["key_points"]]
+                        # If the model already provided a script, keep it as-is
+                        provided_script = str(chapter.get("script", "") or "").strip()
+                        if provided_script:
+                            chapter["script"] = provided_script
+                        else:
+                            # Otherwise, generate a comprehensive script using the shared script generator
+                            # Combine title, description, and key points for comprehensive script generation
+                            content_for_script = (
+                                f"Chapter Topic: {chapter.get('title', '')}\n"
                             )
-                            content_for_script += (
-                                f"\nKey Points to Cover in Detail:\n{key_points_text}\n"
-                            )
+                            content_for_script += f"Chapter Description: {chapter.get('description', '')}\n"
+                            if chapter.get("key_points"):
+                                key_points_text = "\n".join(
+                                    [f"- {point}" for point in chapter["key_points"]]
+                                )
+                                content_for_script += f"\nKey Points to Cover in Detail:\n{key_points_text}\n"
                             content_for_script += (
                                 "\nPlease provide a detailed, comprehensive explanation of this chapter topic, "
                                 "thoroughly covering all key points with relevant examples where appropriate."
@@ -370,7 +374,7 @@ class PDFAnalyzer:
                                     content_for_script, language=language
                                 )
                             )
-                        chapter["script"] = script
+                            chapter["script"] = script
 
                         chapters_with_scripts.append(chapter)
 
@@ -454,109 +458,3 @@ class PDFAnalyzer:
             chapters_with_scripts.append(chapter_with_script)
 
         return chapters_with_scripts
-
-    async def analyze_chapters(
-        self, chapters: list[dict[str, Any]], language: str = "english"
-    ) -> dict[str, Any]:
-        """
-        Perform additional analysis on already segmented chapters.
-
-        This method analyzes the structure and content of chapters to provide
-        insights like content summary, key topics, reading time estimation, etc.
-
-        Args:
-            chapters: List of chapter dictionaries with title, description, key_points, and script
-            language: Target language for analysis
-
-        Returns:
-            Dictionary with analysis results including content summary, key topics, etc.
-        """
-        try:
-            # Extract all content from chapters for analysis
-            all_titles = [chapter.get("title", "") for chapter in chapters]
-            all_descriptions = [chapter.get("description", "") for chapter in chapters]
-            all_key_points = []
-            for chapter in chapters:
-                key_points = chapter.get("key_points", [])
-                if key_points:
-                    all_key_points.extend(key_points)
-            all_scripts = [chapter.get("script", "") for chapter in chapters]
-
-            # Combine content for overall analysis
-            combined_content = "\n".join(
-                all_titles + all_descriptions + all_key_points + all_scripts
-            )
-
-            # Estimate reading time (average reading speed: 200 words per minute)
-            word_count = len(combined_content.split())
-            estimated_reading_time = max(1, word_count // 200)  # At least 1 minute
-
-            # Analyze content structure
-            chapter_analysis = []
-            for i, chapter in enumerate(chapters):
-                chapter_content = (
-                    f"{chapter.get('title', '')} {chapter.get('description', '')} "
-                    f"{' '.join(chapter.get('key_points', []))} {chapter.get('script', '')}"
-                )
-                chapter_word_count = len(chapter_content.split())
-                chapter_reading_time = max(1, chapter_word_count // 200)
-
-                chapter_analysis.append(
-                    {
-                        "chapter_index": i + 1,
-                        "title": chapter.get("title", ""),
-                        "word_count": chapter_word_count,
-                        "estimated_reading_time": chapter_reading_time,
-                        "key_points_count": len(chapter.get("key_points", [])),
-                    }
-                )
-
-            # Extract key topics from key points
-            all_key_points_text = " ".join(all_key_points)
-            # Simple approach: extract potential key topics from key points
-            import re
-
-            # Extract words that appear to be key topics (simple heuristic)
-            potential_topics = re.findall(r"\b[A-Z][a-z]+\b", all_key_points_text)
-            key_topics = list(set(potential_topics))[
-                :10
-            ]  # Limit to top 10 unique topics
-
-            # Create content summary
-            content_summary = (
-                f"This document contains {len(chapters)} chapters with approximately "
-                f"{word_count} words and an estimated reading time of "
-                f"{estimated_reading_time} minutes. It covers {len(key_topics)} key topics."
-            )
-
-            analysis_results = {
-                "total_chapters": len(chapters),
-                "total_word_count": word_count,
-                "estimated_reading_time": estimated_reading_time,
-                "content_summary": content_summary,
-                "key_topics": key_topics,
-                "chapters": chapter_analysis,
-            }
-
-            return analysis_results
-
-        except Exception as e:
-            print(f"Error analyzing chapters: {e}")
-            # Return basic analysis if detailed analysis fails
-            return {
-                "total_chapters": len(chapters),
-                "total_word_count": 0,
-                "estimated_reading_time": 0,
-                "content_summary": "Basic chapter analysis",
-                "key_topics": [],
-                "chapters": [
-                    {
-                        "chapter_index": i + 1,
-                        "title": chapter.get("title", ""),
-                        "word_count": 0,
-                        "estimated_reading_time": 0,
-                        "key_points_count": len(chapter.get("key_points", [])),
-                    }
-                    for i, chapter in enumerate(chapters)
-                ],
-            }

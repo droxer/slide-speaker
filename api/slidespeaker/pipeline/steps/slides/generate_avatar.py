@@ -9,8 +9,8 @@ animated avatar presentations for each slide in the presentation.
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.services.avatar_factory import AvatarFactory
 from slidespeaker.utils.config import config, get_storage_provider
+from slidespeaker.video.avatar import AvatarFactory
 
 # Get storage provider instance
 storage_provider = get_storage_provider()

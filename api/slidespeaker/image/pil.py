@@ -160,7 +160,8 @@ class PILImageGenerator:
         )  # Adjusted width for better wrapping
 
         title_y = 170
-        title_line_height = 70
+        # Increase title line spacing for readability
+        title_line_height = 80
 
         # Move the title higher by reducing title_y
         title_y = 110  # Was 170, now moved up by 60px
@@ -177,7 +178,8 @@ class PILImageGenerator:
 
         # Add chapter description
         description = chapter.get("description", "")
-        desc_y = title_y + total_title_height + 70  # Increased spacing
+        # Increase spacing between title and description
+        desc_y = title_y + total_title_height + 90
 
         # Increase font size for description and keypoints
         # We'll create larger fonts based on the originals
@@ -212,7 +214,8 @@ class PILImageGenerator:
         if description:
             # Use smaller width for better line control
             desc_lines = textwrap.wrap(description, width=80)
-            desc_line_height = 55  # Increased line height for larger font
+            # Increase description line height for better line spacing
+            desc_line_height = 68
 
             for i, line in enumerate(desc_lines[:4]):  # Limit to 4 lines for better fit
                 bbox = draw.textbbox((0, 0), line, font=larger_desc_font)
@@ -229,7 +232,8 @@ class PILImageGenerator:
         # Add key points
         key_points = chapter.get("key_points", [])
         if key_points:
-            keypoints_start_y = desc_y + desc_content_height + 60
+            # Increase spacing between description and key points
+            keypoints_start_y = desc_y + desc_content_height + 80
 
             # Draw "Key Points:" header
             header_text = "Key Points:"
@@ -240,43 +244,91 @@ class PILImageGenerator:
                 font=larger_desc_font,
             )
 
-            # Draw each key point with proper spacing
-            keypoint_line_height = 55  # Increased line height for larger font
+            # Draw each key point with increased line spacing (more breathing room)
+            keypoint_line_height = 88
             keypoint_y = (
-                keypoints_start_y + 60
-            )  # More space after header for larger font
+                keypoints_start_y + 80
+            )  # Extra space after header for larger font
 
             for i, point in enumerate(key_points[:6]):  # Limit to 6 key points
+                # Compute starting y for this keypoint
                 current_y = keypoint_y + i * keypoint_line_height
 
-                # Check if we're approaching the bottom of the slide
+                # Stop if near the bottom
                 if current_y > height - 150:
                     break
 
-                # Format the key point with bullet
-                bullet_point = f"• {point}"
+                # Wrap only the text (without bullet) for a clean hanging indent
+                wrapped_lines = textwrap.wrap(str(point), width=90)
+                if not wrapped_lines:
+                    continue
 
-                # For key points, use more conservative wrapping
-                wrapped_lines = textwrap.wrap(bullet_point, width=90)
+                # Draw a bullet sized to the current font line height
+                # Support styles: 'dot' (default), 'large_dot', 'square', 'hyphen'
+                bullet_style = str(chapter.get("bullet_style", "dot")).lower()
+                line_bbox = draw.textbbox(
+                    (0, 0), wrapped_lines[0], font=larger_keypoint_font
+                )
+                line_h = max(1, line_bbox[3] - line_bbox[1])
+                cy = current_y + line_h // 2
+                cx = margin
+                indent_x: int
 
-                # Draw each wrapped line of the key point
-                for j, line in enumerate(wrapped_lines):
-                    line_y = (
-                        current_y + j * 38
-                    )  # Slightly larger line spacing for larger font
+                if bullet_style in ("square", "box"):
+                    side = max(4, int(line_h * 0.22))
+                    half = side // 2
+                    draw.rectangle(
+                        [cx - half, cy - half, cx + half, cy + half],
+                        fill="#34495e",
+                        outline=None,
+                    )
+                    indent_x = margin + side + 12
+                elif bullet_style in ("hyphen", "dash"):
+                    hy_w = max(8, int(line_h * 0.5))
+                    hy_h = max(2, int(line_h * 0.08))
+                    draw.rectangle(
+                        [cx, cy - hy_h // 2, cx + hy_w, cy + hy_h // 2],
+                        fill="#34495e",
+                        outline=None,
+                    )
+                    indent_x = margin + hy_w + 12
+                else:  # dot / large_dot default
+                    radius_factor = (
+                        0.18 if bullet_style in ("dot", "•", "bullet") else 0.28
+                    )
+                    r = max(3, int(line_h * radius_factor))
+                    draw.ellipse(
+                        [cx - r, cy - r, cx + r, cy + r],
+                        fill="#34495e",
+                        outline=None,
+                    )
+                    indent_x = margin + (r * 2) + 12
 
-                    # Ensure we don't exceed slide bounds
+                # First line
+                if current_y <= height - 120:
+                    draw.text(
+                        (indent_x, current_y),
+                        wrapped_lines[0],
+                        fill="#34495e",
+                        font=larger_keypoint_font,
+                    )
+
+                # Continuation lines (hanging indent)
+                # Increase continuation line spacing for readability
+                continuation_step = 60
+                for j, cont_line in enumerate(wrapped_lines[1:], start=1):
+                    line_y = current_y + j * continuation_step
                     if line_y <= height - 120:
                         draw.text(
-                            (margin + 30, line_y),
-                            line,
+                            (indent_x, line_y),
+                            cont_line,
                             fill="#34495e",
                             font=larger_keypoint_font,
                         )
 
-                    # If this is a wrapped line, don't increment the main key point counter
-                    if j > 0:
-                        # Adjust spacing for next key point if we had wrapping
-                        keypoint_line_height = max(
-                            keypoint_line_height, (j + 1) * 38 + 12
-                        )
+                # If wrapping occurred, increase spacing for the next bullet accordingly
+                if len(wrapped_lines) > 1:
+                    keypoint_line_height = max(
+                        keypoint_line_height,
+                        len(wrapped_lines) * continuation_step + 16,
+                    )

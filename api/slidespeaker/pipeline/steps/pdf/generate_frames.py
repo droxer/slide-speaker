@@ -9,9 +9,7 @@ from typing import Any
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.processing.image_generator import (
-    ImageGenerator as SharedImageGenerator,
-)
+from slidespeaker.image import ImageGenerator as SharedImageGenerator
 from slidespeaker.utils.config import config, get_storage_provider
 
 image_generator = SharedImageGenerator()
@@ -20,7 +18,7 @@ image_generator = SharedImageGenerator()
 storage_provider = get_storage_provider()
 
 
-async def generate_chapter_images_step(file_id: str, language: str = "english") -> None:
+async def generate_frames_step(file_id: str, language: str = "english") -> None:
     """
     Generate slide-like images for PDF chapters.
 

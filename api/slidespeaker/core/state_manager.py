@@ -43,7 +43,6 @@ class RedisStateManager:
             # PDF-specific steps
             steps = {
                 "segment_pdf_content": {"status": "pending", "data": None},
-                "analyze_pdf_content": {"status": "pending", "data": None},
                 "revise_pdf_transcripts": {"status": "pending", "data": None},
                 "generate_pdf_chapter_images": {"status": "pending", "data": None},
                 "generate_pdf_audio": {"status": "pending", "data": None},
@@ -51,7 +50,7 @@ class RedisStateManager:
                     "status": "pending" if generate_subtitles else "skipped",
                     "data": None,
                 },
-                "compose_pdf_video": {"status": "pending", "data": None},
+                "compose_video": {"status": "pending", "data": None},
             }
 
             # Add translation steps if needed
@@ -106,10 +105,6 @@ class RedisStateManager:
                 steps.update(
                     {
                         "generate_subtitle_transcripts": {
-                            "status": "pending",
-                            "data": None,
-                        },
-                        "revise_subtitle_transcripts": {
                             "status": "pending",
                             "data": None,
                         },

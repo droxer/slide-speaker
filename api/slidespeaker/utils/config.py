@@ -35,6 +35,13 @@ class Config:
         self.watermark_opacity = float(os.getenv("WATERMARK_OPACITY", "0.95"))
         self.watermark_size = int(os.getenv("WATERMARK_SIZE", "64"))
 
+        # FFmpeg configuration
+        self.ffmpeg_fps = int(os.getenv("FFMPEG_FPS", "24"))
+        self.ffmpeg_threads = int(os.getenv("FFMPEG_THREADS", "2"))
+        self.ffmpeg_preset = os.getenv("FFMPEG_PRESET", "medium")
+        self.ffmpeg_bitrate = os.getenv("FFMPEG_BITRATE", "2000k")
+        self.ffmpeg_audio_bitrate = os.getenv("FFMPEG_AUDIO_BITRATE", "128k")
+
         # Storage configuration
         self.storage_provider = os.getenv("STORAGE_PROVIDER", "local")
         self.storage_config = self._get_storage_config()

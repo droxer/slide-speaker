@@ -10,9 +10,7 @@ from pathlib import Path
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.processing.slide_extractor import (
-    SlideExtractor,
-)
+from slidespeaker.document import SlideExtractor
 
 slide_processor = SlideExtractor()
 
