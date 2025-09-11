@@ -119,6 +119,7 @@ body.subtle-material .advanced-options-button:hover {
 
 /* Secondary/neutral buttons */
 body.subtle-material .cancel-button,
+body.subtle-material .cancel-btn,
 body.subtle-material .delete-button {
   background: var(--sm-surface) !important;
   color: var(--sm-on-secondary) !important;
@@ -173,6 +174,26 @@ body.subtle-material .pagination .page-button:disabled {
   color: #9ca3af !important;
   border-color: var(--sm-border) !important;
 }
+
+/* Neutralize fancy STOP button styling in Material theme */
+body.subtle-material .cancel-btn {
+  animation: none !important;
+  background: var(--sm-surface) !important;
+  color: var(--sm-on-secondary) !important;
+  border: 1px solid var(--sm-border) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+body.subtle-material .cancel-btn::before { display: none !important; }
+body.subtle-material .cancel-btn:hover {
+  background: #f3f4f6 !important;
+  color: #0f172a !important;
+  border-color: #d1d5db !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+body.subtle-material .cancel-btn:active { transform: none !important; }
 
 /* Cleaner grouping for System Overview and Real-time Status */
 body.subtle-material .statistics-summary {
@@ -232,6 +253,7 @@ body.subtle-material .search-button:focus,
 body.subtle-material .retry-button:focus,
 body.subtle-material .preview-button:focus,
 body.subtle-material .cancel-button:focus,
+body.subtle-material .cancel-btn:focus,
 body.subtle-material .delete-button:focus,
 body.subtle-material .page-button:focus,
 body.subtle-material button:focus {

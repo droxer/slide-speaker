@@ -50,7 +50,7 @@ class RedisStateManager:
                     "status": "pending" if generate_subtitles else "skipped",
                     "data": None,
                 },
-                "compose_pdf_video": {"status": "pending", "data": None},
+                "compose_video": {"status": "pending", "data": None},
             }
 
             # Add translation steps if needed
@@ -105,10 +105,6 @@ class RedisStateManager:
                 steps.update(
                     {
                         "generate_subtitle_transcripts": {
-                            "status": "pending",
-                            "data": None,
-                        },
-                        "revise_subtitle_transcripts": {
                             "status": "pending",
                             "data": None,
                         },

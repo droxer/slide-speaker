@@ -51,6 +51,7 @@ interface ProcessingDetails {
   current_step: string;
   steps: Record<string, StepDetails>;
   errors: ProcessingError[];
+  filename?: string;
   voice_language?: string;
   subtitle_language?: string;
   created_at: string;
@@ -165,13 +166,13 @@ const localStorageUtils = {
 };
 
 function App() {
-  // UI theme: 'flat' (default) or 'classic'
+  // UI theme: 'flat' (default), 'classic', or 'material'
   const [uiTheme, setUiTheme] = useState<'flat' | 'classic' | 'material'>(() => {
     try {
       const saved = localStorage.getItem(THEME_STORAGE_KEY);
       if (saved === 'classic' || saved === 'flat' || saved === 'material') return saved as 'flat' | 'classic' | 'material';
     } catch {}
-    return 'classic';
+    return 'flat';
   });
 
   // Apply/remove ultra-flat class based on theme
@@ -462,7 +463,8 @@ function App() {
           // Add VTT subtitle track if subtitles are enabled
           const track = document.createElement('track');
           track.kind = 'subtitles';
-          track.src = `/api/subtitles/${fileId}/vtt`;
+          // Always use absolute URL with explicit language to avoid mismatches
+          track.src = `${API_BASE_URL}/api/subtitles/${fileId}/vtt?language=${encodeURIComponent(subtitleLanguage)}`;
           track.setAttribute('srclang', subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 
                          subtitleLanguage === 'traditional_chinese' ? 'zh-Hant' : 
                          subtitleLanguage === 'japanese' ? 'ja' : 
@@ -482,10 +484,10 @@ function App() {
           
           track.addEventListener('error', (e) => {
             console.error('Subtitle track loading error:', e);
-            // Fallback: try loading with absolute URL
-            const absoluteUrl = `${API_BASE_URL}/api/subtitles/${fileId}/vtt`;
-            console.log('Trying absolute URL:', absoluteUrl);
-            track.src = absoluteUrl;
+            // Fallback: try without explicit language (server infers from state)
+            const fallbackUrl = `${API_BASE_URL}/api/subtitles/${fileId}/vtt`;
+            console.log('Trying fallback URL:', fallbackUrl);
+            track.src = fallbackUrl;
           });
           
           videoRef.current.appendChild(track);
@@ -496,7 +498,7 @@ function App() {
               console.log('Retrying subtitle loading...');
               const retryTrack = document.createElement('track');
               retryTrack.kind = 'subtitles';
-              retryTrack.src = `${API_BASE_URL}/api/subtitles/${fileId}/vtt`;
+              retryTrack.src = `${API_BASE_URL}/api/subtitles/${fileId}/vtt?language=${encodeURIComponent(subtitleLanguage)}`;
               retryTrack.setAttribute('srclang', subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 
                              subtitleLanguage === 'traditional_chinese' ? 'zh-Hant' : 
                              subtitleLanguage === 'japanese' ? 'ja' : 
@@ -537,7 +539,6 @@ function App() {
       'translate_voice_transcripts': 'Translating Voice Transcripts',
       'translate_subtitle_transcripts': 'Translating Subtitle Transcripts',
       'generate_subtitle_transcripts': 'Generating Subtitle Transcripts',
-      'revise_subtitle_transcripts': 'Revising Subtitle Transcripts',
       'generate_audio': 'Generating Audio',
       'generate_avatar_videos': 'Creating Avatar',
       'convert_slides_to_images': 'Converting Slides',
@@ -555,6 +556,23 @@ function App() {
       'unknown': 'Initializing'
     };
     return stepNames[step] || step;
+  };
+
+  const formatStepNameWithLanguages = (
+    step: string,
+    voiceLang: string,
+    subtitleLang?: string
+  ): string => {
+    const vl = (voiceLang || 'english').toLowerCase();
+    const sl = (subtitleLang || vl).toLowerCase();
+    const same = vl === sl;
+    if (
+      same &&
+      (step === 'translate_voice_transcripts' || step === 'translate_subtitle_transcripts')
+    ) {
+      return 'Translating Transcripts';
+    }
+    return formatStepName(step);
   };
 
   const getLanguageDisplayName = (languageCode: string): string => {
@@ -583,15 +601,21 @@ function App() {
     const fileTypeText = isPdf ? 'PDF Document' : 'Presentation';
     
     if (activeSteps.length > 0) {
-      const stepName = formatStepName(activeSteps[0][0]);
+      const currentStepKey = activeSteps[0][0];
+      const stepName = formatStepNameWithLanguages(
+        currentStepKey,
+        processingDetails.voice_language || 'english',
+        processingDetails.subtitle_language || processingDetails.voice_language || 'english'
+      );
       const statusMessages: Record<string, string> = {
         // Common messages for all file types
         'Extracting Slides': `Analyzing your ${fileTypeText} structure...`,
         'Analyzing Content': `Examining ${fileTypeText} content...`,
         'Generating Transcripts': 'Generating English transcripts...',
         'Revising Transcripts': 'Polishing transcripts for delivery...',
-        'Translating Voice Transcripts': 'Translating transcripts to voice language...',
-        'Translating Subtitle Transcripts': 'Translating transcripts for subtitles...',
+        'Translating Voice Transcripts': 'Translating transcripts...',
+        'Translating Subtitle Transcripts': 'Translating transcripts...',
+        'Translating Transcripts': 'Translating transcripts...',
         'Generating Subtitle Transcripts': 'Generating subtitle transcripts...',
         'Reviewing Subtitles': 'Perfecting subtitle timing and accuracy...',
         'Generating Audio': 'Creating natural voice narration...',
@@ -850,7 +874,15 @@ function App() {
             {status === 'processing' && (
               <div className="processing-view">
                 <div className="spinner"></div>
-                <h3>{getProcessingStatusMessage()}</h3>                
+                <h3>{getProcessingStatusMessage()}</h3>
+                {(() => {
+                  const name = file?.name || processingDetails?.filename;
+                  return name ? (
+                    <div className="processing-file-name" title={name}>
+                      <span className="info-value" style={{ marginLeft: 6 }}>{name}</span>
+                    </div>
+                  ) : null;
+                })()}
                 <div className="progress-container">
                   <div className="progress-bar">
                     <div 
@@ -889,13 +921,20 @@ function App() {
                           'generate_pdf_chapter_images', 
                           'generate_pdf_audio',
                           'generate_pdf_subtitles',
-                          'compose_pdf_video'
+                          // Backend uses 'compose_video' for the PDF compose step
+                          'compose_video'
                         ]
                           .map((stepName) => {
                             const stepData = processingDetails.steps[stepName];
                             // Hide steps that are not present or explicitly skipped
                             if (!stepData || stepData.status === 'skipped') {
                               return null;
+                            }
+                            const vl = (processingDetails.voice_language || 'english').toLowerCase();
+                            const sl = (processingDetails.subtitle_language || vl).toLowerCase();
+                            const same = vl === sl;
+                            if (same && stepName === 'translate_subtitle_transcripts') {
+                              return null; // collapse duplicate translate step
                             }
                             return (
                               <div key={stepName} className={`step-item ${stepData.status}`}>
@@ -904,7 +943,7 @@ function App() {
                                    stepData.status === 'processing' || stepData.status === 'in_progress' ? '⏳' :
                                    stepData.status === 'failed' ? '✗' : '○'}
                                 </span>
-                                <span className="step-name">{formatStepName(stepName)}</span>
+                                <span className="step-name">{formatStepNameWithLanguages(stepName, vl, sl)}</span>
                               </div>
                             );
                           })
@@ -930,6 +969,12 @@ function App() {
                             if (!stepData || stepData.status === 'skipped') {
                               return null;
                             }
+                            const vl = (processingDetails.voice_language || 'english').toLowerCase();
+                            const sl = (processingDetails.subtitle_language || vl).toLowerCase();
+                            const same = vl === sl;
+                            if (same && stepName === 'translate_subtitle_transcripts') {
+                              return null; // collapse duplicate translate step
+                            }
                             return (
                               <div key={stepName} className={`step-item ${stepData.status}`}>
                                 <span className="step-icon">
@@ -937,7 +982,7 @@ function App() {
                                    stepData.status === 'processing' || stepData.status === 'in_progress' ? '⏳' :
                                    stepData.status === 'failed' ? '✗' : '○'}
                                 </span>
-                                <span className="step-name">{formatStepName(stepName)}</span>
+                                <span className="step-name">{formatStepNameWithLanguages(stepName, vl, sl)}</span>
                               </div>
                             );
                           })
@@ -949,11 +994,15 @@ function App() {
                       <div className="error-section">
                         <h4>Errors Encountered</h4>
                         <div className="error-list">
-                          {processingDetails.errors.map((error, index) => (
-                            <div key={index} className="error-item">
-                              <strong>{formatStepName(error.step)}:</strong> {error.error}
-                            </div>
-                          ))}
+                          {processingDetails.errors.map((error, index) => {
+                            const vl = (processingDetails.voice_language || 'english').toLowerCase();
+                            const sl = (processingDetails.subtitle_language || vl).toLowerCase();
+                            return (
+                              <div key={index} className="error-item">
+                                <strong>{formatStepNameWithLanguages(error.step, vl, sl)}:</strong> {error.error}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -975,6 +1024,7 @@ function App() {
                         ref={videoRef}
                         controls
                         src={`${API_BASE_URL}/api/video/${fileId}`}
+                        crossOrigin="anonymous"
                         className="preview-video-large"
                       >
                         {/* Video tracks will be added dynamically via useEffect */}

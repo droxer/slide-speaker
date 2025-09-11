@@ -9,7 +9,7 @@ natural, engaging transcripts suitable for AI avatar presentation.
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.processing.transcript_generator import TranscriptGenerator
+from slidespeaker.transcript import TranscriptGenerator
 
 transcript_generator = TranscriptGenerator()
 

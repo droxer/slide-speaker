@@ -10,14 +10,26 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
-from slidespeaker.processing.video_previewer import VideoPreviewer
 from slidespeaker.storage import StorageProvider
 from slidespeaker.utils.config import config, get_storage_provider
+from slidespeaker.video import VideoPreviewer
 
 router = APIRouter(prefix="/api", tags=["downloads"])
 
 # Initialize video previewer
 video_previewer = VideoPreviewer()
+
+
+@router.get("/preview/{file_id}")
+async def get_video_preview(file_id: str, language: str = "english") -> dict[str, Any]:
+    """Get video preview data including video URL and subtitle information."""
+    try:
+        preview_data = video_previewer.generate_preview_data(file_id, language)
+        return preview_data
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to generate preview: {str(e)}"
+        ) from e
 
 
 @router.get("/video/{file_id}")
@@ -162,17 +174,21 @@ async def options_srt_subtitles(file_id: str) -> Response:
 
 
 @router.get("/subtitles/{file_id}/srt")
-async def get_srt_subtitles(file_id: str) -> Response:
+async def get_srt_subtitles(file_id: str, language: str | None = None) -> Response:
     """Download SRT subtitle file."""
-    # Get the subtitle language from the file's state
+    # Get the subtitle language from query parameter or file's state
     from slidespeaker.core.state_manager import state_manager
 
-    state = await state_manager.get_state(file_id)
-    subtitle_language = "english"  # Default to English
-    if state and "subtitle_language" in state and state["subtitle_language"]:
-        subtitle_language = state["subtitle_language"]
-    elif state and "voice_language" in state:
-        subtitle_language = state["voice_language"]
+    subtitle_language = language  # Use query parameter if provided
+    if not subtitle_language:
+        # If no language specified, get from file state
+        state = await state_manager.get_state(file_id)
+        if state and "subtitle_language" in state and state["subtitle_language"]:
+            subtitle_language = state["subtitle_language"]
+        elif state and "voice_language" in state:
+            subtitle_language = state["voice_language"]
+        else:
+            subtitle_language = "english"  # Default to English
 
     # Convert language to locale code
     from slidespeaker.utils.locales import locale_utils
@@ -225,26 +241,31 @@ async def get_srt_subtitles(file_id: str) -> Response:
         content=subtitle_content,
         media_type="text/plain",
         headers={
-            "Content-Disposition": f"attachment; filename=presentation_{file_id}.srt",
+            "Content-Disposition": f"attachment; filename=presentation_{file_id}_{locale_code}.srt",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
             "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
+            "Cache-Control": "public, max-age=3600",  # Add caching to prevent constant requests
         },
     )
 
 
 @router.get("/subtitles/{file_id}/vtt")
-async def get_vtt_subtitles(file_id: str) -> Response:
+async def get_vtt_subtitles(file_id: str, language: str | None = None) -> Response:
     """Download VTT subtitle file."""
-    # Get the subtitle language from the file's state
+    # Get the subtitle language from query parameter or file's state
     from slidespeaker.core.state_manager import state_manager
 
-    state = await state_manager.get_state(file_id)
-    subtitle_language = "english"  # Default to English
-    if state and "subtitle_language" in state and state["subtitle_language"]:
-        subtitle_language = state["subtitle_language"]
-    elif state and "voice_language" in state:
-        subtitle_language = state["voice_language"]
+    subtitle_language = language  # Use query parameter if provided
+    if not subtitle_language:
+        # If no language specified, get from file state
+        state = await state_manager.get_state(file_id)
+        if state and "subtitle_language" in state and state["subtitle_language"]:
+            subtitle_language = state["subtitle_language"]
+        elif state and "voice_language" in state:
+            subtitle_language = state["voice_language"]
+        else:
+            subtitle_language = "english"  # Default to English
 
     # Convert language to locale code
     from slidespeaker.utils.locales import locale_utils
@@ -297,10 +318,11 @@ async def get_vtt_subtitles(file_id: str) -> Response:
         content=subtitle_content,
         media_type="text/vtt",
         headers={
-            "Content-Disposition": f"inline; filename=presentation_{file_id}.vtt",
+            "Content-Disposition": f"inline; filename=presentation_{file_id}_{locale_code}.vtt",
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
             "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
+            "Cache-Control": "public, max-age=3600",  # Add caching to prevent constant requests
         },
     )
 
@@ -318,17 +340,21 @@ async def options_vtt_subtitles(file_id: str) -> Response:
 
 
 @router.head("/subtitles/{file_id}/vtt")
-async def head_vtt_subtitles(file_id: str) -> Response:
+async def head_vtt_subtitles(file_id: str, language: str | None = None) -> Response:
     """HEAD endpoint to check if VTT subtitle file exists."""
-    # Get the subtitle language from the file's state
+    # Get the subtitle language from query parameter or file's state
     from slidespeaker.core.state_manager import state_manager
 
-    state = await state_manager.get_state(file_id)
-    subtitle_language = "english"  # Default to English
-    if state and "subtitle_language" in state and state["subtitle_language"]:
-        subtitle_language = state["subtitle_language"]
-    elif state and "voice_language" in state:
-        subtitle_language = state["voice_language"]
+    subtitle_language = language  # Use query parameter if provided
+    if not subtitle_language:
+        # If no language specified, get from file state
+        state = await state_manager.get_state(file_id)
+        if state and "subtitle_language" in state and state["subtitle_language"]:
+            subtitle_language = state["subtitle_language"]
+        elif state and "voice_language" in state:
+            subtitle_language = state["voice_language"]
+        else:
+            subtitle_language = "english"  # Default to English
 
     # Convert language to locale code
     from slidespeaker.utils.locales import locale_utils
@@ -379,22 +405,27 @@ async def head_vtt_subtitles(file_id: str) -> Response:
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
         "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
+        "Cache-Control": "public, max-age=3600",  # Add caching to prevent constant requests
     }
     return Response(status_code=200, headers=headers)
 
 
 @router.head("/subtitles/{file_id}/srt")
-async def head_srt_subtitles(file_id: str) -> Response:
+async def head_srt_subtitles(file_id: str, language: str | None = None) -> Response:
     """HEAD endpoint to check if SRT subtitle file exists."""
-    # Get the subtitle language from the file's state
+    # Get the subtitle language from query parameter or file's state
     from slidespeaker.core.state_manager import state_manager
 
-    state = await state_manager.get_state(file_id)
-    subtitle_language = "english"  # Default to English
-    if state and "subtitle_language" in state and state["subtitle_language"]:
-        subtitle_language = state["subtitle_language"]
-    elif state and "voice_language" in state:
-        subtitle_language = state["voice_language"]
+    subtitle_language = language  # Use query parameter if provided
+    if not subtitle_language:
+        # If no language specified, get from file state
+        state = await state_manager.get_state(file_id)
+        if state and "subtitle_language" in state and state["subtitle_language"]:
+            subtitle_language = state["subtitle_language"]
+        elif state and "voice_language" in state:
+            subtitle_language = state["voice_language"]
+        else:
+            subtitle_language = "english"  # Default to English
 
     # Convert language to locale code
     from slidespeaker.utils.locales import locale_utils
@@ -447,5 +478,6 @@ async def head_srt_subtitles(file_id: str) -> Response:
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
         "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
+        "Cache-Control": "public, max-age=3600",  # Add caching to prevent constant requests
     }
     return Response(status_code=200, headers=headers)

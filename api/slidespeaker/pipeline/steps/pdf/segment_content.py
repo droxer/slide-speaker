@@ -9,7 +9,7 @@ from pathlib import Path
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.processing.pdf_analyzer import PDFAnalyzer
+from slidespeaker.document import PDFAnalyzer
 
 
 async def segment_content_step(

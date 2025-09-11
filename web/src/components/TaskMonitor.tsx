@@ -74,6 +74,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
   const [subtitleObjectUrl, setSubtitleObjectUrl] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
   const modalVideoRef = React.useRef<HTMLVideoElement | null>(null);
+  const lastSubtitleFileIdRef = React.useRef<string | null>(null);
   const [removingTaskIds, setRemovingTaskIds] = useState<Set<string>>(new Set());
 
   // Debug log for preview state
@@ -99,8 +100,17 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
         return;
       }
 
+      // Prevent repeated fetches for the same file if already loaded
+      if (
+        lastSubtitleFileIdRef.current === selectedTaskForPreview.file_id &&
+        subtitleAvailable
+      ) {
+        return;
+      }
+
       setSubtitleLoading(true);
-      const url = `${apiBaseUrl}/api/subtitles/${selectedTaskForPreview.file_id}/vtt`;
+      const preferredLanguage = selectedTaskForPreview.kwargs?.subtitle_language || selectedTaskForPreview.state?.subtitle_language || selectedTaskForPreview.kwargs?.voice_language || 'english';
+      const url = `${apiBaseUrl}/api/subtitles/${selectedTaskForPreview.file_id}/vtt?language=${encodeURIComponent(preferredLanguage)}`;
       try {
         const resp = await fetch(url, { headers: { Accept: 'text/vtt,*/*' } });
         if (resp.ok) {
@@ -109,6 +119,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
           const obj = URL.createObjectURL(blob);
           setSubtitleObjectUrl(obj);
           setSubtitleAvailable(true);
+          lastSubtitleFileIdRef.current = selectedTaskForPreview.file_id;
           // subtitles loaded
         } else {
           console.warn('Subtitle GET failed', resp.status);
@@ -126,7 +137,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     };
     
     checkSubtitles();
-  }, [selectedTaskForPreview, apiBaseUrl, subtitleObjectUrl]);
+  }, [selectedTaskForPreview, apiBaseUrl]);
 
   // No imperative src assignment; <video src> handles local and S3 redirect
 
@@ -325,7 +336,6 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
       'translate_voice_transcripts': 'Translating Voice Transcripts',
       'translate_subtitle_transcripts': 'Translating Subtitle Transcripts',
       'generate_subtitle_transcripts': 'Generating Subtitle Transcripts',
-      'revise_subtitle_transcripts': 'Revising Subtitle Transcripts',
       'generate_audio': 'Generating Audio',
       'generate_avatar_videos': 'Creating Avatar',
       'convert_slides_to_images': 'Converting Slides',
@@ -343,6 +353,24 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
       'unknown': 'Initializing'
     };
     return stepNames[step] || step;
+  };
+
+  // Context-aware step name (collapse translation when languages match)
+  const formatStepNameWithLanguages = (
+    step: string,
+    voiceLang: string,
+    subtitleLang?: string
+  ): string => {
+    const vl = (voiceLang || 'english').toLowerCase();
+    const sl = (subtitleLang || vl).toLowerCase();
+    const same = vl === sl;
+    if (
+      same &&
+      (step === 'translate_voice_transcripts' || step === 'translate_subtitle_transcripts')
+    ) {
+      return 'Translating Transcripts';
+    }
+    return formatStepName(step);
   };
 
   // Get file type display name
@@ -595,12 +623,18 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                 </div>
                 
                 {/* Current Step or Status - Hide Status for completed tasks */}
-                {task.status !== 'completed' && task.state && (
+                {task.status !== 'completed' && task.state && (() => {
+                  const voiceLang =
+                    task.kwargs?.voice_language || task.state?.voice_language || 'english';
+                  const subtitleLang =
+                    task.kwargs?.subtitle_language || task.state?.subtitle_language || voiceLang;
+                  return (
                   <div className="task-info">
                     <span className="info-label">Current Step:</span>
-                    <span className="info-value">{formatStepName(task.state.current_step)}</span>
+                    <span className="info-value">{formatStepNameWithLanguages(task.state.current_step, voiceLang, subtitleLang)}</span>
                   </div>
-                )}
+                  );
+                })()}
                 
                 {task.completion_percentage !== undefined && task.status !== 'completed' && (
                   <div className="task-info">
@@ -723,9 +757,9 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
             <div className="video-player-container">
               {(() => {
                 const videoUrl = `${apiBaseUrl}/api/video/${selectedTaskForPreview.file_id}`;
-                const subtitleUrl = `${apiBaseUrl}/api/subtitles/${selectedTaskForPreview.file_id}/vtt`;
                 const voiceLanguage = selectedTaskForPreview.kwargs?.voice_language || selectedTaskForPreview.state?.voice_language || 'english';
                 const subtitleLanguage = selectedTaskForPreview.kwargs?.subtitle_language || selectedTaskForPreview.state?.subtitle_language || voiceLanguage;
+                const subtitleUrl = `${apiBaseUrl}/api/subtitles/${selectedTaskForPreview.file_id}/vtt?language=${encodeURIComponent(subtitleLanguage)}`;
                 
                 
                 
@@ -739,6 +773,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                       playsInline
                       preload="auto"
                       className="video-player"
+                      crossOrigin="anonymous"
                       // Avoid forcing CORS preflight for OSS/S3 video playback
                       // by not setting crossOrigin; let the browser fetch normally
                       src={videoUrl}

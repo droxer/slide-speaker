@@ -9,9 +9,7 @@ from typing import Any
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.processing.image_generator import (
-    ImageGenerator as SharedImageGenerator,
-)
+from slidespeaker.image import ImageGenerator as SharedImageGenerator
 from slidespeaker.utils.config import config, get_storage_provider
 
 image_generator = SharedImageGenerator()

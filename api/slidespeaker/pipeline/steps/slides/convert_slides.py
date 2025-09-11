@@ -11,9 +11,7 @@ from pathlib import Path
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.processing.slide_extractor import (
-    SlideExtractor,
-)
+from slidespeaker.document import SlideExtractor
 from slidespeaker.utils.config import config, get_storage_provider
 
 slide_processor = SlideExtractor()

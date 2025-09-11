@@ -244,11 +244,11 @@ class PILImageGenerator:
                 font=larger_desc_font,
             )
 
-            # Draw each key point with increased line spacing
-            keypoint_line_height = 68
+            # Draw each key point with increased line spacing (more breathing room)
+            keypoint_line_height = 88
             keypoint_y = (
-                keypoints_start_y + 60
-            )  # More space after header for larger font
+                keypoints_start_y + 80
+            )  # Extra space after header for larger font
 
             for i, point in enumerate(key_points[:6]):  # Limit to 6 key points
                 # Compute starting y for this keypoint
@@ -314,8 +314,8 @@ class PILImageGenerator:
                     )
 
                 # Continuation lines (hanging indent)
-                # Increase continuation line spacing as well
-                continuation_step = 48
+                # Increase continuation line spacing for readability
+                continuation_step = 60
                 for j, cont_line in enumerate(wrapped_lines[1:], start=1):
                     line_y = current_y + j * continuation_step
                     if line_y <= height - 120:

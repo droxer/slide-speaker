@@ -48,11 +48,9 @@ def _get_pdf_processing_steps(
         "revise_pdf_transcripts",  # Revise English transcripts first
     ]
 
-    # Add translation steps for voice if language is not English
+    # Add translation steps
     if voice_language.lower() != "english":
         steps_order.extend(["translate_voice_transcripts"])
-
-    # Add translation steps for subtitles if subtitle language is specified and not English
     if subtitle_language and subtitle_language.lower() != "english":
         steps_order.extend(["translate_subtitle_transcripts"])
 
@@ -69,9 +67,37 @@ def _get_pdf_processing_steps(
         steps_order.append("generate_pdf_subtitles")
 
     # Always add compose video step
-    steps_order.append("compose_pdf_video")
+    steps_order.append("compose_video")
 
     return steps_order
+
+
+def _format_pdf_step_display_name(
+    step_name: str, voice_language: str | None, subtitle_language: str | None
+) -> str:
+    """Return display label for PDF steps with unified translate label when appropriate."""
+    base_names: dict[str, str] = {
+        "segment_pdf_content": "Segmenting PDF content into chapters",
+        "revise_pdf_transcripts": "Revising and refining chapter transcripts",
+        "translate_voice_transcripts": "Translating voice transcripts",
+        "translate_subtitle_transcripts": "Translating subtitle transcripts",
+        "generate_pdf_chapter_images": "Generating chapter images",
+        "generate_pdf_audio": "Generating chapter audio",
+        "generate_pdf_subtitles": "Generating subtitles",
+        "compose_video": "Composing final video",
+    }
+    if step_name in ("translate_voice_transcripts", "translate_subtitle_transcripts"):
+        vl = (voice_language or "english").lower()
+        sl = (subtitle_language or vl).lower()
+        # Only use unified label when both languages are the same and not English
+        if vl == sl and vl != "english":
+            return "Translating transcripts"
+        # Otherwise use specific labels
+        elif step_name == "translate_voice_transcripts":
+            return "Translating voice transcripts"
+        else:
+            return "Translating subtitle transcripts"
+    return base_names.get(step_name, step_name)
 
 
 async def _execute_pdf_step(
@@ -99,17 +125,9 @@ async def _execute_pdf_step(
 
     # Skip completed steps
     if state and state["steps"][step_name]["status"] == "completed":
-        step_display_names = {
-            "segment_pdf_content": "Segmenting PDF content into chapters",
-            "revise_pdf_transcripts": "Revising and refining chapter transcripts",
-            "translate_voice_transcripts": "Translating voice transcripts",
-            "translate_subtitle_transcripts": "Translating subtitle transcripts",
-            "generate_pdf_chapter_images": "Generating chapter images",
-            "generate_pdf_audio": "Generating chapter audio",
-            "generate_pdf_subtitles": "Generating subtitles",
-            "compose_pdf_video": "Composing final video",
-        }
-        display_name = step_display_names.get(step_name, step_name)
+        display_name = _format_pdf_step_display_name(
+            step_name, voice_language, subtitle_language
+        )
         logger.info(f"=== Task {task_id} - Stage already completed: {display_name} ===")
         return
 
@@ -119,17 +137,9 @@ async def _execute_pdf_step(
         "failed",
         "in_progress",
     ]:
-        step_display_names = {
-            "segment_pdf_content": "Segmenting PDF content into chapters",
-            "revise_pdf_transcripts": "Revising and refining chapter transcripts",
-            "translate_voice_transcripts": "Translating voice transcripts",
-            "translate_subtitle_transcripts": "Translating subtitle transcripts",
-            "generate_pdf_chapter_images": "Generating chapter images",
-            "generate_pdf_audio": "Generating chapter audio",
-            "generate_pdf_subtitles": "Generating subtitles",
-            "compose_pdf_video": "Composing final video",
-        }
-        display_name = step_display_names.get(step_name, step_name)
+        display_name = _format_pdf_step_display_name(
+            step_name, voice_language, subtitle_language
+        )
         logger.info(f"=== Task {task_id} - Executing stage: {display_name} ===")
 
         # Update step status to in_progress
@@ -150,12 +160,19 @@ async def _execute_pdf_step(
                     file_id, "english"
                 )  # Always revise English transcripts first
             elif step_name == "translate_voice_transcripts":
-                # Translate English transcripts to voice language
-                await translate_voice_transcripts_step(file_id, voice_language)
+                # Translate for voice generation
+                await translate_voice_transcripts_step(
+                    file_id,
+                    source_language="english",
+                    target_language=voice_language,
+                )
             elif step_name == "translate_subtitle_transcripts":
-                # Translate English transcripts to subtitle language
-                subtitle_lang = subtitle_language or voice_language
-                await translate_subtitle_transcripts_step(file_id, subtitle_lang)
+                # Translate for subtitle generation
+                await translate_subtitle_transcripts_step(
+                    file_id,
+                    source_language="english",
+                    target_language=subtitle_language or "english",
+                )
             elif step_name == "generate_pdf_chapter_images":
                 await generate_frames_step(file_id, voice_language)
             elif step_name == "generate_pdf_audio":
@@ -163,14 +180,12 @@ async def _execute_pdf_step(
             elif step_name == "generate_pdf_subtitles":
                 subtitle_lang = subtitle_language or voice_language
                 await generate_subtitles_step(file_id, subtitle_lang)
-            elif step_name == "compose_pdf_video":
+            elif step_name == "compose_video":
                 await compose_video_step(file_id)
-
             # Mark step as completed
             await state_manager.update_step_status(
                 file_id, step_name, "completed", data=None
             )
-
             if task_id:
                 logger.info(f"=== Task {task_id} - Completed: {display_name} ===")
         except Exception as e:
@@ -292,10 +307,7 @@ async def process_pdf_file(
                     task_id,
                 )
 
-                # Mark step as completed
-                await state_manager.update_step_status(
-                    file_id, step_name, "completed", data=None
-                )
+                # Step completion handled inside _execute_pdf_step
                 completed_steps += 1
                 logger.info(f"Completed step: {step_name} ({step_index}/{total_steps})")
 
@@ -354,17 +366,11 @@ async def _log_initial_pdf_state(file_id: str) -> None:
     if state:
         logger.info(f"Current processing status: {state['status']}")
         for step_name, step_data in state["steps"].items():
-            step_display_names = {
-                "segment_pdf_content": "Segmenting PDF content into chapters",
-                "revise_pdf_transcripts": "Revising and refining chapter transcripts",
-                "translate_voice_transcripts": "Translating voice transcripts",
-                "translate_subtitle_transcripts": "Translating subtitle transcripts",
-                "generate_pdf_chapter_images": "Generating chapter images",
-                "generate_pdf_audio": "Generating chapter audio",
-                "generate_pdf_subtitles": "Generating subtitles",
-                "compose_pdf_video": "Composing final video",
-            }
-            display_name = step_display_names.get(step_name, step_name)
+            display_name = _format_pdf_step_display_name(
+                step_name,
+                state.get("voice_language"),
+                state.get("subtitle_language"),
+            )
             status_text = step_data["status"]
             if status_text == "skipped":
                 status_text = "Skipped (disabled)"

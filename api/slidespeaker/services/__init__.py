@@ -4,8 +4,7 @@ Service components for SlideSpeaker
 
 # No direct exports - use factory patterns instead
 # Import factory classes for convenience
-from .avatar_factory import AvatarFactory
-from .translation_service import TranslationService
-from .tts_factory import TTSFactory
+from slidespeaker.translation import TranslationService
+from slidespeaker.video.avatar import AvatarFactory
 
-__all__ = ["TTSFactory", "AvatarFactory", "TranslationService"]
+__all__ = ["AvatarFactory", "TranslationService"]

@@ -14,7 +14,7 @@ from openai import OpenAI
 from PyPDF2 import PdfReader
 
 # Import the shared transcript generator
-from slidespeaker.processing.transcript_generator import TranscriptGenerator
+from slidespeaker.transcript import TranscriptGenerator
 
 # Language-specific prompts for PDF analysis
 LANGUAGE_PROMPTS = {
@@ -228,7 +228,11 @@ class PDFAnalyzer:
 
     def __init__(self) -> None:
         """Initialize the PDF analyzer with OpenAI client and script generator"""
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        # Get API key from environment (this is a special case that's not in config)
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is required")
+        self.client = OpenAI(api_key=api_key)
         self.model: str = os.getenv("PDF_ANALYZER_MODEL", "gpt-4o-mini")
         self.transcript_generator = TranscriptGenerator()
 
