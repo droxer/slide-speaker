@@ -166,6 +166,51 @@ body.ultra-flat .preview-button:hover {
   border-color: #d1d5db !important;
 }
 
+/* Processing steps: flatten visuals */
+body.ultra-flat .steps-container {
+  background: #ffffff !important;
+  border: 1px solid var(--uf-border) !important;
+  border-radius: 4px !important;
+}
+body.ultra-flat .step-item {
+  background: #ffffff !important;
+  border: 1px solid var(--uf-border) !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+}
+body.ultra-flat .step-item.processing,
+body.ultra-flat .step-item.in_progress {
+  background: #f3f4f6 !important; /* neutral-100 */
+  border-color: var(--uf-border) !important;
+  animation: none !important; /* remove pulse */
+}
+body.ultra-flat .step-item.processing::before,
+body.ultra-flat .step-item.in_progress::before { display: none !important; }
+body.ultra-flat .step-item.completed { background: #f0fdf4 !important; border-color: #86efac !important; }
+body.ultra-flat .step-item.failed { background: #fef2f2 !important; border-color: #fecaca !important; }
+body.ultra-flat .step-item.pending { background: #f8fafc !important; border-color: var(--uf-border) !important; }
+body.ultra-flat .step-item.skipped { background: #f1f5f9 !important; border-color: #e2e8f0 !important; opacity: 1 !important; }
+body.ultra-flat .step-icon { animation: none !important; }
+body.ultra-flat .step-name { color: #111827 !important; }
+
+/* File type badges (PDF/PPT): remove gradients; use flat solids */
+body.ultra-flat .file-type-badge {
+  background: #f3f4f6 !important; /* neutral-100 */
+  color: #111827 !important;      /* neutral-900 */
+  border: 1px solid var(--uf-border) !important;
+  border-radius: 2px !important;
+}
+body.ultra-flat .file-type-badge.pdf {
+  background: #ef4444 !important; /* red-500 */
+  color: #ffffff !important;
+  border-color: #ef4444 !important;
+}
+body.ultra-flat .file-type-badge.ppt {
+  background: #2563eb !important; /* blue-600 */
+  color: #ffffff !important;
+  border-color: #2563eb !important;
+}
+
 /* Close button in video modal: ensure strong contrast */
 body.ultra-flat .video-close-button {
   background: #111827 !important;

@@ -194,6 +194,7 @@ function App() {
   const [status, setStatus] = useState<AppStatus>('idle');
   const [progress, setProgress] = useState<number>(0);
   const [processingDetails, setProcessingDetails] = useState<ProcessingDetails | null>(null);
+  // Using final audio endpoint; no need to fetch per-track list
   const [voiceLanguage, setVoiceLanguage] = useState<string>('english');
   const [subtitleLanguage, setSubtitleLanguage] = useState<string>('english');
   const [videoResolution, setVideoResolution] = useState<string>('hd'); // hd as default
@@ -346,6 +347,8 @@ function App() {
     loadSavedState();
   }, []);
 
+  // No-op: final audio is served via a single endpoint
+
   // Save task state to local storage whenever relevant state changes
   useEffect(() => {
     if (status !== 'idle' && !isResumingTask) {
@@ -447,7 +450,7 @@ function App() {
 
   // Add subtitle tracks when video is loaded
   useEffect(() => {
-    if (status === 'completed' && generateSubtitles && fileId && videoRef.current) {
+    if (status === 'completed' && generateSubtitles && taskId && videoRef.current) {
       const addSubtitles = () => {
         if (videoRef.current) {
           // Remove existing tracks
@@ -464,7 +467,7 @@ function App() {
           const track = document.createElement('track');
           track.kind = 'subtitles';
           // Always use absolute URL with explicit language to avoid mismatches
-          track.src = `${API_BASE_URL}/api/subtitles/${fileId}/vtt?language=${encodeURIComponent(subtitleLanguage)}`;
+          track.src = `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(subtitleLanguage)}`;
           track.setAttribute('srclang', subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 
                          subtitleLanguage === 'traditional_chinese' ? 'zh-Hant' : 
                          subtitleLanguage === 'japanese' ? 'ja' : 
@@ -485,7 +488,7 @@ function App() {
           track.addEventListener('error', (e) => {
             console.error('Subtitle track loading error:', e);
             // Fallback: try without explicit language (server infers from state)
-            const fallbackUrl = `${API_BASE_URL}/api/subtitles/${fileId}/vtt`;
+            const fallbackUrl = `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt`;
             console.log('Trying fallback URL:', fallbackUrl);
             track.src = fallbackUrl;
           });
@@ -498,7 +501,7 @@ function App() {
               console.log('Retrying subtitle loading...');
               const retryTrack = document.createElement('track');
               retryTrack.kind = 'subtitles';
-              retryTrack.src = `${API_BASE_URL}/api/subtitles/${fileId}/vtt?language=${encodeURIComponent(subtitleLanguage)}`;
+              retryTrack.src = `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(subtitleLanguage)}`;
               retryTrack.setAttribute('srclang', subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : 
                              subtitleLanguage === 'traditional_chinese' ? 'zh-Hant' : 
                              subtitleLanguage === 'japanese' ? 'ja' : 
@@ -527,7 +530,7 @@ function App() {
         videoRef.current.addEventListener('loadeddata', addSubtitles, { once: true });
       }
     }
-  }, [status, generateSubtitles, subtitleLanguage, fileId]);
+  }, [status, generateSubtitles, subtitleLanguage, taskId]);
 
   const formatStepName = (step: string): string => {
     const stepNames: Record<string, string> = {
@@ -1014,7 +1017,7 @@ function App() {
             {status === 'completed' && (
               <div className="completed-view">
                 <div className="success-icon">✓</div>
-                <h3>Your AI Presentation is Ready!</h3>
+                <h3>Your Masterpiece is Ready!</h3>
                 <p className="success-message">Congratulations! Your presentation has been transformed into an engaging AI-powered video.</p>
                 
                 <div className="preview-container">
@@ -1023,7 +1026,7 @@ function App() {
                       <video 
                         ref={videoRef}
                         controls
-                        src={`${API_BASE_URL}/api/video/${fileId}`}
+                        src={`${API_BASE_URL}/api/tasks/${taskId}` + `/video`}
                         crossOrigin="anonymous"
                         className="preview-video-large"
                       >
@@ -1055,17 +1058,18 @@ function App() {
                       
                       {/* Resource URLs */}
                       <div className="resource-links">
+                        {/* Video */}
                         <div className="url-copy-row">
                           <span className="resource-label-inline">Video</span>
                           <input 
                             type="text" 
-                            value={`${API_BASE_URL}/api/video/${fileId}`}
+                            value={`${API_BASE_URL}/api/tasks/${taskId}/video`}
                             readOnly 
                             className="url-input-enhanced"
                           />
                           <button 
                             onClick={() => {
-                              navigator.clipboard.writeText(`${API_BASE_URL}/api/video/${fileId}`);
+                              navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/video`);
                               alert('Video URL copied!');
                             }}
                             className="copy-btn-enhanced"
@@ -1073,47 +1077,89 @@ function App() {
                             Copy
                           </button>
                         </div>
-                        
+
+                        {/* Audio */}
+                        <div className="url-copy-row">
+                          <span className="resource-label-inline">Audio</span>
+                          <input 
+                            type="text" 
+                            value={`${API_BASE_URL}/api/tasks/${taskId}/audio`}
+                            readOnly 
+                            className="url-input-enhanced"
+                          />
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/audio`);
+                              alert(`Audio URL copied!`);
+                            }}
+                            className="copy-btn-enhanced"
+                          >
+                            Copy
+                          </button>
+                        </div>
+
+                        {/* Transcript */}
+                        {fileId && (
+                          <div className="url-copy-row">
+                            <span className="resource-label-inline">Transcript</span>
+                            <input 
+                              type="text" 
+                              value={`${API_BASE_URL}/api/tasks/${taskId}/transcripts/markdown`}
+                              readOnly 
+                              className="url-input-enhanced"
+                            />
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/transcripts/markdown`);
+                                alert('Transcript URL copied!');
+                              }}
+                              className="copy-btn-enhanced"
+                            >
+                              Copy
+                            </button>
+                          </div>
+                        )}
+
+                        {/* VTT */}
+                        <div className="url-copy-row">
+                          <span className="resource-label-inline">VTT</span>
+                          <input 
+                            type="text" 
+                            value={`${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt`}
+                            readOnly 
+                            className="url-input-enhanced"
+                          />
+                          <button 
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt`);
+                              alert('VTT URL copied!');
+                            }}
+                            className="copy-btn-enhanced"
+                          >
+                            Copy
+                          </button>
+                        </div>
+
+                        {/* SRT */}
                         {generateSubtitles && fileId && (
-                          <>
-                            <div className="url-copy-row">
-                              <span className="resource-label-inline">SRT</span>
-                              <input 
-                                type="text" 
-                                value={`${API_BASE_URL}/api/subtitles/${fileId}/srt`}
-                                readOnly 
-                                className="url-input-enhanced"
-                              />
-                              <button 
-                                onClick={() => {
-                                  navigator.clipboard.writeText(`${API_BASE_URL}/api/subtitles/${fileId}/srt`);
-                                  alert('SRT URL copied!');
-                                }}
-                                className="copy-btn-enhanced"
-                              >
-                                Copy
-                              </button>
-                            </div>
-                            
-                            <div className="url-copy-row">
-                              <span className="resource-label-inline">VTT</span>
-                              <input 
-                                type="text" 
-                                value={`${API_BASE_URL}/api/subtitles/${fileId}/vtt`}
-                                readOnly 
-                                className="url-input-enhanced"
-                              />
-                              <button 
-                                onClick={() => {
-                                  navigator.clipboard.writeText(`${API_BASE_URL}/api/subtitles/${fileId}/vtt`);
-                                  alert('VTT URL copied!');
-                                }}
-                                className="copy-btn-enhanced"
-                              >
-                                Copy
-                              </button>
-                            </div>
-                          </>
+                          <div className="url-copy-row">
+                            <span className="resource-label-inline">SRT</span>
+                            <input 
+                              type="text" 
+                              value={`${API_BASE_URL}/api/tasks/${taskId}/subtitles/srt`}
+                              readOnly 
+                              className="url-input-enhanced"
+                            />
+                            <button 
+                              onClick={() => {
+                                navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/subtitles/srt`);
+                                alert('SRT URL copied!');
+                              }}
+                              className="copy-btn-enhanced"
+                            >
+                              Copy
+                            </button>
+                          </div>
                         )}
                       </div>
                     </div>

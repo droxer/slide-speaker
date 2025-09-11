@@ -63,7 +63,7 @@ async def compose_video(
 
         # Determine output filename
         file_type = "pdf" if is_pdf else "presentation"
-        video_filename = f"{file_id}_{file_type}_final.mp4"
+        video_filename = f"{file_id}_{file_type}.mp4"
         final_video_path = video_dir / video_filename
 
         # Get subtitle files (SRT and VTT) if available
@@ -96,7 +96,7 @@ async def compose_video(
 
         # Upload to storage
         storage_provider = get_storage_provider()
-        storage_key = f"{file_id}_final.mp4"
+        storage_key = f"{file_id}.mp4"
         storage_url = storage_provider.upload_file(
             str(final_video_path), storage_key, "video/mp4"
         )

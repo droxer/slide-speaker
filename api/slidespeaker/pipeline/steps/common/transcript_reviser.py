@@ -12,6 +12,7 @@ from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.transcript import TranscriptReviewer
+from slidespeaker.transcript.markdown import transcripts_to_markdown
 
 
 async def revise_transcripts_common(
@@ -53,6 +54,62 @@ async def revise_transcripts_common(
         await state_manager.update_step_status(
             file_id, state_key, "completed", revised_transcripts
         )
+        # Persist Markdown representation alongside list data without changing the data shape
+        try:
+            state = await state_manager.get_state(file_id)
+            if state and "steps" in state and state_key in state["steps"]:
+                # Use label based on whether this is PDF or slides
+                label = (
+                    "Chapter"
+                    if state.get("file_ext", "").lower() == ".pdf"
+                    else "Slide"
+                )
+                # Merge metadata (title/description/key_points) from original transcripts if available
+                merged: list[dict[str, Any]] = []
+                for i, rev in enumerate(revised_transcripts):
+                    base: dict[str, Any] = {}
+                    # Attach numbering
+                    if label == "Chapter":
+                        base["chapter_number"] = i + 1
+                    else:
+                        base["slide_number"] = i + 1
+                    # Pull original fields when present
+                    if i < len(original_transcripts):
+                        orig = original_transcripts[i] or {}
+                        if isinstance(orig, dict):
+                            for k in ("title", "description", "key_points"):
+                                if k in orig:
+                                    base[k] = orig[k]
+                    # Use revised script
+                    base["script"] = (
+                        rev.get("script", "") if isinstance(rev, dict) else str(rev)
+                    )
+                    merged.append(base)
+
+                md = transcripts_to_markdown(
+                    merged, section_label=label, filename=state.get("filename")
+                )
+                state["steps"][state_key]["markdown"] = md
+                await state_manager._save_state(file_id, state)
+        except Exception:
+            # Non-fatal metadata
+            pass
+
+        # Upload final transcript markdown to storage (best-effort)
+        try:
+            from slidespeaker.utils.config import get_storage_provider
+
+            storage_provider = get_storage_provider()
+            object_key = f"{file_id}_final_transcript.md"
+            url = storage_provider.upload_bytes(
+                md.encode("utf-8"), object_key, "text/markdown"
+            )
+            state = await state_manager.get_state(file_id)
+            if state and "steps" in state and state_key in state["steps"]:
+                state["steps"][state_key]["markdown_storage_url"] = url
+                await state_manager._save_state(file_id, state)
+        except Exception as e:
+            logger.error(f"Failed to upload transcript markdown to storage: {e}")
         logger.info(
             f"Transcript revision completed successfully with {len(revised_transcripts)} transcripts"
         )

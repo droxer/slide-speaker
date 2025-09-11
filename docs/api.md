@@ -326,6 +326,24 @@ The API provides detailed error information in the progress endpoint under the `
 
 ## Additional Endpoints
 
+### Download Audio
+
+Final mixed audio for the full presentation:
+
+```
+GET /api/audio/{file_id}
+GET /api/tasks/{task_id}/audio
+```
+
+List generated per-slide audio tracks (for debugging):
+
+```
+GET /api/audio/{file_id}/tracks
+GET /api/tasks/{task_id}/audio/tracks
+```
+
+Filenames now use `{file_id}.mp3` for final audio. Legacy `_final*.mp3` are still served for backward compatibility. For local storage, when a final MP3 is not present, the server streams a concatenation of per-slide audio files.
+
 ### Get Supported Languages
 
 ```

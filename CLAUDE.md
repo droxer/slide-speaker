@@ -46,7 +46,7 @@ make check                  # Run both linting and type checking
 5. **Audio Generation**: Text-to-speech with ElevenLabs, OpenAI, or local TTS
 6. **Avatar Generation**: HeyGen/DALL-E creates AI presenter videos (optional)
 7. **Video Composition**: FFmpeg combines slides + avatar + audio into final MP4
-8. **Output**: `output/{file_id}_final.mp4` with optional subtitles
+8. **Output**: `output/{file_id}.mp4` with optional subtitles (`{file_id}_{locale}.srt|vtt`)
 
 ### Key Components
 

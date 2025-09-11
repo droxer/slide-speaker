@@ -12,7 +12,7 @@ from loguru import logger
 
 from slidespeaker.audio import AudioGenerator
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.utils.config import config
+from slidespeaker.utils.config import config, get_storage_provider
 
 
 async def generate_audio_common(
@@ -95,6 +95,27 @@ async def generate_audio_common(
     logger.info(
         f"Audio generation completed successfully with {len(audio_files)} files"
     )
+
+    # Upload generated audio to storage provider (best-effort) without changing data shape
+    try:
+        storage_provider = get_storage_provider()
+        storage_urls: list[str] = []
+        for i, path in enumerate(audio_files, start=1):
+            object_key = f"{file_id}_audio_{i}.mp3"
+            try:
+                url = storage_provider.upload_file(path, object_key, "audio/mpeg")
+                storage_urls.append(url)
+            except Exception as upload_err:
+                logger.error(
+                    f"Failed to upload audio file to storage: {path} - {upload_err}"
+                )
+        state = await state_manager.get_state(file_id)
+        if state and "steps" in state and state_key in state["steps"]:
+            state["steps"][state_key]["storage_urls"] = storage_urls
+            await state_manager._save_state(file_id, state)
+            logger.info(f"Uploaded {len(storage_urls)} audio files to storage")
+    except Exception as e:
+        logger.error(f"Audio storage upload encountered an error: {e}")
 
 
 async def get_pdf_transcripts(file_id: str) -> list[dict[str, Any]]:

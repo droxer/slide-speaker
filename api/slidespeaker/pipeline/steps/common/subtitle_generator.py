@@ -101,8 +101,8 @@ async def generate_subtitles_common(
         subtitle_urls: list[str] = []
         storage_provider = get_storage_provider()
         try:
-            srt_key = f"{file_id}_final_{locale_code}.srt"
-            vtt_key = f"{file_id}_final_{locale_code}.vtt"
+            srt_key = f"{file_id}_{locale_code}.srt"
+            vtt_key = f"{file_id}_{locale_code}.vtt"
 
             srt_url = storage_provider.upload_file(str(srt_path), srt_key, "text/plain")
             vtt_url = storage_provider.upload_file(str(vtt_path), vtt_key, "text/vtt")

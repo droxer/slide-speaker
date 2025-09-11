@@ -144,11 +144,63 @@ body.subtle-material .video-close-button {
   border-color: var(--sm-primary) !important;
 }
 
+/* File type badges (PDF/PPT): subtle, no gradients */
+body.subtle-material .file-type-badge {
+  background: var(--sm-surface) !important;
+  color: #0f172a !important;
+  border: 1px solid var(--sm-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+}
+body.subtle-material .file-type-badge.pdf {
+  background: #ef4444 !important; /* Material red */
+  color: #ffffff !important;
+  border-color: #ef4444 !important;
+}
+body.subtle-material .file-type-badge.ppt {
+  background: var(--sm-primary) !important; /* Use theme primary */
+  color: var(--sm-on-primary) !important;
+  border-color: var(--sm-primary) !important;
+}
+
+/* Link-style buttons in material theme */
+body.subtle-material .link-button {
+  color: var(--sm-primary) !important;
+}
+
 /* Stat icons */
 body.subtle-material .stat-icon {
   background: var(--sm-primary) !important;
   color: var(--sm-on-primary) !important;
 }
+
+/* Steps (processing view): soft elevation, material colors */
+body.subtle-material .steps-container {
+  background: var(--sm-surface) !important;
+  border: 1px solid var(--sm-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+}
+body.subtle-material .step-item {
+  background: var(--sm-surface) !important;
+  border: 1px solid var(--sm-border) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+body.subtle-material .step-item.processing,
+body.subtle-material .step-item.in_progress {
+  background: #eef2ff !important; /* indigo-50 */
+  border-color: #c7d2fe !important; /* indigo-200 */
+}
+body.subtle-material .step-item.processing::before,
+body.subtle-material .step-item.in_progress::before {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.65), transparent) !important;
+}
+body.subtle-material .step-item.completed { background: #ecfdf5 !important; border-color: #a7f3d0 !important; }
+body.subtle-material .step-item.failed { background: #fef2f2 !important; border-color: #fecaca !important; }
+body.subtle-material .step-item.pending { background: #f8fafc !important; border-color: var(--sm-border) !important; }
+body.subtle-material .step-item.skipped { background: #f1f5f9 !important; border-color: #e2e8f0 !important; }
+body.subtle-material .step-name { color: #0f172a !important; }
 
 /* Footer: standard surface with slight elevation (not glass) */
 body.subtle-material .app-footer {

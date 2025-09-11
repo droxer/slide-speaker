@@ -188,9 +188,16 @@ async def _execute_step(
                 "translate_voice_transcripts",
                 "translate_subtitle_transcripts",
             ):
-                # Unified translation handles both voice and subtitles; computes once if same
+                # Translate to the correct target depending on the step
+                target_language = (
+                    voice_language
+                    if step_name == "translate_voice_transcripts"
+                    else (subtitle_language or voice_language)
+                )
                 await translate_transcripts_step(
-                    file_id, source_language="english", target_language=voice_language
+                    file_id,
+                    source_language="english",
+                    target_language=target_language,
                 )
             elif step_name == "generate_audio":
                 # Use translated transcripts if available, otherwise use English transcripts

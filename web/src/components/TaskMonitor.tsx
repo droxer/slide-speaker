@@ -60,6 +60,7 @@ interface TaskMonitorProps {
 }
 
 const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
+  const EXPANDED_STORAGE_KEY = 'slidespeaker_taskmonitor_expanded_v1';
   const [tasks, setTasks] = useState<Task[]>([]);
   const [statistics, setStatistics] = useState<TaskStatistics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,6 +77,17 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
   const modalVideoRef = React.useRef<HTMLVideoElement | null>(null);
   const lastSubtitleFileIdRef = React.useRef<string | null>(null);
   const [removingTaskIds, setRemovingTaskIds] = useState<Set<string>>(new Set());
+  const [expandedDownloads, setExpandedDownloads] = useState<Set<string>>(new Set());
+  const prevStatusesRef = React.useRef<Record<string, string>>({});
+
+  const toggleDownloads = (taskId: string) => {
+    setExpandedDownloads((prev) => {
+      const next = new Set(prev);
+      if (next.has(taskId)) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+  };
 
   // Debug log for preview state
   useEffect(() => {
@@ -110,7 +122,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
 
       setSubtitleLoading(true);
       const preferredLanguage = selectedTaskForPreview.kwargs?.subtitle_language || selectedTaskForPreview.state?.subtitle_language || selectedTaskForPreview.kwargs?.voice_language || 'english';
-      const url = `${apiBaseUrl}/api/subtitles/${selectedTaskForPreview.file_id}/vtt?language=${encodeURIComponent(preferredLanguage)}`;
+      const url = `${apiBaseUrl}/api/tasks/${selectedTaskForPreview.task_id}/subtitles/vtt?language=${encodeURIComponent(preferredLanguage)}`;
       try {
         const resp = await fetch(url, { headers: { Accept: 'text/vtt,*/*' } });
         if (resp.ok) {
@@ -138,6 +150,18 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     
     checkSubtitles();
   }, [selectedTaskForPreview, apiBaseUrl]);
+
+  // Ensure subtitles display like completed view (force showing when available)
+  useEffect(() => {
+    if (selectedTaskForPreview && subtitleAvailable && modalVideoRef.current) {
+      try {
+        const tracks = modalVideoRef.current.textTracks;
+        if (tracks && tracks.length > 0) {
+          tracks[0].mode = 'showing';
+        }
+      } catch {}
+    }
+  }, [selectedTaskForPreview, subtitleAvailable]);
 
   // No imperative src assignment; <video src> handles local and S3 redirect
 
@@ -175,6 +199,47 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
       setLoading(false);
     }
   }, [apiBaseUrl, currentPage, statusFilter, tasksPerPage]);
+
+  // (Removed) fetching per-task audio tracks; using final audio endpoint directly
+
+  // Persist expanded set to localStorage
+  useEffect(() => {
+    try {
+      const arr = Array.from(expandedDownloads);
+      localStorage.setItem(EXPANDED_STORAGE_KEY, JSON.stringify(arr));
+    } catch {}
+  }, [expandedDownloads]);
+
+  // Load persisted expanded state on mount
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(EXPANDED_STORAGE_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) {
+          setExpandedDownloads(new Set(arr.filter((x) => typeof x === 'string')));
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Auto-expand newly completed tasks once
+  useEffect(() => {
+    if (!tasks || tasks.length === 0) return;
+    setExpandedDownloads((prev) => {
+      const next = new Set(prev);
+      for (const t of tasks) {
+        const prevStatus = prevStatusesRef.current[t.task_id];
+        if (t.status === 'completed' && prevStatus && prevStatus !== 'completed') {
+          // Only auto-expand if user hasn't persisted an opposite preference
+          next.add(t.task_id);
+        }
+        // Update prev status map
+        prevStatusesRef.current[t.task_id] = t.status;
+      }
+      return next;
+    });
+  }, [tasks]);
 
   // Search tasks
   const searchTasks = async (query: string) => {
@@ -548,110 +613,224 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                 </div>
               </div>
               
-              <div className="task-details">
-                <div className="task-info">
-                  <span className="info-label">File ID:</span>
-                  <span className="info-value">{task.file_id}</span>
-                </div>
+              <div className="task-details simple-details">
+                {(() => {
+                  const filename = task.kwargs?.filename || task.state?.filename;
+                  const voiceLang = task.kwargs?.voice_language || task.state?.voice_language || 'english';
+                  const subtitleLang = task.kwargs?.subtitle_language || task.state?.subtitle_language || voiceLang;
+                  const videoRes = task.kwargs?.video_resolution || task.state?.video_resolution || 'hd';
+                  return (
+                    <>
+                      {/* Title row: filename + file type */}
+                      <div className="task-title-row">
+                        <div className="task-title" title={filename || task.file_id}>
+                          {filename || task.file_id}
+                        </div>
+                        <div className={`file-type-badge ${isPdfFile(task.kwargs?.file_ext) ? 'pdf' : 'ppt'}`}>
+                          {getFileTypeDisplayName(task.kwargs?.file_ext)}
+                        </div>
+                      </div>
 
-                {/* Original filename */}
-                {(() => {
-                  const originalName = task.kwargs?.filename || task.state?.filename;
-                  return originalName ? (
-                    <div className="task-info">
-                      <span className="info-label">Filename:</span>
-                      <span className="info-value" title={originalName}>{originalName}</span>
-                    </div>
-                  ) : null;
-                })()}
-                
-                {/* Language Information - Consistent with other fields */}
-                <div className="task-info">
-                  <span className="info-label">Voice Language:</span>
-                  <span className="info-value">
-                    {(() => {
-                      const voiceLang =
-                        task.kwargs?.voice_language ||
-                        task.state?.voice_language ||
-                        'english';
-                      return getLanguageDisplayName(voiceLang);
-                    })()}
-                  </span>
-                </div>
-                
-                {(() => {
-                  const voiceLang =
-                    task.kwargs?.voice_language ||
-                    task.state?.voice_language ||
-                    'english';
-                  const subtitleLang =
-                    task.kwargs?.subtitle_language ||
-                    task.state?.subtitle_language ||
-                    voiceLang; // default subtitles to voice language when unspecified
-                  return (
-                    <div className="task-info">
-                      <span className="info-label">Subtitle Language:</span>
-                      <span className="info-value">
-                        {getLanguageDisplayName(subtitleLang)}
-                      </span>
-                    </div>
+                      {/* Meta chips */}
+                      <div className="meta-row">
+                        <span className="chip">Voice: {getLanguageDisplayName(voiceLang)}</span>
+                        <span className="chip">Subs: {getLanguageDisplayName(subtitleLang)}</span>
+                        <span className="chip">{getVideoResolutionDisplayName(videoRes)}</span>
+                        <span className="chip id-chip" title={task.file_id}>ID: <span className="id-mono">{task.file_id}</span></span>
+                      </div>
+
+                      {/* Current step + progress for non-completed */}
+                      {task.status !== 'completed' && task.state && (
+                        <div className="step-progress">
+                          <div className="step-line">{formatStepNameWithLanguages(task.state.current_step, voiceLang, subtitleLang)}</div>
+                          {task.completion_percentage !== undefined && (
+                            <div className="progress-rail" aria-valuemin={0} aria-valuemax={100} aria-valuenow={task.completion_percentage} role="progressbar">
+                              <div className="progress-fill" style={{ width: `${Math.max(0, Math.min(100, task.completion_percentage))}%` }} />
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Timestamps small and subtle */}
+                      <div className="timestamps-row">
+                        <span className="timestamp">Created: {formatDate(task.created_at)}</span>
+                        <span className="timestamp">Updated: {formatDate(task.updated_at)}</span>
+                      </div>
+                    </>
                   );
                 })()}
-                
-                {/* Video Resolution */}
-                {(() => {
-                  const videoResolution =
-                    task.kwargs?.video_resolution ||
-                    task.state?.video_resolution ||
-                    'hd'; // Default to HD if not specified
-                  return (
-                    <div className="task-info">
-                      <span className="info-label">Video Resolution:</span>
-                      <span className="info-value">
-                        {getVideoResolutionDisplayName(videoResolution)}
-                      </span>
+
+                {task.status === 'completed' && (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 8 }}>
+                      <button
+                        onClick={() => toggleDownloads(task.task_id)}
+                        className="link-button"
+                        aria-expanded={expandedDownloads.has(task.task_id)}
+                        aria-controls={`downloads-${task.task_id}`}
+                        type="button"
+                        title="More"
+                      >
+                        More <span className={`chevron ${expandedDownloads.has(task.task_id) ? 'open' : ''}`} aria-hidden="true" />
+                      </button>
                     </div>
-                  );
-                })()}
-                
-                {/* File type information */}
-                <div className="task-info">
-                  <span className="info-label">Document Type:</span>
-                  <span className={`file-type-badge ${isPdfFile(task.kwargs?.file_ext) ? 'pdf' : 'ppt'}`}>
-                    {getFileTypeDisplayName(task.kwargs?.file_ext)}
-                  </span>
-                </div>
-                
-                {/* Current Step or Status - Hide Status for completed tasks */}
-                {task.status !== 'completed' && task.state && (() => {
-                  const voiceLang =
-                    task.kwargs?.voice_language || task.state?.voice_language || 'english';
-                  const subtitleLang =
-                    task.kwargs?.subtitle_language || task.state?.subtitle_language || voiceLang;
-                  return (
-                  <div className="task-info">
-                    <span className="info-label">Current Step:</span>
-                    <span className="info-value">{formatStepNameWithLanguages(task.state.current_step, voiceLang, subtitleLang)}</span>
-                  </div>
-                  );
-                })()}
-                
-                {task.completion_percentage !== undefined && task.status !== 'completed' && (
-                  <div className="task-info">
-                    <span className="info-label">Progress:</span>
-                    <span className="info-value">{task.completion_percentage}%</span>
-                  </div>
+                    {!expandedDownloads.has(task.task_id) && (
+                      <div className="resource-badges" aria-hidden>
+                        <span className="badge">Video</span>
+                        <span className="badge">Audio</span>
+                        <span className="badge">Transcript</span>
+                        <span className="badge">VTT</span>
+                        <span className="badge">SRT</span>
+                      </div>
+                    )}
+                    <div className={`downloads-collapse ${expandedDownloads.has(task.task_id) ? 'open' : ''}`}>
+                      {expandedDownloads.has(task.task_id) && (
+                        <div className="resource-links" id={`downloads-${task.task_id}`}>
+                        {/* Video */}
+                        <div className="url-copy-row">
+                          <span className="resource-label-inline">Video</span>
+                          <input
+                            type="text"
+                            value={`${apiBaseUrl}/api/tasks/${task.task_id}/video`}
+                          readOnly
+                          className="url-input-enhanced"
+                          />
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/video`);
+                              alert('Video URL copied!');
+                            }}
+                            className="copy-btn-enhanced"
+                          >
+                            Copy
+                          </button>
+                        </div>
+
+                        {/* Audio */}
+                        <div className="url-copy-row">
+                          <span className="resource-label-inline">Audio</span>
+                          <input
+                            type="text"
+                            value={`${apiBaseUrl}/api/tasks/${task.task_id}/audio`}
+                            readOnly
+                            className="url-input-enhanced"
+                          />
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/audio`);
+                              alert('Audio URL copied!');
+                            }}
+                            className="copy-btn-enhanced"
+                          >
+                            Copy
+                          </button>
+                        </div>
+
+                        {/* Transcript */}
+                        <div className="url-copy-row">
+                          <span className="resource-label-inline">Transcript</span>
+                          <input
+                            type="text"
+                            value={`${apiBaseUrl}/api/tasks/${task.task_id}/transcripts/markdown`}
+                            readOnly
+                            className="url-input-enhanced"
+                          />
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/transcripts/markdown`);
+                              alert('Transcript URL copied!');
+                            }}
+                            className="copy-btn-enhanced"
+                          >
+                            Copy
+                          </button>
+                        </div>
+
+                        {/* VTT */}
+                        <div className="url-copy-row">
+                          <span className="resource-label-inline">VTT</span>
+                          <input
+                            type="text"
+                            value={`${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/vtt`}
+                            readOnly
+                            className="url-input-enhanced"
+                          />
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/vtt`);
+                              alert('VTT URL copied!');
+                            }}
+                            className="copy-btn-enhanced"
+                          >
+                            Copy
+                          </button>
+                        </div>
+
+                        {/* SRT */}
+                        <div className="url-copy-row">
+                          <span className="resource-label-inline">SRT</span>
+                          <input
+                            type="text"
+                            value={`${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/srt`}
+                            readOnly
+                            className="url-input-enhanced"
+                          />
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/srt`);
+                              alert('SRT URL copied!');
+                            }}
+                            className="copy-btn-enhanced"
+                          >
+                            Copy
+                          </button>
+                        </div>
+
+                        <div className="url-copy-row">
+                          <span className="resource-label-inline">VTT</span>
+                          <input
+                            type="text"
+                            value={`${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/vtt`}
+                            readOnly
+                            className="url-input-enhanced"
+                          />
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/vtt`);
+                              alert('VTT URL copied!');
+                            }}
+                            className="copy-btn-enhanced"
+                          >
+                            Copy
+                          </button>
+                        </div>
+
+                        {/* Transcript */}
+                          <div className="url-copy-row">
+                            <span className="resource-label-inline">Transcript</span>
+                          <input
+                            type="text"
+                            value={`${apiBaseUrl}/api/tasks/${task.task_id}/transcripts/markdown`}
+                            readOnly
+                            className="url-input-enhanced"
+                          />
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/transcripts/markdown`);
+                              alert('Transcript URL copied!');
+                            }}
+                            className="copy-btn-enhanced"
+                          >
+                            Copy
+                          </button>
+                        </div>
+
+                        
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
-                
-                <div className="task-info">
-                  <span className="info-label">Created:</span>
-                  <span className="info-value">{formatDate(task.created_at)}</span>
-                </div>
-                
-                <div className="task-info">
-                  <span className="info-label">Updated:</span>
-                  <span className="info-value">{formatDate(task.updated_at)}</span>
-                </div>
               </div>
               
               <div className="task-actions">
@@ -703,6 +882,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                   </svg>
                 </button>
               </div>
+
             </div>
           ))
         )}
@@ -756,10 +936,10 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
             {/* Video Player */}
             <div className="video-player-container">
               {(() => {
-                const videoUrl = `${apiBaseUrl}/api/video/${selectedTaskForPreview.file_id}`;
+                const videoUrl = `${apiBaseUrl}/api/tasks/${selectedTaskForPreview.task_id}/video`;
                 const voiceLanguage = selectedTaskForPreview.kwargs?.voice_language || selectedTaskForPreview.state?.voice_language || 'english';
                 const subtitleLanguage = selectedTaskForPreview.kwargs?.subtitle_language || selectedTaskForPreview.state?.subtitle_language || voiceLanguage;
-                const subtitleUrl = `${apiBaseUrl}/api/subtitles/${selectedTaskForPreview.file_id}/vtt?language=${encodeURIComponent(subtitleLanguage)}`;
+                const subtitleUrl = `${apiBaseUrl}/api/tasks/${selectedTaskForPreview.task_id}/subtitles/vtt?language=${encodeURIComponent(subtitleLanguage)}`;
                 
                 
                 

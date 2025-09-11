@@ -26,10 +26,15 @@ class VideoPreviewer:
         self, file_id: str, subtitle_language: str = "english"
     ) -> dict[str, Any]:
         try:
-            video_key = f"{file_id}_final.mp4"
-            if not get_storage_provider().file_exists(video_key):
-                raise FileNotFoundError(f"Video file not found: {video_key}")
+            # Prefer new naming without _final, fallback to legacy
             storage = get_storage_provider()
+            video_key = (
+                f"{file_id}.mp4"
+                if storage.file_exists(f"{file_id}.mp4")
+                else f"{file_id}_final.mp4"
+            )
+            if not storage.file_exists(video_key):
+                raise FileNotFoundError(f"Video file not found: {video_key}")
             video_url = storage.get_file_url(video_key)
             video_info = {
                 "file_id": file_id,
@@ -39,20 +44,30 @@ class VideoPreviewer:
             }
             subtitle_info: dict[str, Any] = {}
             locale_code = locale_utils.get_locale_code(subtitle_language)
-            srt_key = f"{file_id}_final_{locale_code}.srt"
-            vtt_key = f"{file_id}_final_{locale_code}.vtt"
+            srt_key = f"{file_id}_{locale_code}.srt"
+            vtt_key = f"{file_id}_{locale_code}.vtt"
             srt_exists = get_storage_provider().file_exists(srt_key)
             vtt_exists = get_storage_provider().file_exists(vtt_key)
             if not srt_exists:
-                legacy_srt_key = f"{file_id}_final.srt"
+                legacy_srt_key = f"{file_id}_final_{locale_code}.srt"
                 if get_storage_provider().file_exists(legacy_srt_key):
                     srt_key = legacy_srt_key
                     srt_exists = True
+                else:
+                    legacy_srt2 = f"{file_id}_final.srt"
+                    if get_storage_provider().file_exists(legacy_srt2):
+                        srt_key = legacy_srt2
+                        srt_exists = True
             if not vtt_exists:
-                legacy_vtt_key = f"{file_id}_final.vtt"
+                legacy_vtt_key = f"{file_id}_final_{locale_code}.vtt"
                 if get_storage_provider().file_exists(legacy_vtt_key):
                     vtt_key = legacy_vtt_key
                     vtt_exists = True
+                else:
+                    legacy_vtt2 = f"{file_id}_final.vtt"
+                    if get_storage_provider().file_exists(legacy_vtt2):
+                        vtt_key = legacy_vtt2
+                        vtt_exists = True
             logger.info(
                 f"Checking for subtitle files: SRT={srt_exists}, VTT={vtt_exists}"
             )
@@ -91,7 +106,7 @@ class VideoPreviewer:
             f"Getting subtitle tracks for file_id={file_id}, language={subtitle_language}, lang_code={lang_code}"
         )
         storage = get_storage_provider()
-        srt_key = f"{file_id}_final_{lang_code}.srt"
+        srt_key = f"{file_id}_{lang_code}.srt"
         if get_storage_provider().file_exists(srt_key):
             try:
                 srt_url = storage.get_file_url(srt_key)
@@ -106,7 +121,7 @@ class VideoPreviewer:
                 )
             except Exception as e:
                 logger.error(f"Error processing SRT track: {e}")
-        vtt_key = f"{file_id}_final_{lang_code}.vtt"
+        vtt_key = f"{file_id}_{lang_code}.vtt"
         if get_storage_provider().file_exists(vtt_key):
             try:
                 vtt_url = storage.get_file_url(vtt_key)

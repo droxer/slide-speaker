@@ -17,6 +17,7 @@ from slidespeaker.routes.languages import router as languages_router
 from slidespeaker.routes.progress import router as progress_router
 from slidespeaker.routes.stats import router as stats_router
 from slidespeaker.routes.tasks import router as tasks_router
+from slidespeaker.routes.transcripts import router as transcripts_router
 from slidespeaker.routes.upload import router as upload_router
 from slidespeaker.utils.config import config
 from slidespeaker.utils.logging_config import setup_logging
@@ -56,6 +57,7 @@ app.include_router(progress_router)
 app.include_router(downloads_router)
 app.include_router(languages_router)
 app.include_router(stats_router)
+app.include_router(transcripts_router)
 
 
 @app.get("/")

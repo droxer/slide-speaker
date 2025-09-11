@@ -18,6 +18,7 @@ from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 from slidespeaker.utils.config import config
 from slidespeaker.utils.locales import locale_utils
+from slidespeaker.utils.redis_config import RedisConfig
 
 router = APIRouter(prefix="/api", tags=["upload"])
 
@@ -114,6 +115,27 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         logger.info(
             f"File uploaded: {file_id}, type: {file_ext}, task submitted: {task_id}"
         )
+
+        # Persist task_id -> file_id mapping for reliable task-based endpoints
+        try:
+            redis = RedisConfig.get_redis_client()
+            await redis.set(
+                f"ss:task2file:{task_id}", file_id, ex=60 * 60 * 24 * 30
+            )  # 30 days
+            await redis.set(
+                f"ss:file2task:{file_id}", task_id, ex=60 * 60 * 24 * 30
+            )  # 30 days
+        except Exception as map_err:
+            logger.warning(f"Failed to persist task→file mapping: {map_err}")
+
+        # Also embed the task_id into state for easier lookup
+        try:
+            state = await state_manager.get_state(file_id)
+            if state is not None:
+                state["task_id"] = task_id
+                await state_manager._save_state(file_id, state)
+        except Exception as save_err:
+            logger.warning(f"Failed to save task_id into state: {save_err}")
 
         return {
             "file_id": file_id,
