@@ -19,6 +19,11 @@ From slides to videos with AI voices and avatars.
 - **State Persistence**: Local storage prevents data loss on page refresh
 - **Enhanced UI**: Improved user experience with better error handling
 - **Task Monitoring**: Comprehensive task tracking and management with statistics
+- **Task-based Downloads**: Stable, task-id-based endpoints for video, audio, transcripts, and subtitles
+- **Consistent Subtitles**: Subtitle generation respects `subtitle_language` and styling is consistent in preview and completed views
+- **Refined Task Monitor**: Clean task cards with link-style “More” toggle exposing all downloads (Video, Audio, Transcript, VTT, SRT)
+- **Theme Support**: Ultra‑Flat and Subtle‑Material themes with aligned status pills and interactions
+- **Typography**: Google Open Sans as the default font across the web app
 - **Watermark Integration**: Automatic watermarking of generated videos
 - **Advanced PDF Processing**: Specialized handling for PDF files with chapter-based analysis and AI-generated content
 
@@ -45,6 +50,14 @@ From slides to videos with AI voices and avatars.
 3. **Visit** `http://localhost:3000` to upload presentations and create AI-powered videos
 
 4. **API Documentation** is available at `http://localhost:8000/docs`
+
+5. **Downloads & Endpoints**
+   - Frontend and documentation use task-based endpoints:
+     - `/api/tasks/{task_id}/video`
+     - `/api/tasks/{task_id}/audio`
+     - `/api/tasks/{task_id}/transcripts/markdown`
+     - `/api/tasks/{task_id}/subtitles/vtt|srt`
+   - The backend continues to serve legacy file-based routes for compatibility.
 
 ## Documentation
 

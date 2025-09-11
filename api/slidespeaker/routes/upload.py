@@ -33,9 +33,14 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         body = await request.json()
         filename = body.get("filename")
         file_data = body.get("file_data")
-        voice_language = body.get("voice_language", "english")
-        subtitle_language = body.get(
-            "subtitle_language"
+        # Normalize incoming languages to internal keys
+        raw_voice_language = body.get("voice_language", "english")
+        raw_subtitle_language = body.get("subtitle_language")
+        voice_language = locale_utils.normalize_language(raw_voice_language)
+        subtitle_language = (
+            locale_utils.normalize_language(raw_subtitle_language)
+            if raw_subtitle_language is not None
+            else None
         )  # Don't default to audio language
         video_resolution = body.get("video_resolution", "hd")  # Default to HD
         generate_avatar = body.get("generate_avatar", True)  # Default to True

@@ -42,6 +42,11 @@ async def generate_subtitles_common(
     await state_manager.update_step_status(file_id, state_key, "processing")
     logger.info(f"Starting subtitle generation for file: {file_id}")
 
+    # Normalize target language to internal key
+    from slidespeaker.utils.locales import locale_utils as _lu
+
+    language = _lu.normalize_language(language)
+
     # Get transcripts for subtitle generation
     # Pass language parameter if the function supports it
     try:
@@ -101,8 +106,18 @@ async def generate_subtitles_common(
         subtitle_urls: list[str] = []
         storage_provider = get_storage_provider()
         try:
-            srt_key = f"{file_id}_{locale_code}.srt"
-            vtt_key = f"{file_id}_{locale_code}.vtt"
+            # Prefer task-id based naming if available in state
+            try:
+                _state = await state_manager.get_state(file_id)
+                base_id = (
+                    str(_state.get("task_id"))
+                    if _state and isinstance(_state, dict) and _state.get("task_id")
+                    else file_id
+                )
+            except Exception:
+                base_id = file_id
+            srt_key = f"{base_id}_{locale_code}.srt"
+            vtt_key = f"{base_id}_{locale_code}.vtt"
 
             srt_url = storage_provider.upload_file(str(srt_path), srt_key, "text/plain")
             vtt_url = storage_provider.upload_file(str(vtt_path), vtt_key, "text/vtt")
@@ -144,6 +159,7 @@ async def get_pdf_subtitles_transcripts(
     chapters: list[dict[str, Any]] = []
 
     # Determine which transcripts to use for subtitles based on language
+    source_key: str | None = None
     if state and "steps" in state:
         # If requesting English subtitles, prioritize English transcripts
         if language.lower() == "english":
@@ -157,6 +173,7 @@ async def get_pdf_subtitles_transcripts(
                 logger.info(
                     "Using original English transcripts for PDF subtitle generation"
                 )
+                source_key = "segment_pdf_content"
             # Priority 2: Translated subtitle transcripts (if they're English)
             elif (
                 "translate_subtitle_transcripts" in state["steps"]
@@ -168,6 +185,7 @@ async def get_pdf_subtitles_transcripts(
                 logger.info(
                     f"Using translated subtitle transcripts for PDF subtitle generation (language: {language})"
                 )
+                source_key = "translate_subtitle_transcripts"
             # Priority 3: Translated voice transcripts (if they're English)
             elif (
                 "translate_voice_transcripts" in state["steps"]
@@ -179,6 +197,7 @@ async def get_pdf_subtitles_transcripts(
                 logger.info(
                     f"Using translated voice transcripts for PDF subtitle generation (language: {language})"
                 )
+                source_key = "translate_voice_transcripts"
         else:
             # For non-English languages, prioritize translated transcripts
             # Priority 1: Use translated subtitle transcripts if available
@@ -191,6 +210,7 @@ async def get_pdf_subtitles_transcripts(
                 logger.info(
                     f"Using translated subtitle transcripts for PDF subtitle generation (language: {language})"
                 )
+                source_key = "translate_subtitle_transcripts"
             # Priority 2: Use translated voice transcripts as fallback
             elif (
                 "translate_voice_transcripts" in state["steps"]
@@ -201,6 +221,7 @@ async def get_pdf_subtitles_transcripts(
                 logger.info(
                     f"Using translated voice transcripts for PDF subtitle generation (language: {language})"
                 )
+                source_key = "translate_voice_transcripts"
             # Priority 3: Fall back to original chapters with English transcripts
             elif (
                 "segment_pdf_content" in state["steps"]
@@ -211,7 +232,19 @@ async def get_pdf_subtitles_transcripts(
                 logger.info(
                     "Using original English transcripts for PDF subtitle generation"
                 )
+                source_key = "segment_pdf_content"
 
+    # Persist selection metadata for diagnostics
+    try:
+        if state is not None:
+            state["subtitle_generation"] = {
+                "pipeline": "pdf",
+                "language": language,
+                "source": source_key or "unknown",
+            }
+            await state_manager._save_state(file_id, state)
+    except Exception:
+        pass
     return chapters
 
 
@@ -224,6 +257,7 @@ async def get_slide_subtitles_transcripts(
     transcripts_data: list[dict[str, Any]] = []
 
     # Determine which transcripts to use for subtitles based on language
+    source_key: str | None = None
     if state and "steps" in state:
         # If requesting English subtitles, prioritize English transcripts
         if language.lower() == "english":
@@ -235,6 +269,7 @@ async def get_slide_subtitles_transcripts(
             ):
                 transcripts_data = state["steps"]["revise_transcripts"]["data"]
                 logger.info("Using regular English transcripts for subtitle generation")
+                source_key = "revise_transcripts"
             # Priority 2: Translated subtitle transcripts (if they're English)
             elif (
                 "translate_subtitle_transcripts" in state["steps"]
@@ -247,6 +282,7 @@ async def get_slide_subtitles_transcripts(
                 logger.info(
                     f"Using translated subtitle transcripts for subtitle generation (language: {language})"
                 )
+                source_key = "translate_subtitle_transcripts"
             # Priority 3: Translated voice transcripts (if they're English)
             elif (
                 "translate_voice_transcripts" in state["steps"]
@@ -257,6 +293,7 @@ async def get_slide_subtitles_transcripts(
                 logger.info(
                     f"Using translated voice transcripts for subtitle generation (language: {language})"
                 )
+                source_key = "translate_voice_transcripts"
         else:
             # For non-English languages, prioritize translated transcripts
             # Priority 1: Use translated subtitle transcripts if available
@@ -271,6 +308,7 @@ async def get_slide_subtitles_transcripts(
                 logger.info(
                     f"Using translated subtitle transcripts for subtitle generation (language: {language})"
                 )
+                source_key = "translate_subtitle_transcripts"
             # Priority 2: Use translated voice transcripts as fallback
             elif (
                 "translate_voice_transcripts" in state["steps"]
@@ -281,6 +319,7 @@ async def get_slide_subtitles_transcripts(
                 logger.info(
                     f"Using translated voice transcripts for subtitle generation (language: {language})"
                 )
+                source_key = "translate_voice_transcripts"
             # Priority 3: Fall back to regular English transcripts
             elif (
                 "revise_transcripts" in state["steps"]
@@ -289,7 +328,19 @@ async def get_slide_subtitles_transcripts(
             ):
                 transcripts_data = state["steps"]["revise_transcripts"]["data"]
                 logger.info("Using regular English transcripts for subtitle generation")
+                source_key = "revise_transcripts"
 
+    # Persist selection metadata for diagnostics
+    try:
+        if state is not None:
+            state["subtitle_generation"] = {
+                "pipeline": "slides",
+                "language": language,
+                "source": source_key or "unknown",
+            }
+            await state_manager._save_state(file_id, state)
+    except Exception:
+        pass
     return transcripts_data
 
 

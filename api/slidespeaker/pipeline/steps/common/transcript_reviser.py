@@ -100,7 +100,15 @@ async def revise_transcripts_common(
             from slidespeaker.utils.config import get_storage_provider
 
             storage_provider = get_storage_provider()
-            object_key = f"{file_id}_final_transcript.md"
+            # Prefer task-id-based filename when available
+            state2 = await state_manager.get_state(file_id)
+            task_id = None
+            if state2 and isinstance(state2, dict):
+                task_id = state2.get("task_id") or (state2.get("task") or {}).get(
+                    "task_id"
+                )
+            base_id = task_id if isinstance(task_id, str) and task_id else file_id
+            object_key = f"{base_id}_transcript.md"
             url = storage_provider.upload_bytes(
                 md.encode("utf-8"), object_key, "text/markdown"
             )

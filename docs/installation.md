@@ -142,7 +142,7 @@ All storage providers support presigned URL generation for secure file access, a
 
 ### Locale-aware Subtitle Filenames
 
-The system generates locale-aware subtitle filenames (e.g., `_en.srt`, `_zh-Hans.vtt`) for better internationalization support while maintaining backward compatibility with legacy formats.
+The system generates locale-aware subtitle filenames (e.g., `_en.srt`, `_zh-Hans.vtt`) and prefers task-id-based names when a task ID is available (e.g., `{task_id}_{locale}.vtt|srt`). Legacy file-based names remain readable for backward compatibility.
 
 ## Watermark Integration
 
@@ -198,6 +198,10 @@ Recent enhancements include:
 - **Advanced filtering**: Filter tasks by status, creation date, and other properties
 - **Detailed analytics**: Understand language usage, success/failure rates, and processing patterns
 - **Comprehensive search**: Find tasks quickly using search queries
+ - **Unified downloads**: Task cards show a link-style “More” toggle revealing task-based downloads in this order: Video, Audio, Transcript, VTT, SRT
+ - **Consistent subtitles**: Subtitle styling is aligned between preview and completed views and uses the requested `subtitle_language`
+ - **Theme support**: Ultra‑Flat and Subtle‑Material themes with status pill colors and accessible focus states
+ - **Typography**: Google Open Sans as the default font for consistent UI
 
 ## Memory Optimization
 

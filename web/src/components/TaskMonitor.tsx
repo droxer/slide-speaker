@@ -149,7 +149,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     };
     
     checkSubtitles();
-  }, [selectedTaskForPreview, apiBaseUrl]);
+  }, [selectedTaskForPreview, apiBaseUrl, subtitleAvailable, subtitleObjectUrl]);
 
   // Ensure subtitles display like completed view (force showing when available)
   useEffect(() => {
@@ -187,7 +187,9 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
       params.append('offset', ((currentPage - 1) * tasksPerPage).toString());
 
       const tasksResponse = await axios.get(`${apiBaseUrl}/api/tasks?${params}`);
-      setTasks(tasksResponse.data.tasks);
+      // Keep only real tasks with valid task_id (exclude synthetic state_* entries)
+      const realTasks = (tasksResponse.data.tasks || []).filter((t: any) => typeof t?.task_id === 'string' && !t.task_id.startsWith('state_'));
+      setTasks(realTasks);
 
       // Fetch statistics
       const statsResponse = await axios.get(`${apiBaseUrl}/api/tasks/statistics`);
@@ -443,13 +445,13 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     const ext = fileExt?.toLowerCase();
     switch (ext) {
       case '.pdf':
-        return 'PDF Document';
+        return 'PDF';
       case '.pptx':
-        return 'PowerPoint Presentation';
+        return 'PPT';
       case '.ppt':
-        return 'PowerPoint 97-2003 Presentation';
+        return 'PPT';
       default:
-        return `${ext?.toUpperCase() || 'Unknown'} File`;
+        return `${ext?.toUpperCase() || 'Unknown'}`;
     }
   };
 
@@ -603,14 +605,59 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
           tasks.map((task) => (
             <div key={task.task_id} className={`task-item ${getStatusColor(task.status)} ${removingTaskIds.has(task.task_id) ? 'removing' : ''}`}>
               <div className="task-header">
-                <div className="task-id">Task: {task.task_id}</div>
-                <div className={`task-status ${getStatusColor(task.status)}`}>
-                  {task.status === 'completed' ? 'Completed' : 
-                   task.status === 'processing' ? '⏳ Processing' :
-                   task.status === 'queued' ? '⏸️ Queued' :
-                   task.status === 'failed' ? '❌ Failed' :
-                   task.status === 'cancelled' ? '🚫 Cancelled' : task.status}
+                <div
+                  className="task-id"
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Task ID: ${task.task_id} (press Enter to copy)`}
+                  title={task.task_id}
+                  onClick={() => {
+                    try {
+                      navigator.clipboard.writeText(task.task_id);
+                      alert('Task ID copied!');
+                    } catch (err) {
+                      console.error('Failed to copy task id', err);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      try {
+                        navigator.clipboard.writeText(task.task_id);
+                        alert('Task ID copied!');
+                      } catch (err) {
+                        console.error('Failed to copy task id', err);
+                      }
+                    }
+                  }}
+                >
+                  Task: {task.task_id}
                 </div>
+                {(() => {
+                  const statusLabel = (
+                    task.status === 'completed' ? 'Completed' :
+                    task.status === 'processing' ? 'Processing' :
+                    task.status === 'queued' ? 'Queued' :
+                    task.status === 'failed' ? 'Failed' :
+                    task.status === 'cancelled' ? 'Cancelled' : String(task.status)
+                  );
+                  const statusContent = (
+                    task.status === 'completed' ? 'Completed' :
+                    task.status === 'processing' ? '⏳ Processing' :
+                    task.status === 'queued' ? '⏸️ Queued' :
+                    task.status === 'failed' ? '❌ Failed' :
+                    task.status === 'cancelled' ? '🚫 Cancelled' : String(task.status)
+                  );
+                  return (
+                    <div
+                      className={`task-status ${getStatusColor(task.status)}`}
+                      tabIndex={0}
+                      aria-label={`Status: ${statusLabel}`}
+                    >
+                      {statusContent}
+                    </div>
+                  );
+                })()}
               </div>
               
               <div className="task-details simple-details">
@@ -636,7 +683,6 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                         <span className="chip">Voice: {getLanguageDisplayName(voiceLang)}</span>
                         <span className="chip">Subs: {getLanguageDisplayName(subtitleLang)}</span>
                         <span className="chip">{getVideoResolutionDisplayName(videoRes)}</span>
-                        <span className="chip id-chip" title={task.file_id}>ID: <span className="id-mono">{task.file_id}</span></span>
                       </div>
 
                       {/* Current step + progress for non-completed */}
@@ -786,44 +832,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                           </button>
                         </div>
 
-                        <div className="url-copy-row">
-                          <span className="resource-label-inline">VTT</span>
-                          <input
-                            type="text"
-                            value={`${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/vtt`}
-                            readOnly
-                            className="url-input-enhanced"
-                          />
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/vtt`);
-                              alert('VTT URL copied!');
-                            }}
-                            className="copy-btn-enhanced"
-                          >
-                            Copy
-                          </button>
-                        </div>
-
-                        {/* Transcript */}
-                          <div className="url-copy-row">
-                            <span className="resource-label-inline">Transcript</span>
-                          <input
-                            type="text"
-                            value={`${apiBaseUrl}/api/tasks/${task.task_id}/transcripts/markdown`}
-                            readOnly
-                            className="url-input-enhanced"
-                          />
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/transcripts/markdown`);
-                              alert('Transcript URL copied!');
-                            }}
-                            className="copy-btn-enhanced"
-                          >
-                            Copy
-                          </button>
-                        </div>
+                        
 
                         
                         </div>

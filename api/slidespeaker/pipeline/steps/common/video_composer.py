@@ -61,7 +61,7 @@ async def compose_video(
         # Generate video using shared composer
         composer = VideoComposer()
 
-        # Determine output filename
+        # Determine output filename (local). Keep by file_id for workspace organization
         file_type = "pdf" if is_pdf else "presentation"
         video_filename = f"{file_id}_{file_type}.mp4"
         final_video_path = video_dir / video_filename
@@ -94,9 +94,16 @@ async def compose_video(
         if not final_video_path.exists():
             raise ValueError(f"Failed to compose video: {final_video_path}")
 
-        # Upload to storage
+        # Upload to storage (prefer task-id based key if available)
         storage_provider = get_storage_provider()
-        storage_key = f"{file_id}.mp4"
+        base_id = file_id
+        try:
+            state = await state_manager.get_state(file_id)
+            if state and isinstance(state, dict) and state.get("task_id"):
+                base_id = str(state["task_id"])  # prefer task-id based naming
+        except Exception:
+            base_id = file_id
+        storage_key = f"{base_id}.mp4"
         storage_url = storage_provider.upload_file(
             str(final_video_path), storage_key, "video/mp4"
         )

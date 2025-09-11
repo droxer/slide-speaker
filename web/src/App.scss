@@ -159,12 +159,9 @@ body {
     }
   }
   
-  &:focus {
-    outline: none;
-    box-shadow: 
-      0 0 0 3px rgba(79, 70, 229, 0.4),
-      0 8px 32px rgba(0, 0, 0, 0.15);
-  }
+  /* Avoid showing a border after click; theme overrides add focus-visible rings */
+  &:focus { outline: none; box-shadow: none; }
+  &:focus-visible { outline: none; box-shadow: none; }
   
   &:active {
     transform: translateY(0) scale(0.98);
@@ -1028,6 +1025,75 @@ body:not(.ultra-flat) .app-footer {
   text-align: center;
   padding: 1rem 0;
   animation: fadeInUp 0.6s ease-out;
+}
+
+/* Processing meta header */
+.processing-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr);
+  gap: 8px;
+  margin: 8px 0 10px;
+}
+
+.processing-meta .meta-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid rgba(226, 232, 240, 0.7);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.processing-meta .meta-card .meta-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.processing-meta .meta-icon { font-size: 1rem; }
+.processing-meta .meta-label { color: #475569; font-weight: 700; font-size: 0.85rem; }
+.processing-meta .meta-text {
+  color: #0f172a;
+  font-weight: 600;
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.processing-meta .meta-badge { flex-shrink: 0; }
+.processing-meta .meta-actions { display: flex; align-items: center; gap: 10px; }
+.processing-meta .meta-code {
+  font-family: 'Open Sans', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 0.8rem;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.processing-meta .meta-actions { min-width: 0; }
+.processing-meta .meta-code.clickable { cursor: pointer; }
+.processing-meta .meta-code.clickable:hover { text-decoration: underline; }
+.processing-meta .meta-code.clickable:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
+.processing-meta .copy-link {
+  background: none;
+  border: none;
+  color: #6366f1;
+  cursor: pointer;
+  padding: 0;
+  font-weight: 600;
+}
+.processing-meta .copy-link:hover { text-decoration: underline; }
+
+@media (max-width: 768px) {
+  .processing-meta {
+    grid-template-columns: 1fr;
+  }
 }
 
 @keyframes fadeInUp {
@@ -2294,4 +2360,61 @@ body:not(.ultra-flat) .app-footer {
   content: '🤖';
   font-size: 0.8rem;
   filter: grayscale(0.4);
+}
+.processing-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr);
+  gap: 8px;
+  margin: 8px 0 10px;
+}
+
+.processing-meta .meta-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid rgba(226, 232, 240, 0.7);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.processing-meta .meta-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.processing-meta .meta-icon { font-size: 1rem; }
+.processing-meta .meta-label { color: #475569; font-weight: 700; font-size: 0.85rem; }
+.processing-meta .meta-text {
+  color: #0f172a;
+  font-weight: 600;
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.processing-meta .meta-badge { flex-shrink: 0; }
+.processing-meta .meta-actions { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.processing-meta .meta-code {
+  font-family: 'Open Sans', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 0.8rem;
+  color: #334155;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.processing-meta .meta-code.clickable { cursor: pointer; }
+.processing-meta .meta-code.clickable:hover { text-decoration: underline; }
+
+/* Task meta card: icon + code on same row with no overlap */
+.processing-meta .meta-card.task { justify-content: flex-start; column-gap: 8px; }
+.processing-meta .meta-card.task .meta-title { flex: 0 0 auto; margin-right: 2px; }
+.processing-meta .meta-card.task .meta-actions { flex: 1 1 auto; }
+.processing-meta .meta-card.task .meta-code { flex: 1 1 auto; }
+
+@media (max-width: 768px) {
+  .processing-meta { grid-template-columns: 1fr; }
 }

@@ -24,7 +24,10 @@ from .steps.slides import (
     generate_transcripts_step,
     revise_transcripts_step,
 )
-from .steps.slides.translate_transcripts import translate_transcripts_step
+from .steps.slides.translate_transcripts import (
+    translate_subtitle_transcripts_step,
+    translate_voice_transcripts_step,
+)
 
 
 def _get_processing_steps(
@@ -184,20 +187,17 @@ async def _execute_step(
             elif step_name == "revise_transcripts":
                 # Always revise English transcripts first
                 await revise_transcripts_step(file_id, "english")
-            elif step_name in (
-                "translate_voice_transcripts",
-                "translate_subtitle_transcripts",
-            ):
-                # Translate to the correct target depending on the step
-                target_language = (
-                    voice_language
-                    if step_name == "translate_voice_transcripts"
-                    else (subtitle_language or voice_language)
-                )
-                await translate_transcripts_step(
+            elif step_name == "translate_voice_transcripts":
+                await translate_voice_transcripts_step(
                     file_id,
                     source_language="english",
-                    target_language=target_language,
+                    target_language=voice_language,
+                )
+            elif step_name == "translate_subtitle_transcripts":
+                await translate_subtitle_transcripts_step(
+                    file_id,
+                    source_language="english",
+                    target_language=(subtitle_language or voice_language),
                 )
             elif step_name == "generate_audio":
                 # Use translated transcripts if available, otherwise use English transcripts

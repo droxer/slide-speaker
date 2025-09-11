@@ -391,10 +391,8 @@ function App() {
             setStatus('completed');
             setUploading(false);
             setProgress(100);
-            setTaskId(null);
-            
-            // Clear local storage when completed
-            localStorageUtils.clearTaskState();
+            // Preserve taskId so task-based endpoints remain valid in the completed view
+            // Do not clear local storage here to keep task metadata available
             
           } else if (response.data.status === 'processing' || response.data.status === 'uploaded') {
             setStatus('processing');
@@ -447,6 +445,44 @@ function App() {
       }
     };
   }, [status, fileId]);
+
+  // Ensure taskId is populated in completed view (fallback via stats search)
+  useEffect(() => {
+    const hydrateTaskId = async () => {
+      if (status === 'completed' && fileId && (!taskId || taskId === 'null')) {
+        try {
+          const res = await axios.get(`/api/tasks/search?query=${encodeURIComponent(fileId)}`);
+          const tasks = Array.isArray(res.data?.tasks) ? res.data.tasks : [];
+          const match = tasks.find((t: any) => t?.file_id === fileId && typeof t?.task_id === 'string' && !t.task_id.startsWith('state_'));
+          if (match?.task_id) {
+            setTaskId(match.task_id);
+          }
+        } catch (e) {
+          console.warn('Failed to hydrate taskId for completed view', e);
+        }
+      }
+    };
+    hydrateTaskId();
+  }, [status, fileId, taskId]);
+
+  // Ensure taskId is populated during processing view as well
+  useEffect(() => {
+    const hydrateTaskIdWhileProcessing = async () => {
+      if ((status === 'processing' || status === 'uploading') && fileId && (!taskId || taskId === 'null')) {
+        try {
+          const res = await axios.get(`/api/tasks/search?query=${encodeURIComponent(fileId)}`);
+          const tasks = Array.isArray(res.data?.tasks) ? res.data.tasks : [];
+          const match = tasks.find((t: any) => t?.file_id === fileId && typeof t?.task_id === 'string' && !t.task_id.startsWith('state_'));
+          if (match?.task_id) {
+            setTaskId(match.task_id);
+          }
+        } catch (e) {
+          console.warn('Failed to hydrate taskId for processing view', e);
+        }
+      }
+    };
+    hydrateTaskIdWhileProcessing();
+  }, [status, fileId, taskId]);
 
   // Add subtitle tracks when video is loaded
   useEffect(() => {
@@ -593,7 +629,7 @@ function App() {
   const getProcessingStatusMessage = (): string => {
     if (!processingDetails) {
       return isPdfFile(file?.name || null) 
-        ? 'Bringing Your PDF Document to Life' 
+        ? 'Bringing Your PDF to Life' 
         : 'Bringing Your Presentation to Life';
     }
     
@@ -601,7 +637,7 @@ function App() {
       .filter(([_, step]) => step.status === 'in_progress' || step.status === 'processing');
     
     const isPdf = isPdfFile(file?.name || null);
-    const fileTypeText = isPdf ? 'PDF Document' : 'Presentation';
+    const fileTypeText = isPdf ? 'PDF' : 'PPT';
     
     if (activeSteps.length > 0) {
       const currentStepKey = activeSteps[0][0];
@@ -614,7 +650,7 @@ function App() {
         // Common messages for all file types
         'Extracting Slides': `Analyzing your ${fileTypeText} structure...`,
         'Analyzing Content': `Examining ${fileTypeText} content...`,
-        'Generating Transcripts': 'Generating English transcripts...',
+        'Generating Transcripts': 'Generating transcripts...',
         'Revising Transcripts': 'Polishing transcripts for delivery...',
         'Translating Voice Transcripts': 'Translating transcripts...',
         'Translating Subtitle Transcripts': 'Translating transcripts...',
@@ -631,7 +667,7 @@ function App() {
     }
     
     return isPdf 
-      ? 'Bringing Your PDF Document to Life' 
+      ? 'Bringing Your PDF to Life' 
       : 'Bringing Your Presentation to Life';
   };
 
@@ -655,7 +691,7 @@ function App() {
     if (ext === 'pdf') {
       return (
         <div className="file-type-hint pdf">
-          <span className="file-type-badge pdf">PDF Document</span>
+          <span className="file-type-badge pdf">PDF</span>
           <div className="file-type-description">
             AI will analyze and convert your PDF into engaging video chapters with AI narration and subtitles.
           </div>
@@ -664,7 +700,7 @@ function App() {
     } else if (ext === 'pptx' || ext === 'ppt') {
       return (
         <div className="file-type-hint ppt">
-          <span className="file-type-badge ppt">PowerPoint Presentation</span>
+          <span className="file-type-badge ppt">PPT</span>
           <div className="file-type-description">
             AI will convert your slides into a video with AI narration and optional avatar presenter.
           </div>
@@ -878,14 +914,56 @@ function App() {
               <div className="processing-view">
                 <div className="spinner"></div>
                 <h3>{getProcessingStatusMessage()}</h3>
-                {(() => {
-                  const name = file?.name || processingDetails?.filename;
-                  return name ? (
-                    <div className="processing-file-name" title={name}>
-                      <span className="info-value" style={{ marginLeft: 6 }}>{name}</span>
+                {/* Meta header: filename + task id */}
+                <div className="processing-meta" role="group" aria-label="Task Meta">
+                  <div className="meta-card file" title={processingDetails?.filename || file?.name || fileId || ''}>
+                    <div className="meta-title">
+                      <span className="meta-icon">📄</span>
+                      <span className="meta-text">
+                        {processingDetails?.filename || file?.name || 'Untitled'}
+                      </span>
                     </div>
-                  ) : null;
-                })()}
+                    <div className="meta-badge">
+                      {isPdfFile(file?.name || processingDetails?.filename || null) ? (
+                        <span className="file-type-badge pdf">PDF</span>
+                      ) : (
+                        <span className="file-type-badge ppt">PPT</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="meta-card task" title={taskId || fileId || ''}>
+                    <div className="meta-title">
+                      <span className="meta-icon">🆔</span>
+                    </div>
+                    <div className="meta-actions">
+                      <code
+                        className={`meta-code ${taskId ? 'clickable' : ''}`}
+                        aria-label={`Task ID: ${taskId || 'locating'} (press Enter to copy)`}
+                        role="button"
+                        tabIndex={taskId ? 0 : -1}
+                        onClick={() => { if (taskId) { navigator.clipboard.writeText(taskId); alert('Task ID copied!'); } }}
+                        onKeyDown={(e) => {
+                          if (!taskId) return;
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            try {
+                              navigator.clipboard.writeText(taskId);
+                              alert('Task ID copied!');
+                            } catch (err) {
+                              console.error('Failed to copy task id', err);
+                            }
+                          }
+                        }}
+                        title={taskId || undefined}
+                      >
+                        {taskId || '(locating…)'}
+                      </code>
+                      {!taskId && (
+                        <span className="meta-hint">from file {fileId?.slice(0, 8) || '…'}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
                 <div className="progress-container">
                   <div className="progress-bar">
                     <div 
@@ -906,13 +984,7 @@ function App() {
                 {processingDetails && (
                   <div className="steps-container">
                     <h4>🌟 Crafting Your Masterpiece</h4>
-                    <div className="file-type-indicator">
-                      {isPdfFile(file?.name || null) ? (
-                        <span className="file-type-badge pdf">PDF Document</span>
-                      ) : (
-                        <span className="file-type-badge ppt">PowerPoint Presentation</span>
-                      )}
-                    </div>
+                    {/* Meta moved into header */}
                     <div className="steps-grid">
                       {isPdfFile(file?.name || null) ? (
                         // PDF-specific steps
@@ -1026,7 +1098,7 @@ function App() {
                       <video 
                         ref={videoRef}
                         controls
-                        src={`${API_BASE_URL}/api/tasks/${taskId}` + `/video`}
+                        src={`${API_BASE_URL}/api/tasks/${taskId}/video`}
                         crossOrigin="anonymous"
                         className="preview-video-large"
                       >

@@ -70,61 +70,42 @@ Get detailed progress information for a presentation processing task.
 }
 ```
 
-### Download Completed Video
+### Task-based Downloads
+
+All downloads now use task-id-based endpoints to ensure stability and consistent filenames.
+
+Download completed video:
 
 ```
-GET /api/video/{file_id}
+GET /api/tasks/{task_id}/video
 ```
 
-Download the completed video presentation.
-
-**Response:**
-- Video file (MP4 format) or 404 if not found
-
-### Get Video URL
+Download final mixed audio:
 
 ```
-GET /api/video/{file_id}/url
+GET /api/tasks/{task_id}/audio
 ```
 
-Get a presigned URL for the completed video presentation. This endpoint returns a temporary URL that can be used to download the video directly from the storage provider.
-
-**Response:**
-```json
-{
-  "url": "string",
-  "expires_in": "integer"
-}
-```
-
-### Download Subtitles
+List per-slide audio tracks (debugging):
 
 ```
-GET /api/subtitles/{file_id}/srt
-GET /api/subtitles/{file_id}/vtt
+GET /api/tasks/{task_id}/audio/tracks
 ```
 
-Download subtitle files for the completed video.
-
-**Response:**
-- SRT or VTT subtitle file or 404 if not found
-
-### Get Subtitle URL
+Download subtitles:
 
 ```
-GET /api/subtitles/{file_id}/{lang}/srt/url
-GET /api/subtitles/{file_id}/{lang}/vtt/url
+GET /api/tasks/{task_id}/subtitles/vtt
+GET /api/tasks/{task_id}/subtitles/srt
 ```
 
-Get a presigned URL for subtitle files. This endpoint returns a temporary URL that can be used to download the subtitles directly from the storage provider.
+Download transcript (Markdown):
 
-**Response:**
-```json
-{
-  "url": "string",
-  "expires_in": "integer"
-}
 ```
+GET /api/tasks/{task_id}/transcripts/markdown
+```
+
+Presigned URL variants are available where supported via `/url` suffixes.
 
 ## Task Monitoring Endpoints
 
@@ -326,23 +307,22 @@ The API provides detailed error information in the progress endpoint under the `
 
 ## Additional Endpoints
 
-### Download Audio
+### Legacy Endpoints (Compatibility)
 
-Final mixed audio for the full presentation:
+The backend continues to serve legacy file-based routes for backward compatibility, but new integrations should use task-based endpoints:
 
 ```
+GET /api/video/{file_id}
+GET /api/video/{file_id}/url
 GET /api/audio/{file_id}
-GET /api/tasks/{task_id}/audio
-```
-
-List generated per-slide audio tracks (for debugging):
-
-```
 GET /api/audio/{file_id}/tracks
-GET /api/tasks/{task_id}/audio/tracks
+GET /api/subtitles/{file_id}/srt
+GET /api/subtitles/{file_id}/vtt
+GET /api/subtitles/{file_id}/{lang}/srt/url
+GET /api/subtitles/{file_id}/{lang}/vtt/url
 ```
 
-Filenames now use `{file_id}.mp3` for final audio. Legacy `_final*.mp3` are still served for backward compatibility. For local storage, when a final MP3 is not present, the server streams a concatenation of per-slide audio files.
+Note: Frontend uses only task-based endpoints.
 
 ### Get Supported Languages
 
@@ -383,9 +363,9 @@ If cloud storage upload fails, the system automatically falls back to local stor
 
 All storage providers support presigned URL generation for secure file access, allowing users to download files without exposing credentials. The `/url` endpoints provide temporary URLs that can be used to download files directly from the storage provider.
 
-### Locale-aware Subtitle Filenames
+### Locale-aware, Task-based Filenames
 
-The system generates locale-aware subtitle filenames (e.g., `_en.srt`, `_zh-Hans.vtt`) for better internationalization support while maintaining backward compatibility with legacy formats.
+Generated assets prefer task-id-based filenames when a task ID is available (e.g., `{task_id}.mp4`, `{task_id}_{locale}.vtt|srt`). The system maintains locale-aware subtitle filenames (e.g., `_en.srt`, `_zh-Hans.vtt`) for better internationalization while preserving legacy compatibility when needed.
 
 ### Storage Path Configuration
 
@@ -431,6 +411,7 @@ SlideSpeaker includes comprehensive task monitoring capabilities that allow user
 - **Detailed statistics**: Get comprehensive statistics on task processing
 - **Individual task details**: View detailed information about specific tasks
 - **Task cancellation**: Cancel specific tasks through API endpoints
+- **Unified downloads**: Task Monitor shows Video, Audio, Transcript, VTT, SRT via task-based URLs
 
 ### Statistics and Analytics
 
@@ -442,10 +423,18 @@ The system provides detailed analytics on:
 
 ## State Management Features
 
-### Task State Persistence
+### Task State Persistence and Mapping
 - **Local Storage**: Frontend automatically saves task state to prevent data loss on page refresh
 - **Recovery**: Task progress is restored when users return to the application
 - **Session Management**: Upload history and download links are maintained across sessions
+- **Task/File Mapping**: Upload persists Redis mappings to stabilize task-based downloads:
+  - `ss:task2file:{task_id}` → `{file_id}` (TTL ~30 days)
+  - `ss:file2task:{file_id}` → `{task_id}` (TTL ~30 days)
+
+These mappings allow the server to resolve storage paths reliably from a task ID.
+
+### Subtitle Language Semantics
+- Subtitle generation and translation always use `subtitle_language`. The audio voice language can differ.
 
 ## Watermark Integration
 

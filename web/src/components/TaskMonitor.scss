@@ -363,7 +363,7 @@
   font-weight: 700;
   color: #0f172a;
   margin-bottom: 8px;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   letter-spacing: -0.5px;
   background: linear-gradient(135deg, #0f172a 0%, #334155 100%);
   -webkit-background-clip: text;
@@ -378,6 +378,7 @@
   letter-spacing: 1px;
   font-weight: 600;
   opacity: 0.8;
+  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .loading, .error, .no-tasks {
@@ -393,7 +394,7 @@
   border: 1px solid rgba(255, 255, 255, 0.6);
   max-width: 500px;
   margin: 40px auto;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .error {
@@ -483,6 +484,14 @@
   border-radius: 6px;
   font-weight: 600;
   border: 1px solid #e5e7eb;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+.task-id[role="button"] { cursor: pointer; }
+.task-id[role="button"]:hover { background: #e5e7eb; }
+
+.task-id:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
 }
 
 .task-status {
@@ -496,6 +505,8 @@
   box-shadow: none;
   border: 1px solid #e5e7eb;
   background: #ffffff;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  cursor: default;
 }
 
 /* Soft backgrounds and colored dots for status */
@@ -509,19 +520,30 @@
 }
 
 .task-status.status-completed { color: #166534; border-color: #86efac; background: #ecfdf5; }
+.task-status.status-completed:hover { background: #dcfce7; }
 .task-status.status-completed::before { background-color: #16a34a; }
 
 .task-status.status-processing { color: #1e3a8a; border-color: #bfdbfe; background: #eff6ff; }
+.task-status.status-processing:hover { background: #dbeafe; }
 .task-status.status-processing::before { background-color: #2563eb; }
 
 .task-status.status-queued { color: #92400e; border-color: #fde68a; background: #fffbeb; }
+.task-status.status-queued:hover { background: #fef3c7; }
 .task-status.status-queued::before { background-color: #f59e0b; }
 
 .task-status.status-failed { color: #b91c1c; border-color: #fecaca; background: #fef2f2; }
+.task-status.status-failed:hover { background: #fee2e2; }
 .task-status.status-failed::before { background-color: #ef4444; }
 
 .task-status.status-cancelled { color: #475569; border-color: #e5e7eb; background: #f8fafc; }
+.task-status.status-cancelled:hover { background: #f1f5f9; }
 .task-status.status-cancelled::before { background-color: #94a3b8; }
+
+/* Keyboard focus (visible) */
+.task-status:focus-visible {
+  outline: 2px solid #0ea5e9;
+  outline-offset: 2px;
+}
 
 .task-details { margin-bottom: 12px; }
 

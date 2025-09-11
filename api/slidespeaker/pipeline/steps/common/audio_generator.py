@@ -100,8 +100,14 @@ async def generate_audio_common(
     try:
         storage_provider = get_storage_provider()
         storage_urls: list[str] = []
+        # Read task_id if present to prefer task-based object keys
+        state = await state_manager.get_state(file_id)
+        task_id = None
+        if state and isinstance(state, dict):
+            task_id = state.get("task_id") or (state.get("task") or {}).get("task_id")
         for i, path in enumerate(audio_files, start=1):
-            object_key = f"{file_id}_audio_{i}.mp3"
+            base = task_id if isinstance(task_id, str) and task_id else file_id
+            object_key = f"{base}_audio_{i}.mp3"
             try:
                 url = storage_provider.upload_file(path, object_key, "audio/mpeg")
                 storage_urls.append(url)
@@ -116,6 +122,39 @@ async def generate_audio_common(
             logger.info(f"Uploaded {len(storage_urls)} audio files to storage")
     except Exception as e:
         logger.error(f"Audio storage upload encountered an error: {e}")
+
+    # Create and upload a single final audio file by concatenating per-track MP3s
+    try:
+        if audio_files:
+            storage_provider = get_storage_provider()
+            # Prefer task-id naming for the final audio when available
+            state = await state_manager.get_state(file_id)
+            task_id = None
+            if state and isinstance(state, dict):
+                task_id = state.get("task_id") or (state.get("task") or {}).get(
+                    "task_id"
+                )
+            base = task_id if isinstance(task_id, str) and task_id else file_id
+
+            # Concatenate files into a single MP3
+            final_local_path = config.output_dir / f"{base}.mp3"
+            with open(final_local_path, "wb") as outfile:
+                for ap in audio_files:
+                    with open(ap, "rb") as infile:
+                        while True:
+                            chunk = infile.read(1024 * 256)
+                            if not chunk:
+                                break
+                            outfile.write(chunk)
+
+            # Upload to storage with task-id-based key when possible
+            storage_provider.upload_file(
+                str(final_local_path), f"{base}.mp3", "audio/mpeg"
+            )
+            logger.info(f"Uploaded final concatenated audio: {final_local_path}")
+    except Exception as e:
+        # Non-fatal; streaming fallback in downloads will still work
+        logger.error(f"Failed to create/upload final audio: {e}")
 
 
 async def get_pdf_transcripts(file_id: str) -> list[dict[str, Any]]:
