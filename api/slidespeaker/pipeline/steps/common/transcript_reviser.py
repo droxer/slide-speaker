@@ -97,7 +97,7 @@ async def revise_transcripts_common(
 
         # Upload final transcript markdown to storage (best-effort)
         try:
-            from slidespeaker.utils.config import get_storage_provider
+            from slidespeaker.configs.config import get_storage_provider
 
             storage_provider = get_storage_provider()
             # Prefer task-id-based filename when available

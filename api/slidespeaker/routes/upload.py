@@ -14,11 +14,11 @@ import aiofiles
 from fastapi import APIRouter, HTTPException, Request
 from loguru import logger
 
+from slidespeaker.configs.config import config
+from slidespeaker.configs.locales import locale_utils
+from slidespeaker.configs.redis_config import RedisConfig
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
-from slidespeaker.utils.config import config
-from slidespeaker.utils.locales import locale_utils
-from slidespeaker.utils.redis_config import RedisConfig
 
 router = APIRouter(prefix="/api", tags=["upload"])
 

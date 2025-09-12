@@ -1,10 +1,11 @@
 """Translation service for SlideSpeaker (translation package)."""
 
-import os
 from typing import Any
 
 from loguru import logger
 from openai import OpenAI
+
+from slidespeaker.configs.config import config
 
 # Language mapping for translation
 LANGUAGE_CODES = {
@@ -43,15 +44,17 @@ class TranslationService:
     """Service for translating presentation scripts using AI models"""
 
     def __init__(self) -> None:
+        # Use OpenAI exclusively for translation in this module
+        self.provider: str = "openai"
         self.client: OpenAI | None = None
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = config.openai_api_key
         if api_key:
             try:
                 self.client = OpenAI(api_key=api_key)
             except Exception as e:
                 logger.error(f"Failed to initialize OpenAI client: {e}")
 
-    def translate_scripts(
+    def translate(
         self,
         scripts: list[dict[str, Any]],
         source_language: str,
@@ -79,14 +82,12 @@ class TranslationService:
                     "Translation client not initialized; returning originals"
                 )
                 return scripts
-
             response = self.client.chat.completions.create(
-                model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+                model=config.translation_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": f"{user_prompt}\n\n{joined}"},
                 ],
-                temperature=0.2,
             )
             translated_content = response.choices[0].message.content or ""
             if not translated_content.strip():
@@ -97,6 +98,8 @@ class TranslationService:
         except Exception as e:
             logger.error(f"Error translating scripts: {e}")
             return scripts
+
+    # Qwen translation support removed from this module; using OpenAI only
 
     def _parse_translated_content(
         self, translated_content: str, original_scripts: list[dict[str, Any]]

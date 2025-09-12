@@ -11,8 +11,8 @@ from typing import Any
 from loguru import logger
 
 from slidespeaker.audio import AudioGenerator
+from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.utils.config import config, get_storage_provider
 
 
 async def generate_audio_common(
@@ -151,6 +151,16 @@ async def generate_audio_common(
             storage_provider.upload_file(
                 str(final_local_path), f"{base}.mp3", "audio/mpeg"
             )
+            # Backward-compatibility: also upload under file_id-based key if different
+            try:
+                if base != file_id:
+                    storage_provider.upload_file(
+                        str(final_local_path), f"{file_id}.mp3", "audio/mpeg"
+                    )
+            except Exception as compat_err:
+                logger.warning(
+                    f"Compat upload (file-id key) failed for final audio: {compat_err}"
+                )
             logger.info(f"Uploaded final concatenated audio: {final_local_path}")
     except Exception as e:
         # Non-fatal; streaming fallback in downloads will still work

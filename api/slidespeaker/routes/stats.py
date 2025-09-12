@@ -10,9 +10,9 @@ from typing import Any
 
 from fastapi import APIRouter, Query
 
+from slidespeaker.configs.redis_config import RedisConfig
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
-from slidespeaker.utils.redis_config import RedisConfig
 
 router = APIRouter(prefix="/api", tags=["stats"])
 

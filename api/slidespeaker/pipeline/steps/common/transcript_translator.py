@@ -81,7 +81,28 @@ async def translate_transcripts_common(
     try:
         # Use shared translation service
         translator = TranslationService()
-        translated_transcripts = translator.translate_scripts(
+        # Ensure a provider is available if translation is required
+        if source_language.lower() != target_language.lower():
+            if (
+                translator.provider == "openai"
+                and getattr(translator, "client", None) is None
+            ):
+                msg = "Translation service not configured (missing OPENAI_API_KEY)."
+                logger.error(msg)
+                await state_manager.update_step_status(
+                    file_id, state_key, "failed", {"error": msg}
+                )
+                return
+            if translator.provider == "qwen" and not getattr(
+                translator, "qwen_api_key", None
+            ):
+                msg = "Translation service not configured (missing QWEN_API_KEY)."
+                logger.error(msg)
+                await state_manager.update_step_status(
+                    file_id, state_key, "failed", {"error": msg}
+                )
+                return
+        translated_transcripts = translator.translate(
             source_transcripts, source_language, target_language
         )
 

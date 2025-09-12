@@ -11,13 +11,15 @@ from typing import Any, cast
 
 from loguru import logger
 
+from slidespeaker.configs.config import config
+
 
 class RedisStateManager:
     """Redis-based state manager for tracking presentation processing tasks"""
 
     def __init__(self) -> None:
         """Initialize the state manager with a Redis client connection"""
-        from slidespeaker.utils.redis_config import RedisConfig
+        from slidespeaker.configs.redis_config import RedisConfig
 
         self.redis_client = RedisConfig.get_redis_client()
 
@@ -69,7 +71,10 @@ class RedisStateManager:
             steps = {
                 "extract_slides": {"status": "pending", "data": None},
                 "convert_slides_to_images": {"status": "pending", "data": None},
-                "analyze_slide_images": {"status": "pending", "data": None},
+                "analyze_slide_images": {
+                    "status": "pending" if config.enable_visual_analysis else "skipped",
+                    "data": None,
+                },
                 "generate_transcripts": {"status": "pending", "data": None},
                 "revise_transcripts": {"status": "pending", "data": None},
                 "generate_audio": {"status": "pending", "data": None},

@@ -18,7 +18,7 @@ Guidance for AI coding agents (Codex CLI, Claude Code, etc.) collaborating on th
 ## Repository Structure
 - `api/`: FastAPI backend and workers
   - Entrypoints: `server.py`, `master_worker.py`, `worker.py`.
-  - Core: `slidespeaker/core/` (state + queue), `slidespeaker/utils/` (config, Redis, logging).
+- Core: `slidespeaker/core/` (state + queue), `slidespeaker/configs/` (config, Redis, logging).
   - Routes: `slidespeaker/routes/` (upload, tasks, stats, downloads, languages).
   - Pipeline: `slidespeaker/pipeline/` (PDF vs slides coordinators and steps).
   - Processing: `slidespeaker/processing/` (audio/video/subtitles/images).

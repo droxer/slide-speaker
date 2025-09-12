@@ -5,11 +5,12 @@ This module provides an implementation of the TTS interface using ElevenLabs' te
 It supports multiple voices and high-quality speech synthesis through the ElevenLabs platform.
 """
 
-import os
 from pathlib import Path
 
 import requests
 from loguru import logger
+
+from slidespeaker.configs.config import config
 
 from .tts_interface import TTSInterface
 
@@ -19,10 +20,10 @@ class ElevenLabsTTSService(TTSInterface):
 
     def __init__(self) -> None:
         """Initialize the ElevenLabs TTS service with API configuration"""
-        self.api_key = os.getenv("ELEVENLABS_API_KEY")
+        self.api_key = config.elevenlabs_api_key
         self.base_url = "https://api.elevenlabs.io/v1"
-        self.default_voice_id = os.getenv(
-            "ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM"
+        self.default_voice_id = (
+            config.elevenlabs_voice_id or "21m00Tcm4TlvDq8ikWAM"
         )  # Default voice
 
     async def generate_speech(

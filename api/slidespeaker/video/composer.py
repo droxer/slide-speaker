@@ -24,7 +24,7 @@ from moviepy import (
 from moviepy.video.fx.Resize import Resize
 from moviepy.video.VideoClip import TextClip
 
-from slidespeaker.utils.config import config, get_storage_provider
+from slidespeaker.configs.config import config, get_storage_provider
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,7 @@ class VideoComposer:
 
     def _create_watermark(self, final_clip: VideoFileClip) -> TextClip | None:
         try:
-            from slidespeaker.utils.config import config
+            from slidespeaker.configs.config import config
 
             if not config.watermark_enabled:
                 logger.info("Watermark disabled via configuration")
@@ -279,8 +279,8 @@ class VideoComposer:
                 final_clip_resized.write_videofile(
                     output_path,
                     fps=config.ffmpeg_fps,
-                    codec="libx264",
-                    audio_codec="aac",
+                    codec=config.ffmpeg_codec,
+                    audio_codec=config.ffmpeg_audio_codec,
                     threads=config.ffmpeg_threads,
                     preset=config.ffmpeg_preset,
                     bitrate=config.ffmpeg_bitrate,
@@ -371,8 +371,8 @@ class VideoComposer:
             final_clip_resized.write_videofile(
                 str(output_path),
                 fps=config.ffmpeg_fps,
-                codec="libx264",
-                audio_codec="aac",
+                codec=config.ffmpeg_codec,
+                audio_codec=config.ffmpeg_audio_codec,
                 threads=config.ffmpeg_threads,
                 preset=config.ffmpeg_preset,
                 bitrate=config.ffmpeg_bitrate,
@@ -460,8 +460,8 @@ class VideoComposer:
                 final_clip_resized.write_videofile(
                     str(output_path),
                     fps=config.ffmpeg_fps,
-                    codec="libx264",
-                    audio_codec="aac",
+                    codec=config.ffmpeg_codec,
+                    audio_codec=config.ffmpeg_audio_codec,
                     threads=config.ffmpeg_threads,
                     preset=config.ffmpeg_preset,
                     bitrate=config.ffmpeg_bitrate,

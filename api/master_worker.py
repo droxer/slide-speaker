@@ -22,12 +22,12 @@ load_dotenv()
 # Add the current directory to Python path so we can import slidespeaker modules
 sys.path.insert(0, str(Path(__file__).parent))
 
-from slidespeaker.utils.logging_config import setup_logging  # noqa: E402
+from slidespeaker.configs.config import config  # noqa: E402
+from slidespeaker.configs.logging_config import setup_logging  # noqa: E402
 
-log_level = os.getenv("LOG_LEVEL", "INFO")
-log_file = os.getenv("LOG_FILE")
+log_file = config.log_file
 setup_logging(
-    log_level,
+    config.log_level,
     log_file,
     enable_file_logging=log_file is not None,
     component="master_worker",
@@ -43,7 +43,9 @@ class MasterWorker:
         """Initialize the master worker with configuration settings"""
         self.should_stop = False
         self.workers: list[subprocess.Popen[bytes]] = []
-        self.max_workers = int(os.getenv("MAX_WORKERS", "2"))  # Default to 3 workers
+        self.max_workers = (
+            config.max_workers
+        )  # Default is configured (env: MAX_WORKERS)
         self.worker_processes: dict[str, subprocess.Popen[bytes]] = {}
 
     def signal_handler(self, signum: int, frame: Any) -> None:
@@ -104,18 +106,18 @@ class MasterWorker:
         # Test Redis connection
         try:
             ping_result = await task_queue.redis_client.ping()
-            logger.info(f"Master worker Redis ping result: {ping_result}")
+            logger.debug(f"Master worker Redis ping result: {ping_result}")
 
             # Log Redis config
             config_info = task_queue.redis_client.connection_pool.connection_kwargs
-            logger.info(f"Master worker Redis config: {config_info}")
+            logger.debug(f"Master worker Redis config: {config_info}")
 
-            # Check for existing tasks
+            # Check for existing tasks (debug-level on startup)
             keys = await task_queue.redis_client.keys("ss:task:*")
-            logger.info(f"Found {len(keys)} existing task keys")
+            logger.debug(f"Found {len(keys)} existing task keys")
 
             queue_items = await task_queue.redis_client.lrange("ss:task_queue", 0, -1)  # type: ignore
-            logger.info(f"Found {len(queue_items)} items in task queue")
+            logger.debug(f"Found {len(queue_items)} items in task queue")
 
         except Exception as e:
             logger.error(f"Master worker Redis connection error: {e}")
@@ -128,11 +130,11 @@ class MasterWorker:
 
         try:
             while not self.should_stop:
-                # Log current worker status
+                # Log current worker status (debug to reduce verbosity)
                 active_workers = len(self.worker_processes)
-                logger.info(
-                    f"Master worker status: {active_workers}/{self.max_workers} workers active, "
-                    f"tasks in progress: {list(self.worker_processes.keys())}"
+                logger.debug(
+                    f"Master worker status: {active_workers}/{self.max_workers} active, "
+                    f"tasks: {list(self.worker_processes.keys())}"
                 )
 
                 # Check for completed workers
@@ -160,7 +162,7 @@ class MasterWorker:
                         await asyncio.sleep(0.5)
 
                         self.start_worker_process(task_id)
-                        logger.info(f"Worker process started for task {task_id}")
+                        logger.debug(f"Worker process started for task {task_id}")
                     else:
                         # No tasks available, sleep briefly
                         logger.debug("No tasks available in queue, waiting...")

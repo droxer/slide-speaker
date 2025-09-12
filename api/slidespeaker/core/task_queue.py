@@ -16,7 +16,7 @@ class RedisTaskQueue:
 
     def __init__(self) -> None:
         """Initialize the task queue with Redis client and key prefixes"""
-        from slidespeaker.utils.redis_config import RedisConfig
+        from slidespeaker.configs.redis_config import RedisConfig
 
         self.redis_client = RedisConfig.get_redis_client()
         self.task_prefix = "ss:task"

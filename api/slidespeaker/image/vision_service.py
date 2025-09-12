@@ -1,18 +1,19 @@
 """
 Vision Service for Slide Analysis
 
-This module provides image analysis capabilities using OpenAI's GPT-4 Vision model
+This module provides image analysis capabilities using OpenAI vision models
 to extract content from presentation slides. It analyzes both text and visual elements
 to provide context for script generation.
 """
 
 import base64
-import os
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
 from openai import OpenAI
+
+from slidespeaker.configs.config import config
 
 # Prompt for slide image analysis optimized for script generation
 SLIDE_ANALYSIS_PROMPT = """
@@ -51,11 +52,15 @@ SLIDE_ANALYSIS_SYSTEM_PROMPT = (
 
 
 class VisionService:
-    """Vision service for analyzing slide images using OpenAI GPT-4 Vision"""
+    """Vision service for analyzing slide images using OpenAI vision models"""
 
     def __init__(self) -> None:
-        """Initialize the vision service with OpenAI client"""
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        """Initialize the vision service with configured provider"""
+        self.client: OpenAI | None = None
+        if not config.openai_api_key:
+            logger.error("OPENAI_API_KEY not set; vision analysis will fallback")
+        else:
+            self.client = OpenAI(api_key=config.openai_api_key)
 
     def _encode_image(self, image_path: Path) -> str:
         """Encode image to base64 for OpenAI API"""
@@ -90,7 +95,8 @@ Additional Context from Slide Text Extraction:
 
 Use this extracted text to enhance your analysis and ensure consistency between visual and textual content."""
 
-            model_name = os.getenv("VISION_MODEL", "gpt-4o-mini")
+            assert self.client is not None
+            model_name = config.vision_model
             response = self.client.chat.completions.create(
                 model=model_name,
                 messages=[
@@ -110,8 +116,8 @@ Use this extracted text to enhance your analysis and ensure consistency between 
                 ],
             )
 
-            analysis_text = response.choices[0].message.content
-            if analysis_text is None:
+            analysis_text = response.choices[0].message.content or ""
+            if not analysis_text:
                 analysis_text = "No analysis content available"
 
             analysis_text = analysis_text.strip()
@@ -150,6 +156,8 @@ Use this extracted text to enhance your analysis and ensure consistency between 
                 "numerical_data": [],
                 "structure": "single_image",
             }
+
+    # Qwen support removed from this module; using OpenAI only
 
     def _parse_analysis(self, analysis_text: str) -> dict[str, Any]:
         """Parse the LLM analysis into structured format optimized for script generation"""

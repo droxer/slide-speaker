@@ -3,19 +3,20 @@ HeyGen Avatar Service (video package)
 """
 
 import asyncio
-import os
 from pathlib import Path
 from typing import Any
 
 import requests
 from loguru import logger
 
+from slidespeaker.configs.config import config
+
 from .interface import AvatarInterface
 
 
 class HeyGenAvatarService(AvatarInterface):
     def __init__(self) -> None:
-        self.api_key = os.getenv("HEYGEN_API_KEY")
+        self.api_key = config.heygen_api_key
         self.api_url = "https://api.heygen.com/v2"
         self.default_avatar_id = "Judy"
         self.default_voice_id = "1bd001e7e50f421d891986aad5158bc8"

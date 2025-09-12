@@ -2,7 +2,7 @@
 Avatar Service Factory (video package)
 """
 
-import os
+from slidespeaker.configs.config import config
 
 from .heygen_service import HeyGenAvatarService
 from .interface import AvatarInterface
@@ -18,7 +18,7 @@ class AvatarFactory:
     @classmethod
     def create_service(cls, service_name: str | None = None) -> AvatarInterface:
         if service_name is None:
-            service_name = os.getenv("AVATAR_SERVICE", "heygen").lower()
+            service_name = config.avatar_service
 
         if service_name not in cls._services:
             raise ValueError(

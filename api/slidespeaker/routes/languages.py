@@ -7,7 +7,7 @@ and their locale information for the presentation processing system.
 
 from fastapi import APIRouter
 
-from slidespeaker.utils.locales import locale_utils
+from slidespeaker.configs.locales import locale_utils
 
 router = APIRouter(prefix="/api", tags=["languages"])
 

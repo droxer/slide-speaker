@@ -5,11 +5,12 @@ This module provides an implementation of the TTS interface using OpenAI's text-
 It supports multiple voices and languages through the OpenAI TTS models.
 """
 
-import os
 from pathlib import Path
 
 import openai
 from loguru import logger
+
+from slidespeaker.configs.config import config
 
 from .tts_interface import TTSInterface
 
@@ -19,13 +20,13 @@ class OpenAITTSService(TTSInterface):
 
     def __init__(self) -> None:
         """Initialize the OpenAI TTS service with API client and configuration"""
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = config.openai_api_key
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable is not set")
 
         self.client = openai.OpenAI(api_key=api_key)
-        self.model = os.getenv("OPENAI_TTS_MODEL", "tts-1")
-        self.default_voice = os.getenv("OPENAI_TTS_VOICE", "alloy")
+        self.model = config.openai_tts_model
+        self.default_voice = config.openai_tts_voice
 
         # Validate model
         valid_models = ["tts-1", "tts-1-hd", "gpt-4o-mini-tts"]
@@ -82,7 +83,7 @@ class OpenAITTSService(TTSInterface):
 
     def is_available(self) -> bool:
         """Check if OpenAI TTS is available"""
-        return bool(os.getenv("OPENAI_API_KEY"))
+        return bool(config.openai_api_key)
 
     def get_supported_voices(self, language: str = "english") -> list[str]:
         """Get supported OpenAI TTS voices"""

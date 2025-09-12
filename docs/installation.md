@@ -27,7 +27,7 @@
    uv sync --extra=dev --extra=aws --extra=oss  # Install all optional dependencies
    ```
 
-3. Create a `.env` file in the `api/` directory:
+3. Create a `.env` file in the `api/` directory (see also `api/.env.example`):
    ```env
    # AI Service Keys (at least one from each category)
    OPENAI_API_KEY=your_openai_api_key
@@ -50,6 +50,8 @@
    AWS_REGION=us-east-1
    AWS_ACCESS_KEY_ID=your-access-key-id
    AWS_SECRET_ACCESS_KEY=your-secret-access-key
+   # Optional: For S3-compatible endpoints (e.g., MinIO)
+   AWS_S3_ENDPOINT_URL=
    
    # Aliyun OSS Configuration (required when STORAGE_PROVIDER=oss)
    OSS_BUCKET_NAME=your-bucket-name
@@ -57,6 +59,43 @@
    OSS_ACCESS_KEY_ID=your-access-key-id
    OSS_ACCESS_KEY_SECRET=your-access-key-secret
    OSS_REGION=cn-region
+   # Set to true if you use a custom CNAME domain for your bucket
+   OSS_IS_CNAME=false
+
+   # Media proxy: set true to stream cloud media through API and bypass bucket CORS
+   PROXY_CLOUD_MEDIA=false
+
+   # Provider selection (LLM/translation/tts)
+   SCRIPT_PROVIDER=openai           # Options: openai, qwen
+   OPENAI_SCRIPT_MODEL=gpt-4o
+   TRANSLATION_PROVIDER=openai       # Options: openai, qwen
+   OPENAI_TRANSLATION_MODEL=gpt-4o-mini
+   # Qwen models by scenario
+   QWEN_SCRIPT_MODEL=qwen-turbo
+   QWEN_TRANSLATION_MODEL=qwen-turbo
+   QWEN_REVIEWER_MODEL=qwen-turbo
+   QWEN_VISION_MODEL=qwen-vl-plus
+   IMAGE_PROVIDER=openai
+   OPENAI_IMAGE_MODEL=gpt-image-1
+   QWEN_IMAGE_MODEL=wanx-v1
+
+   # TTS Configuration
+   TTS_SERVICE=openai               # Options: openai, elevenlabs, qwen
+   OPENAI_TTS_MODEL=tts-1
+   OPENAI_TTS_VOICE=alloy
+   ELEVENLABS_VOICE_ID=
+   QWEN_TTS_MODEL=cosyvoice
+   QWEN_TTS_VOICE=female
+
+   # Reviewer and vision providers (override independently)
+   REVIEW_PROVIDER=openai
+   OPENAI_REVIEW_MODEL=gpt-4o
+   VISION_PROVIDER=openai
+   OPENAI_VISION_MODEL=gpt-4o-mini
+   # PDF analyzer
+   PDF_ANALYZER_PROVIDER=openai
+   OPENAI_PDF_ANALYZER_MODEL=gpt-4o-mini
+   QWEN_PDF_ANALYZER_MODEL=qwen-turbo
    ```
 
 4. Start Redis:
@@ -139,6 +178,8 @@ If cloud storage upload fails, the system automatically falls back to local stor
 ### Presigned URLs
 
 All storage providers support presigned URL generation for secure file access, allowing users to download files without exposing credentials.
+
+If you deploy behind strict bucket CORS or a restrictive CDN, you can set `PROXY_CLOUD_MEDIA=true` to proxy media (video/audio) through the API origin. This avoids CORS issues at the cost of server bandwidth.
 
 ### Locale-aware Subtitle Filenames
 
@@ -226,17 +267,38 @@ Recent improvements include memory-efficient video composition to prevent hangin
 ### AI Service Selection
 The application supports multiple AI service providers. You can configure which services to use:
 
-**Transcript Generation:**
-- OpenAI: Set `OPENAI_API_KEY` for GPT-based transcript generation
-- Qwen: Set `QWEN_API_KEY` for Alibaba's Qwen model (good for Chinese content)
+- **Transcript Generation:**
+- Provider: `SCRIPT_PROVIDER=openai|qwen`
+- OpenAI: Set `OPENAI_API_KEY` and `SCRIPT_GENERATOR_MODEL`
+- Qwen: Set `QWEN_API_KEY` and `QWEN_SCRIPT_MODEL` (good for Chinese content)
 
 **Text-to-Speech:**
-- ElevenLabs: Set `ELEVENLABS_API_KEY` for high-quality voices
-- OpenAI TTS: Uses the same `OPENAI_API_KEY` for OpenAI's TTS service
+- Provider: `TTS_SERVICE=openai|elevenlabs|qwen`
+- OpenAI TTS: Uses `OPENAI_API_KEY`, `OPENAI_TTS_MODEL`, `OPENAI_TTS_VOICE`
+- ElevenLabs: Set `ELEVENLABS_API_KEY` and optional `ELEVENLABS_VOICE_ID`
+- Qwen TTS (DashScope): Set `QWEN_API_KEY`, `QWEN_TTS_MODEL`, `QWEN_TTS_VOICE`
 
-**Avatar Generation:**
+- **Reviewer:**
+- Provider: `REVIEW_PROVIDER=openai|qwen`
+- OpenAI: Set `OPENAI_API_KEY`, `SCRIPT_REVIEWER_MODEL`
+- Qwen: Set `QWEN_API_KEY`, `QWEN_REVIEWER_MODEL`
+
+**Vision:**
+- Provider: `VISION_PROVIDER=openai|qwen`
+- OpenAI: Set `OPENAI_API_KEY`, `OPENAI_VISION_MODEL`
+- Qwen: Set `QWEN_API_KEY`, `QWEN_VISION_MODEL`
+
+**Avatar Generation / Images:**
 - HeyGen: Set `HEYGEN_API_KEY` for realistic AI presenters
-- DALL-E: Uses the same `OPENAI_API_KEY` for custom AI-generated avatars
+- OpenAI Images: Uses `OPENAI_API_KEY` with `OPENAI_IMAGE_MODEL`; set `IMAGE_PROVIDER=openai`
+- Qwen Images (DashScope): Set `QWEN_API_KEY`, `QWEN_IMAGE_MODEL`; set `IMAGE_PROVIDER=qwen`
+
+### TTS and LLM Catalog Endpoints
+- List TTS voices: `GET /api/tts/voices?language=english[&provider=openai|elevenlabs|qwen]`
+- TTS catalog: `GET /api/tts/catalog[?provider=...]`
+- LLM models: `GET /api/llm/models`
+
+These help the UI populate voice pickers and display active providers/models.
 
 ### Enhanced Features
 - **State Persistence**: Local storage automatically saves task progress to prevent data loss

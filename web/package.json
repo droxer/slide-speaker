@@ -51,6 +51,12 @@
   "proxy": "http://localhost:8000",
   "devDependencies": {
     "sass": "^1.92.0",
+    "sass-embedded": "^1.77.0",
     "pre-commit": "^3.5.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "sass-loader": "^13.3.2"
+    }
   }
 }

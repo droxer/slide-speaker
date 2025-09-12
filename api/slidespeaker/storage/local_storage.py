@@ -89,7 +89,13 @@ class LocalStorage(StorageProvider):
             logger.error(f"Error downloading file {object_key}: {e}")
             raise
 
-    def get_file_url(self, object_key: str, expires_in: int = 3600) -> str:
+    def get_file_url(
+        self,
+        object_key: str,
+        expires_in: int = 3600,
+        content_disposition: str | None = None,
+        content_type: str | None = None,
+    ) -> str:
         """Get local file URL for local storage."""
         # For local storage, return a file URL that can be accessed via HTTP
         # when served by the web server
