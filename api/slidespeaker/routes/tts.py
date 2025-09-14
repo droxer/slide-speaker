@@ -39,7 +39,6 @@ async def tts_catalog(provider: str | None = None) -> dict[str, object]:
     Provider-specific behavior:
     - elevenlabs: calls list-voices API when possible.
     - openai: returns static set with common voices and language hints.
-    - qwen: removed
     """
     p = (provider or config.tts_service).lower()
     catalog: dict[str, object] = {"provider": p, "voices": []}
@@ -80,8 +79,6 @@ async def tts_catalog(provider: str | None = None) -> dict[str, object]:
             catalog["voices"] = base
             catalog["notes"] = "Static OpenAI voice set; no official list-voices API"
             return catalog
-        elif p == "qwen":
-            raise HTTPException(status_code=400, detail="Qwen TTS support removed")
         else:
             raise RuntimeError(f"Unknown provider: {p}")
     except Exception as e:
@@ -90,15 +87,17 @@ async def tts_catalog(provider: str | None = None) -> dict[str, object]:
 
 @router.get("/llm/models")
 async def llm_models() -> dict[str, object]:
-    """Expose configured providers/models and supported language keys."""
+    """Expose configured providers/models and supported language keys.
+
+    Qwen support is removed for transcript generation/review and TTS; this
+    endpoint reflects OpenAI for script models.
+    """
     from slidespeaker.translation.service import LANGUAGE_CODES
 
     return {
         "script": {
-            "provider": config.script_provider,
-            "model": config.script_generator_model
-            if config.script_provider == "openai"
-            else config.qwen_script_model,
+            "provider": "openai",
+            "model": config.openai_script_model,
         },
         "translation": {
             "provider": config.translation_provider,

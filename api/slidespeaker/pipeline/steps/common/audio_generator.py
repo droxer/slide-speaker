@@ -70,16 +70,24 @@ async def generate_audio_common(
                     voice = voices[0] if voices else None
 
                     # Generate audio
+                    logger.info(
+                        f"Generating TTS for {file_prefix} {i + 1}: language={language}, voice={voice}"
+                    )
                     audio_path = audio_dir / f"{file_prefix}_{i + 1}.mp3"
-                    await audio_generator.generate_audio(
+                    ok = await audio_generator.generate_audio(
                         script_text, str(audio_path), language=language, voice=voice
                     )
 
-                    # Keep audio files local - only final files should be uploaded to cloud storage
-                    audio_files.append(str(audio_path))
-                    logger.info(
-                        f"Generated audio for {file_prefix} {i + 1}: {audio_path}"
-                    )
+                    if ok and audio_path.exists() and audio_path.stat().st_size > 0:
+                        # Keep audio files local - only final files should be uploaded to cloud storage
+                        audio_files.append(str(audio_path))
+                        logger.info(
+                            f"Generated audio for {file_prefix} {i + 1}: {audio_path}"
+                        )
+                    else:
+                        logger.error(
+                            f"Audio generation failed for {file_prefix} {i + 1}; skipping file"
+                        )
                 except Exception as e:
                     logger.error(
                         f"Failed to generate audio for {file_prefix} {i + 1}: {e}"

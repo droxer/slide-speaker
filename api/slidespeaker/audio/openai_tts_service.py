@@ -7,10 +7,10 @@ It supports multiple voices and languages through the OpenAI TTS models.
 
 from pathlib import Path
 
-import openai
 from loguru import logger
 
 from slidespeaker.configs.config import config
+from slidespeaker.llm import tts_speech_stream
 
 from .tts_interface import TTSInterface
 
@@ -24,7 +24,6 @@ class OpenAITTSService(TTSInterface):
         if not api_key:
             raise ValueError("OPENAI_API_KEY environment variable is not set")
 
-        self.client = openai.OpenAI(api_key=api_key)
         self.model = config.openai_tts_model
         self.default_voice = config.openai_tts_voice
 
@@ -61,10 +60,12 @@ class OpenAITTSService(TTSInterface):
         use_voice = voice or voice_mapping.get(language, self.default_voice)
 
         try:
-            response = self.client.audio.speech.create(
-                model=self.model,
-                voice=use_voice,
-                input=text.strip(),
+            logger.info(
+                f"TTS request: model={self.model}, voice={use_voice}, language={language}, "
+                f"text_len={len(text.strip())}"
+            )
+            stream = tts_speech_stream(
+                model=self.model, voice=use_voice, input_text=text.strip()
             )
 
             # Ensure output directory exists
@@ -72,13 +73,15 @@ class OpenAITTSService(TTSInterface):
 
             # Write response content to file
             with open(output_path, "wb") as f:
-                for chunk in response.iter_bytes():
+                for chunk in stream:
                     f.write(chunk)
 
             logger.info(f"Generated OpenAI TTS: {output_path}")
 
         except Exception as e:
-            logger.error(f"OpenAI TTS error: {e}")
+            logger.error(
+                f"OpenAI TTS error (model={self.model}, voice={use_voice}, language={language}): {e}"
+            )
             raise
 
     def is_available(self) -> bool:

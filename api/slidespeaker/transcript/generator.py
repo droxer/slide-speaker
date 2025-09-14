@@ -1,19 +1,17 @@
 """
 Transcript generation module for SlideSpeaker.
 
-Generates AI-powered presentation transcripts per slide using the configured
-provider (OpenAI or Qwen). Combines extracted slide content and visual
-analysis prompts to produce natural, engaging transcripts suitable for
-AI avatar presentation.
+Generates AI-powered presentation transcripts per slide using OpenAI. Combines
+extracted slide content and visual analysis prompts to produce natural, engaging
+transcripts suitable for AI avatar presentation.
 """
 
 from typing import Any
 
-import requests
 from loguru import logger
-from openai import OpenAI
 
 from slidespeaker.configs.config import config
+from slidespeaker.llm import chat_completion
 
 # Language-specific prompts for generating presentation transcripts
 TRANSCRIPT_PROMPTS = {
@@ -37,34 +35,17 @@ DEFAULT_TRANSCRIPTS: dict[str, list[str]] = {
 
 
 class TranscriptGenerator:
-    """Generator for AI-powered presentation transcripts (OpenAI or Qwen)"""
+    """Generator for AI-powered presentation transcripts (OpenAI only)"""
 
     def __init__(self) -> None:
-        """Initialize client based on configured provider."""
-        self.provider = config.script_provider
-        self.client: OpenAI | None = None
-        self.model: str = config.script_generator_model  # OpenAI model by default
-        self.qwen_api_key: str | None = None
-        self.qwen_model: str | None = None
-        if self.provider == "qwen":
-            self.qwen_api_key = config.qwen_api_key
-            self.qwen_model = config.qwen_script_model or "qwen-turbo"
-            if not self.qwen_api_key:
-                # Defer failure to call time to avoid import-time crashes
-                logger.error(
-                    "QWEN_API_KEY not set; Qwen transcript generation will fallback"
-                )
-        else:
-            api_key = config.openai_api_key
-            if api_key:
-                try:
-                    self.client = OpenAI(api_key=api_key)
-                except Exception as e:
-                    logger.error(f"Failed to initialize OpenAI client: {e}")
-            else:
-                logger.error(
-                    "OPENAI_API_KEY not set; OpenAI transcript generation will fallback"
-                )
+        """Initialize OpenAI client from configuration."""
+        # Force OpenAI usage; Qwen support removed for transcript generation
+        self.provider = "openai"
+        self.model: str = config.openai_script_model
+        if not config.openai_api_key:
+            logger.error(
+                "OPENAI_API_KEY not set; OpenAI transcript generation will fallback"
+            )
 
     async def generate_transcript(
         self,
@@ -92,21 +73,13 @@ class TranscriptGenerator:
                 f"{user_prompt}"
             )
 
-            if self.provider == "qwen":
-                content = self._generate_with_qwen(
-                    system_prompt, user_prompt, content_text, analysis_text
-                )
-            else:
-                if not self.client:
-                    raise RuntimeError("OpenAI client not configured")
-                resp = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_content},
-                    ],
-                )
-                content = resp.choices[0].message.content or ""
+            content = chat_completion(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_content},
+                ],
+            )
             transcript = content.strip()
             return transcript
         except Exception as e:
@@ -114,46 +87,3 @@ class TranscriptGenerator:
             # Fallback to a simple default transcript
             defaults = DEFAULT_TRANSCRIPTS.get(language, DEFAULT_TRANSCRIPTS["english"])
             return defaults[0]
-
-    def _generate_with_qwen(
-        self,
-        system_prompt: str,
-        user_prompt: str,
-        content_text: str,
-        analysis_text: str,
-    ) -> str:
-        if not self.qwen_api_key:
-            raise RuntimeError("Qwen API key not configured")
-        url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
-        headers = {
-            "Authorization": f"Bearer {self.qwen_api_key}",
-            "Content-Type": "application/json",
-        }
-        user_content = (
-            f"Slide content:\n{content_text}\n\n"
-            f"Image analysis (if any):\n{analysis_text}\n\n"
-            f"{user_prompt}"
-        )
-        payload = {
-            "model": self.qwen_model or "qwen-turbo",
-            "input": {
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_content},
-                ]
-            },
-            "parameters": {"result_format": "message"},
-        }
-        resp = requests.post(url, json=payload, headers=headers, timeout=60)
-        if resp.status_code != 200:
-            raise RuntimeError(f"Qwen HTTP {resp.status_code}: {resp.text[:200]}")
-        data = resp.json()
-        content = str(
-            ((data.get("output") or {}).get("choices") or [{}])[0]
-            .get("message", {})
-            .get("content", "")
-        )
-        if content:
-            return content
-        alt = str((data.get("output") or {}).get("text") or "")
-        return alt

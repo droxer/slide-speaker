@@ -14,6 +14,7 @@ from loguru import logger
 from openai import OpenAI
 
 from slidespeaker.configs.config import config
+from slidespeaker.llm import chat_completion
 
 # Prompt for slide image analysis optimized for script generation
 SLIDE_ANALYSIS_PROMPT = """
@@ -60,7 +61,8 @@ class VisionService:
         if not config.openai_api_key:
             logger.error("OPENAI_API_KEY not set; vision analysis will fallback")
         else:
-            self.client = OpenAI(api_key=config.openai_api_key)
+            # Client obtained via llm helpers; keep attribute unused for backward compat
+            self.client = None
 
     def _encode_image(self, image_path: Path) -> str:
         """Encode image to base64 for OpenAI API"""
@@ -97,7 +99,7 @@ Use this extracted text to enhance your analysis and ensure consistency between 
 
             assert self.client is not None
             model_name = config.vision_model
-            response = self.client.chat.completions.create(
+            analysis_text = chat_completion(
                 model=model_name,
                 messages=[
                     {"role": "system", "content": SLIDE_ANALYSIS_SYSTEM_PROMPT},
@@ -116,7 +118,7 @@ Use this extracted text to enhance your analysis and ensure consistency between 
                 ],
             )
 
-            analysis_text = response.choices[0].message.content or ""
+            analysis_text = analysis_text or ""
             if not analysis_text:
                 analysis_text = "No analysis content available"
 

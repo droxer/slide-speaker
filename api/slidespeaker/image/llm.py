@@ -1,6 +1,6 @@
 """LLM-based image generation module for SlideSpeaker.
 
-Generates presentation-style images using the configured provider (OpenAI or Qwen).
+Generates presentation-style images using OpenAI only.
 Supports detailed slide images without text based on title/description/key points.
 """
 
@@ -9,9 +9,9 @@ from typing import TYPE_CHECKING
 
 import requests
 from loguru import logger
-from openai import OpenAI
 
 from slidespeaker.configs.config import config
+from slidespeaker.llm import image_generate
 
 if TYPE_CHECKING:
     pass
@@ -66,26 +66,16 @@ SIMPLE_BACKGROUND_PROMPTS = {
 
 
 class LLMImageGenerator:
-    """Generator for presentation-style images using OpenAI or Qwen"""
+    """Generator for presentation-style images using OpenAI only"""
 
     def __init__(self) -> None:
         """Initialize the image generator with configured provider"""
-        self.provider = config.image_provider
-        self.openai_client: OpenAI | None = None
-        self.qwen_api_key: str | None = None
-        if self.provider == "qwen":
-            self.qwen_api_key = config.qwen_api_key
-            if not self.qwen_api_key:
-                raise ValueError(
-                    "QWEN_API_KEY environment variable is required for Qwen images"
-                )
-        else:
-            api_key = config.openai_api_key
-            if not api_key:
-                raise ValueError(
-                    "OPENAI_API_KEY environment variable is required for OpenAI images"
-                )
-            self.openai_client = OpenAI(api_key=api_key)
+        self.provider = "openai"
+        api_key = config.openai_api_key
+        if not api_key:
+            raise ValueError(
+                "OPENAI_API_KEY environment variable is required for OpenAI images"
+            )
 
     async def generate_slide_image(
         self,
@@ -142,70 +132,21 @@ Requirements:
 
             logger.info(f"Generating slide image with prompt: {prompt[:100]}...")
 
-            if self.provider == "qwen":
-                await self._generate_with_qwen(prompt, output_path)
-                logger.info(f"Slide image generated successfully (Qwen): {output_path}")
-                return True
-            else:
-                image_model = config.openai_image_model
-                assert self.openai_client is not None
-                response = self.openai_client.images.generate(
-                    model=image_model,
-                    prompt=prompt,
-                    size="1792x1024",
-                    n=1,
-                )
-
-                # Download and save the generated image
-                if response.data and len(response.data) > 0:
-                    image_url = response.data[0].url
-                    if image_url:
-                        await self._download_image(image_url, output_path)
-                        logger.info(
-                            f"Slide image generated successfully: {output_path}"
-                        )
-                        return True
-                    else:
-                        raise ValueError("No image URL returned from OpenAI image API")
-                else:
-                    raise ValueError("No image data returned from OpenAI image API")
+            image_model = config.openai_image_model
+            urls = image_generate(
+                prompt=prompt, model=image_model, size="1792x1024", n=1
+            )
+            if not urls:
+                raise ValueError("No image returned from OpenAI image API")
+            await self._download_image(urls[0], output_path)
+            logger.info(f"Slide image generated successfully: {output_path}")
+            return True
 
         except Exception as e:
             logger.error(f"DALL-E slide image generation error: {e}")
             raise
 
-    async def _generate_with_qwen(self, prompt: str, output_path: Path) -> None:
-        url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/image-generation/generation"
-        headers = {
-            "Authorization": f"Bearer {config.qwen_api_key}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": config.qwen_image_model,
-            "input": {"prompt": prompt},
-            "parameters": {"size": "1792x1024"},
-        }
-        resp = requests.post(url, json=payload, headers=headers, timeout=120)
-        if resp.status_code != 200:
-            raise ValueError(f"Qwen image HTTP {resp.status_code}: {resp.text[:200]}")
-        data = resp.json()
-        # Prefer URL when available
-        results = (data.get("output") or {}).get("results") or []
-        if results:
-            img_url = results[0].get("url")
-            if img_url:
-                await self._download_image(img_url, output_path)
-                return
-        # Fallback to base64 fields
-        b64_list = (data.get("output") or {}).get("b64_images") or []
-        if b64_list:
-            import base64
-
-            img_bytes = base64.b64decode(b64_list[0])
-            with open(output_path, "wb") as f:
-                f.write(img_bytes)
-            return
-        raise ValueError("Qwen image: no results in response")
+    # Qwen image generation removed
 
     async def _download_image(self, image_url: str, output_path: Path) -> None:
         """Download image from URL and save to output path."""

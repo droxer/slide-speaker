@@ -49,27 +49,21 @@ async def get_config_diagnostic() -> dict[str, object]:
         "models": {
             "script": {
                 "openai": getattr(config, "openai_script_model", None),
-                "qwen": getattr(config, "qwen_script_model", None),
             },
             "translation": {
                 "openai": getattr(config, "openai_translation_model", None),
-                "qwen": getattr(config, "qwen_translation_model", None),
             },
             "review": {
                 "openai": getattr(config, "openai_reviewer_model", None),
-                "qwen": getattr(config, "qwen_reviewer_model", None),
             },
             "vision": {
                 "openai": getattr(config, "openai_vision_model", None),
-                "qwen": getattr(config, "qwen_vision_model", None),
             },
             "image": {
                 "openai": getattr(config, "openai_image_model", None),
-                "qwen": getattr(config, "qwen_image_model", None),
             },
             "pdf_analyzer": {
                 "openai": getattr(config, "openai_pdf_analyzer_model", None),
-                "qwen": getattr(config, "qwen_pdf_analyzer_model", None),
             },
             "tts": {
                 "openai": {
@@ -88,7 +82,6 @@ async def get_config_diagnostic() -> dict[str, object]:
         },
         "keys_present": {
             "openai": bool(getattr(config, "openai_api_key", None)),
-            "qwen": bool(getattr(config, "qwen_api_key", None)),
             "elevenlabs": bool(getattr(config, "elevenlabs_api_key", None)),
             "heygen": bool(getattr(config, "heygen_api_key", None)),
         },

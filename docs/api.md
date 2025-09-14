@@ -377,7 +377,7 @@ You can customize the storage paths using environment variables:
 The API now supports multiple AI service providers. The system will automatically use available services based on configured API keys:
 
 ### Supported Services
-- **Script Generation**: OpenAI GPT models or Qwen
+- **Script Generation**: OpenAI GPT models
 - **Text-to-Speech**: OpenAI TTS, ElevenLabs, or local TTS
 - **Avatar Generation**: HeyGen for realistic avatars or DALL-E for custom AI-generated presenters
 

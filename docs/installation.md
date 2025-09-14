@@ -7,7 +7,7 @@
 - Redis server
 - FFmpeg
 - API keys for:
-  - OpenAI or Qwen (for transcript generation)
+  - OpenAI (for transcript generation)
   - ElevenLabs or OpenAI TTS (for audio generation)
   - HeyGen or DALL-E (for avatar generation)
 
@@ -31,7 +31,11 @@
    ```env
    # AI Service Keys (at least one from each category)
    OPENAI_API_KEY=your_openai_api_key
-   QWEN_API_KEY=your_qwen_api_key
+   OPENAI_BASE_URL=                  # Optional: set for OpenAI-compatible endpoints
+   OPENAI_TIMEOUT=60                 # Default request timeout (seconds)
+   OPENAI_RETRIES=3                  # Retry attempts for LLM/image/tts calls
+   OPENAI_BACKOFF=0.5                # Initial backoff seconds (exponential)
+   # Qwen has been removed; no QWEN_API_KEY required
    
    ELEVENLABS_API_KEY=your_elevenlabs_api_key
    
@@ -66,26 +70,19 @@
    PROXY_CLOUD_MEDIA=false
 
    # Provider selection (LLM/translation/tts)
-   SCRIPT_PROVIDER=openai           # Options: openai, qwen
+   SCRIPT_PROVIDER=openai           # Options: openai
    OPENAI_SCRIPT_MODEL=gpt-4o
-   TRANSLATION_PROVIDER=openai       # Options: openai, qwen
+   TRANSLATION_PROVIDER=openai       # Options: openai
    OPENAI_TRANSLATION_MODEL=gpt-4o-mini
-   # Qwen models by scenario
-   QWEN_SCRIPT_MODEL=qwen-turbo
-   QWEN_TRANSLATION_MODEL=qwen-turbo
-   QWEN_REVIEWER_MODEL=qwen-turbo
-   QWEN_VISION_MODEL=qwen-vl-plus
+   # Qwen removed: no QWEN_* models
    IMAGE_PROVIDER=openai
    OPENAI_IMAGE_MODEL=gpt-image-1
-   QWEN_IMAGE_MODEL=wanx-v1
 
    # TTS Configuration
-   TTS_SERVICE=openai               # Options: openai, elevenlabs, qwen
+   TTS_SERVICE=openai               # Options: openai, elevenlabs
    OPENAI_TTS_MODEL=tts-1
    OPENAI_TTS_VOICE=alloy
    ELEVENLABS_VOICE_ID=
-   QWEN_TTS_MODEL=cosyvoice
-   QWEN_TTS_VOICE=female
 
    # Reviewer and vision providers (override independently)
    REVIEW_PROVIDER=openai
@@ -95,7 +92,7 @@
    # PDF analyzer
    PDF_ANALYZER_PROVIDER=openai
    OPENAI_PDF_ANALYZER_MODEL=gpt-4o-mini
-   QWEN_PDF_ANALYZER_MODEL=qwen-turbo
+   # QWEN_PDF_ANALYZER_MODEL removed
    ```
 
 4. Start Redis:
@@ -268,33 +265,33 @@ Recent improvements include memory-efficient video composition to prevent hangin
 The application supports multiple AI service providers. You can configure which services to use:
 
 - **Transcript Generation:**
-- Provider: `SCRIPT_PROVIDER=openai|qwen`
+- Provider: `SCRIPT_PROVIDER=openai`
 - OpenAI: Set `OPENAI_API_KEY` and `SCRIPT_GENERATOR_MODEL`
-- Qwen: Set `QWEN_API_KEY` and `QWEN_SCRIPT_MODEL` (good for Chinese content)
+  Qwen removed: use `OPENAI_SCRIPT_MODEL`
 
 **Text-to-Speech:**
-- Provider: `TTS_SERVICE=openai|elevenlabs|qwen`
+- Provider: `TTS_SERVICE=openai|elevenlabs`
 - OpenAI TTS: Uses `OPENAI_API_KEY`, `OPENAI_TTS_MODEL`, `OPENAI_TTS_VOICE`
 - ElevenLabs: Set `ELEVENLABS_API_KEY` and optional `ELEVENLABS_VOICE_ID`
-- Qwen TTS (DashScope): Set `QWEN_API_KEY`, `QWEN_TTS_MODEL`, `QWEN_TTS_VOICE`
+  Qwen TTS removed
 
 - **Reviewer:**
-- Provider: `REVIEW_PROVIDER=openai|qwen`
+- Provider: `REVIEW_PROVIDER=openai`
 - OpenAI: Set `OPENAI_API_KEY`, `SCRIPT_REVIEWER_MODEL`
-- Qwen: Set `QWEN_API_KEY`, `QWEN_REVIEWER_MODEL`
+  Qwen reviewer removed
 
 **Vision:**
-- Provider: `VISION_PROVIDER=openai|qwen`
+- Provider: `VISION_PROVIDER=openai`
 - OpenAI: Set `OPENAI_API_KEY`, `OPENAI_VISION_MODEL`
-- Qwen: Set `QWEN_API_KEY`, `QWEN_VISION_MODEL`
+  Qwen vision removed
 
 **Avatar Generation / Images:**
 - HeyGen: Set `HEYGEN_API_KEY` for realistic AI presenters
 - OpenAI Images: Uses `OPENAI_API_KEY` with `OPENAI_IMAGE_MODEL`; set `IMAGE_PROVIDER=openai`
-- Qwen Images (DashScope): Set `QWEN_API_KEY`, `QWEN_IMAGE_MODEL`; set `IMAGE_PROVIDER=qwen`
+- Qwen Images removed; use `OPENAI_IMAGE_MODEL` with `IMAGE_PROVIDER=openai`
 
 ### TTS and LLM Catalog Endpoints
-- List TTS voices: `GET /api/tts/voices?language=english[&provider=openai|elevenlabs|qwen]`
+- List TTS voices: `GET /api/tts/voices?language=english[&provider=openai|elevenlabs]`
 - TTS catalog: `GET /api/tts/catalog[?provider=...]`
 - LLM models: `GET /api/llm/models`
 

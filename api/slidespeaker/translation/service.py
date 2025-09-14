@@ -3,9 +3,9 @@
 from typing import Any
 
 from loguru import logger
-from openai import OpenAI
 
 from slidespeaker.configs.config import config
+from slidespeaker.llm import chat_completion
 
 # Language mapping for translation
 LANGUAGE_CODES = {
@@ -46,13 +46,6 @@ class TranslationService:
     def __init__(self) -> None:
         # Use OpenAI exclusively for translation in this module
         self.provider: str = "openai"
-        self.client: OpenAI | None = None
-        api_key = config.openai_api_key
-        if api_key:
-            try:
-                self.client = OpenAI(api_key=api_key)
-            except Exception as e:
-                logger.error(f"Failed to initialize OpenAI client: {e}")
 
     def translate(
         self,
@@ -77,19 +70,13 @@ class TranslationService:
             text_blocks = [s.get("script", "").strip() for s in scripts]
             joined = "\n\n".join(text_blocks)
 
-            if not self.client:
-                logger.warning(
-                    "Translation client not initialized; returning originals"
-                )
-                return scripts
-            response = self.client.chat.completions.create(
+            translated_content = chat_completion(
                 model=config.translation_model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": f"{user_prompt}\n\n{joined}"},
                 ],
             )
-            translated_content = response.choices[0].message.content or ""
             if not translated_content.strip():
                 return scripts
 

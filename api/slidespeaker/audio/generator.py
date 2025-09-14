@@ -40,7 +40,7 @@ class AudioGenerator:
             await self.tts_service.generate_speech(
                 text, output_path_obj, language, voice
             )
-            if output_path_obj.exists():
+            if output_path_obj.exists() and output_path_obj.stat().st_size > 0:
                 file_size = output_path_obj.stat().st_size
                 print(f"Generated audio file: {output_path_obj} ({file_size} bytes)")
                 duration = self._get_audio_duration(output_path_obj)
@@ -54,9 +54,12 @@ class AudioGenerator:
                             print(
                                 f"Warning: Unusual speech rate detected ({wpm:.0f} WPM)"
                             )
+                return True
             else:
-                print(f"Warning: Audio file was not created at {output_path_obj}")
-            return True
+                print(
+                    f"Warning: Audio file was not created or is empty at {output_path_obj}"
+                )
+                return False
         except Exception as e:
             print(f"Error generating audio: {e}")
             return False

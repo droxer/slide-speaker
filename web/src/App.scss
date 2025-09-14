@@ -1030,7 +1030,7 @@ body:not(.ultra-flat) .app-footer {
 /* Processing meta header */
 .processing-meta {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   margin: 8px 0 10px;
 }
@@ -1048,11 +1048,12 @@ body:not(.ultra-flat) .app-footer {
 .processing-meta .meta-card .meta-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
+  flex: 1 1 auto; /* allow title area to grow and shrink */
 }
 
-.processing-meta .meta-icon { font-size: 1rem; }
+.processing-meta .meta-icon { font-size: 1rem; flex: 0 0 auto; }
 .processing-meta .meta-label { color: #475569; font-weight: 700; font-size: 0.85rem; }
 .processing-meta .meta-text {
   color: #0f172a;
@@ -1061,9 +1062,12 @@ body:not(.ultra-flat) .app-footer {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;       /* enable truncation within flex */
+  flex: 1 1 auto;     /* take remaining space next to icon */
 }
 
-.processing-meta .meta-badge { flex-shrink: 0; }
+.processing-meta .meta-badge { flex-shrink: 0; margin-left: 10px; display: flex; align-items: center; }
+.processing-meta .file-type-badge { line-height: 1; }
 .processing-meta .meta-actions { display: flex; align-items: center; gap: 10px; }
 .processing-meta .meta-code {
   font-family: 'Open Sans', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
@@ -2363,7 +2367,7 @@ body:not(.ultra-flat) .app-footer {
 }
 .processing-meta {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
   margin: 8px 0 10px;
 }
@@ -2381,11 +2385,12 @@ body:not(.ultra-flat) .app-footer {
 .processing-meta .meta-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
+  flex: 1 1 auto; /* allow title area to grow and shrink */
 }
 
-.processing-meta .meta-icon { font-size: 1rem; }
+.processing-meta .meta-icon { font-size: 1rem; flex: 0 0 auto; }
 .processing-meta .meta-label { color: #475569; font-weight: 700; font-size: 0.85rem; }
 .processing-meta .meta-text {
   color: #0f172a;
@@ -2394,9 +2399,11 @@ body:not(.ultra-flat) .app-footer {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;       /* enable truncation within flex */
+  flex: 1 1 auto;     /* take remaining space next to icon */
 }
 
-.processing-meta .meta-badge { flex-shrink: 0; }
+.processing-meta .meta-badge { flex-shrink: 0; margin-left: 10px; }
 .processing-meta .meta-actions { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .processing-meta .meta-code {
   font-family: 'Open Sans', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;

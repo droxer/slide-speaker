@@ -9,10 +9,10 @@ for presentation generation.
 from typing import Any
 
 from loguru import logger
-from openai import OpenAI
 from PyPDF2 import PdfReader
 
 from slidespeaker.configs.config import config
+from slidespeaker.llm import chat_completion
 
 # Import the shared transcript generator
 from slidespeaker.transcript import TranscriptGenerator
@@ -230,12 +230,9 @@ class PDFAnalyzer:
     def __init__(self) -> None:
         """Initialize the PDF analyzer with configured provider"""
         # Use OpenAI exclusively for PDF analysis in this module
-        self.client: OpenAI | None = None
         self.model: str = config.pdf_analyzer_model
-        api_key = config.openai_api_key
-        if not api_key:
+        if not config.openai_api_key:
             raise ValueError("OPENAI_API_KEY environment variable is required")
-        self.client = OpenAI(api_key=api_key)
         self.model = config.pdf_analyzer_model
         self.transcript_generator = TranscriptGenerator()
 
@@ -323,8 +320,7 @@ class PDFAnalyzer:
                 max_num_of_segments=max_num_of_segments,
             )
 
-            assert self.client is not None
-            response = self.client.chat.completions.create(
+            content = chat_completion(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": prompts["system"]},
@@ -332,7 +328,6 @@ class PDFAnalyzer:
                 ],
             )
             # Parse the response
-            content = response.choices[0].message.content or ""
             if content:
                 import json
 

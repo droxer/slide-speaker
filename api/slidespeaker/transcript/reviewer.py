@@ -1,17 +1,16 @@
 """Module for reviewing and refining presentation transcripts.
 
-This module uses AI language models to review and improve generated presentation transcripts
+This module uses OpenAI to review and improve generated presentation transcripts
 for consistency, flow, and quality. It ensures appropriate formatting for AI avatar delivery
 and handles proper positioning of opening/closing statements.
 """
 
 from typing import Any
 
-import requests
 from loguru import logger
-from openai import OpenAI
 
 from slidespeaker.configs.config import config
+from slidespeaker.llm import chat_completion
 
 # Language-specific review prompts
 REVIEW_PROMPTS = {
@@ -31,33 +30,15 @@ INSTRUCTION_PROMPTS = {
 
 
 class TranscriptReviewer:
-    """Reviewer for AI-generated presentation transcripts (OpenAI or Qwen)"""
+    """Reviewer for AI-generated presentation transcripts (OpenAI only)"""
 
     def __init__(self) -> None:
-        """Initialize reviewer based on configured provider"""
-        self.provider = config.review_provider
-        self.client: OpenAI | None = None
-        self.model: str = config.script_reviewer_model
-        self.qwen_api_key: str | None = None
-        self.qwen_model: str | None = None
-        if self.provider == "qwen":
-            self.qwen_api_key = config.qwen_api_key
-            self.qwen_model = config.qwen_reviewer_model or "qwen-turbo"
-            if not self.qwen_api_key:
-                logger.error(
-                    "QWEN_API_KEY not set; Qwen reviewer will fallback to original text"
-                )
-        else:
-            api_key = config.openai_api_key
-            if api_key:
-                try:
-                    self.client = OpenAI(api_key=api_key)
-                except Exception as e:
-                    logger.error(f"Failed to initialize OpenAI client: {e}")
-            else:
-                logger.error(
-                    "OPENAI_API_KEY not set; reviewer will fallback to originals"
-                )
+        """Initialize OpenAI reviewer"""
+        # Force OpenAI usage; Qwen support removed for transcript review
+        self.provider = "openai"
+        self.model: str = config.openai_reviewer_model
+        if not config.openai_api_key:
+            logger.error("OPENAI_API_KEY not set; reviewer will fallback to originals")
 
     async def revise_transcripts(
         self, transcripts: list[dict[str, Any]], language: str = "english"
@@ -76,24 +57,13 @@ class TranscriptReviewer:
         content = "\n\n".join([t.get("script", "") for t in transcripts])
 
         try:
-            if self.provider == "qwen":
-                reviewed_content = self._review_with_qwen(
-                    system_prompt, instruction_prompt, content
-                )
-            else:
-                if not self.client:
-                    raise RuntimeError("OpenAI client not configured")
-                resp = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {
-                            "role": "user",
-                            "content": instruction_prompt + "\n\n" + content,
-                        },
-                    ],
-                )
-                reviewed_content = resp.choices[0].message.content or ""
+            reviewed_content = chat_completion(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": instruction_prompt + "\n\n" + content},
+                ],
+            )
         except Exception as e:
             logger.error(f"Transcript review failed: {e}")
             # If the model call fails, return original transcripts
@@ -130,40 +100,4 @@ class TranscriptReviewer:
                 result.append(transcripts[i])
         return result
 
-    def _review_with_qwen(
-        self, system_prompt: str, instruction_prompt: str, content: str
-    ) -> str:
-        if not self.qwen_api_key:
-            raise RuntimeError("Qwen API key not configured")
-        url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation"
-        headers = {
-            "Authorization": f"Bearer {self.qwen_api_key}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "model": self.qwen_model or "qwen-turbo",
-            "input": {
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {
-                        "role": "user",
-                        "content": instruction_prompt + "\n\n" + content,
-                    },
-                ]
-            },
-            "parameters": {"result_format": "message"},
-        }
-        resp = requests.post(url, json=payload, headers=headers, timeout=60)
-        if resp.status_code != 200:
-            raise RuntimeError(
-                f"Qwen review HTTP {resp.status_code}: {resp.text[:200]}"
-            )
-        data = resp.json()
-        text = str(
-            ((data.get("output") or {}).get("choices") or [{}])[0]
-            .get("message", {})
-            .get("content", "")
-        )
-        if text:
-            return text
-        return str((data.get("output") or {}).get("text") or "")
+    # Qwen review support removed

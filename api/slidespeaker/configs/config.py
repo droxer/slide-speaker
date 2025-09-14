@@ -50,52 +50,55 @@ class Config:
 
         # API keys and providers
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
+        # Optional base URL for OpenAI-compatible services
+        self.openai_base_url = os.getenv("OPENAI_BASE_URL") or os.getenv(
+            "OPENAI_API_BASE"
+        )
+        # OpenAI request tuning
+        self.openai_timeout = float(os.getenv("OPENAI_TIMEOUT", "60"))
+        self.openai_retries = int(os.getenv("OPENAI_RETRIES", "3"))
+        self.openai_backoff = float(os.getenv("OPENAI_BACKOFF", "0.5"))
         self.openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
-        # Vision providers/models
-        self.vision_provider = os.getenv("VISION_PROVIDER", "openai").lower()
+        # Vision providers/models (clamped to OpenAI)
+        self.vision_provider = "openai"
         self.openai_vision_model = os.getenv(
             "OPENAI_VISION_MODEL", os.getenv("VISION_MODEL", "gpt-4o-mini")
         )
         self.vision_model = self.openai_vision_model
 
-        # Reviewer
-        self.review_provider = os.getenv("REVIEW_PROVIDER", "openai").lower()
+        # Reviewer (OpenAI only)
+        self.review_provider = "openai"
         self.openai_reviewer_model = os.getenv(
             "OPENAI_REVIEW_MODEL", os.getenv("SCRIPT_REVIEWER_MODEL", "gpt-4o-mini")
         )
         self.script_reviewer_model = self.openai_reviewer_model
 
-        # Script generation
-        self.script_provider = os.getenv("SCRIPT_PROVIDER", "openai").lower()
+        # Script generation (OpenAI only)
+        self.script_provider = "openai"
         self.openai_script_model = os.getenv(
             "OPENAI_SCRIPT_MODEL", os.getenv("SCRIPT_GENERATOR_MODEL", "gpt-4o-mini")
         )
         self.script_generator_model = self.openai_script_model
 
-        # PDF analyzer
-        self.pdf_analyzer_provider = os.getenv(
-            "PDF_ANALYZER_PROVIDER", "openai"
-        ).lower()
+        # PDF analyzer (OpenAI only)
+        self.pdf_analyzer_provider = "openai"
         self.openai_pdf_analyzer_model = os.getenv(
             "OPENAI_PDF_ANALYZER_MODEL", "gpt-4o-mini"
         )
         self.pdf_analyzer_model = self.openai_pdf_analyzer_model
 
-        # Translation
-        self.translation_provider = os.getenv("TRANSLATION_PROVIDER", "openai").lower()
+        # Translation (OpenAI only)
+        self.translation_provider = "openai"
         self.openai_translation_model = os.getenv(
             "OPENAI_TRANSLATION_MODEL", "gpt-4o-mini"
         )
         self.translation_model = self.openai_translation_model
 
-        # Qwen models/keys (kept for features still supported elsewhere)
-        self.qwen_api_key = os.getenv("QWEN_API_KEY")
-        self.qwen_script_model = os.getenv("QWEN_SCRIPT_MODEL", "qwen-turbo")
-        self.qwen_reviewer_model = os.getenv("QWEN_REVIEWER_MODEL", "qwen-turbo")
-
-        # TTS
+        # TTS (clamp to supported set)
         self.tts_service = os.getenv("TTS_SERVICE", "openai").lower()
+        if self.tts_service not in {"openai", "elevenlabs"}:
+            self.tts_service = "openai"
         self.openai_tts_model = os.getenv("OPENAI_TTS_MODEL", "tts-1")
         self.openai_tts_voice = os.getenv("OPENAI_TTS_VOICE", "alloy")
         self.elevenlabs_api_key = os.getenv("ELEVENLABS_API_KEY")
@@ -104,11 +107,10 @@ class Config:
         # Images
         self.avatar_service = os.getenv("AVATAR_SERVICE", "heygen").lower()
         self.heygen_api_key = os.getenv("HEYGEN_API_KEY")
-        self.image_provider = os.getenv("IMAGE_PROVIDER", "openai").lower()
+        self.image_provider = "openai"
         self.openai_image_model = os.getenv(
             "OPENAI_IMAGE_MODEL", os.getenv("IMAGE_GENERATION_MODEL", "gpt-image-1")
         )
-        self.qwen_image_model = os.getenv("QWEN_IMAGE_MODEL", "wanx-v1")
         self.image_generation_model = self.openai_image_model
         self.slide_image_provider = os.getenv("SLIDE_IMAGE_PROVIDER", "PIL")
 
