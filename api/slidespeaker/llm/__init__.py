@@ -1,19 +1,9 @@
 """
-LLM package providing centralized client initialization and helpers.
+LLM package exposing a provider-agnostic facade.
 
-Currently supports OpenAI-compatible clients with optional base_url.
+Backed by OpenAI today, with extension points for other vendors.
 """
 
-from .client import (
-    chat_completion,
-    get_openai_client,
-    image_generate,
-    tts_speech_stream,
-)
+from .provider import chat_completion, get_llm, image_generate, tts_speech_stream
 
-__all__ = [
-    "get_openai_client",
-    "chat_completion",
-    "image_generate",
-    "tts_speech_stream",
-]
+__all__ = ["get_llm", "chat_completion", "image_generate", "tts_speech_stream"]

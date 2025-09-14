@@ -35,6 +35,7 @@
    OPENAI_TIMEOUT=60                 # Default request timeout (seconds)
    OPENAI_RETRIES=3                  # Retry attempts for LLM/image/tts calls
    OPENAI_BACKOFF=0.5                # Initial backoff seconds (exponential)
+   LLM_PROVIDER=openai               # LLM provider (openai; google in future)
    # Qwen has been removed; no QWEN_API_KEY required
    
    ELEVENLABS_API_KEY=your_elevenlabs_api_key

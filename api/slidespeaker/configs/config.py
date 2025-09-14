@@ -54,6 +54,8 @@ class Config:
         self.openai_base_url = os.getenv("OPENAI_BASE_URL") or os.getenv(
             "OPENAI_API_BASE"
         )
+        # LLM provider (pluggable; default openai)
+        self.llm_provider = os.getenv("LLM_PROVIDER", "openai").lower()
         # OpenAI request tuning
         self.openai_timeout = float(os.getenv("OPENAI_TIMEOUT", "60"))
         self.openai_retries = int(os.getenv("OPENAI_RETRIES", "3"))
