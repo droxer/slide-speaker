@@ -107,6 +107,18 @@ GET /api/tasks/{task_id}/transcripts/markdown
 
 Presigned URL variants are available where supported via `/url` suffixes.
 
+### Preview Metadata (Task-based)
+
+Get preview information for a completed task, including a playable video URL and available subtitle tracks.
+
+```
+GET /api/tasks/{task_id}/preview
+HEAD /api/tasks/{task_id}/preview
+OPTIONS /api/tasks/{task_id}/preview
+```
+
+Note: The legacy file-based endpoint `GET /api/preview/{file_id}` is deprecated. Use the task-based endpoint instead.
+
 ## Task Monitoring Endpoints
 
 ### List All Tasks
@@ -307,22 +319,9 @@ The API provides detailed error information in the progress endpoint under the `
 
 ## Additional Endpoints
 
-### Legacy Endpoints (Compatibility)
+### Legacy Endpoints
 
-The backend continues to serve legacy file-based routes for backward compatibility, but new integrations should use task-based endpoints:
-
-```
-GET /api/video/{file_id}
-GET /api/video/{file_id}/url
-GET /api/audio/{file_id}
-GET /api/audio/{file_id}/tracks
-GET /api/subtitles/{file_id}/srt
-GET /api/subtitles/{file_id}/vtt
-GET /api/subtitles/{file_id}/{lang}/srt/url
-GET /api/subtitles/{file_id}/{lang}/vtt/url
-```
-
-Note: Frontend uses only task-based endpoints.
+Legacy file-based endpoints have been removed and return HTTP 410 Gone. Use task-based endpoints exclusively.
 
 ### Get Supported Languages
 
@@ -378,7 +377,7 @@ You can customize the storage paths using environment variables:
 The API now supports multiple AI service providers. The system will automatically use available services based on configured API keys:
 
 ### Supported Services
-- **Script Generation**: OpenAI GPT models or Qwen
+- **Script Generation**: OpenAI GPT models
 - **Text-to-Speech**: OpenAI TTS, ElevenLabs, or local TTS
 - **Avatar Generation**: HeyGen for realistic avatars or DALL-E for custom AI-generated presenters
 

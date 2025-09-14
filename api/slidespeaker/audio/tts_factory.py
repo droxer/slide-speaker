@@ -7,7 +7,7 @@ instances. It supports multiple TTS providers (OpenAI, ElevenLabs) and handles
 service availability checking and configuration validation.
 """
 
-import os
+from slidespeaker.configs.config import config
 
 from .elevenlabs_tts_service import ElevenLabsTTSService
 from .openai_tts_service import OpenAITTSService
@@ -37,7 +37,7 @@ class TTSFactory:
             ValueError: If service name is invalid or service is not available
         """
         if service_name is None:
-            service_name = os.getenv("TTS_SERVICE", "openai").lower()
+            service_name = config.tts_service
 
         if service_name not in cls._services:
             raise ValueError(

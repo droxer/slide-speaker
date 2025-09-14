@@ -10,6 +10,7 @@ from pathlib import Path
 
 from loguru import logger
 
+from slidespeaker.configs.config import config
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 
@@ -44,10 +45,19 @@ def _get_processing_steps(
     steps_order = [
         "extract_slides",
         "convert_slides_to_images",
-        "analyze_slide_images",
-        "generate_transcripts",  # Generate English transcripts first
-        "revise_transcripts",  # Revise English transcripts first
     ]
+
+    # Optionally include slide image analysis based on env flag
+    if config.enable_visual_analysis:
+        steps_order.append("analyze_slide_images")
+
+    # Core transcript generation steps
+    steps_order.extend(
+        [
+            "generate_transcripts",  # Generate English transcripts first
+            "revise_transcripts",  # Revise English transcripts first
+        ]
+    )
 
     # Add translation steps, dedupe when voice/subtitle languages match
     add_voice = voice_language.lower() != "english"
@@ -137,13 +147,12 @@ async def _execute_step(
     # Get fresh state
     state = await state_manager.get_state(file_id)
 
-    # Get subtitle language from state
+    # Get subtitle language from state (do not default to voice language)
     subtitle_language = None
     if state and "subtitle_language" in state:
         subtitle_language = state["subtitle_language"]
-    # Default to audio language if subtitle language not specified
-    if subtitle_language is None:
-        subtitle_language = voice_language
+    # Compute effective subtitle language for steps requiring a concrete value
+    effective_subtitle_language = subtitle_language or "english"
 
     # Skip completed steps
     if state and state["steps"][step_name]["status"] == "completed":
@@ -182,7 +191,7 @@ async def _execute_step(
                 await generate_transcripts_step(file_id, "english")
             elif step_name == "generate_subtitle_transcripts":
                 await generate_transcripts_step(
-                    file_id, subtitle_language, is_subtitle=True
+                    file_id, effective_subtitle_language, is_subtitle=True
                 )
             elif step_name == "revise_transcripts":
                 # Always revise English transcripts first
@@ -197,7 +206,7 @@ async def _execute_step(
                 await translate_subtitle_transcripts_step(
                     file_id,
                     source_language="english",
-                    target_language=(subtitle_language or voice_language),
+                    target_language=(subtitle_language or "english"),
                 )
             elif step_name == "generate_audio":
                 # Use translated transcripts if available, otherwise use English transcripts
@@ -206,7 +215,7 @@ async def _execute_step(
             elif step_name == "generate_avatar_videos":
                 await generate_avatar_step(file_id)
             elif step_name == "generate_subtitles":
-                await generate_subtitles_step(file_id, subtitle_language)
+                await generate_subtitles_step(file_id, effective_subtitle_language)
             elif step_name == "convert_slides_to_images":
                 await convert_slides_step(file_id, file_path, file_ext)
             elif step_name == "compose_video":

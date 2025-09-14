@@ -1,16 +1,17 @@
 """
 Transcript generation module for SlideSpeaker.
 
-This module generates AI-powered presentation transcripts for each slide using OpenAI's GPT models.
-It combines extracted slide content and visual analysis prompts to produce
-engaging, natural-sounding transcripts suitable for AI avatar presentation.
+Generates AI-powered presentation transcripts per slide using OpenAI. Combines
+extracted slide content and visual analysis prompts to produce natural, engaging
+transcripts suitable for AI avatar presentation.
 """
 
-import os
 from typing import Any
 
 from loguru import logger
-from openai import OpenAI
+
+from slidespeaker.configs.config import config
+from slidespeaker.llm import chat_completion
 
 # Language-specific prompts for generating presentation transcripts
 TRANSCRIPT_PROMPTS = {
@@ -34,16 +35,17 @@ DEFAULT_TRANSCRIPTS: dict[str, list[str]] = {
 
 
 class TranscriptGenerator:
-    """Generator for AI-powered presentation transcripts using OpenAI GPT models"""
+    """Generator for AI-powered presentation transcripts (OpenAI only)"""
 
     def __init__(self) -> None:
-        """Initialize the transcript generator with OpenAI client"""
-        # Get API key from environment (this is a special case that's not in config)
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is required")
-        self.client = OpenAI(api_key=api_key)
-        self.model: str = os.getenv("SCRIPT_GENERATOR_MODEL", "gpt-4o-mini")
+        """Initialize OpenAI client from configuration."""
+        # Force OpenAI usage; Qwen support removed for transcript generation
+        self.provider = "openai"
+        self.model: str = config.openai_script_model
+        if not config.openai_api_key:
+            logger.error(
+                "OPENAI_API_KEY not set; OpenAI transcript generation will fallback"
+            )
 
     async def generate_transcript(
         self,
@@ -51,11 +53,7 @@ class TranscriptGenerator:
         image_analysis: Any | None = None,
         language: str = "english",
     ) -> str:
-        """Generate a presentation transcript for a slide using AI.
-
-        This method creates a natural, engaging transcript suitable for AI avatar presentation
-        based on analyzed slide content and any available image analysis.
-        """
+        """Generate a presentation transcript for one slide using the configured provider."""
         try:
             system_prompt = SYSTEM_ROLES.get(language, SYSTEM_ROLES["english"])
             user_prompt = TRANSCRIPT_PROMPTS.get(
@@ -75,15 +73,15 @@ class TranscriptGenerator:
                 f"{user_prompt}"
             )
 
-            resp = self.client.chat.completions.create(
+            content = chat_completion(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_content},
                 ],
             )
-            transcript = resp.choices[0].message.content or ""
-            return transcript.strip()
+            transcript = content.strip()
+            return transcript
         except Exception as e:
             logger.error(f"Transcript generation failed: {e}")
             # Fallback to a simple default transcript

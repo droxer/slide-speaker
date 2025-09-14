@@ -35,7 +35,7 @@ class OSSStorage(StorageProvider):
         access_key_id: str,
         access_key_secret: str,
         region: str | None = None,
-        internal_endpoint: bool = False,
+        is_cname: bool = False,
     ):
         """Initialize Aliyun OSS storage.
 
@@ -55,11 +55,14 @@ class OSSStorage(StorageProvider):
         self.bucket_name = bucket_name
         self.endpoint = endpoint
         self.region = region or self._extract_region_from_endpoint(endpoint)
-        self.internal_endpoint = internal_endpoint
+        self.is_cname = is_cname
 
         # Initialize OSS client
         self.auth = oss2.Auth(access_key_id, access_key_secret)
-        self.bucket = oss2.Bucket(self.auth, f"https://{endpoint}", bucket_name)
+        # If using a custom CNAME domain for the bucket, pass is_cname=True
+        self.bucket = oss2.Bucket(
+            self.auth, f"https://{endpoint}", bucket_name, is_cname=self.is_cname
+        )
 
         # Verify bucket exists and is accessible
         self._verify_bucket_access()
@@ -99,6 +102,16 @@ class OSSStorage(StorageProvider):
             headers = {}
             if content_type:
                 headers["Content-Type"] = content_type
+            # Encourage inline rendering by default for common types
+            lower_key = object_key.lower()
+            if lower_key.endswith(
+                (".mp4", ".mp3", ".vtt", ".srt", ".md", ".png", ".jpg", ".jpeg")
+            ):
+                from pathlib import Path as _Path
+
+                headers["Content-Disposition"] = (
+                    f"inline; filename={_Path(object_key).name}"
+                )
 
             self.bucket.put_object_from_file(
                 object_key, str(file_path), headers=headers
@@ -121,20 +134,65 @@ class OSSStorage(StorageProvider):
             logger.error(f"Failed to download file from OSS: {e}")
             raise
 
-    def get_file_url(self, object_key: str, expires_in: int = 3600) -> str:
-        """Generate a signed URL for OSS object with proper CORS support."""
-        try:
-            # Generate presigned URL for temporary access
-            # Use the bucket's sign_url method which creates a proper OSS presigned URL
-            url: str = self.bucket.sign_url("GET", object_key, expires_in)
+    def get_file_url(
+        self,
+        object_key: str,
+        expires_in: int = 3600,
+        content_disposition: str | None = None,
+        content_type: str | None = None,
+    ) -> str:
+        """Generate a signed URL for OSS object with inline disposition.
 
-            # Log the generated URL for debugging
+        Adds response headers to encourage inline playback for media and to set
+        accurate content types for browsers. CORS must still be configured at
+        the bucket for cross-origin access.
+        """
+        try:
+            # Infer content-type from file extension when not provided
+            ct = content_type
+            key_lower = object_key.lower()
+            if ct is None and key_lower.endswith(".mp4"):
+                ct = "video/mp4"
+            elif ct is None and key_lower.endswith(".mp3"):
+                ct = "audio/mpeg"
+            elif ct is None and key_lower.endswith(".vtt"):
+                ct = "text/vtt"
+            elif ct is None and key_lower.endswith(".srt"):
+                ct = "text/plain"
+            elif ct is None and key_lower.endswith(".md"):
+                ct = "text/markdown"
+            elif ct is None and key_lower.endswith(".png"):
+                ct = "image/png"
+            elif ct is None and (
+                key_lower.endswith(".jpg") or key_lower.endswith(".jpeg")
+            ):
+                ct = "image/jpeg"
+
+            # Build response override params when requested
+            params = None
+            if content_disposition or (ct and not key_lower.endswith(".mp4")):
+                params = {}
+                if content_disposition:
+                    params["response-content-disposition"] = content_disposition
+                elif not key_lower.endswith(".mp4"):
+                    # Default to inline for non-mp4 when not specified
+                    filename = Path(object_key).name
+                    params["response-content-disposition"] = (
+                        f"inline; filename={filename}"
+                    )
+                if ct:
+                    params["response-content-type"] = ct
+
+            url: str = (
+                self.bucket.sign_url("GET", object_key, expires_in, params=params)
+                if params is not None
+                else self.bucket.sign_url("GET", object_key, expires_in)
+            )
+
             logger.debug(
                 f"Generated OSS presigned URL for {object_key}: {url[:100]}..."
             )
-
             return url
-
         except OssError as e:
             logger.error(f"Failed to generate signed URL for {object_key}: {e}")
             raise
@@ -167,6 +225,16 @@ class OSSStorage(StorageProvider):
             headers = {}
             if content_type:
                 headers["Content-Type"] = content_type
+            # Encourage inline rendering by default for text/media
+            lower_key = object_key.lower()
+            if lower_key.endswith(
+                (".mp4", ".mp3", ".vtt", ".srt", ".md", ".png", ".jpg", ".jpeg")
+            ):
+                from pathlib import Path as _Path
+
+                headers["Content-Disposition"] = (
+                    f"inline; filename={_Path(object_key).name}"
+                )
 
             self.bucket.put_object(object_key, data, headers=headers)
 

@@ -1,16 +1,17 @@
 """LLM-based image generation module for SlideSpeaker.
 
-This module generates presentation-style images using DALL-E based on slide content.
-It can create both detailed presentation slides and simple background images.
+Generates presentation-style images using OpenAI only.
+Supports detailed slide images without text based on title/description/key points.
 """
 
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import requests
 from loguru import logger
-from openai import OpenAI
+
+from slidespeaker.configs.config import config
+from slidespeaker.llm import image_generate
 
 if TYPE_CHECKING:
     pass
@@ -65,15 +66,16 @@ SIMPLE_BACKGROUND_PROMPTS = {
 
 
 class LLMImageGenerator:
-    """Generator for presentation-style images using DALL-E"""
+    """Generator for presentation-style images using OpenAI only"""
 
     def __init__(self) -> None:
-        """Initialize the image generator with OpenAI client"""
-        # Get API key from environment (this is a special case that's not in config)
-        api_key = os.getenv("OPENAI_API_KEY")
+        """Initialize the image generator with configured provider"""
+        self.provider = "openai"
+        api_key = config.openai_api_key
         if not api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is required")
-        self.openai_client = OpenAI(api_key=api_key)
+            raise ValueError(
+                "OPENAI_API_KEY environment variable is required for OpenAI images"
+            )
 
     async def generate_slide_image(
         self,
@@ -130,29 +132,21 @@ Requirements:
 
             logger.info(f"Generating slide image with prompt: {prompt[:100]}...")
 
-            image_model = os.getenv("IMAGE_GENERATION_MODEL", "dall-e-3")
-            response = self.openai_client.images.generate(
-                model=image_model,
-                prompt=prompt,
-                size="1792x1024",
-                n=1,
+            image_model = config.openai_image_model
+            urls = image_generate(
+                prompt=prompt, model=image_model, size="1792x1024", n=1
             )
-
-            # Download and save the generated image
-            if response.data and len(response.data) > 0:
-                image_url = response.data[0].url
-                if image_url:
-                    await self._download_image(image_url, output_path)
-                    logger.info(f"Slide image generated successfully: {output_path}")
-                    return True
-                else:
-                    raise ValueError("No image URL returned from DALL-E")
-            else:
-                raise ValueError("No image data returned from DALL-E")
+            if not urls:
+                raise ValueError("No image returned from OpenAI image API")
+            await self._download_image(urls[0], output_path)
+            logger.info(f"Slide image generated successfully: {output_path}")
+            return True
 
         except Exception as e:
             logger.error(f"DALL-E slide image generation error: {e}")
             raise
+
+    # Qwen image generation removed
 
     async def _download_image(self, image_url: str, output_path: Path) -> None:
         """Download image from URL and save to output path."""

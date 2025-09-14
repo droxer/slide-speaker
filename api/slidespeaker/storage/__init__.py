@@ -40,7 +40,13 @@ class StorageProvider(ABC):
         pass
 
     @abstractmethod
-    def get_file_url(self, object_key: str, expires_in: int = 3600) -> str:
+    def get_file_url(
+        self,
+        object_key: str,
+        expires_in: int = 3600,
+        content_disposition: str | None = None,
+        content_type: str | None = None,
+    ) -> str:
         """Get a presigned URL for accessing a file.
 
         Args:

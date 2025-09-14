@@ -38,7 +38,7 @@ async def accept_task(
     # subtitle_language remains as provided (could be None)
 
     # Normalize languages early for consistent downstream behavior
-    from slidespeaker.utils.locales import locale_utils
+    from slidespeaker.configs.locales import locale_utils
 
     voice_language = locale_utils.normalize_language(voice_language)
     subtitle_language = (

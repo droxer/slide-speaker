@@ -1,10 +1,11 @@
 """Unified image generation (image package)."""
 
-import os
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
+
+from slidespeaker.configs.config import config
 
 from .llm import LLMImageGenerator
 from .pil import PILImageGenerator
@@ -18,7 +19,7 @@ class ImageGenerator:
     async def generate_images(
         self, chapters: list[dict[str, Any]], output_dir: Path
     ) -> list[Path]:
-        if os.getenv("SLIDE_IMAGE_PROVIDER") == "llm":
+        if config.slide_image_provider.lower() == "llm":
             return await self._generate_slide_images_by_llm(chapters, output_dir)
         else:
             return await self._generate_slide_images_by_pil(chapters, output_dir)

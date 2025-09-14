@@ -36,12 +36,12 @@ make check                  # Run both linting and type checking
 **SlideSpeaker** converts PDF/PPTX presentations into AI-generated videos using:
 - **Frontend**: React + TypeScript + Sass (port 3000)
 - **Backend**: FastAPI + Redis + Python workers (port 8000)
-- **Services**: OpenAI/Qwen (transcripts), ElevenLabs/OpenAI TTS (audio), HeyGen/DALL-E (avatars), FFmpeg (video composition)
+- **Services**: OpenAI (transcripts), ElevenLabs/OpenAI TTS (audio), HeyGen/DALL-E (avatars), FFmpeg (video composition)
 
 ### Processing Pipeline
 1. **Upload**: PDF/PPTX → `uploads/` directory
 2. **Extraction**: PDF/PPTX → slide images + text content
-3. **Transcript Generation**: OpenAI/Qwen creates presentation transcripts per slide
+3. **Transcript Generation**: OpenAI creates presentation transcripts per slide
 4. **Transcript Revision**: AI revises transcripts for better flow
 5. **Audio Generation**: Text-to-speech with ElevenLabs, OpenAI, or local TTS
 6. **Avatar Generation**: HeyGen/DALL-E creates AI presenter videos (optional)
@@ -53,7 +53,7 @@ make check                  # Run both linting and type checking
 **Backend Services**:
 - `api/slidespeaker/core/` - State management, task queue, pipeline coordination
 - `api/slidespeaker/processing/` - Video composition, subtitle generation, image processing
-- `api/slidespeaker/services/` - External API integrations (OpenAI, Qwen, ElevenLabs, HeyGen, DALL-E)
+- `api/slidespeaker/services/` - External API integrations (OpenAI, ElevenLabs, HeyGen, DALL-E)
 - `api/slidespeaker/pipeline/` - Individual processing steps (extract slides, generate transcripts, etc.)
 
 **State Management**:
@@ -75,13 +75,13 @@ make check                  # Run both linting and type checking
 - `web/` - React frontend
 - `uploads/` - Temporary uploaded files
 - `output/` - Generated videos and subtitles (local storage)
-- `.env` - API keys (OpenAI, Qwen, ElevenLabs, HeyGen) and storage configuration
+- `.env` - API keys (OpenAI, ElevenLabs, HeyGen) and storage configuration
 
 ### Environment Setup
 Required API keys in `api/.env`:
 ```
 OPENAI_API_KEY=your_key
-QWEN_API_KEY=your_key
+OPENAI_BASE_URL=               # Optional: set for OpenAI-compatible endpoints
 ELEVENLABS_API_KEY=your_key
 HEYGEN_API_KEY=your_key
 
@@ -107,6 +107,19 @@ OSS_REGION=cn-region
 2. Start frontend: `cd web && pnpm start`
 3. Access UI at http://localhost:3000
 4. API docs at http://localhost:8000/docs
+
+### LLM Usage
+
+- Use the centralized LLM helpers in `api/slidespeaker/llm/`:
+  - `get_openai_client()` yields a singleton client configured with `OPENAI_API_KEY` and optional `OPENAI_BASE_URL`.
+  - `chat_completion()`, `image_generate()`, `tts_speech_stream()` wrap common calls with retries/backoff and timeout.
+- Do not instantiate OpenAI clients directly in modules; rely on the helpers.
+- TTS provider is clamped to `openai` or `elevenlabs` via config.
+
+### Frontend Task Meta
+
+- In processing view, the two Task Meta cards (file and task) are equal width.
+- The file icon and filename do not overlap, and the file‑type badge is vertically centered.
 
 ### Recent Improvements
 **Storage System Overhaul**:

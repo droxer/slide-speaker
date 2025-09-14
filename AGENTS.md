@@ -18,11 +18,12 @@ Guidance for AI coding agents (Codex CLI, Claude Code, etc.) collaborating on th
 ## Repository Structure
 - `api/`: FastAPI backend and workers
   - Entrypoints: `server.py`, `master_worker.py`, `worker.py`.
-  - Core: `slidespeaker/core/` (state + queue), `slidespeaker/utils/` (config, Redis, logging).
+- Core: `slidespeaker/core/` (state + queue), `slidespeaker/configs/` (config, Redis, logging).
   - Routes: `slidespeaker/routes/` (upload, tasks, stats, downloads, languages).
   - Pipeline: `slidespeaker/pipeline/` (PDF vs slides coordinators and steps).
   - Processing: `slidespeaker/processing/` (audio/video/subtitles/images).
-  - Services: `slidespeaker/services/` (OpenAI, Qwen, ElevenLabs, HeyGen, vision, TTS).
+  - Services: `slidespeaker/services/` (OpenAI, ElevenLabs, HeyGen, vision, TTS).
+  - LLM: `slidespeaker/llm/` (centralized OpenAI client + chat/image/tts helpers).
   - Storage: `slidespeaker/storage/` (local, S3, OSS via unified interface).
 - `web/`: React + TypeScript UI
   - Entrypoints: `src/index.tsx`, `src/App.tsx`.
@@ -43,6 +44,7 @@ Guidance for AI coding agents (Codex CLI, Claude Code, etc.) collaborating on th
 - Python: 4‑space indent; Ruff 120‑char lines; full type annotations; names: functions/modules `snake_case`, classes `PascalCase`, constants `UPPER_SNAKE_CASE`.
 - Web (TS/React): ESLint + `tsconfig.json`; components `PascalCase` in `src/components/` with matching `.scss`.
 - Do: Follow existing patterns, keep functions small, add docstrings where present elsewhere.
+- Do: Use `slidespeaker/llm` helpers (chat_completion, image_generate, tts_speech_stream) instead of creating OpenAI clients directly.
 - Don’t: Change filenames/exports casually, add license headers, or commit secrets.
 
 ## Frontend UX Rules (Task Monitor & Completed View)
@@ -54,6 +56,7 @@ Guidance for AI coding agents (Codex CLI, Claude Code, etc.) collaborating on th
 - Completed headline text: “Your Masterpiece is Ready!”.
 - Default font: Google Open Sans across the web app.
 - Status pills (Completed/Processing/Queued/Failed/Cancelled) adopt theme colors in both Flat and Subtle‑Material themes with hover/focus states.
+- Processing view Task Meta: two equal‑width cards; file icon + name must not overlap; file‑type badge vertically centered.
 
 ## Testing & Verification
 - API: No formal tests yet. Prioritize `make check` (Ruff + mypy). If you add tests, place under `api/tests/` as `test_*.py`.
@@ -67,7 +70,8 @@ Guidance for AI coding agents (Codex CLI, Claude Code, etc.) collaborating on th
     - `/api/tasks/{task_id}/subtitles/vtt|srt`
 
 ## Security & Configuration
-- Secrets: Require `api/.env` (OpenAI, Qwen, ElevenLabs, HeyGen, Redis). Never commit secrets. See `api/.env.example`.
+- Secrets: Require `api/.env` (OpenAI, ElevenLabs, HeyGen, Redis). Never commit secrets. See `api/.env.example`.
+- LLM config: `OPENAI_API_KEY` required; optional `OPENAI_BASE_URL` for compatible services; `OPENAI_TIMEOUT/RETRIES/BACKOFF` supported.
 - Storage: Configure `STORAGE_PROVIDER` (`local|s3|oss`) and related keys. Local mounts `/files` for direct serving.
 - Engines: Python ≥ 3.12 via `uv`; Node ≥ 20 for web.
 

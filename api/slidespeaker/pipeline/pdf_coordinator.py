@@ -178,7 +178,8 @@ async def _execute_pdf_step(
             elif step_name == "generate_pdf_audio":
                 await generate_audio_step(file_id, voice_language)
             elif step_name == "generate_pdf_subtitles":
-                subtitle_lang = subtitle_language or voice_language
+                # Always prefer explicit subtitle language; default to English
+                subtitle_lang = subtitle_language or "english"
                 await generate_subtitles_step(file_id, subtitle_lang)
             elif step_name == "compose_video":
                 await compose_video_step(file_id)

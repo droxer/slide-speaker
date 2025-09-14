@@ -6,12 +6,13 @@ It uses AI to understand the content structure and create meaningful segments
 for presentation generation.
 """
 
-import os
 from typing import Any
 
 from loguru import logger
-from openai import OpenAI
 from PyPDF2 import PdfReader
+
+from slidespeaker.configs.config import config
+from slidespeaker.llm import chat_completion
 
 # Import the shared transcript generator
 from slidespeaker.transcript import TranscriptGenerator
@@ -227,13 +228,12 @@ class PDFAnalyzer:
     """Analyzer for PDF content that segments content into chapters"""
 
     def __init__(self) -> None:
-        """Initialize the PDF analyzer with OpenAI client and script generator"""
-        # Get API key from environment (this is a special case that's not in config)
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
+        """Initialize the PDF analyzer with configured provider"""
+        # Use OpenAI exclusively for PDF analysis in this module
+        self.model: str = config.pdf_analyzer_model
+        if not config.openai_api_key:
             raise ValueError("OPENAI_API_KEY environment variable is required")
-        self.client = OpenAI(api_key=api_key)
-        self.model: str = os.getenv("PDF_ANALYZER_MODEL", "gpt-4o-mini")
+        self.model = config.pdf_analyzer_model
         self.transcript_generator = TranscriptGenerator()
 
     async def analyze_and_segment(
@@ -320,16 +320,14 @@ class PDFAnalyzer:
                 max_num_of_segments=max_num_of_segments,
             )
 
-            response = self.client.chat.completions.create(
+            content = chat_completion(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": prompts["system"]},
                     {"role": "user", "content": formatted_prompt},
                 ],
             )
-
             # Parse the response
-            content = response.choices[0].message.content
             if content:
                 import json
 

@@ -12,7 +12,7 @@ from typing import Any
 from loguru import logger
 
 from ..audio import AudioGenerator
-from ..utils.locales import locale_utils
+from ..configs.locales import locale_utils
 from .text_segmentation import split_sentences
 from .timing import calculate_chunk_durations
 

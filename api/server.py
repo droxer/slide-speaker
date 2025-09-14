@@ -12,15 +12,18 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from slidespeaker.configs.config import config
+from slidespeaker.configs.logging_config import setup_logging
+from slidespeaker.routes.diagnostic import router as diagnostic_router
 from slidespeaker.routes.downloads import router as downloads_router
 from slidespeaker.routes.languages import router as languages_router
+from slidespeaker.routes.preview import router as preview_router
 from slidespeaker.routes.progress import router as progress_router
 from slidespeaker.routes.stats import router as stats_router
 from slidespeaker.routes.tasks import router as tasks_router
 from slidespeaker.routes.transcripts import router as transcripts_router
+from slidespeaker.routes.tts import router as tts_router
 from slidespeaker.routes.upload import router as upload_router
-from slidespeaker.utils.config import config
-from slidespeaker.utils.logging_config import setup_logging
 
 app = FastAPI(title="AI Slider API")
 
@@ -28,10 +31,14 @@ app = FastAPI(title="AI Slider API")
 @app.on_event("startup")
 async def startup_event() -> None:
     """Initialize logging configuration on application startup"""
-    log_level = os.getenv("LOG_LEVEL", "INFO")
-    log_file = os.getenv("LOG_FILE")
+    # Use centralized config for logging settings
+    log_level = config.log_level
+    log_file = config.log_file
     setup_logging(
-        log_level, log_file, enable_file_logging=log_file is not None, component="api"
+        log_level,
+        log_file,
+        enable_file_logging=log_file is not None,
+        component="api",
     )
 
     # Mount static files for local storage if using local storage provider
@@ -58,6 +65,9 @@ app.include_router(downloads_router)
 app.include_router(languages_router)
 app.include_router(stats_router)
 app.include_router(transcripts_router)
+app.include_router(tts_router)
+app.include_router(diagnostic_router)
+app.include_router(preview_router)
 
 
 @app.get("/")

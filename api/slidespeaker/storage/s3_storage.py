@@ -117,12 +117,23 @@ class S3Storage(StorageProvider):
             logger.error(f"Failed to download file from S3: {e}")
             raise
 
-    def get_file_url(self, object_key: str, expires_in: int = 3600) -> str:
+    def get_file_url(
+        self,
+        object_key: str,
+        expires_in: int = 3600,
+        content_disposition: str | None = None,
+        content_type: str | None = None,
+    ) -> str:
         """Generate a presigned URL for S3 object."""
         try:
+            params: dict[str, str] = {"Bucket": self.bucket_name, "Key": object_key}
+            if content_disposition:
+                params["ResponseContentDisposition"] = content_disposition
+            if content_type:
+                params["ResponseContentType"] = content_type
             url: str = self.s3_client.generate_presigned_url(
                 "get_object",
-                Params={"Bucket": self.bucket_name, "Key": object_key},
+                Params=params,
                 ExpiresIn=expires_in,
             )
             return url

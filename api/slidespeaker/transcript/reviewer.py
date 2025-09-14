@@ -1,15 +1,16 @@
 """Module for reviewing and refining presentation transcripts.
 
-This module uses AI language models to review and improve generated presentation transcripts
+This module uses OpenAI to review and improve generated presentation transcripts
 for consistency, flow, and quality. It ensures appropriate formatting for AI avatar delivery
 and handles proper positioning of opening/closing statements.
 """
 
-import os
 from typing import Any
 
 from loguru import logger
-from openai import OpenAI
+
+from slidespeaker.configs.config import config
+from slidespeaker.llm import chat_completion
 
 # Language-specific review prompts
 REVIEW_PROMPTS = {
@@ -29,16 +30,15 @@ INSTRUCTION_PROMPTS = {
 
 
 class TranscriptReviewer:
-    """Reviewer for AI-generated presentation transcripts using OpenAI GPT models"""
+    """Reviewer for AI-generated presentation transcripts (OpenAI only)"""
 
     def __init__(self) -> None:
-        """Initialize the reviewer with OpenAI client"""
-        # Get API key from environment (this is a special case that's not in config)
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is required")
-        self.client = OpenAI(api_key=api_key)
-        self.model: str = os.getenv("SCRIPT_REVIEWER_MODEL", "gpt-4o-mini")
+        """Initialize OpenAI reviewer"""
+        # Force OpenAI usage; Qwen support removed for transcript review
+        self.provider = "openai"
+        self.model: str = config.openai_reviewer_model
+        if not config.openai_api_key:
+            logger.error("OPENAI_API_KEY not set; reviewer will fallback to originals")
 
     async def revise_transcripts(
         self, transcripts: list[dict[str, Any]], language: str = "english"
@@ -57,14 +57,13 @@ class TranscriptReviewer:
         content = "\n\n".join([t.get("script", "") for t in transcripts])
 
         try:
-            resp = self.client.chat.completions.create(
+            reviewed_content = chat_completion(
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": instruction_prompt + "\n\n" + content},
                 ],
             )
-            reviewed_content = resp.choices[0].message.content or ""
         except Exception as e:
             logger.error(f"Transcript review failed: {e}")
             # If the model call fails, return original transcripts
@@ -100,3 +99,5 @@ class TranscriptReviewer:
             else:
                 result.append(transcripts[i])
         return result
+
+    # Qwen review support removed

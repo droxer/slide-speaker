@@ -5,11 +5,11 @@ from typing import Any, cast
 
 from loguru import logger
 
-from slidespeaker.storage import StorageProvider
-from slidespeaker.utils.config import (
+from slidespeaker.configs.config import (
     get_storage_provider as global_get_storage_provider,
 )
-from slidespeaker.utils.locales import locale_utils
+from slidespeaker.configs.locales import locale_utils
+from slidespeaker.storage import StorageProvider
 
 _storage_provider = None
 

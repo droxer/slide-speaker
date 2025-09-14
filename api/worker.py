@@ -19,12 +19,15 @@ load_dotenv()
 # Add the current directory to Python path so we can import slidespeaker modules
 sys.path.insert(0, str(Path(__file__).parent))
 
-from slidespeaker.utils.logging_config import setup_logging  # noqa: E402
+from slidespeaker.configs.config import config, get_env  # noqa: E402
+from slidespeaker.configs.logging_config import setup_logging  # noqa: E402
 
-log_level = os.getenv("LOG_LEVEL", "INFO")
-log_file = os.getenv("LOG_FILE")
+log_file = config.log_file
 setup_logging(
-    log_level, log_file, enable_file_logging=log_file is not None, component="worker"
+    config.log_level,
+    log_file,
+    enable_file_logging=log_file is not None,
+    component="worker",
 )
 
 from slidespeaker.core.task_queue import task_queue  # noqa: E402
@@ -187,7 +190,7 @@ async def process_task(task_id: str) -> bool:
 async def main() -> None:
     """Main worker process entry point"""
     # Get task ID from environment variable
-    task_id = os.getenv("TASK_ID")
+    task_id = get_env("TASK_ID")
     if not task_id:
         logger.error("TASK_ID environment variable not set")
         sys.exit(1)

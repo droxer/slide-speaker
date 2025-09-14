@@ -1,8 +1,8 @@
 """
-Utility components for SlideSpeaker
+Configs components for SlideSpeaker
 """
 
-# Utility modules
+# Re-export locale utils from configs
 from .locales import LocaleUtils, locale_utils
 
 __all__ = ["LocaleUtils", "locale_utils"]

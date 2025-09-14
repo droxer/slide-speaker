@@ -10,9 +10,9 @@ from pathlib import Path
 
 from loguru import logger
 
+from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.document import SlideExtractor
-from slidespeaker.utils.config import config, get_storage_provider
 
 slide_processor = SlideExtractor()
 

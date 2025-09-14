@@ -11,8 +11,8 @@ from typing import Any
 from loguru import logger
 
 from slidespeaker.audio import AudioGenerator
+from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.utils.config import config, get_storage_provider
 
 
 async def generate_audio_common(
@@ -70,16 +70,24 @@ async def generate_audio_common(
                     voice = voices[0] if voices else None
 
                     # Generate audio
+                    logger.info(
+                        f"Generating TTS for {file_prefix} {i + 1}: language={language}, voice={voice}"
+                    )
                     audio_path = audio_dir / f"{file_prefix}_{i + 1}.mp3"
-                    await audio_generator.generate_audio(
+                    ok = await audio_generator.generate_audio(
                         script_text, str(audio_path), language=language, voice=voice
                     )
 
-                    # Keep audio files local - only final files should be uploaded to cloud storage
-                    audio_files.append(str(audio_path))
-                    logger.info(
-                        f"Generated audio for {file_prefix} {i + 1}: {audio_path}"
-                    )
+                    if ok and audio_path.exists() and audio_path.stat().st_size > 0:
+                        # Keep audio files local - only final files should be uploaded to cloud storage
+                        audio_files.append(str(audio_path))
+                        logger.info(
+                            f"Generated audio for {file_prefix} {i + 1}: {audio_path}"
+                        )
+                    else:
+                        logger.error(
+                            f"Audio generation failed for {file_prefix} {i + 1}; skipping file"
+                        )
                 except Exception as e:
                     logger.error(
                         f"Failed to generate audio for {file_prefix} {i + 1}: {e}"
@@ -151,6 +159,16 @@ async def generate_audio_common(
             storage_provider.upload_file(
                 str(final_local_path), f"{base}.mp3", "audio/mpeg"
             )
+            # Backward-compatibility: also upload under file_id-based key if different
+            try:
+                if base != file_id:
+                    storage_provider.upload_file(
+                        str(final_local_path), f"{file_id}.mp3", "audio/mpeg"
+                    )
+            except Exception as compat_err:
+                logger.warning(
+                    f"Compat upload (file-id key) failed for final audio: {compat_err}"
+                )
             logger.info(f"Uploaded final concatenated audio: {final_local_path}")
     except Exception as e:
         # Non-fatal; streaming fallback in downloads will still work
