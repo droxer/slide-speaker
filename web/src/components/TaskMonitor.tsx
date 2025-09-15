@@ -71,7 +71,6 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
   const [tasksPerPage] = useState(10);
   const [selectedTaskForPreview, setSelectedTaskForPreview] = useState<Task | null>(null);
   const [subtitleAvailable, setSubtitleAvailable] = useState<boolean>(false);
-  const [subtitleLoading, setSubtitleLoading] = useState<boolean>(false);
   const [subtitleObjectUrl, setSubtitleObjectUrl] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
   const modalVideoRef = React.useRef<HTMLVideoElement | null>(null);
@@ -173,6 +172,27 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     };
   }, [audioCues, audioPreviewTaskId]);
 
+  // Prevent video and audio from playing simultaneously in task cards
+  useEffect(() => {
+    // This effect will handle synchronization when audio preview is active
+    if (!audioPreviewTaskId) return;
+    
+    const audio = audioRef.current;
+    if (!audio) return;
+    
+    const handleAudioPlay = () => {
+      // If there's a modal video playing, pause it
+      if (modalVideoRef.current && !modalVideoRef.current.paused) {
+        modalVideoRef.current.pause();
+      }
+    };
+    
+    audio.addEventListener('play', handleAudioPlay);
+    
+    return () => {
+      audio.removeEventListener('play', handleAudioPlay);
+    };
+  }, [audioPreviewTaskId]);
 
   // Debug log for preview state
   useEffect(() => {
@@ -189,7 +209,6 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     const checkSubtitles = async () => {
       if (!selectedTaskForPreview) {
         setSubtitleAvailable(false);
-        setSubtitleLoading(false);
         if (subtitleObjectUrl) {
           URL.revokeObjectURL(subtitleObjectUrl);
           setSubtitleObjectUrl(null);
@@ -205,7 +224,6 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
         return;
       }
 
-      setSubtitleLoading(true);
       const preferredLanguage = selectedTaskForPreview.kwargs?.subtitle_language || selectedTaskForPreview.state?.subtitle_language || selectedTaskForPreview.kwargs?.voice_language || 'english';
       const url = `${apiBaseUrl}/api/tasks/${selectedTaskForPreview.task_id}/subtitles/vtt?language=${encodeURIComponent(preferredLanguage)}`;
       try {
@@ -228,13 +246,60 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
         if (subtitleObjectUrl) URL.revokeObjectURL(subtitleObjectUrl);
         setSubtitleObjectUrl(null);
         setSubtitleAvailable(false);
-      } finally {
-        setSubtitleLoading(false);
       }
     };
     
     checkSubtitles();
   }, [selectedTaskForPreview, apiBaseUrl, subtitleAvailable, subtitleObjectUrl]);
+
+  // Prefetch video, audio, and subtitles when task is selected for preview
+  useEffect(() => {
+    if (!selectedTaskForPreview) return;
+
+    // Create an array to hold all the link elements for cleanup
+    const linkElements: HTMLLinkElement[] = [];
+
+    try {
+      // Prefetch video
+      const videoUrl = `${apiBaseUrl}/api/tasks/${selectedTaskForPreview.task_id}/video`;
+      const videoLink = document.createElement('link');
+      videoLink.rel = 'prefetch';
+      videoLink.href = videoUrl;
+      videoLink.as = 'video';
+      document.head.appendChild(videoLink);
+      linkElements.push(videoLink);
+
+      // Prefetch audio
+      const audioUrl = `${apiBaseUrl}/api/tasks/${selectedTaskForPreview.task_id}/audio`;
+      const audioLink = document.createElement('link');
+      audioLink.rel = 'prefetch';
+      audioLink.href = audioUrl;
+      audioLink.as = 'audio';
+      document.head.appendChild(audioLink);
+      linkElements.push(audioLink);
+
+      // Prefetch subtitles
+      const preferredLanguage = selectedTaskForPreview.kwargs?.subtitle_language || selectedTaskForPreview.state?.subtitle_language || selectedTaskForPreview.kwargs?.voice_language || 'english';
+      const subtitleUrl = `${apiBaseUrl}/api/tasks/${selectedTaskForPreview.task_id}/subtitles/vtt?language=${encodeURIComponent(preferredLanguage)}`;
+      const subtitleLink = document.createElement('link');
+      subtitleLink.rel = 'prefetch';
+      subtitleLink.href = subtitleUrl;
+      subtitleLink.as = 'track';
+      document.head.appendChild(subtitleLink);
+      linkElements.push(subtitleLink);
+    } catch (error) {
+      console.warn('Failed to create prefetch links:', error);
+    }
+
+    // Clean up links when component unmounts or selectedTaskForPreview changes
+    return () => {
+      linkElements.forEach(link => {
+        if (document.head.contains(link)) {
+          document.head.removeChild(link);
+        }
+      });
+    };
+  }, [selectedTaskForPreview, apiBaseUrl]);
 
   // Do not force subtitles to display in preview; user can enable via player controls
 
@@ -258,6 +323,27 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
       }
     } catch {}
   }, [selectedTaskForPreview, subtitleObjectUrl, subtitleAvailable]);
+
+  // Prevent video and audio from playing simultaneously - when modal video plays, pause audio preview
+  useEffect(() => {
+    if (!selectedTaskForPreview) return;
+    
+    const video = modalVideoRef.current;
+    if (!video) return;
+    
+    const handleVideoPlay = () => {
+      // If there's an audio preview playing, pause it
+      if (audioPreviewTaskId && audioRef.current && !audioRef.current.paused) {
+        audioRef.current.pause();
+      }
+    };
+    
+    video.addEventListener('play', handleVideoPlay);
+    
+    return () => {
+      video.removeEventListener('play', handleVideoPlay);
+    };
+  }, [selectedTaskForPreview, audioPreviewTaskId]);
 
   // Fetch tasks and statistics
   const fetchTasks = React.useCallback(async () => {

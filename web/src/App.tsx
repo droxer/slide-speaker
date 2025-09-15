@@ -216,6 +216,14 @@ function App() {
   const [showCompletedBanner, setShowCompletedBanner] = useState<boolean>(() => {
     try { return localStorage.getItem('ss_show_completed_banner') !== '0'; } catch { return true; }
   });
+  const COMPLETED_MEDIA_KEY = 'slidespeaker_completed_media';
+  const [completedMedia, setCompletedMedia] = useState<'video' | 'audio'>(() => {
+    try {
+      const stored = localStorage.getItem(COMPLETED_MEDIA_KEY);
+      if (stored === 'video' || stored === 'audio') return stored as 'video' | 'audio';
+    } catch {}
+    return 'video';
+  });
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -478,6 +486,11 @@ function App() {
     } catch {}
   }, [status, taskId, videoRef]);
 
+  // Persist completed media selection
+  useEffect(() => {
+    try { localStorage.setItem(COMPLETED_MEDIA_KEY, completedMedia); } catch {}
+  }, [completedMedia]);
+
   // Also hide banner when video starts playing
   useEffect(() => {
     if (status !== 'completed') return;
@@ -492,6 +505,85 @@ function App() {
     v.addEventListener('play', onPlay);
     return () => { v.removeEventListener('play', onPlay); };
   }, [status, taskId, showCompletedBanner]);
+
+  // Prevent video and audio from playing simultaneously
+  useEffect(() => {
+    if (status !== 'completed') return;
+    
+    const video = videoRef.current;
+    const audio = audioRef.current;
+    
+    if (!video || !audio) return;
+    
+    const handleVideoPlay = () => {
+      if (!audio.paused) {
+        audio.pause();
+      }
+    };
+    
+    const handleAudioPlay = () => {
+      if (!video.paused) {
+        video.pause();
+      }
+    };
+    
+    video.addEventListener('play', handleVideoPlay);
+    audio.addEventListener('play', handleAudioPlay);
+    
+    return () => {
+      video.removeEventListener('play', handleVideoPlay);
+      audio.removeEventListener('play', handleAudioPlay);
+    };
+  }, [status, taskId]);
+
+  // Prefetch video, audio, and subtitles when task is completed
+  useEffect(() => {
+    if (status !== 'completed' || !taskId) return;
+
+    // Create an array to hold all the link elements for cleanup
+    const linkElements: HTMLLinkElement[] = [];
+
+    try {
+      // Prefetch video
+      const videoUrl = `${API_BASE_URL}/api/tasks/${taskId}/video`;
+      const videoLink = document.createElement('link');
+      videoLink.rel = 'prefetch';
+      videoLink.href = videoUrl;
+      videoLink.as = 'video';
+      document.head.appendChild(videoLink);
+      linkElements.push(videoLink);
+
+      // Prefetch audio
+      const audioUrl = `${API_BASE_URL}/api/tasks/${taskId}/audio`;
+      const audioLink = document.createElement('link');
+      audioLink.rel = 'prefetch';
+      audioLink.href = audioUrl;
+      audioLink.as = 'audio';
+      document.head.appendChild(audioLink);
+      linkElements.push(audioLink);
+
+      // Prefetch subtitles
+      const subtitleLanguageCode = processingDetails?.subtitle_language || subtitleLanguage || voiceLanguage || 'english';
+      const subtitleUrl = `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(subtitleLanguageCode)}`;
+      const subtitleLink = document.createElement('link');
+      subtitleLink.rel = 'prefetch';
+      subtitleLink.href = subtitleUrl;
+      subtitleLink.as = 'track';
+      document.head.appendChild(subtitleLink);
+      linkElements.push(subtitleLink);
+    } catch (error) {
+      console.warn('Failed to create prefetch links:', error);
+    }
+
+    // Clean up links when component unmounts or taskId changes
+    return () => {
+      linkElements.forEach(link => {
+        if (document.head.contains(link)) {
+          document.head.removeChild(link);
+        }
+      });
+    };
+  }, [status, taskId, processingDetails, subtitleLanguage, voiceLanguage]);
 
   // Sync active cue with audio time
   useEffect(() => {
@@ -1340,8 +1432,29 @@ function App() {
                   </div>
                 )}
                 
-                <div className="preview-container preview-two-col">
-                  <div className="video-col">
+                {/* Tabs for switching media mode - placed at the top for better visibility */}
+                <div className="mode-toggle-container">
+                  <div className="mode-toggle compact">
+                    <button
+                      type="button"
+                      className={`toggle-btn ${completedMedia === 'video' ? 'active' : ''}`}
+                      onClick={() => setCompletedMedia('video')}
+                    >
+                      🎬 Video
+                    </button>
+                    <button
+                      type="button"
+                      className={`toggle-btn ${completedMedia === 'audio' ? 'active' : ''}`}
+                      onClick={() => setCompletedMedia('audio')}
+                    >
+                      🎧 Audio
+                    </button>
+                  </div>
+                </div>
+                
+                {/* Video area (shows only in Video mode) */}
+                {completedMedia === 'video' && (
+                  <div className="media-section video-active">
                     <div className="video-wrapper">
                       <video 
                         ref={videoRef}
@@ -1365,54 +1478,33 @@ function App() {
                       </video>
                     </div>
                   </div>
-                  <div className="details-col">
-                    {/* Inline audio player for quick listening */}
-                    <div className="audio-player-inline" style={{ marginTop: 12 }}>
-                      <audio
-                        ref={audioRef}
-                        controls
-                        preload="auto"
-                        src={`${API_BASE_URL}/api/tasks/${taskId}/audio`}
-                        crossOrigin="anonymous"
-                        aria-label="Audio narration preview"
-                      >
-                        Your browser does not support the audio element.
-                      </audio>
-                    </div>
-                    {showAudioTranscript && audioCues.length > 0 && (
-                      <div className="audio-transcript-pane" ref={audioTranscriptRef} aria-label="Audio captions">
-                        {audioCues.map((cue, idx) => (
-                          <div
-                            key={idx}
-                            id={`audio-cue-${idx}`}
-                            className={`cue ${activeAudioCueIdx === idx ? 'active' : ''}`}
-                            onClick={() => {
-                              const a = audioRef.current;
-                              if (!a) return;
-                              const target = Math.max(0, Math.min(isFinite(a.duration) ? a.duration - 0.05 : cue.start + 0.01, cue.start + 0.01));
-                              const doPlay = () => a.play().catch(() => {});
-                              const doSeekReady = () => {
-                                try {
-                                  const onSeeked = () => { a.removeEventListener('seeked', onSeeked); doPlay(); };
-                                  a.addEventListener('seeked', onSeeked, { once: true });
-                                  if ((a as any).fastSeek) {
-                                    (a as any).fastSeek(target);
-                                  } else {
-                                    a.currentTime = target;
-                                  }
-                                } catch {
-                                  a.currentTime = target;
-                                  doPlay();
-                                }
-                              };
-                              if (a.readyState >= 1) doSeekReady();
-                              else a.addEventListener('loadedmetadata', doSeekReady, { once: true });
-                            }}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
+                )}
+                
+                {/* Audio area (shows only in Audio mode) */}
+                {completedMedia === 'audio' && (
+                  <div className="media-section audio-active">
+                    <div className="audio-section">
+                      {/* Inline audio player for quick listening */}
+                      <div className="audio-player-inline">
+                        <audio
+                          ref={audioRef}
+                          controls
+                          preload="auto"
+                          src={`${API_BASE_URL}/api/tasks/${taskId}/audio`}
+                          crossOrigin="anonymous"
+                          aria-label="Audio narration preview"
+                        >
+                          Your browser does not support the audio element.
+                        </audio>
+                      </div>
+                      {showAudioTranscript && audioCues.length > 0 && (
+                        <div className="audio-transcript-pane" ref={audioTranscriptRef} aria-label="Audio captions">
+                          {audioCues.map((cue, idx) => (
+                            <div
+                              key={idx}
+                              id={`audio-cue-${idx}`}
+                              className={`cue ${activeAudioCueIdx === idx ? 'active' : ''}`}
+                              onClick={() => {
                                 const a = audioRef.current;
                                 if (!a) return;
                                 const target = Math.max(0, Math.min(isFinite(a.duration) ? a.duration - 0.05 : cue.start + 0.01, cue.start + 0.01));
@@ -1433,147 +1525,176 @@ function App() {
                                 };
                                 if (a.readyState >= 1) doSeekReady();
                                 else a.addEventListener('loadedmetadata', doSeekReady, { once: true });
-                              }
-                            }}
-                          >
-                            <div className="t-time">{Math.floor(cue.start / 60)}:{String(Math.floor(cue.start % 60)).padStart(2, '0')}</div>
-                            <div className="t-text">{cue.text}</div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <div className="preview-info-compact">
-                      <div className="info-grid">
-                        <div className="info-item">
-                          <span className="info-label">Voice Language:</span>
-                          <span className="info-value">{processingDetails?.voice_language ? getLanguageDisplayName(processingDetails.voice_language) : 'English'}</span>
-                        </div>
-                        <div className="info-item">
-                          <span className="info-label">Subtitle Language:</span>
-                          <span className="info-value">{processingDetails?.subtitle_language ? getLanguageDisplayName(processingDetails.subtitle_language) : getLanguageDisplayName(subtitleLanguage)}</span>
-                        </div>
-                        {isPdfFile(file?.name || null) ? (
-                          <div className="info-item">
-                            <span className="info-label">Document Type:</span>
-                            <span className="info-value">PDF Chapters</span>
-                          </div>
-                        ) : (
-                          <div className="info-item">
-                            <span className="info-label disabled">AI Avatar:</span>
-                            <span className="info-value">{generateAvatar ? '✓ Generated' : '✗ Disabled'}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    {/* Resource URLs */}
-                    <div className="resource-links">
-                      {/* Video */}
-                      <div className="url-copy-row">
-                        <span className="resource-label-inline">Video</span>
-                        <input 
-                          type="text" 
-                            value={`${API_BASE_URL}/api/tasks/${taskId}/video`}
-                            readOnly 
-                            className="url-input-enhanced"
-                          />
-                          <button 
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/video`);
-                              alert('Video URL copied!');
-                            }}
-                            className="copy-btn-enhanced"
-                          >
-                            Copy
-                          </button>
-                        </div>
-
-                        {/* Audio */}
-                        <div className="url-copy-row">
-                          <span className="resource-label-inline">Audio</span>
-                          <input 
-                            type="text" 
-                            value={`${API_BASE_URL}/api/tasks/${taskId}/audio`}
-                            readOnly 
-                            className="url-input-enhanced"
-                          />
-                          <button 
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/audio`);
-                              alert(`Audio URL copied!`);
-                            }}
-                            className="copy-btn-enhanced"
-                          >
-                            Copy
-                          </button>
-                        </div>
-
-                        {/* Transcript */}
-                        {fileId && (
-                          <div className="url-copy-row">
-                            <span className="resource-label-inline">Transcript</span>
-                            <input 
-                              type="text" 
-                              value={`${API_BASE_URL}/api/tasks/${taskId}/transcripts/markdown`}
-                              readOnly 
-                              className="url-input-enhanced"
-                            />
-                            <button 
-                              onClick={() => {
-                                navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/transcripts/markdown`);
-                                alert('Transcript URL copied!');
                               }}
-                              className="copy-btn-enhanced"
-                            >
-                              Copy
-                            </button>
-                          </div>
-                        )}
-
-                        {/* VTT */}
-                        <div className="url-copy-row">
-                          <span className="resource-label-inline">VTT</span>
-                          <input 
-                            type="text" 
-                            value={`${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt`}
-                            readOnly 
-                            className="url-input-enhanced"
-                          />
-                          <button 
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt`);
-                              alert('VTT URL copied!');
-                            }}
-                            className="copy-btn-enhanced"
-                          >
-                            Copy
-                          </button>
-                        </div>
-
-                        {/* SRT */}
-                        {generateSubtitles && fileId && (
-                          <div className="url-copy-row">
-                            <span className="resource-label-inline">SRT</span>
-                            <input 
-                              type="text" 
-                              value={`${API_BASE_URL}/api/tasks/${taskId}/subtitles/srt`}
-                              readOnly 
-                              className="url-input-enhanced"
-                            />
-                            <button 
-                              onClick={() => {
-                                navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/subtitles/srt`);
-                                alert('SRT URL copied!');
+                              role="button"
+                              tabIndex={0}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  const a = audioRef.current;
+                                  if (!a) return;
+                                  const target = Math.max(0, Math.min(isFinite(a.duration) ? a.duration - 0.05 : cue.start + 0.01, cue.start + 0.01));
+                                  const doPlay = () => a.play().catch(() => {});
+                                  const doSeekReady = () => {
+                                    try {
+                                      const onSeeked = () => { a.removeEventListener('seeked', onSeeked); doPlay(); };
+                                      a.addEventListener('seeked', onSeeked, { once: true });
+                                      if ((a as any).fastSeek) {
+                                        (a as any).fastSeek(target);
+                                      } else {
+                                        a.currentTime = target;
+                                      }
+                                    } catch {
+                                      a.currentTime = target;
+                                      doPlay();
+                                    }
+                                  };
+                                  if (a.readyState >= 1) doSeekReady();
+                                  else a.addEventListener('loadedmetadata', doSeekReady, { once: true });
+                                }
                               }}
-                              className="copy-btn-enhanced"
                             >
-                              Copy
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                              <div className="t-time">{Math.floor(cue.start / 60)}:{String(Math.floor(cue.start % 60)).padStart(2, '0')}</div>
+                              <div className="t-text">{cue.text}</div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
+                )}
                 
+                {/* Information section */}
+                <div className="preview-info-compact">
+                  <div className="info-grid">
+                    <div className="info-item">
+                      <span className="info-label">Voice Language:</span>
+                      <span className="info-value">{processingDetails?.voice_language ? getLanguageDisplayName(processingDetails.voice_language) : 'English'}</span>
+                    </div>
+                    <div className="info-item">
+                      <span className="info-label">Subtitle Language:</span>
+                      <span className="info-value">{processingDetails?.subtitle_language ? getLanguageDisplayName(processingDetails.subtitle_language) : getLanguageDisplayName(subtitleLanguage)}</span>
+                    </div>
+                    {isPdfFile(file?.name || null) ? (
+                      <div className="info-item">
+                        <span className="info-label">Document Type:</span>
+                        <span className="info-value">PDF Chapters</span>
+                      </div>
+                    ) : (
+                      <div className="info-item">
+                        <span className="info-label disabled">AI Avatar:</span>
+                        <span className="info-value">{generateAvatar ? '✓ Generated' : '✗ Disabled'}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Resource URLs */}
+                <div className="resource-links">
+                  {/* Video */}
+                  <div className="url-copy-row">
+                    <span className="resource-label-inline">Video</span>
+                    <input 
+                      type="text" 
+                        value={`${API_BASE_URL}/api/tasks/${taskId}/video`}
+                        readOnly 
+                        className="url-input-enhanced"
+                      />
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/video`);
+                          alert('Video URL copied!');
+                        }}
+                        className="copy-btn-enhanced"
+                      >
+                        Copy
+                      </button>
+                    </div>
+
+                    {/* Audio */}
+                    <div className="url-copy-row">
+                      <span className="resource-label-inline">Audio</span>
+                      <input 
+                        type="text" 
+                        value={`${API_BASE_URL}/api/tasks/${taskId}/audio`}
+                        readOnly 
+                        className="url-input-enhanced"
+                      />
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/audio`);
+                          alert(`Audio URL copied!`);
+                        }}
+                        className="copy-btn-enhanced"
+                      >
+                        Copy
+                      </button>
+                    </div>
+
+                    {/* Transcript */}
+                    {fileId && (
+                      <div className="url-copy-row">
+                        <span className="resource-label-inline">Transcript</span>
+                        <input 
+                          type="text" 
+                          value={`${API_BASE_URL}/api/tasks/${taskId}/transcripts/markdown`}
+                          readOnly 
+                          className="url-input-enhanced"
+                        />
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/transcripts/markdown`);
+                            alert('Transcript URL copied!');
+                          }}
+                          className="copy-btn-enhanced"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    )}
+
+                    {/* VTT */}
+                    <div className="url-copy-row">
+                      <span className="resource-label-inline">VTT</span>
+                      <input 
+                        type="text" 
+                        value={`${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt`}
+                        readOnly 
+                        className="url-input-enhanced"
+                      />
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt`);
+                          alert('VTT URL copied!');
+                        }}
+                        className="copy-btn-enhanced"
+                      >
+                        Copy
+                      </button>
+                    </div>
+
+                    {/* SRT */}
+                    {generateSubtitles && fileId && (
+                      <div className="url-copy-row">
+                        <span className="resource-label-inline">SRT</span>
+                        <input 
+                          type="text" 
+                          value={`${API_BASE_URL}/api/tasks/${taskId}/subtitles/srt`}
+                          readOnly 
+                          className="url-input-enhanced"
+                        />
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(`${API_BASE_URL}/api/tasks/${taskId}/subtitles/srt`);
+                            alert('SRT URL copied!');
+                          }}
+                          className="copy-btn-enhanced"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 
                 {/* Prominent create-new CTA placed at the end of the completed view for better user flow */}
                 <div className="completed-cta-bottom">
