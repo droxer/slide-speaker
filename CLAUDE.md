@@ -102,6 +102,14 @@ OSS_ACCESS_KEY_SECRET=your-access-key-secret
 OSS_REGION=cn-region
 ```
 
+### Performance Optimization Options
+For faster video processing during development, you can enable performance optimizations:
+
+```bash
+# Enable fast video encoding (uses ultrafast preset and more threads)
+FFMPEG_FAST_MODE=true
+```
+
 ### Development Workflow
 1. Start backend: `cd api && python server.py`
 2. Start frontend: `cd web && pnpm start`

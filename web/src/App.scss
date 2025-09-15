@@ -1582,12 +1582,40 @@ body:not(.ultra-flat) .app-footer {
   .completed-cta {
     justify-content: center;
   }
+  
+  .completed-cta-bottom {
+    margin: 1.5rem 0 0.5rem 0;
+    padding: 0.75rem 0;
+  }
+  
+  .completed-cta-bottom .primary-btn {
+    min-width: 200px;
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+  }
 }
 
 .completed-view .success-icon {
   font-size: 2.5rem;
   color: #10b981;
   margin-bottom: 0.75rem;
+}
+
+/* Bottom CTA in completed view */
+.completed-cta-bottom {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 2rem 0 1rem 0;
+  padding: 1rem 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.completed-cta-bottom .primary-btn {
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  min-width: 250px;
 }
 
 .completed-view h3 {

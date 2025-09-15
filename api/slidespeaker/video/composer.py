@@ -9,6 +9,7 @@ full-featured presentations with AI avatars and simpler image+audio presentation
 import asyncio
 import gc
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -34,7 +35,9 @@ class VideoComposer:
 
     def __init__(self, max_memory_mb: int = 500):
         self.max_memory_mb = max_memory_mb
-        self.executor = ThreadPoolExecutor(max_workers=2)
+        # Use more workers for parallel processing, but limit to avoid memory issues
+        max_workers = min(4, (os.cpu_count() or 2) + 1)
+        self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.storage_provider = get_storage_provider()
         self.temp_files: list[Path] = []
 
@@ -190,6 +193,19 @@ class VideoComposer:
                 logger.warning(f"Failed to cleanup temp file {temp_file}: {e}")
         self.temp_files.clear()
 
+    def _safe_close_clip(self, clip: Any) -> None:
+        """Safely close a MoviePy clip and handle any exceptions."""
+        try:
+            if hasattr(clip, "close"):
+                clip.close()
+        except Exception as e:
+            logger.debug(f"Error closing clip: {e}")
+
+    def _safe_close_clips(self, clips: list[Any]) -> None:
+        """Safely close multiple MoviePy clips."""
+        for clip in clips:
+            self._safe_close_clip(clip)
+
     async def create_images_only_video(
         self, slide_images: list[Path], output_path: Path, video_resolution: str = "hd"
     ) -> None:
@@ -276,13 +292,19 @@ class VideoComposer:
                 final_clip_resized = final_clip.with_effects(
                     [Resize(width=target_width, height=target_height)]
                 )
+                # Use fast mode settings when enabled for development/testing
+                ffmpeg_preset = config.ffmpeg_preset
+                ffmpeg_threads = config.ffmpeg_threads
+                if config.ffmpeg_fast_mode:
+                    ffmpeg_preset = "ultrafast"
+                    ffmpeg_threads = max(ffmpeg_threads, (os.cpu_count() or 2))
                 final_clip_resized.write_videofile(
                     output_path,
                     fps=config.ffmpeg_fps,
                     codec=config.ffmpeg_codec,
                     audio_codec=config.ffmpeg_audio_codec,
-                    threads=config.ffmpeg_threads,
-                    preset=config.ffmpeg_preset,
+                    threads=ffmpeg_threads,
+                    preset=ffmpeg_preset,
                     bitrate=config.ffmpeg_bitrate,
                     audio_bitrate=config.ffmpeg_audio_bitrate,
                     temp_audiofile=str(Path(output_path).parent / "temp_audio.m4a"),
@@ -293,15 +315,14 @@ class VideoComposer:
                 logger.error(f"Video composition error: {e}")
                 raise
             finally:
-                try:
-                    for clip in video_clips:
-                        clip.close()
-                    if "final_clip" in locals():
-                        final_clip.close()
-                    if "final_clip_resized" in locals():
-                        final_clip_resized.close()
-                except Exception:
-                    pass
+                # Safely close all clips
+                self._safe_close_clips(video_clips)
+                if "final_clip" in locals():
+                    self._safe_close_clip(final_clip)
+                if "final_clip_resized" in locals():
+                    self._safe_close_clip(final_clip_resized)
+                if "watermark" in locals():
+                    self._safe_close_clip(watermark)
                 gc.collect()
 
         loop = asyncio.get_event_loop()
@@ -368,13 +389,19 @@ class VideoComposer:
             final_clip_resized = final_clip.with_effects(
                 [Resize(width=target_width, height=target_height)]
             )
+            # Use fast mode settings when enabled for development/testing
+            ffmpeg_preset = config.ffmpeg_preset
+            ffmpeg_threads = config.ffmpeg_threads
+            if config.ffmpeg_fast_mode:
+                ffmpeg_preset = "ultrafast"
+                ffmpeg_threads = max(ffmpeg_threads, (os.cpu_count() or 2))
             final_clip_resized.write_videofile(
                 str(output_path),
                 fps=config.ffmpeg_fps,
                 codec=config.ffmpeg_codec,
                 audio_codec=config.ffmpeg_audio_codec,
-                threads=config.ffmpeg_threads,
-                preset=config.ffmpeg_preset,
+                threads=ffmpeg_threads,
+                preset=ffmpeg_preset,
                 bitrate=config.ffmpeg_bitrate,
                 audio_bitrate=config.ffmpeg_audio_bitrate,
                 temp_audiofile=str(Path(output_path).parent / "temp_audio.m4a"),
@@ -385,6 +412,14 @@ class VideoComposer:
             logger.error(f"Error creating video: {e}")
             raise
         finally:
+            # Safely close all clips
+            self._safe_close_clips(video_clips)
+            if "final_clip" in locals():
+                self._safe_close_clip(final_clip)
+            if "final_clip_resized" in locals():
+                self._safe_close_clip(final_clip_resized)
+            if "watermark" in locals():
+                self._safe_close_clip(watermark)
             gc.collect()
 
     async def _compose_video_with_local_files(
@@ -457,13 +492,19 @@ class VideoComposer:
                 final_clip_resized = final_clip.with_effects(
                     [Resize(width=target_width, height=target_height)]
                 )
+                # Use fast mode settings when enabled for development/testing
+                ffmpeg_preset = config.ffmpeg_preset
+                ffmpeg_threads = config.ffmpeg_threads
+                if config.ffmpeg_fast_mode:
+                    ffmpeg_preset = "ultrafast"
+                    ffmpeg_threads = max(ffmpeg_threads, (os.cpu_count() or 2))
                 final_clip_resized.write_videofile(
                     str(output_path),
                     fps=config.ffmpeg_fps,
                     codec=config.ffmpeg_codec,
                     audio_codec=config.ffmpeg_audio_codec,
-                    threads=config.ffmpeg_threads,
-                    preset=config.ffmpeg_preset,
+                    threads=ffmpeg_threads,
+                    preset=ffmpeg_preset,
                     bitrate=config.ffmpeg_bitrate,
                     audio_bitrate=config.ffmpeg_audio_bitrate,
                     temp_audiofile=str(Path(output_path).parent / "temp_audio.m4a"),
@@ -474,6 +515,20 @@ class VideoComposer:
                 logger.error(f"Error composing video: {e}")
                 raise
             finally:
+                # Safely close all clips
+                self._safe_close_clips(video_clips)
+                if "final_clip" in locals():
+                    self._safe_close_clip(final_clip)
+                if "final_clip_resized" in locals():
+                    self._safe_close_clip(final_clip_resized)
+                if "watermark" in locals():
+                    self._safe_close_clip(watermark)
+                if "comp_clip" in locals():
+                    self._safe_close_clip(comp_clip)
+                if "bg_clip" in locals():
+                    self._safe_close_clip(bg_clip)
+                if "fg_clip" in locals():
+                    self._safe_close_clip(fg_clip)
                 gc.collect()
 
         loop = asyncio.get_event_loop()

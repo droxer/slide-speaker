@@ -1325,12 +1325,6 @@ function App() {
                     </button>
                   </div>
                 )}
-                {/* Prominent create-new CTA placed near the top for visibility */}
-                <div className="completed-cta">
-                  <button onClick={resetForm} className="primary-btn" type="button">
-                    Create Another Video
-                  </button>
-                </div>
                 
                 <div className="preview-container">
                   <div className="video-main">
@@ -1523,6 +1517,12 @@ function App() {
                 </div>
                 
                 
+                {/* Prominent create-new CTA placed at the end of the completed view for better user flow */}
+                <div className="completed-cta-bottom">
+                  <button onClick={resetForm} className="primary-btn" type="button">
+                    Create Another Video
+                  </button>
+                </div>
               </div>
             )}
 
