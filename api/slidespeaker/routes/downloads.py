@@ -204,12 +204,41 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
 async def _proxy_cloud_media(
     object_key: str, media_type: str, range_header: str | None
 ) -> StreamingResponse:
-    """Proxy a cloud object through the API, preserving range semantics.
+    """Proxy a cloud object through the API, preferring SDK download.
 
-    This avoids client-side CORS by streaming bytes from the API origin.
+    Uses provider SDK (download_bytes) to avoid signed URL issues; falls back
+    to presigned URL streaming only if necessary. Range is best-effort.
     """
     sp: StorageProvider = get_storage_provider()
-    # Short-lived URL; no response override params for video/mp4 range
+
+    # Attempt SDK download first (most reliable across providers)
+    try:
+        blob: bytes = sp.download_bytes(object_key)
+
+        def iter_mem(chunk_size: int = 1024 * 256) -> Iterator[bytes]:
+            total = len(blob)
+            offset = 0
+            # Note: ignoring range_header; serving full content inline
+            while offset < total:
+                end = min(offset + chunk_size, total)
+                yield blob[offset:end]
+                offset = end
+
+        return StreamingResponse(
+            iter_mem(),
+            status_code=200,
+            headers={
+                "Content-Type": media_type,
+                "Content-Length": str(len(blob)),
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Access-Control-Allow-Origin": "*",
+            },
+        )
+    except Exception:
+        # Fall back to URL streaming when SDK download is unavailable
+        pass
+
+    # Short-lived URL; avoid response overrides here to keep compatibility
     url = sp.get_file_url(object_key, expires_in=300)
 
     # Build request with optional Range header
@@ -237,7 +266,6 @@ async def _proxy_cloud_media(
 
     out_headers = {
         "Content-Type": media_type,
-        "Accept-Ranges": "bytes",
         "Cache-Control": "no-cache, no-store, must-revalidate",
         "Access-Control-Allow-Origin": "*",
     }
@@ -245,6 +273,7 @@ async def _proxy_cloud_media(
         out_headers["Content-Length"] = content_length
     if content_range:
         out_headers["Content-Range"] = content_range
+        out_headers["Accept-Ranges"] = "bytes"
 
     return StreamingResponse(iter_stream(), status_code=status, headers=out_headers)
 
@@ -513,23 +542,35 @@ async def get_final_audio(file_id: str, request: Request) -> Any:
 
     # 1) Prebuilt final audio in storage
     for key in _final_audio_object_keys(file_id):
-        if sp.file_exists(key):
-            if config.storage_provider == "local":
-                actual = config.output_dir / key
-                return FileResponse(
-                    str(actual),
-                    media_type="audio/mpeg",
-                    filename=f"presentation_{file_id}.mp3",
-                    headers={
-                        "Access-Control-Allow-Origin": "*",
-                        "Cache-Control": "public, max-age=3600",
-                    },
-                )
-            else:
+        if config.storage_provider == "local":
+            # Local FS: verify and serve directly
+            actual = config.output_dir / key
+            try:
+                if actual.exists() and actual.is_file():
+                    return FileResponse(
+                        str(actual),
+                        media_type="audio/mpeg",
+                        filename=f"presentation_{file_id}.mp3",
+                        headers={
+                            "Access-Control-Allow-Origin": "*",
+                            "Cache-Control": "public, max-age=3600",
+                            "Content-Disposition": f"inline; filename=presentation_{file_id}.mp3",
+                        },
+                    )
+            except Exception:
+                pass
+        else:
+            # Cloud: try proxying the object key without relying on HEAD permissions
+            try:
                 if config.proxy_cloud_media:
-                    # Proxy audio through API to avoid bucket CORS
                     return await _proxy_cloud_media(key, "audio/mpeg", None)
-                url = sp.get_file_url(key, expires_in=300)
+                # If proxy disabled, attempt redirect
+                url = sp.get_file_url(
+                    key,
+                    expires_in=300,
+                    content_disposition=f"inline; filename=presentation_{file_id}.mp3",
+                    content_type="audio/mpeg",
+                )
                 return Response(
                     status_code=307,
                     headers={
@@ -538,6 +579,13 @@ async def get_final_audio(file_id: str, request: Request) -> Any:
                         "Access-Control-Allow-Origin": "*",
                     },
                 )
+            except HTTPException as e:
+                # Continue to next key on 404/403; re-raise others
+                if e.status_code not in (403, 404):
+                    raise
+            except Exception:
+                # Continue to next key on any provider error
+                pass
 
     # 2) Local: concatenate audio files
     if config.storage_provider == "local":
@@ -547,17 +595,31 @@ async def get_final_audio(file_id: str, request: Request) -> Any:
                 _stream_concatenated_files(audio_files),
                 media_type="audio/mpeg",
                 headers={
-                    "Content-Disposition": f"attachment; filename=presentation_{file_id}.mp3",
+                    # Serve inline so <audio> can play concatenated bytes
+                    "Content-Disposition": f"inline; filename=presentation_{file_id}.mp3",
                     "Access-Control-Allow-Origin": "*",
                     "Cache-Control": "no-cache",
                 },
             )
 
-    # 3) Fallback: last generated track
+    # 3) Fallback: last generated track (serve inline)
     audio_files = await _get_audio_files_from_state(file_id)
     if not audio_files:
         raise HTTPException(status_code=404, detail="Final audio not found")
-    return await get_audio_file(file_id, len(audio_files))
+    try:
+        actual_file_path = audio_files[-1]
+        return FileResponse(
+            actual_file_path,
+            media_type="audio/mpeg",
+            filename=f"presentation_{file_id}.mp3",
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Cache-Control": "public, max-age=3600",
+                "Content-Disposition": f"inline; filename=presentation_{file_id}.mp3",
+            },
+        )
+    except Exception as e:
+        raise HTTPException(status_code=404, detail="Final audio not found") from e
 
 
 @router.get("/tasks/{task_id}/audio/tracks")
@@ -575,11 +637,18 @@ async def list_audio_files_by_task(task_id: str) -> dict[str, Any]:
 
 @router.get("/tasks/{task_id}/audio")
 async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
+    """Serve final audio by task, preferring task-id-based object keys.
+
+    Avoid pre-checks that can fail on cloud providers with restricted HEAD permissions.
+    Try task-id first; on 404, fall back to file-id mapping.
+    """
     file_id = await _file_id_from_task(task_id)
-    sp: StorageProvider = get_storage_provider()
-    if sp.file_exists(f"{task_id}.mp3"):
+    try:
         return await get_final_audio(task_id, request)
-    return await get_final_audio(file_id, request)
+    except HTTPException as e:
+        if e.status_code != 404:
+            raise
+        return await get_final_audio(file_id, request)
 
 
 @router.get("/tasks/{task_id}/audio/download")
@@ -645,6 +714,7 @@ async def get_audio_file_by_task(task_id: str, index: int) -> Any:
             "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
             "Access-Control-Allow-Headers": "*",
             "Cache-Control": "public, max-age=3600",
+            "Content-Disposition": f"inline; filename={task_id}_track_{index}.mp3",
         },
     )
 

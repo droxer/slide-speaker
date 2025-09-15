@@ -700,6 +700,20 @@
   opacity: 1;
 }
 
+/* Tighten resource links spacing in task cards */
+.task-details .resource-links {
+  border-top: 1px solid #e2e8f0;
+  padding-top: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.task-details .resource-links .url-copy-row {
+  margin-bottom: 0.6rem;
+}
+
+/* Transcript pane styles removed */
+
+
 /* Compact badges summary when collapsed */
 .resource-badges {
   display: flex;
@@ -740,6 +754,104 @@
 .link-button:focus {
   outline: none;
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+}
+
+/* Audio preview block with captions in task cards */
+.audio-preview-block {
+  margin: 6px 0 10px;
+}
+.audio-preview-block audio {
+  width: 100%;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+.audio-preview-block .audio-transcript-pane {
+  margin-top: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  background: rgba(248, 250, 252, 0.85);
+  border: 1px solid rgba(203, 213, 225, 0.7);
+  border-radius: 10px;
+  padding: 8px;
+}
+.audio-preview-block .audio-transcript-pane .cue {
+  padding: 6px 8px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+.audio-preview-block .audio-transcript-pane .cue:hover {
+  background: rgba(226, 232, 240, 0.6);
+}
+.audio-preview-block .audio-transcript-pane .cue.active {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+}
+.audio-preview-block .audio-transcript-pane .t-time {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 700;
+}
+.audio-preview-block .audio-transcript-pane .t-text {
+  font-size: 13px;
+  color: #0f172a;
+  white-space: pre-wrap;
+}
+
+/* Modal audio preview below the video */
+.modal-audio-preview {
+  margin-top: 10px;
+}
+.modal-audio-preview audio {
+  width: 100%;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+.modal-audio-preview .audio-transcript-pane {
+  margin-top: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  background: rgba(248, 250, 252, 0.85);
+  border: 1px solid rgba(203, 213, 225, 0.7);
+  border-radius: 10px;
+  padding: 8px;
+}
+.modal-audio-preview .audio-transcript-pane .cue {
+  padding: 6px 8px;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 8px;
+  align-items: start;
+}
+.modal-audio-preview .audio-transcript-pane .cue:hover {
+  background: rgba(226, 232, 240, 0.6);
+}
+.modal-audio-preview .audio-transcript-pane .cue.active {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+}
+.modal-audio-preview .audio-transcript-pane .t-time {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 700;
+}
+.modal-audio-preview .audio-transcript-pane .t-text {
+  font-size: 13px;
+  color: #0f172a;
+  white-space: pre-wrap;
 }
 
 .cancel-button {
@@ -1663,3 +1775,16 @@
 }
 
 /* indeterminate animation removed with loading overlay */
+/* Transcript layout styles removed */
+.modal-preview-stack {
+  display: block;
+}
+.modal-preview-stack .modal-video-wrapper {
+  margin-bottom: 10px;
+}
+
+.modal-audio-controls {
+  display: flex;
+  justify-content: flex-end;
+  margin: 6px 0;
+}

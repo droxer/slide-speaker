@@ -166,13 +166,13 @@ const localStorageUtils = {
 };
 
 function App() {
-  // UI theme: 'flat' (default), 'classic', or 'material'
+  // UI theme: 'classic' (Modern, default), 'flat', or 'material'
   const [uiTheme, setUiTheme] = useState<'flat' | 'classic' | 'material'>(() => {
     try {
       const saved = localStorage.getItem(THEME_STORAGE_KEY);
       if (saved === 'classic' || saved === 'flat' || saved === 'material') return saved as 'flat' | 'classic' | 'material';
     } catch {}
-    return 'flat';
+    return 'classic';
   });
 
   // Apply/remove ultra-flat class based on theme
@@ -194,6 +194,7 @@ function App() {
   const [status, setStatus] = useState<AppStatus>('idle');
   const [progress, setProgress] = useState<number>(0);
   const [processingDetails, setProcessingDetails] = useState<ProcessingDetails | null>(null);
+  const [processingTranscriptMd, setProcessingTranscriptMd] = useState<string | null>(null);
   // Using final audio endpoint; no need to fetch per-track list
   const [voiceLanguage, setVoiceLanguage] = useState<string>('english');
   const [subtitleLanguage, setSubtitleLanguage] = useState<string>('english');
@@ -202,13 +203,35 @@ function App() {
   const [generateSubtitles, setGenerateSubtitles] = useState<boolean>(true);
   const [isResumingTask, setIsResumingTask] = useState<boolean>(false);
   const [showTaskMonitor, setShowTaskMonitor] = useState<boolean>(false);
+  const [uploadMode, setUploadMode] = useState<'slides' | 'pdf'>('slides');
   const videoRef = useRef<HTMLVideoElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  type Cue = { start: number; end: number; text: string };
+  const [audioCues, setAudioCues] = useState<Cue[]>([]);
+  const [activeAudioCueIdx, setActiveAudioCueIdx] = useState<number | null>(null);
+  const audioTranscriptRef = useRef<HTMLDivElement>(null);
+  const [showAudioTranscript, setShowAudioTranscript] = useState<boolean>(false);
+  const [audioCuesLoaded, setAudioCuesLoaded] = useState<boolean>(false);
+  // Completed banner visibility (dismissible)
+  const [showCompletedBanner, setShowCompletedBanner] = useState<boolean>(() => {
+    try { return localStorage.getItem('ss_show_completed_banner') !== '0'; } catch { return true; }
+  });
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       const ext = selectedFile.name.toLowerCase().split('.').pop();
-      if (ext && ['pdf', 'pptx', 'ppt'].includes(ext)) {
+      const isPdf = ext === 'pdf';
+      const isSlide = ext === 'pptx' || ext === 'ppt';
+      if (uploadMode === 'pdf' && !isPdf) {
+        alert('Please select a PDF file for PDF processing.');
+        return;
+      }
+      if (uploadMode === 'slides' && !isSlide) {
+        alert('Please select a PPTX or PPT file for Slides processing.');
+        return;
+      }
+      if (ext && (isPdf || isSlide)) {
         setFile(selectedFile);
         setFileType(ext);
       } else {
@@ -346,6 +369,154 @@ function App() {
 
     loadSavedState();
   }, []);
+
+  // Fetch transcript markdown during processing for preview
+  useEffect(() => {
+    const fetchTranscript = async () => {
+      if (!taskId || status !== 'processing') return;
+      try {
+        const resp = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/transcripts/markdown`, { headers: { Accept: 'text/markdown' } });
+        if (resp.ok) {
+          const text = await resp.text();
+          setProcessingTranscriptMd(text);
+        }
+      } catch {
+        /* ignore */
+      }
+    };
+    fetchTranscript();
+  }, [taskId, status]);
+
+  // Fetch VTT and build cues for Completed view audio transcript when user plays audio
+  useEffect(() => {
+    const loadVtt = async () => {
+      if (status !== 'completed' || !taskId || !showAudioTranscript || audioCuesLoaded) return;
+      try {
+        const lang = (processingDetails?.subtitle_language || subtitleLanguage || voiceLanguage || 'english');
+        const resp = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(lang)}`, { headers: { Accept: 'text/vtt,*/*' } });
+        if (!resp.ok) return;
+        const text = await resp.text();
+        // Parse WebVTT into cues
+        const lines = text.split(/\r?\n/);
+        const parsed: Cue[] = [];
+        let i = 0;
+        const timeRe = /(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s+-->\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})/;
+        while (i < lines.length) {
+          const line = lines[i].trim();
+          if (!line) { i++; continue; }
+          if (line.toUpperCase() === 'WEBVTT' || /^\d+$/.test(line)) { i++; continue; }
+          const m = line.match(timeRe);
+          if (m) {
+            const toSec = (h: string, m: string, s: string, ms: string) => (
+              parseInt(h, 10) * 3600 + parseInt(m, 10) * 60 + parseInt(s, 10) + parseInt(ms, 10) / 1000
+            );
+            const start = toSec(m[1], m[2], m[3], m[4]);
+            const end = toSec(m[5], m[6], m[7], m[8]);
+            i++;
+            const textLines: string[] = [];
+            while (i < lines.length && lines[i].trim() !== '') {
+              textLines.push(lines[i]);
+              i++;
+            }
+            parsed.push({ start, end, text: textLines.join('\n') });
+          } else {
+            i++;
+          }
+        }
+        setAudioCues(parsed);
+        setAudioCuesLoaded(true);
+      } catch {
+        // ignore
+      }
+    };
+    loadVtt();
+  }, [status, taskId, processingDetails, subtitleLanguage, voiceLanguage, showAudioTranscript, audioCuesLoaded]);
+
+  // Reset transcript state when task/status changes
+  useEffect(() => {
+    setShowAudioTranscript(false);
+    setAudioCuesLoaded(false);
+    setAudioCues([]);
+    setActiveAudioCueIdx(null);
+    // Show banner on transition to completed unless user dismissed it previously
+    if (status === 'completed') {
+      try {
+        const flag = localStorage.getItem('ss_show_completed_banner');
+        setShowCompletedBanner(flag !== '0');
+      } catch {}
+    }
+  }, [taskId, status]);
+
+  // Only show transcript after user initiates audio playback
+  useEffect(() => {
+    if (status !== 'completed') return;
+    const el = audioRef.current;
+    if (!el) return;
+    const onPlay = () => {
+      setShowAudioTranscript(true);
+      // Auto-hide banner on first media interaction
+      if (showCompletedBanner) {
+        setShowCompletedBanner(false);
+        try { localStorage.setItem('ss_show_completed_banner', '0'); } catch {}
+      }
+    };
+    el.addEventListener('play', onPlay);
+    return () => { el.removeEventListener('play', onPlay); };
+  }, [status, taskId, showCompletedBanner]);
+
+  // Also hide banner when video starts playing
+  useEffect(() => {
+    if (status !== 'completed') return;
+    const v = videoRef.current;
+    if (!v) return;
+    const onPlay = () => {
+      if (showCompletedBanner) {
+        setShowCompletedBanner(false);
+        try { localStorage.setItem('ss_show_completed_banner', '0'); } catch {}
+      }
+    };
+    v.addEventListener('play', onPlay);
+    return () => { v.removeEventListener('play', onPlay); };
+  }, [status, taskId, showCompletedBanner]);
+
+  // Sync active cue with audio time
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || audioCues.length === 0) return;
+    const onTime = () => {
+      const t = audio.currentTime;
+      let idx: number | null = null;
+      for (let j = 0; j < audioCues.length; j++) {
+        const c = audioCues[j];
+        if (t >= c.start && t <= c.end) { idx = j; break; }
+      }
+      setActiveAudioCueIdx(idx);
+    };
+    audio.addEventListener('timeupdate', onTime);
+    audio.addEventListener('seeked', onTime);
+    onTime();
+    return () => {
+      audio.removeEventListener('timeupdate', onTime);
+      audio.removeEventListener('seeked', onTime);
+    };
+  }, [audioCues]);
+
+  // Auto-scroll transcript to active cue
+  useEffect(() => {
+    if (activeAudioCueIdx === null) return;
+    const container = audioTranscriptRef.current;
+    if (!container) return;
+    const el = container.querySelector(`#audio-cue-${activeAudioCueIdx}`) as HTMLElement | null;
+    if (!el) return;
+    try {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    } catch {
+      const cRect = container.getBoundingClientRect();
+      const eRect = el.getBoundingClientRect();
+      const delta = eRect.top - cRect.top - cRect.height / 2;
+      container.scrollTop += delta;
+    }
+  }, [activeAudioCueIdx]);
 
   // No-op: final audio is served via a single endpoint
 
@@ -734,13 +905,14 @@ function App() {
               <button
                 onClick={() => setShowTaskMonitor(false)}
                 className={`toggle-btn ${!showTaskMonitor ? 'active' : ''}`}
-                title="Processing View"
+                title="Studio"
                 role="tab"
                 aria-selected={!showTaskMonitor}
-                aria-controls="processing-panel"
+                aria-controls="studio-panel"
+                id="studio-tab"
               >
                 <span className="toggle-icon" aria-hidden="true">▶</span>
-                <span className="toggle-text">Process</span>
+                <span className="toggle-text">Studio</span>
               </button>
               <button
                 onClick={() => setShowTaskMonitor(true)}
@@ -749,6 +921,7 @@ function App() {
                 role="tab"
                 aria-selected={showTaskMonitor}
                 aria-controls="monitor-panel"
+                id="monitor-tab"
               >
                 <span className="toggle-icon" aria-hidden="true">📊</span>
                 <span className="toggle-text">Monitor</span>
@@ -764,11 +937,45 @@ function App() {
             <TaskMonitor apiBaseUrl={API_BASE_URL} />
           </div>
         ) : (
-          <div id="processing-panel" role="tabpanel" aria-labelledby="process-tab">
+          <div id="studio-panel" role="tabpanel" aria-labelledby="studio-tab">
             <div className="card-container">
               <div className={`content-card ${status === 'completed' ? 'wide' : ''}`}>
             {status === 'idle' && (
               <div className="upload-view">
+                {/* Entry mode toggle: Slides vs PDF are processed differently */}
+                <div className="mode-toggle" role="tablist" aria-label="Entry Mode">
+                  <button
+                    type="button"
+                    className={`toggle-btn ${uploadMode === 'slides' ? 'active' : ''}`}
+                    onClick={() => setUploadMode('slides')}
+                    role="tab"
+                    aria-selected={uploadMode === 'slides'}
+                    aria-controls="slides-mode-panel"
+                  >
+                    🖼️ Slides
+                  </button>
+                  <button
+                    type="button"
+                    className={`toggle-btn ${uploadMode === 'pdf' ? 'active' : ''}`}
+                    onClick={() => setUploadMode('pdf')}
+                    role="tab"
+                    aria-selected={uploadMode === 'pdf'}
+                    aria-controls="pdf-mode-panel"
+                  >
+                    📄 PDF
+                  </button>
+                </div>
+                <div className="mode-explainer" aria-live="polite">
+                  {uploadMode === 'slides' ? (
+                    <>
+                      <strong>Slides Mode:</strong> Processes each slide individually for transcripts, audio, subtitles, and composes a final video.
+                    </>
+                  ) : (
+                    <>
+                      <strong>PDF Mode:</strong> Segments the document into chapters, generates chapter audio + subtitles, then composes the final video.
+                    </>
+                  )}
+                </div>
                 {isResumingTask && (
                   <div className="resume-indicator">
                     <div className="spinner"></div>
@@ -780,7 +987,7 @@ function App() {
                   <input
                     type="file"
                     id="file-upload"
-                    accept=".pdf,.pptx,.ppt"
+                    accept={uploadMode === 'pdf' ? '.pdf' : '.pptx,.ppt'}
                     onChange={handleFileChange}
                     className="file-input"
                     disabled={isResumingTask}
@@ -788,20 +995,21 @@ function App() {
                   <label htmlFor="file-upload" className={`file-upload-label ${isResumingTask ? 'disabled' : ''}`}>
                     <div className="upload-icon">📄</div>
                     <div className="upload-text">
-                      {file ? file.name : 'Choose a file'}
+                      {file ? file.name : (uploadMode === 'pdf' ? 'Choose a PDF file' : 'Choose a PPTX/PPT file')}
                     </div>
                     <div className="upload-hint">
                       {file ? (
                         getFileTypeHint(file.name)
                       ) : (
-                        'Supports PDF, PPTX, and PPT files'
+                        (uploadMode === 'pdf'
+                          ? 'PDF will be processed as chapters for video + audio + subtitles'
+                          : 'Slides will be processed per slide for video + audio + subtitles')
                       )}
                     </div>
                   </label>
                 </div>
                 
                 <div className="video-options-section">
-                  <h3 className="video-options-title">Video Settings</h3>
                   <div className="video-options-grid">
                     <div className="video-option-card">
                       <div className="video-option-header">
@@ -885,7 +1093,7 @@ function App() {
                     className="primary-btn"
                     disabled={uploading}
                   >
-                    Create Your Masterpiece
+                    Create Video
                   </button>
                 )}
               </div>
@@ -979,7 +1187,7 @@ function App() {
                 >
                   STOP
                 </button>
-         
+        
                 
                 {processingDetails && (
                   <div className="steps-container">
@@ -1083,14 +1291,46 @@ function App() {
                     )}
                   </div>
                 )}
+
+                {processingTranscriptMd && (
+                  <div className="processing-transcript">
+                    <h4>Transcript (Preview)</h4>
+                    <div className="transcript-content" role="region" aria-label="Transcript preview">
+                      <pre>
+                        {processingTranscriptMd}
+                      </pre>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
             {status === 'completed' && (
               <div className="completed-view">
-                <div className="success-icon">✓</div>
-                <h3>Your Masterpiece is Ready!</h3>
-                <p className="success-message">Congratulations! Your presentation has been transformed into an engaging AI-powered video.</p>
+                {showCompletedBanner && (
+                  <div className="completed-banner">
+                    <div className="success-icon">✓</div>
+                    <h3>Your Masterpiece is Ready!</h3>
+                    <p className="success-message">Congratulations! Your presentation has been transformed into an engaging AI-powered video.</p>
+                    <button
+                      type="button"
+                      className="banner-dismiss"
+                      aria-label="Dismiss banner"
+                      onClick={() => {
+                        setShowCompletedBanner(false);
+                        try { localStorage.setItem('ss_show_completed_banner', '0'); } catch {}
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                )}
+                {/* Prominent create-new CTA placed near the top for visibility */}
+                <div className="completed-cta">
+                  <button onClick={resetForm} className="primary-btn" type="button">
+                    Create Another Video
+                  </button>
+                </div>
                 
                 <div className="preview-container">
                   <div className="video-main">
@@ -1105,6 +1345,50 @@ function App() {
                         {/* Video tracks will be added dynamically via useEffect */}
                       </video>
                     </div>
+                    {/* Inline audio player for quick listening */}
+                    <div className="audio-player-inline" style={{ marginTop: 12 }}>
+                      <audio
+                        ref={audioRef}
+                        controls
+                        preload="none"
+                        src={`${API_BASE_URL}/api/tasks/${taskId}/audio`}
+                        crossOrigin="anonymous"
+                        aria-label="Audio narration preview"
+                      >
+                        Your browser does not support the audio element.
+                      </audio>
+                    </div>
+                    {showAudioTranscript && audioCues.length > 0 && (
+                      <div className="audio-transcript-pane" ref={audioTranscriptRef} aria-label="Audio captions">
+                        {audioCues.map((cue, idx) => (
+                          <div
+                            key={idx}
+                            id={`audio-cue-${idx}`}
+                            className={`cue ${activeAudioCueIdx === idx ? 'active' : ''}`}
+                            onClick={() => {
+                              if (audioRef.current) {
+                                audioRef.current.currentTime = cue.start + 0.01;
+                                audioRef.current.play().catch(() => {});
+                              }
+                            }}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                if (audioRef.current) {
+                                  audioRef.current.currentTime = cue.start + 0.01;
+                                  audioRef.current.play().catch(() => {});
+                                }
+                              }
+                            }}
+                          >
+                            <div className="t-time">{Math.floor(cue.start / 60)}:{String(Math.floor(cue.start % 60)).padStart(2, '0')}</div>
+                            <div className="t-text">{cue.text}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                     <div className="preview-info-compact">
                       <div className="info-grid">
                         <div className="info-item">
@@ -1238,11 +1522,7 @@ function App() {
                   </div>
                 </div>
                 
-                <div className="action-buttons">
-                  <button onClick={resetForm} className="primary-btn create-new-btn">
-                    Create Your Next Masterpiece
-                  </button>
-                </div>
+                
               </div>
             )}
 

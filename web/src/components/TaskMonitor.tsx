@@ -78,6 +78,18 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
   const lastSubtitleFileIdRef = React.useRef<string | null>(null);
   const [removingTaskIds, setRemovingTaskIds] = useState<Set<string>>(new Set());
   const [expandedDownloads, setExpandedDownloads] = useState<Set<string>>(new Set());
+  const [audioPreviewTaskId, setAudioPreviewTaskId] = useState<string | null>(null);
+  type Cue = { start: number; end: number; text: string };
+  const [audioCues, setAudioCues] = useState<Cue[]>([]);
+  const [activeAudioCueIdx, setActiveAudioCueIdx] = useState<number | null>(null);
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  const audioTranscriptRef = React.useRef<HTMLDivElement | null>(null);
+  // Modal audio preview (placed close to video preview)
+  const modalAudioRef = React.useRef<HTMLAudioElement | null>(null);
+  const [modalAudioCues, setModalAudioCues] = useState<Cue[]>([]);
+  const [activeModalAudioCueIdx, setActiveModalAudioCueIdx] = useState<number | null>(null);
+  const modalAudioTranscriptRef = React.useRef<HTMLDivElement | null>(null);
+  const [showModalAudio, setShowModalAudio] = useState<boolean>(true);
   const prevStatusesRef = React.useRef<Record<string, string>>({});
 
   const toggleDownloads = (taskId: string) => {
@@ -88,6 +100,167 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
       return next;
     });
   };
+
+  const toggleAudioPreview = async (task: Task) => {
+    // Ensure downloads section is expanded for this task so the preview is visible
+    setExpandedDownloads((prev) => {
+      const next = new Set(prev);
+      next.add(task.task_id);
+      return next;
+    });
+    if (audioPreviewTaskId === task.task_id) {
+      setAudioPreviewTaskId(null);
+      setAudioCues([]);
+      setActiveAudioCueIdx(null);
+      return;
+    }
+    setAudioPreviewTaskId(task.task_id);
+    // Fetch VTT cues for this task
+    try {
+      const preferredLanguage = task.kwargs?.subtitle_language || task.state?.subtitle_language || task.kwargs?.voice_language || 'english';
+      const url = `${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/vtt?language=${encodeURIComponent(preferredLanguage)}`;
+      const resp = await fetch(url, { headers: { Accept: 'text/vtt,*/*' } });
+      if (!resp.ok) { setAudioCues([]); return; }
+      const text = await resp.text();
+      const lines = text.split(/\r?\n/);
+      const parsed: Cue[] = [];
+      let i = 0;
+      const timeRe = /(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s+-->\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})/;
+      while (i < lines.length) {
+        const line = lines[i].trim();
+        if (!line) { i++; continue; }
+        if (line.toUpperCase() === 'WEBVTT' || /^\d+$/.test(line)) { i++; continue; }
+        const m = line.match(timeRe);
+        if (m) {
+          const toSec = (h: string, m: string, s: string, ms: string) => (
+            parseInt(h, 10) * 3600 + parseInt(m, 10) * 60 + parseInt(s, 10) + parseInt(ms, 10) / 1000
+          );
+          const start = toSec(m[1], m[2], m[3], m[4]);
+          const end = toSec(m[5], m[6], m[7], m[8]);
+          i++;
+          const textLines: string[] = [];
+          while (i < lines.length && lines[i].trim() !== '') {
+            textLines.push(lines[i]);
+            i++;
+          }
+          parsed.push({ start, end, text: textLines.join('\n') });
+        } else {
+          i++;
+        }
+      }
+      setAudioCues(parsed);
+      setActiveAudioCueIdx(null);
+    } catch {
+      setAudioCues([]);
+    }
+  };
+
+  // Sync active cue with audio time
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || audioCues.length === 0) return;
+    const onTime = () => {
+      const t = audio.currentTime;
+      let idx: number | null = null;
+      for (let j = 0; j < audioCues.length; j++) {
+        const c = audioCues[j];
+        if (t >= c.start && t <= c.end) { idx = j; break; }
+      }
+      setActiveAudioCueIdx(idx);
+    };
+    audio.addEventListener('timeupdate', onTime);
+    audio.addEventListener('seeked', onTime);
+    onTime();
+    return () => {
+      audio.removeEventListener('timeupdate', onTime);
+      audio.removeEventListener('seeked', onTime);
+    };
+  }, [audioCues, audioPreviewTaskId]);
+
+  // Load VTT for selected preview task and build cues for modal audio
+  useEffect(() => {
+    const fetchModalVtt = async () => {
+      const t = selectedTaskForPreview;
+      if (!t) { setModalAudioCues([]); return; }
+      try {
+        const preferredLanguage = t.kwargs?.subtitle_language || t.state?.subtitle_language || t.kwargs?.voice_language || 'english';
+        const url = `${apiBaseUrl}/api/tasks/${t.task_id}/subtitles/vtt?language=${encodeURIComponent(preferredLanguage)}`;
+        const resp = await fetch(url, { headers: { Accept: 'text/vtt,*/*' } });
+        if (!resp.ok) { setModalAudioCues([]); return; }
+        const text = await resp.text();
+        const lines = text.split(/\r?\n/);
+        const parsed: Cue[] = [];
+        let i = 0;
+        const timeRe = /(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s+-->\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})/;
+        while (i < lines.length) {
+          const line = lines[i].trim();
+          if (!line) { i++; continue; }
+          if (line.toUpperCase() === 'WEBVTT' || /^\d+$/.test(line)) { i++; continue; }
+          const m = line.match(timeRe);
+          if (m) {
+            const toSec = (h: string, m: string, s: string, ms: string) => (
+              parseInt(h, 10) * 3600 + parseInt(m, 10) * 60 + parseInt(s, 10) + parseInt(ms, 10) / 1000
+            );
+            const start = toSec(m[1], m[2], m[3], m[4]);
+            const end = toSec(m[5], m[6], m[7], m[8]);
+            i++;
+            const textLines: string[] = [];
+            while (i < lines.length && lines[i].trim() !== '') {
+              textLines.push(lines[i]);
+              i++;
+            }
+            parsed.push({ start, end, text: textLines.join('\n') });
+          } else {
+            i++;
+          }
+        }
+        setModalAudioCues(parsed);
+        setActiveModalAudioCueIdx(null);
+      } catch {
+        setModalAudioCues([]);
+      }
+    };
+    fetchModalVtt();
+  }, [selectedTaskForPreview, apiBaseUrl]);
+
+  // Sync modal audio cues with playback
+  useEffect(() => {
+    const audio = modalAudioRef.current;
+    if (!audio || modalAudioCues.length === 0) return;
+    const onTime = () => {
+      const t = audio.currentTime;
+      let idx: number | null = null;
+      for (let j = 0; j < modalAudioCues.length; j++) {
+        const c = modalAudioCues[j];
+        if (t >= c.start && t <= c.end) { idx = j; break; }
+      }
+      setActiveModalAudioCueIdx(idx);
+    };
+    audio.addEventListener('timeupdate', onTime);
+    audio.addEventListener('seeked', onTime);
+    onTime();
+    return () => {
+      audio.removeEventListener('timeupdate', onTime);
+      audio.removeEventListener('seeked', onTime);
+    };
+  }, [modalAudioCues]);
+
+  // Auto-scroll modal transcript
+  useEffect(() => {
+    if (activeModalAudioCueIdx === null) return;
+    const container = modalAudioTranscriptRef.current;
+    if (!container) return;
+    const el = container.querySelector(`#modal-audio-cue-${activeModalAudioCueIdx}`) as HTMLElement | null;
+    if (!el) return;
+    try {
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    } catch {
+      const cRect = container.getBoundingClientRect();
+      const eRect = el.getBoundingClientRect();
+      const delta = eRect.top - cRect.top - cRect.height / 2;
+      container.scrollTop += delta;
+    }
+  }, [activeModalAudioCueIdx]);
 
   // Debug log for preview state
   useEffect(() => {
@@ -151,17 +324,8 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     checkSubtitles();
   }, [selectedTaskForPreview, apiBaseUrl, subtitleAvailable, subtitleObjectUrl]);
 
-  // Ensure subtitles display like completed view (force showing when available)
-  useEffect(() => {
-    if (selectedTaskForPreview && subtitleAvailable && modalVideoRef.current) {
-      try {
-        const tracks = modalVideoRef.current.textTracks;
-        if (tracks && tracks.length > 0) {
-          tracks[0].mode = 'showing';
-        }
-      } catch {}
-    }
-  }, [selectedTaskForPreview, subtitleAvailable]);
+  // Do not force subtitles to display in preview; user can enable via player controls
+
 
   // No imperative src assignment; <video src> handles local and S3 redirect
 
@@ -732,6 +896,40 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                     <div className={`downloads-collapse ${expandedDownloads.has(task.task_id) ? 'open' : ''}`}>
                       {expandedDownloads.has(task.task_id) && (
                         <div className="resource-links" id={`downloads-${task.task_id}`}>
+                        {/* Optional Audio Preview with captions (toggled via Listen button) */}
+                        {audioPreviewTaskId === task.task_id && (
+                          <div id={`audio-preview-${task.task_id}`} className="audio-preview-block">
+                            <audio
+                              ref={audioRef}
+                              controls
+                              preload="none"
+                              src={`${apiBaseUrl}/api/tasks/${task.task_id}/audio`}
+                              crossOrigin="anonymous"
+                              aria-label={`Audio narration for task ${task.task_id}`}
+                            />
+                            {audioCues.length > 0 && (
+                              <div className="audio-transcript-pane" ref={audioTranscriptRef}>
+                                {audioCues.map((cue, idx) => (
+                                  <div
+                                    key={idx}
+                                    className={`cue ${activeAudioCueIdx === idx ? 'active' : ''}`}
+                                    onClick={() => {
+                                      if (audioRef.current) {
+                                        audioRef.current.currentTime = cue.start + 0.01;
+                                        audioRef.current.play().catch(() => {});
+                                      }
+                                    }}
+                                    role="button"
+                                    tabIndex={0}
+                                  >
+                                    <div className="t-time">{Math.floor(cue.start / 60)}:{String(Math.floor(cue.start % 60)).padStart(2, '0')}</div>
+                                    <div className="t-text">{cue.text}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                         {/* Video */}
                         <div className="url-copy-row">
                           <span className="resource-label-inline">Video</span>
@@ -844,20 +1042,32 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
               
               <div className="task-actions">
                 {task.status === 'completed' && (
-                  <button
-                    onClick={(e) => {
-                      console.log('Watch Video button clicked', e);
-                      console.log('Task data:', task);
-                      e.preventDefault();
-                      e.stopPropagation();
-                      previewTask(task);
-                    }}
-                    className="preview-button"
-                    title="Watch Generated Video"
-                    type="button"
-                  >
-                    ▶️ Watch
-                  </button>
+                  <>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        previewTask(task);
+                      }}
+                      className="preview-button"
+                      title="Watch Generated Video"
+                      type="button"
+                    >
+                      ▶️ Watch
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        toggleAudioPreview(task);
+                      }}
+                      className="preview-button"
+                      title="Listen to Audio"
+                      type="button"
+                    >
+                      🎧 Listen
+                    </button>
+                  </>
                 )}
                 {(task.status === 'queued' || task.status === 'processing') && (
                   <button
@@ -953,7 +1163,8 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                 
                 
                 return (
-                  <div className="modal-video-wrapper">
+                  <div className="modal-preview-stack">
+                    <div className="modal-video-wrapper">
                     <video 
                       key={selectedTaskForPreview.file_id}
                       ref={modalVideoRef}
@@ -992,7 +1203,6 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                                    subtitleLanguage === 'korean' ? 'ko' : 
                                    subtitleLanguage === 'thai' ? 'th' : 'en'}
                           label={getLanguageDisplayName(subtitleLanguage)}
-                          default
                           onError={(e) => console.error('Subtitle track loading error:', e)}
                         />
                       )}
@@ -1031,6 +1241,53 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                     )}
                     
                     {/* Subtitle indicator removed per request */}
+                    </div>
+                    {/* Audio preview placed close to the video preview */}
+                    <div className="modal-audio-controls">
+                      <button
+                        type="button"
+                        className="link-button"
+                        onClick={() => setShowModalAudio((s) => !s)}
+                        aria-expanded={showModalAudio}
+                        aria-controls="modal-audio-preview"
+                      >
+                        Audio Preview <span className={`chevron ${showModalAudio ? 'open' : ''}`} aria-hidden="true" />
+                      </button>
+                    </div>
+                    {showModalAudio && (
+                      <div id="modal-audio-preview" className="modal-audio-preview">
+                        <audio
+                          ref={modalAudioRef}
+                          controls
+                          preload="none"
+                          src={`${apiBaseUrl}/api/tasks/${selectedTaskForPreview.task_id}/audio`}
+                          crossOrigin="anonymous"
+                          aria-label="Audio narration preview"
+                        />
+                        {modalAudioCues.length > 0 && (
+                          <div className="audio-transcript-pane" ref={modalAudioTranscriptRef} aria-label="Audio captions">
+                            {modalAudioCues.map((cue, idx) => (
+                              <div
+                                key={idx}
+                                id={`modal-audio-cue-${idx}`}
+                                className={`cue ${activeModalAudioCueIdx === idx ? 'active' : ''}`}
+                                onClick={() => {
+                                  if (modalAudioRef.current) {
+                                    modalAudioRef.current.currentTime = cue.start + 0.01;
+                                    modalAudioRef.current.play().catch(() => {});
+                                  }
+                                }}
+                                role="button"
+                                tabIndex={0}
+                              >
+                                <div className="t-time">{Math.floor(cue.start / 60)}:{String(Math.floor(cue.start % 60)).padStart(2, '0')}</div>
+                                <div className="t-text">{cue.text}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 );
               })()}

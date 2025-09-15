@@ -122,20 +122,6 @@ async def generate_subtitles_common(
             srt_url = storage_provider.upload_file(str(srt_path), srt_key, "text/plain")
             vtt_url = storage_provider.upload_file(str(vtt_path), vtt_key, "text/vtt")
 
-            # Backward-compatibility: also upload under file_id-based keys if different
-            try:
-                if base_id != file_id:
-                    storage_provider.upload_file(
-                        str(srt_path), f"{file_id}_{locale_code}.srt", "text/plain"
-                    )
-                    storage_provider.upload_file(
-                        str(vtt_path), f"{file_id}_{locale_code}.vtt", "text/vtt"
-                    )
-            except Exception as compat_err:
-                logger.warning(
-                    f"Compat upload (file-id keys) failed for subtitles: {compat_err}"
-                )
-
             subtitle_urls = [srt_url, vtt_url]
             logger.info(f"Uploaded subtitles to storage: {srt_url}, {vtt_url}")
         except Exception as storage_error:

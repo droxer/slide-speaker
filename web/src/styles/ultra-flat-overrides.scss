@@ -80,6 +80,32 @@ body.ultra-flat .toggle-btn.active {
   transform: none !important;
 }
 
+/* Ensure mode-toggle follows flat design principles */
+body.ultra-flat .mode-toggle {
+  background: #f3f4f6 !important;
+  border: 1px solid var(--uf-border) !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  padding: 2px !important;
+}
+body.ultra-flat .mode-toggle .toggle-btn {
+  background: #ffffff !important;
+  color: #374151 !important;
+  border: 1px solid transparent !important;
+  border-radius: 2px !important;
+  padding: 6px 12px !important;
+  font-weight: 500 !important;
+}
+body.ultra-flat .mode-toggle .toggle-btn.active {
+  background: var(--uf-btn-bg) !important;
+  color: var(--uf-btn-text) !important;
+  border-color: var(--uf-btn-bg) !important;
+}
+body.ultra-flat .mode-toggle .toggle-btn:not(.active):hover {
+  background: #f3f4f6 !important;
+  border-color: var(--uf-border) !important;
+}
+
 body.ultra-flat .toggle-btn:hover:not(.active) {
   background: #f3f4f6 !important;
   color: #111827 !important;
@@ -394,6 +420,18 @@ body.ultra-flat .footer-note {
     flex: 1 1 0 !important;
     justify-content: center !important;
     padding: 10px 12px !important;
+    font-size: 0.9rem !important;
+  }
+
+  body.ultra-flat .mode-toggle {
+    width: 100% !important;
+    margin-bottom: 8px !important;
+  }
+
+  body.ultra-flat .mode-toggle .toggle-btn {
+    flex: 1 !important;
+    justify-content: center !important;
+    padding: 6px !important;
     font-size: 0.9rem !important;
   }
 

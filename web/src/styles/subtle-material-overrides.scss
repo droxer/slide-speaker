@@ -89,6 +89,34 @@ body.subtle-material .view-toggle .toggle-btn:focus-visible {
   outline-offset: 2px !important;
 }
 
+/* Mode Toggle (Slides vs PDF) */
+body.subtle-material .mode-toggle {
+  background: var(--sm-surface) !important;
+  border: 1px solid var(--sm-border) !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  padding: 3px !important;
+  margin-bottom: 10px !important;
+}
+body.subtle-material .mode-toggle .toggle-btn {
+  background: var(--sm-surface) !important;
+  color: #334155 !important;
+  border: 1px solid transparent !important;
+  border-radius: 6px !important;
+  padding: 6px 12px !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+}
+body.subtle-material .mode-toggle .toggle-btn.active {
+  background: var(--sm-primary) !important;
+  color: var(--sm-on-primary) !important;
+  border-color: var(--sm-primary) !important;
+}
+body.subtle-material .mode-toggle .toggle-btn:not(.active):hover {
+  background: var(--sm-secondary) !important;
+  border-color: var(--sm-border) !important;
+}
+
 /* Inputs */
 body.subtle-material input[type="text"],
 body.subtle-material input[type="file"],
@@ -389,6 +417,8 @@ body.subtle-material button:focus {
   }
   body.subtle-material .view-toggle { width: 100% !important; }
   body.subtle-material .view-toggle .toggle-btn { flex: 1 1 0 !important; justify-content: center !important; }
+  body.subtle-material .mode-toggle { width: 100% !important; margin-bottom: 8px !important; }
+  body.subtle-material .mode-toggle .toggle-btn { flex: 1 !important; justify-content: center !important; padding: 6px !important; font-size: 0.9rem !important; }
   body.subtle-material .content-card { padding: 1.25rem !important; border-radius: 8px !important; }
   body.subtle-material .monitor-header { flex-direction: column !important; gap: 12px !important; }
   body.subtle-material .search-form { flex-direction: column !important; gap: 10px !important; }

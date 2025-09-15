@@ -17,24 +17,27 @@ def transcripts_to_markdown(
     filename: str | None = None,
 ) -> str:
     """
-    Convert a sequence of transcript items to a Markdown document.
+    Convert a sequence of transcript items to a strict Markdown document.
 
-    Each item is expected to contain either:
-      - "slide_number" (int|str) or "chapter_number" (int|str) identifying the order
-      - "script" (str) with the transcript text
+    Strict format required:
+      # <file_name>
 
-    Args:
-        items: Iterable of transcript dict-like objects
-        section_label: Label to use for section headers (e.g., "Slide" or "Chapter")
+      ## <Section Title>
+      <transcripts>
 
-    Returns:
-        Markdown string with one section per item.
+    Notes:
+      - The document title is the original filename when provided.
+      - Section title prefers the item's "title". If missing, it falls back to
+        "{section_label} {number}".
+      - Only the transcript text is emitted under each section; no extra labels
+        (no Description/Key Points/Script lists).
     """
-    lines: list[str] = ["# Transcripts"]
-    if filename:
-        lines.extend(["", f"File: {filename}", ""])
-    else:
-        lines.append("")
+    # Title: prefer the provided filename; otherwise a neutral fallback
+    title_text = (
+        filename.strip() if isinstance(filename, str) and filename else "Transcripts"
+    )
+    lines: list[str] = [f"# {title_text}", ""]
+
     for idx, item in enumerate(items, 1):
         number = (
             str(item.get("slide_number"))
@@ -45,28 +48,13 @@ def transcripts_to_markdown(
                 else str(idx)
             )
         )
-        title = str(item.get("title") or "").strip()
-        description = str(item.get("description") or "").strip()
-        key_points = item.get("key_points")
-        if not isinstance(key_points, list):
-            key_points = []
+        raw_title = str(item.get("title") or "").strip()
+        header_title = raw_title if raw_title else f"{section_label} {number}"
         script = str(item.get("script") or "").strip()
 
-        # Section header: "<number> - <title>" (omit label prefix per request)
-        header = f"{number} - {title}" if title else str(number)
-        lines.append(f"## {header}")
+        # Section header and body
+        lines.append(f"## {header_title}")
+        lines.append(script)
         lines.append("")
 
-        # Include details if present
-        if description:
-            lines.append(f"- Description: {description}")
-        if key_points:
-            lines.append("- Key Points:")
-            for kp in key_points:
-                lines.append(f"  - {str(kp)}")
-        # Always include script, even if empty placeholder
-        lines.append("- Script:")
-        lines.append("")
-        lines.append(script if script else "_(no content)_")
-        lines.append("")
     return "\n".join(lines).rstrip() + "\n"
