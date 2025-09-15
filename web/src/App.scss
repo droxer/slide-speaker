@@ -1725,6 +1725,9 @@ body:not(.ultra-flat) .app-footer {
   margin: 2rem 0;
 }
 
+/* Two-column layout for completed view: video left, details right */
+/* Two-column layout removed to restore previous design */
+
 .video-main {
   display: flex;
   flex-direction: column;
@@ -1837,14 +1840,12 @@ body:not(.ultra-flat) .app-footer {
 
 /* Cleaner video details section */
 .preview-info-compact {
-  background: rgba(255, 255, 255, 0.98);
-  border-radius: 20px;
-  padding: 2rem;
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
-  margin-top: 1.5rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: transparent;
+  border-radius: 12px;
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  margin-top: 0.5rem;
 }
 
 /* Inline audio player styling (Completed view) */
@@ -1913,11 +1914,22 @@ body:not(.ultra-flat) .app-footer {
   font-size: 12px;
   color: #64748b;
   font-weight: 700;
+  min-width: 64px;
+  text-align: right;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 .audio-transcript-pane .t-text {
   font-size: 14px;
   color: #0f172a;
   white-space: pre-wrap;
+}
+/* Highlight the timestamp of the active cue to aid tracking while scrolling */
+.audio-transcript-pane .cue.active .t-time {
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+  color: #ffffff;
+  box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.25);
 }
 
 /* Ensure left alignment for transcript text in Completed view */
@@ -1925,11 +1937,7 @@ body:not(.ultra-flat) .app-footer {
   text-align: left;
 }
 
-.preview-info-compact:hover {
-  box-shadow: 0 16px 56px rgba(0, 0, 0, 0.15);
-  transform: translateY(-2px);
-  border-color: rgba(203, 213, 225, 0.9);
-}
+.preview-info-compact:hover { box-shadow: none; transform: none; }
 
 .preview-info-compact h4 {
   margin: 0 0 1.5rem 0;
@@ -1942,32 +1950,11 @@ body:not(.ultra-flat) .app-footer {
   letter-spacing: -0.4px;
 }
 
-.info-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 0.75rem;
-}
+.info-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 0.5rem; }
 
-.info-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.875rem 1rem;
-  background: rgba(248, 250, 252, 0.9);
-  border-radius: 12px;
-  border: 1px solid rgba(226, 232, 240, 0.7);
-  font-size: 0.9rem;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-  overflow: hidden;
-}
+.info-item { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 0.75rem; background: #f1f5f9; border-radius: 8px; border: 1px solid #e2e8f0; font-size: 13px; white-space: nowrap; overflow: hidden; }
 
-.info-item:hover {
-  background: rgba(241, 245, 249, 0.95);
-  border-color: rgba(203, 213, 225, 0.8);
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-}
+.info-item:hover { background: rgba(241, 245, 249, 0.95); border-color: rgba(203, 213, 225, 0.8); }
 
 @media (max-width: 768px) {
   .preview-info-compact {
@@ -1995,27 +1982,9 @@ body:not(.ultra-flat) .app-footer {
   }
 }
 
-.info-label {
-  color: #475569;
-  font-weight: 600;
-  font-size: 0.85rem;
-  letter-spacing: -0.2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  flex-shrink: 0;
-  margin-right: 0.5rem;
-}
+.info-label { color: #1f2937; font-weight: 600; font-size: 13px; letter-spacing: -0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 0; margin-right: 0.5rem; }
 
-.info-value {
-  color: #0f172a;
-  font-weight: 600;
-  font-size: 0.85rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-align: right;
-}
+.info-value { color: #334155; font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
 
 /* Status indicator styles - we'll handle this with classes in React */
 
@@ -2233,6 +2202,9 @@ body:not(.ultra-flat) .app-footer {
 .completed-view .resource-links .url-copy-row {
   margin-bottom: 0.6rem;
 }
+
+/* Collapsible downloads in completed view */
+/* Collapsible downloads removed in completed view to restore previous design */
 
 .url-copy-row {
   display: flex;

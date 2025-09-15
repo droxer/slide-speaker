@@ -445,6 +445,7 @@ function App() {
         setShowCompletedBanner(flag !== '0');
       } catch {}
     }
+    // Completed view initializes subtitles from processing details only (not editable)
   }, [taskId, status]);
 
   // Only show transcript after user initiates audio playback
@@ -463,6 +464,19 @@ function App() {
     el.addEventListener('play', onPlay);
     return () => { el.removeEventListener('play', onPlay); };
   }, [status, taskId, showCompletedBanner]);
+
+  // Ensure video subtitles display by default in Completed view
+  useEffect(() => {
+    if (status !== 'completed') return;
+    const v = videoRef.current;
+    if (!v) return;
+    try {
+      const tracks = v.textTracks;
+      if (tracks && tracks.length > 0) {
+        tracks[0].mode = 'showing';
+      }
+    } catch {}
+  }, [status, taskId, videoRef]);
 
   // Also hide banner when video starts playing
   useEffect(() => {
@@ -1326,8 +1340,8 @@ function App() {
                   </div>
                 )}
                 
-                <div className="preview-container">
-                  <div className="video-main">
+                <div className="preview-container preview-two-col">
+                  <div className="video-col">
                     <div className="video-wrapper">
                       <video 
                         ref={videoRef}
@@ -1336,15 +1350,28 @@ function App() {
                         crossOrigin="anonymous"
                         className="preview-video-large"
                       >
-                        {/* Video tracks will be added dynamically via useEffect */}
+                        {/* Always include a subtitles track for the completed view */}
+                        <track
+                          kind="subtitles"
+                          src={`${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(processingDetails?.subtitle_language || subtitleLanguage || voiceLanguage || 'english')}`}
+                          srcLang={(processingDetails?.subtitle_language || subtitleLanguage || voiceLanguage || 'english') === 'simplified_chinese' ? 'zh-Hans' :
+                                   (processingDetails?.subtitle_language || subtitleLanguage || voiceLanguage || 'english') === 'traditional_chinese' ? 'zh-Hant' :
+                                   (processingDetails?.subtitle_language || subtitleLanguage || voiceLanguage || 'english') === 'japanese' ? 'ja' :
+                                   (processingDetails?.subtitle_language || subtitleLanguage || voiceLanguage || 'english') === 'korean' ? 'ko' :
+                                   (processingDetails?.subtitle_language || subtitleLanguage || voiceLanguage || 'english') === 'thai' ? 'th' : 'en'}
+                          label={getLanguageDisplayName(processingDetails?.subtitle_language || subtitleLanguage || voiceLanguage || 'english')}
+                          default
+                        />
                       </video>
                     </div>
+                  </div>
+                  <div className="details-col">
                     {/* Inline audio player for quick listening */}
                     <div className="audio-player-inline" style={{ marginTop: 12 }}>
                       <audio
                         ref={audioRef}
                         controls
-                        preload="none"
+                        preload="auto"
                         src={`${API_BASE_URL}/api/tasks/${taskId}/audio`}
                         crossOrigin="anonymous"
                         aria-label="Audio narration preview"
@@ -1360,20 +1387,52 @@ function App() {
                             id={`audio-cue-${idx}`}
                             className={`cue ${activeAudioCueIdx === idx ? 'active' : ''}`}
                             onClick={() => {
-                              if (audioRef.current) {
-                                audioRef.current.currentTime = cue.start + 0.01;
-                                audioRef.current.play().catch(() => {});
-                              }
+                              const a = audioRef.current;
+                              if (!a) return;
+                              const target = Math.max(0, Math.min(isFinite(a.duration) ? a.duration - 0.05 : cue.start + 0.01, cue.start + 0.01));
+                              const doPlay = () => a.play().catch(() => {});
+                              const doSeekReady = () => {
+                                try {
+                                  const onSeeked = () => { a.removeEventListener('seeked', onSeeked); doPlay(); };
+                                  a.addEventListener('seeked', onSeeked, { once: true });
+                                  if ((a as any).fastSeek) {
+                                    (a as any).fastSeek(target);
+                                  } else {
+                                    a.currentTime = target;
+                                  }
+                                } catch {
+                                  a.currentTime = target;
+                                  doPlay();
+                                }
+                              };
+                              if (a.readyState >= 1) doSeekReady();
+                              else a.addEventListener('loadedmetadata', doSeekReady, { once: true });
                             }}
                             role="button"
                             tabIndex={0}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
-                                if (audioRef.current) {
-                                  audioRef.current.currentTime = cue.start + 0.01;
-                                  audioRef.current.play().catch(() => {});
-                                }
+                                const a = audioRef.current;
+                                if (!a) return;
+                                const target = Math.max(0, Math.min(isFinite(a.duration) ? a.duration - 0.05 : cue.start + 0.01, cue.start + 0.01));
+                                const doPlay = () => a.play().catch(() => {});
+                                const doSeekReady = () => {
+                                  try {
+                                    const onSeeked = () => { a.removeEventListener('seeked', onSeeked); doPlay(); };
+                                    a.addEventListener('seeked', onSeeked, { once: true });
+                                    if ((a as any).fastSeek) {
+                                      (a as any).fastSeek(target);
+                                    } else {
+                                      a.currentTime = target;
+                                    }
+                                  } catch {
+                                    a.currentTime = target;
+                                    doPlay();
+                                  }
+                                };
+                                if (a.readyState >= 1) doSeekReady();
+                                else a.addEventListener('loadedmetadata', doSeekReady, { once: true });
                               }
                             }}
                           >
@@ -1391,7 +1450,7 @@ function App() {
                         </div>
                         <div className="info-item">
                           <span className="info-label">Subtitle Language:</span>
-                          <span className="info-value">{processingDetails?.subtitle_language ? getLanguageDisplayName(processingDetails.subtitle_language) : 'English'}</span>
+                          <span className="info-value">{processingDetails?.subtitle_language ? getLanguageDisplayName(processingDetails.subtitle_language) : getLanguageDisplayName(subtitleLanguage)}</span>
                         </div>
                         {isPdfFile(file?.name || null) ? (
                           <div className="info-item">
@@ -1405,14 +1464,14 @@ function App() {
                           </div>
                         )}
                       </div>
-                      
-                      {/* Resource URLs */}
-                      <div className="resource-links">
-                        {/* Video */}
-                        <div className="url-copy-row">
-                          <span className="resource-label-inline">Video</span>
-                          <input 
-                            type="text" 
+                    </div>
+                    {/* Resource URLs */}
+                    <div className="resource-links">
+                      {/* Video */}
+                      <div className="url-copy-row">
+                        <span className="resource-label-inline">Video</span>
+                        <input 
+                          type="text" 
                             value={`${API_BASE_URL}/api/tasks/${taskId}/video`}
                             readOnly 
                             className="url-input-enhanced"
@@ -1514,7 +1573,6 @@ function App() {
                       </div>
                     </div>
                   </div>
-                </div>
                 
                 
                 {/* Prominent create-new CTA placed at the end of the completed view for better user flow */}

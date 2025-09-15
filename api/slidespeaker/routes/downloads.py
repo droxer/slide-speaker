@@ -214,22 +214,64 @@ async def _proxy_cloud_media(
     # Attempt SDK download first (most reliable across providers)
     try:
         blob: bytes = sp.download_bytes(object_key)
+        total = len(blob)
 
+        # Handle Range header for seeking support
+        if range_header:
+            try:
+                units, _, rng = range_header.partition("=")
+                start_s, _, end_s = rng.partition("-")
+                if units.strip().lower() != "bytes":
+                    raise ValueError("Unsupported range unit")
+                start = int(start_s) if start_s else 0
+                end = int(end_s) if end_s else total - 1
+                start = max(0, start)
+                end = min(end, total - 1)
+                if start > end:
+                    # Invalid range
+                    raise ValueError("Invalid range")
+                length = end - start + 1
+            except Exception:
+                # Malformed; ignore range
+                start = 0
+                end = total - 1
+                length = total
+
+            def iter_slice(chunk_size: int = 1024 * 256) -> Iterator[bytes]:
+                offset = start
+                while offset <= end:
+                    nxt = min(offset + chunk_size, end + 1)
+                    yield blob[offset:nxt]
+                    offset = nxt
+
+            return StreamingResponse(
+                iter_slice(),
+                status_code=206,
+                headers={
+                    "Content-Type": media_type,
+                    "Content-Length": str(length),
+                    "Content-Range": f"bytes {start}-{end}/{total}",
+                    "Accept-Ranges": "bytes",
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Access-Control-Allow-Origin": "*",
+                },
+            )
+
+        # No Range: send full content with Accept-Ranges to allow client-side seeking after load
         def iter_mem(chunk_size: int = 1024 * 256) -> Iterator[bytes]:
-            total = len(blob)
             offset = 0
-            # Note: ignoring range_header; serving full content inline
             while offset < total:
-                end = min(offset + chunk_size, total)
-                yield blob[offset:end]
-                offset = end
+                nxt = min(offset + chunk_size, total)
+                yield blob[offset:nxt]
+                offset = nxt
 
         return StreamingResponse(
             iter_mem(),
             status_code=200,
             headers={
                 "Content-Type": media_type,
-                "Content-Length": str(len(blob)),
+                "Content-Length": str(total),
+                "Accept-Ranges": "bytes",
                 "Cache-Control": "no-cache, no-store, must-revalidate",
                 "Access-Control-Allow-Origin": "*",
             },
