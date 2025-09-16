@@ -17,33 +17,31 @@ from .utils import sanitize_transcript
 
 # Language-specific prompts for generating presentation transcripts
 TRANSCRIPT_PROMPTS = {
-    "english": (
-        "Create a detailed, deeply-understood presentation transcript in English based on the content below. "
-        "Demonstrate true comprehension by:\n"
-        "- Explaining concepts in plain language, then layering nuance\n"
-        "- Defining terms and acronyms the first time they appear\n"
-        "- Making relationships and cause–effect explicit\n"
-        "- Using short, concrete examples or analogies when helpful\n"
-        "- Anticipating likely audience questions or confusions and addressing them\n"
-        "- Paraphrasing slide text (do not read bullets verbatim)\n"
-        "- Keeping a clear narrative flow and signposting transitions\n\n"
-        "Target 80–140 spoken words, optimized for clarity and retention."
-    ),
+    "english": """Create a detailed, deeply understood presentation transcript in English based on the content below.
+Demonstrate true comprehension by:
+- Explaining concepts in plain language, then layering nuance
+- Defining terms and acronyms the first time they appear
+- Making relationships and cause–effect explicit
+- Using short, concrete examples or analogies when helpful
+- Anticipating likely audience questions or confusions and addressing them
+- Paraphrasing slide text (do not read bullets verbatim)
+- Keeping a clear narrative flow and signposting transitions
+
+Target 80–140 spoken words, optimized for clarity and retention.""",
 }
 
 SYSTEM_ROLES = {
-    "english": (
-        "You are a professional presentation narrator and explainer. "
-        "Your goal is to help listeners truly understand. "
-        "Write natural, spoken transcripts that: (1) prioritize comprehension "
-        "over brevity, (2) preserve technical accuracy, (3) keep pacing and "
-        "structure suitable for audio narration, and (4) avoid greetings/"
-        "closings except at appropriate slides."
-    ),
+    "english": """You are a professional presentation narrator and explainer.
+Your goal is to help listeners truly understand.
+Write natural, spoken transcripts that:
+1) prioritize comprehension over brevity,
+2) preserve technical accuracy,
+3) keep pacing and structure suitable for audio narration, and
+4) avoid greetings/closings except at appropriate slides.""",
 }
 
 # Fallback transcripts in different languages
-DEFAULT_TRANSCRIPTS: dict[str, list[str]] = {
+DEFAULT_TRANSCRIPTS = {
     "english": [
         "Welcome to our presentation. We'll explore the key ideas step by step.",
         "This section dives deeper into the core concepts with clear examples.",
@@ -121,15 +119,18 @@ class TranscriptGenerator:
                 return ""
 
             analysis_text = _content_only_analysis(image_analysis)
-            guidelines = (
-                "CRITICAL: Do not mention slide layout, colors, icons, animations, or phrases like 'on the slide'. "  # noqa: E501
-                "Present the ideas directly, focusing on meaning and explanation."
-            )
-            user_content = (
-                f"Slide content (text extraction):\n{content_text}\n\n"
-                f"Content analysis (no visual UI mentions):\n{analysis_text}\n\n"
-                f"{user_prompt}\n\n{guidelines}"
-            )
+            guidelines = """CRITICAL: Do not mention slide layout, colors, icons, animations,
+or phrases like 'on the slide'. Present the ideas directly, focusing on
+meaning and explanation."""
+            user_content = f"""Slide content (text extraction):
+{content_text}
+
+Content analysis (no visual UI mentions):
+{analysis_text}
+
+{user_prompt}
+
+{guidelines}"""
 
             content = chat_completion(
                 model=self.model,

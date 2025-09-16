@@ -14,33 +14,25 @@ from slidespeaker.llm import chat_completion
 
 from .utils import sanitize_transcript
 
-# Language-specific review prompts
-REVIEW_PROMPTS = {
-    "english": (
-        "Review and refine the following presentation transcripts to ensure "
-        "consistency in tone, style, and smooth transitions. "
-        "CRITICAL: Remove mentions of slide visuals (layout, colors, icons, "
-        "animations, 'on the slide', 'as shown here'). "
-        "Focus on explaining the content itself. Ensure opening appears only "
-        "on the first slide and closing only on the last."
-    ),  # noqa: E501
-    "simplified_chinese": "审查并优化以下演示文稿，确保语调、风格一致，幻灯片之间过渡自然。避免提及任何可视化界面元素（布局、颜色、图标、动画、‘在幻灯片上’等），专注于内容本身。关键要求：开场白只出现在首页，结尾语只出现在末页。",  # noqa: E501
-    "traditional_chinese": "審閱並優化以下簡報文稿，確保語調、風格一致，簡報之間過渡自然。避免提及任何視覺化介面元素（版面、顏色、圖示、動畫、‘在投影片上’等），專注於內容本身。關鍵要求：開場白僅在首頁，結語僅在末頁。",  # noqa: E501
-    "japanese": "次のトランスクリプトをレビューし、トーンと流れの一貫性を高めてください。UI/視覚要素（レイアウト、色、アイコン、アニメーション、「スライド上で」等）への言及は避け、内容の説明に集中してください。冒頭は最初のスライドのみ、締めは最後のみ。",  # noqa: E501
-    "korean": "다음 트랜스크립트를 검토하여 일관성과 흐름을 개선하세요. UI/시각 요소(레이아웃, 색상, 아이콘, 애니메이션, ‘슬라이드에서’ 등)에 대한 언급을 피하고 내용 설명에 집중하세요. 도입은 첫 슬라이드, 마무리는 마지막 슬라이드에만 포함합니다.",  # noqa: E501
-    "thai": "ตรวจสอบและปรับปรุงสคริปต์โดยหลีกเลี่ยงการกล่าวถึงองค์ประกอบ UI/ภาพ (เลย์เอาต์ สี ไอคอน แอนิเมชัน ‘บนสไลด์’ ฯลฯ) ให้เน้นอธิบายเนื้อหาเท่านั้น ข้อความเปิดเฉพาะสไลด์แรก และปิดเฉพาะสไลด์สุดท้าย",  # noqa: E501
-}
+REVIEW_PROMPT = """Review and refine the following presentation transcripts to ensure
+consistency in tone, style, and smooth transitions. CRITICAL: Remove mentions of
+slide visuals (layout, colors, icons, animations, 'on the slide', 'as shown here').
+Focus on explaining the content itself. Ensure opening appears only on the first
+slide and closing only on the last."""
 
-# Language-specific instruction prompts
-INSTRUCTION_PROMPTS = {
-    "english": (
-        "Please provide refined versions that: (1) keep tone/terminology consistent, (2) use smooth transitions, (3) are engaging yet precise, "  # noqa: E501
-        "(4) target 80–140 words per slide, and (5) eliminate any references to visual UI (layout, colors, icons, animations, 'on the slide').\n\n"  # noqa: E501
-        "CRITICAL POSITIONING:\n- Slide 1: opening only\n- Slides 2..N-1: direct content, smooth transitions\n- Slide N: closing summary and call-to-action\n\n"  # noqa: E501
-        "FORMAT: Return plain text for each slide’s content only, no labels or numbering."  # noqa: E501
-    ),  # noqa: E501
-    "simplified_chinese": "请提供每页精炼版本：保持术语一致、过渡顺滑、语言专业；每页目标80–140字；禁止提及UI/视觉元素（布局、颜色、图标、动画、“在幻灯片上”等），只解释内容本身。开场仅在第一页，结语仅在最后一页。格式：只返回每页纯文本，无编号标签。",  # noqa: E501
-}
+INSTRUCTION_PROMPT = """Please provide refined versions that:
+(1) keep tone/terminology consistent,
+(2) use smooth transitions,
+(3) are engaging yet precise,
+(4) target 80–140 words per slide, and
+(5) eliminate any references to visual UI (layout, colors, icons, animations, 'on the slide').
+
+CRITICAL POSITIONING:
+- Slide 1: opening only
+- Slides 2..N-1: direct content, smooth transitions
+- Slide N: closing summary and call-to-action
+
+FORMAT: Return plain text for each slide’s content only, no labels or numbering."""
 
 
 class TranscriptReviewer:
@@ -61,11 +53,9 @@ class TranscriptReviewer:
         if not transcripts:
             return []
 
-        # Build prompts in target language
-        system_prompt = REVIEW_PROMPTS.get(language, REVIEW_PROMPTS["english"])
-        instruction_prompt = INSTRUCTION_PROMPTS.get(
-            language, INSTRUCTION_PROMPTS["english"]
-        )
+        # Use English-only prompts regardless of requested language
+        system_prompt = REVIEW_PROMPT
+        instruction_prompt = INSTRUCTION_PROMPT
 
         # Concatenate transcripts for the model
         content = "\n\n".join([t.get("script", "") for t in transcripts])
@@ -75,7 +65,12 @@ class TranscriptReviewer:
                 model=self.model,
                 messages=[
                     {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": instruction_prompt + "\n\n" + content},
+                    {
+                        "role": "user",
+                        "content": f"""{instruction_prompt}
+
+{content}""",
+                    },
                 ],
             )
         except Exception as e:

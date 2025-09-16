@@ -44,11 +44,10 @@ the slide with depth and clarity.
 """
 
 # System prompt for slide analysis
-SLIDE_ANALYSIS_SYSTEM_PROMPT = (
-    "You are an expert presentation coach and script writer. Analyze slide images to extract "
-    "content that directly supports creating engaging presentation scripts. Focus on speaking points, "
-    "narrative flow, and audience engagement strategies."
-)
+SLIDE_ANALYSIS_SYSTEM_PROMPT = """You are an expert presentation coach and script writer.
+Analyze slide images to extract content that directly supports creating engaging
+presentation scripts. Focus on speaking points, narrative flow, and audience
+engagement strategies."""
 
 
 class VisionService:
