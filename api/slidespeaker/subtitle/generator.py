@@ -5,6 +5,7 @@ Generates SRT and VTT subtitles from scripts and audio, using
 multilingual sentence splitting and locale-aware timing allocation.
 """
 
+import math
 from datetime import timedelta
 from pathlib import Path
 from typing import Any
@@ -158,6 +159,7 @@ class SubtitleGenerator:
         srt_lines = []
         start_time = timedelta(seconds=0)
         subtitle_number = 1
+        max_cue_seconds = self._max_cue_seconds(language)
 
         for _i, (script_data, audio_path) in enumerate(
             zip(scripts, audio_files, strict=False)
@@ -185,15 +187,121 @@ class SubtitleGenerator:
                 else:
                     chunk_end_time = start_time + timedelta(seconds=chunk_duration)
 
-                start_timestamp = self._format_srt_timestamp(chunk_start_time)
-                end_timestamp = self._format_srt_timestamp(chunk_end_time)
+                # Split overly long cues by punctuation first; fall back to time slices
+                total_secs = max(
+                    0.0, (chunk_end_time - chunk_start_time).total_seconds()
+                )
+                if total_secs <= max_cue_seconds + 1e-3:
+                    start_timestamp = self._format_srt_timestamp(chunk_start_time)
+                    end_timestamp = self._format_srt_timestamp(chunk_end_time)
+                    srt_lines.append(str(subtitle_number))
+                    srt_lines.append(f"{start_timestamp} --> {end_timestamp}")
+                    srt_lines.append(chunk)
+                    srt_lines.append("")
+                    subtitle_number += 1
+                else:
+                    parts = self._split_for_cue(chunk, language)
+                    if len(parts) <= 1:
+                        # Split by time only, repeating text
+                        segments = max(
+                            2, int(math.ceil(total_secs / max(0.01, max_cue_seconds)))
+                        )
+                        seg_len = total_secs / segments
+                        for s in range(segments):
+                            seg_start = chunk_start_time + timedelta(
+                                seconds=seg_len * s
+                            )
+                            seg_end = (
+                                chunk_end_time
+                                if s == segments - 1
+                                else chunk_start_time
+                                + timedelta(seconds=seg_len * (s + 1))
+                            )
+                            start_timestamp = self._format_srt_timestamp(seg_start)
+                            end_timestamp = self._format_srt_timestamp(seg_end)
+                            srt_lines.append(str(subtitle_number))
+                            srt_lines.append(f"{start_timestamp} --> {end_timestamp}")
+                            srt_lines.append(chunk)
+                            srt_lines.append("")
+                            subtitle_number += 1
+                    else:
+                        # Allocate time proportionally to parts; cap each part by max_cue_seconds
+                        # and merge ultra-short cues (<0.9s) into neighbors where possible.
+                        raw_durs = calculate_chunk_durations(
+                            total_secs, parts, chunk, language
+                        )
+                        min_cue = 0.9
+                        # Merge small parts forward into subsequent parts
+                        merged_parts: list[str] = []
+                        merged_durs: list[float] = []
+                        acc_text = ""
+                        acc_dur = 0.0
+                        for p_text, p_dur in zip(parts, raw_durs, strict=False):
+                            if not acc_text:
+                                acc_text = p_text
+                                acc_dur = p_dur
+                            else:
+                                acc_text = f"{acc_text} {p_text}".strip()
+                                acc_dur += p_dur
+                            if acc_dur >= min_cue:
+                                merged_parts.append(acc_text)
+                                merged_durs.append(acc_dur)
+                                acc_text = ""
+                                acc_dur = 0.0
+                        if acc_text:
+                            merged_parts.append(acc_text)
+                            merged_durs.append(acc_dur)
 
-                srt_lines.append(str(subtitle_number))
-                srt_lines.append(f"{start_timestamp} --> {end_timestamp}")
-                srt_lines.append(chunk)
-                srt_lines.append("")
+                        cursor = chunk_start_time
+                        last_seg_end: timedelta | None = None
+                        for p_text, p_dur in zip(
+                            merged_parts, merged_durs, strict=False
+                        ):
+                            remaining = p_dur
+                            while remaining > 1e-6:
+                                seg_dur = min(remaining, max_cue_seconds)
+                                # Avoid creating a tiny tail; absorb into this segment
+                                if 0 < remaining - seg_dur < min_cue:
+                                    seg_dur = remaining
+                                seg_end = cursor + timedelta(seconds=seg_dur)
+                                # If this segment is ultra-short and we have
+                                # a previous segment, merge into previous
+                                if (
+                                    last_seg_end is not None
+                                    and seg_dur < min_cue
+                                    and len(srt_lines) >= 4
+                                ):
+                                    # Merge by extending previous segment end and appending text
+                                    # Previous block starts 4 lines earlier: [num, timing, text, blank]
+                                    prev_timing_idx = len(srt_lines) - 3
+                                    prev_text_idx = len(srt_lines) - 2
+                                    # Extend previous end timestamp
+                                    prev_timing = srt_lines[prev_timing_idx]
+                                    # prev_timing format: "HH:MM:SS,mmm --> HH:MM:SS,mmm"
+                                    new_prev_timing = (
+                                        prev_timing.split(" --> ")[0]
+                                        + " --> "
+                                        + self._format_srt_timestamp(seg_end)
+                                    )
+                                    srt_lines[prev_timing_idx] = new_prev_timing
+                                    # Append text
+                                    srt_lines[prev_text_idx] = (
+                                        srt_lines[prev_text_idx] + " " + p_text
+                                    ).strip()
+                                else:
+                                    start_timestamp = self._format_srt_timestamp(cursor)
+                                    end_timestamp = self._format_srt_timestamp(seg_end)
+                                    srt_lines.append(str(subtitle_number))
+                                    srt_lines.append(
+                                        f"{start_timestamp} --> {end_timestamp}"
+                                    )
+                                    srt_lines.append(p_text)
+                                    srt_lines.append("")
+                                    subtitle_number += 1
+                                last_seg_end = seg_end
+                                cursor = seg_end
+                                remaining -= seg_dur
 
-                subtitle_number += 1
                 start_time = chunk_end_time
 
         return "\n".join(srt_lines)
@@ -213,6 +321,7 @@ class SubtitleGenerator:
         lang_code = locale_utils.get_locale_code(language)
         vtt_lines = [f"WEBVTT Language: {lang_code}", ""]
         start_time = timedelta(seconds=0)
+        max_cue_seconds = self._max_cue_seconds(language)
 
         for _i, (script_data, audio_path) in enumerate(
             zip(scripts, audio_files, strict=False)
@@ -240,16 +349,137 @@ class SubtitleGenerator:
                 else:
                     chunk_end_time = start_time + timedelta(seconds=chunk_duration)
 
-                start_timestamp = self._format_vtt_timestamp(chunk_start_time)
-                end_timestamp = self._format_vtt_timestamp(chunk_end_time)
+                # Split overly long cues by punctuation first; fall back to time slices
+                total_secs = max(
+                    0.0, (chunk_end_time - chunk_start_time).total_seconds()
+                )
+                if total_secs <= max_cue_seconds + 1e-3:
+                    start_timestamp = self._format_vtt_timestamp(chunk_start_time)
+                    end_timestamp = self._format_vtt_timestamp(chunk_end_time)
+                    vtt_lines.append(f"{start_timestamp} --> {end_timestamp}")
+                    vtt_lines.append(chunk)
+                    vtt_lines.append("")
+                else:
+                    parts = self._split_for_cue(chunk, language)
+                    if len(parts) <= 1:
+                        # Split by time only, repeating text
+                        segments = max(
+                            2, int(math.ceil(total_secs / max(0.01, max_cue_seconds)))
+                        )
+                        seg_len = total_secs / segments
+                        for s in range(segments):
+                            seg_start = chunk_start_time + timedelta(
+                                seconds=seg_len * s
+                            )
+                            seg_end = (
+                                chunk_end_time
+                                if s == segments - 1
+                                else chunk_start_time
+                                + timedelta(seconds=seg_len * (s + 1))
+                            )
+                            start_timestamp = self._format_vtt_timestamp(seg_start)
+                            end_timestamp = self._format_vtt_timestamp(seg_end)
+                            vtt_lines.append(f"{start_timestamp} --> {end_timestamp}")
+                            vtt_lines.append(chunk)
+                            vtt_lines.append("")
+                    else:
+                        # Allocate time proportionally to parts; cap each part by max_cue_seconds
+                        # and merge ultra-short cues (<0.9s) into neighbors where possible.
+                        raw_durs = calculate_chunk_durations(
+                            total_secs, parts, chunk, language
+                        )
+                        min_cue = 0.9
+                        # Merge small parts forward into subsequent parts
+                        merged_parts: list[str] = []
+                        merged_durs: list[float] = []
+                        acc_text = ""
+                        acc_dur = 0.0
+                        for p_text, p_dur in zip(parts, raw_durs, strict=False):
+                            if not acc_text:
+                                acc_text = p_text
+                                acc_dur = p_dur
+                            else:
+                                acc_text = f"{acc_text} {p_text}".strip()
+                                acc_dur += p_dur
+                            if acc_dur >= min_cue:
+                                merged_parts.append(acc_text)
+                                merged_durs.append(acc_dur)
+                                acc_text = ""
+                                acc_dur = 0.0
+                        if acc_text:
+                            merged_parts.append(acc_text)
+                            merged_durs.append(acc_dur)
 
-                vtt_lines.append(f"{start_timestamp} --> {end_timestamp}")
-                vtt_lines.append(chunk)
-                vtt_lines.append("")
+                        cursor = chunk_start_time
+                        last_text_idx: int | None = None
+                        for p_text, p_dur in zip(
+                            merged_parts, merged_durs, strict=False
+                        ):
+                            remaining = p_dur
+                            while remaining > 1e-6:
+                                seg_dur = min(remaining, max_cue_seconds)
+                                if 0 < remaining - seg_dur < min_cue:
+                                    seg_dur = remaining
+                                const_seg_end = cursor + timedelta(seconds=seg_dur)
+                                start_timestamp = self._format_vtt_timestamp(cursor)
+                                end_timestamp = self._format_vtt_timestamp(
+                                    const_seg_end
+                                )
+
+                                # If this segment is ultra-short and there is a prior cue, merge text and extend timing
+                                if seg_dur < min_cue and last_text_idx is not None:
+                                    # Update previous timing end
+                                    timing_idx = last_text_idx - 1
+                                    prev_timing = vtt_lines[timing_idx]
+                                    vtt_lines[timing_idx] = (
+                                        prev_timing.split(" --> ")[0]
+                                        + " --> "
+                                        + end_timestamp
+                                    )
+                                    # Append text
+                                    vtt_lines[last_text_idx] = (
+                                        vtt_lines[last_text_idx] + " " + p_text
+                                    ).strip()
+                                else:
+                                    vtt_lines.append(
+                                        f"{start_timestamp} --> {end_timestamp}"
+                                    )
+                                    vtt_lines.append(p_text)
+                                    vtt_lines.append("")
+                                    last_text_idx = len(vtt_lines) - 2
+
+                                cursor = const_seg_end
+                                remaining -= seg_dur
 
                 start_time = chunk_end_time
 
         return "\n".join(vtt_lines)
+
+    def _max_cue_seconds(self, language: str | None) -> float:
+        """
+        Maximum duration per subtitle cue, language-aware if needed.
+        Keep cues reasonably short for readability and syncing.
+        """
+        lang = (language or "").lower()
+        if lang in {"simplified_chinese", "traditional_chinese", "japanese", "korean"}:
+            return 5.5
+        if lang in {"thai"}:
+            return 6.0
+        return 7.0
+
+    def _split_for_cue(self, text: str, language: str) -> list[str]:
+        """Split cue text into smaller parts for long cues.
+        Uses language-aware sentence splitting with stricter fallback lengths.
+        """
+        lang = (language or "").lower()
+        if lang in {"simplified_chinese", "traditional_chinese", "japanese", "korean"}:
+            # Tighter fallback for dense scripts
+            parts = split_sentences(text, max_fallback_len=25)
+        elif lang in {"thai"}:
+            parts = split_sentences(text, max_fallback_len=30)
+        else:
+            parts = split_sentences(text, max_fallback_len=40)
+        return [p for p in parts if p and p.strip()]
 
     def _split_text_for_subtitles(self, text: str, language: str) -> list[str]:
         # Use the shared sentence splitter with fallback chunk length tailored

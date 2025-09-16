@@ -420,21 +420,135 @@ function App() {
             );
             const start = toSec(m[1], m[2], m[3], m[4]);
             const end = toSec(m[5], m[6], m[7], m[8]);
+            
+            // Validate timing and prepare to split overly long cues for better UX
+            const duration = end - start;
+            // Only warn for extremely long cues to avoid noisy logs
+            if (duration > 30) {
+              console.warn(`Unusually long subtitle duration detected: ${duration.toFixed(2)}s`, { start, end, text: lines[i+1] });
+            }
+            
+            // Ensure end time is after start time
+            if (end <= start) {
+              console.warn('Invalid subtitle timing detected', { start, end });
+              i++;
+              continue;
+            }
+            
             i++;
             const textLines: string[] = [];
             while (i < lines.length && lines[i].trim() !== '') {
               textLines.push(lines[i]);
               i++;
             }
-            parsed.push({ start, end, text: textLines.join('\n') });
+            const cueText = textLines.join('\n');
+
+            // Split long cues by punctuation and allocate time proportionally for transcript sync
+            // Video track remains unchanged; this only impacts the audio transcript pane.
+            // Language-aware cap per segment (Medium profile)
+            const langKey = (lang || '').toLowerCase();
+            const MAX_SEGMENT = (
+              langKey === 'simplified_chinese' ||
+              langKey === 'traditional_chinese' ||
+              langKey === 'japanese' ||
+              langKey === 'korean'
+            ) ? 5.5 : (langKey === 'thai' ? 6.0 : 7.0);
+            if (duration > MAX_SEGMENT + 0.01) {
+              // Try punctuation-aware splitting first
+              const parts = cueText
+                .split(/(?<=[。！？；.!?;])\s+|(?<=[，、,])\s+/)
+                .map(p => p.trim())
+                .filter(Boolean);
+              if (parts.length > 1) {
+                // Weight by non-space length
+                const lens = parts.map(p => p.replace(/\s+/g, '').length || 1);
+                const total = lens.reduce((a, b) => a + b, 0) || 1;
+                let cursor = start;
+                const localSegs: {start:number;end:number;text:string}[] = [];
+                const MIN_CUE = 0.9;
+                for (let idx = 0; idx < parts.length; idx++) {
+                  const weight = lens[idx] / total;
+                  let dur = duration * weight;
+                  // Cap by MAX_SEGMENT and spill into multiple slices if needed
+                  while (dur > MAX_SEGMENT + 1e-6) {
+                    const segEnd = Math.min(end, cursor + MAX_SEGMENT);
+                    localSegs.push({ start: cursor, end: segEnd, text: parts[idx] });
+                    cursor = segEnd;
+                    dur -= MAX_SEGMENT;
+                  }
+                  if (dur > 1e-3) {
+                    let segEnd = Math.min(end, cursor + dur);
+                    // If this last slice would be ultra-short next to previous, merge into previous
+                    if (
+                      localSegs.length > 0 &&
+                      (segEnd - cursor) < MIN_CUE
+                    ) {
+                      const last = localSegs[localSegs.length - 1];
+                      // Extend previous end
+                      last.end = segEnd;
+                      // Join text
+                      last.text = `${last.text} ${parts[idx]}`.trim();
+                    } else {
+                      localSegs.push({ start: cursor, end: segEnd, text: parts[idx] });
+                    }
+                    cursor = segEnd;
+                  }
+                }
+                // Also merge any internal ultra-short segments
+                const merged: typeof localSegs = [];
+                for (const seg of localSegs) {
+                  if (merged.length > 0 && (seg.end - seg.start) < MIN_CUE) {
+                    const last = merged[merged.length - 1];
+                    last.end = seg.end;
+                    last.text = `${last.text} ${seg.text}`.trim();
+                  } else {
+                    merged.push(seg);
+                  }
+                }
+                for (const seg of merged) parsed.push(seg);
+              } else {
+                // Fallback to equal time slices with repeated text
+                const segments = Math.max(2, Math.ceil(duration / MAX_SEGMENT));
+                const segLen = duration / segments;
+                for (let s = 0; s < segments; s++) {
+                  const segStart = start + s * segLen;
+                  const segEnd = Math.min(end, segStart + segLen);
+                  parsed.push({ start: segStart, end: segEnd, text: cueText });
+                }
+              }
+            } else {
+              parsed.push({ start, end, text: cueText });
+            }
           } else {
             i++;
           }
         }
-        setAudioCues(parsed);
+        // Deduplicate and merge adjacent cues with identical text
+        const round = (x: number) => Math.round(x * 1000) / 1000; // 1ms precision
+        const seen = new Set<string>();
+        const unique: Cue[] = [];
+        for (const c of parsed) {
+          const key = `${round(c.start)}|${round(c.end)}|${c.text}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            unique.push({ start: c.start, end: c.end, text: c.text });
+          }
+        }
+        unique.sort((a, b) => (a.start - b.start) || (a.end - b.end));
+        const merged: Cue[] = [];
+        const EPS = 0.1; // merge gap <=100ms
+        for (const c of unique) {
+          const last = merged[merged.length - 1];
+          if (last && last.text === c.text && c.start - last.end <= EPS) {
+            last.end = Math.max(last.end, c.end);
+          } else {
+            merged.push({ ...c });
+          }
+        }
+        setAudioCues(merged);
         setAudioCuesLoaded(true);
-      } catch {
-        // ignore
+      } catch (error) {
+        console.error('Error loading VTT file:', error);
       }
     };
     loadVtt();
@@ -585,25 +699,52 @@ function App() {
     };
   }, [status, taskId, processingDetails, subtitleLanguage, voiceLanguage]);
 
-  // Sync active cue with audio time
+  // Sync active cue with audio time (RAF-driven for smoothness)
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || audioCues.length === 0) return;
-    const onTime = () => {
-      const t = audio.currentTime;
-      let idx: number | null = null;
-      for (let j = 0; j < audioCues.length; j++) {
-        const c = audioCues[j];
-        if (t >= c.start && t <= c.end) { idx = j; break; }
+
+    const EPS = 0.03;
+    const findIdx = (t: number): number | null => {
+      // Binary search on sorted cues
+      let lo = 0, hi = audioCues.length - 1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        const c = audioCues[mid];
+        if (t < c.start - EPS) hi = mid - 1;
+        else if (t > c.end + EPS) lo = mid + 1;
+        else return mid;
       }
-      setActiveAudioCueIdx(idx);
+      return null;
     };
-    audio.addEventListener('timeupdate', onTime);
-    audio.addEventListener('seeked', onTime);
-    onTime();
+
+    let rafId: number | null = null;
+    const tick = () => {
+      const t = audio.currentTime;
+      const idx = findIdx(t);
+      setActiveAudioCueIdx((prev) => (prev !== idx ? idx : prev));
+      rafId = requestAnimationFrame(tick);
+    };
+
+    const start = () => { if (rafId == null) rafId = requestAnimationFrame(tick); };
+    const stop = () => { if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } };
+    const onPlay = () => start();
+    const onPause = () => stop();
+    const onEnded = () => stop();
+    const onSeeked = () => { const idx = findIdx(audio.currentTime); setActiveAudioCueIdx(idx); };
+
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('pause', onPause);
+    audio.addEventListener('ended', onEnded);
+    audio.addEventListener('seeked', onSeeked);
+    // Kick once in case we're already playing
+    if (!audio.paused) start(); else onSeeked();
     return () => {
-      audio.removeEventListener('timeupdate', onTime);
-      audio.removeEventListener('seeked', onTime);
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('seeked', onSeeked);
+      stop();
     };
   }, [audioCues]);
 

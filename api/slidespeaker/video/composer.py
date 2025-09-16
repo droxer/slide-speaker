@@ -7,6 +7,7 @@ full-featured presentations with AI avatars and simpler image+audio presentation
 """
 
 import asyncio
+import contextlib
 import gc
 import logging
 import os
@@ -249,10 +250,11 @@ class VideoComposer:
         video_resolution: str = "hd",
     ) -> None:
         def _compose_video_from_segments_sync() -> None:
+            video_clips: list[Any] = []
             try:
                 if not segments:
                     raise ValueError("No segments provided for video composition")
-                video_clips = []
+                # video_clips initialized above to ensure it's always defined
                 for segment in segments:
                     duration = float(segment.get("duration", 0))
                     if duration <= 0:
@@ -316,7 +318,8 @@ class VideoComposer:
                 raise
             finally:
                 # Safely close all clips
-                self._safe_close_clips(video_clips)
+                with contextlib.suppress(Exception):
+                    self._safe_close_clips(video_clips)
                 if "final_clip" in locals():
                     self._safe_close_clip(final_clip)
                 if "final_clip_resized" in locals():
@@ -345,10 +348,11 @@ class VideoComposer:
         video_resolution: str = "hd",
     ) -> None:
         """Synchronous method to create video from images and audio files."""
+        video_clips: list[Any] = []
         try:
             if not slide_images:
                 raise ValueError("No slide images provided")
-            video_clips = []
+            # video_clips initialized above to ensure it's always defined
             for i, image_path in enumerate(slide_images):
                 image_path = Path(image_path)
                 if not image_path.exists():
@@ -413,7 +417,8 @@ class VideoComposer:
             raise
         finally:
             # Safely close all clips
-            self._safe_close_clips(video_clips)
+            with contextlib.suppress(Exception):
+                self._safe_close_clips(video_clips)
             if "final_clip" in locals():
                 self._safe_close_clip(final_clip)
             if "final_clip_resized" in locals():
@@ -431,6 +436,7 @@ class VideoComposer:
         video_resolution: str = "hd",
     ) -> None:
         def _compose_video_sync() -> None:
+            video_clips: list[Any] = []
             try:
                 if not slide_images:
                     raise ValueError("No slide images provided")
@@ -446,7 +452,7 @@ class VideoComposer:
                     logger.warning(
                         "Mismatched counts; attempting best-effort composition"
                     )
-                video_clips = []
+                # video_clips initialized above to ensure it's always defined
                 num_segments = min(
                     len(slide_images), len(avatar_videos), len(audio_files)
                 )
@@ -516,7 +522,8 @@ class VideoComposer:
                 raise
             finally:
                 # Safely close all clips
-                self._safe_close_clips(video_clips)
+                with contextlib.suppress(Exception):
+                    self._safe_close_clips(video_clips)
                 if "final_clip" in locals():
                     self._safe_close_clip(final_clip)
                 if "final_clip_resized" in locals():

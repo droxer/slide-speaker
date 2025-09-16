@@ -143,32 +143,77 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
           i++;
         }
       }
-      setAudioCues(parsed);
+      // Deduplicate and merge adjacent cues with identical text
+      const round = (x: number) => Math.round(x * 1000) / 1000; // 1ms precision
+      const seen = new Set<string>();
+      const unique: Cue[] = [];
+      for (const c of parsed) {
+        const key = `${round(c.start)}|${round(c.end)}|${c.text}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          unique.push({ start: c.start, end: c.end, text: c.text });
+        }
+      }
+      unique.sort((a, b) => (a.start - b.start) || (a.end - b.end));
+      const merged: Cue[] = [];
+      const EPS = 0.1; // merge gap <=100ms
+      for (const c of unique) {
+        const last = merged[merged.length - 1];
+        if (last && last.text === c.text && c.start - last.end <= EPS) {
+          last.end = Math.max(last.end, c.end);
+        } else {
+          merged.push({ ...c });
+        }
+      }
+      setAudioCues(merged);
       setActiveAudioCueIdx(null);
     } catch {
       setAudioCues([]);
     }
   };
 
-  // Sync active cue with audio time
+  // Sync active cue with audio time (RAF-driven for smoothness)
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio || audioCues.length === 0) return;
-    const onTime = () => {
-      const t = audio.currentTime;
-      let idx: number | null = null;
-      for (let j = 0; j < audioCues.length; j++) {
-        const c = audioCues[j];
-        if (t >= c.start && t <= c.end) { idx = j; break; }
+    const EPS = 0.03;
+    const findIdx = (t: number): number | null => {
+      let lo = 0, hi = audioCues.length - 1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        const c = audioCues[mid];
+        if (t < c.start - EPS) hi = mid - 1;
+        else if (t > c.end + EPS) lo = mid + 1;
+        else return mid;
       }
-      setActiveAudioCueIdx(idx);
+      return null;
     };
-    audio.addEventListener('timeupdate', onTime);
-    audio.addEventListener('seeked', onTime);
-    onTime();
+
+    let rafId: number | null = null;
+    const tick = () => {
+      const t = audio.currentTime;
+      const idx = findIdx(t);
+      setActiveAudioCueIdx((prev) => (prev !== idx ? idx : prev));
+      rafId = requestAnimationFrame(tick);
+    };
+    const start = () => { if (rafId == null) rafId = requestAnimationFrame(tick); };
+    const stop = () => { if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } };
+    const onPlay = () => start();
+    const onPause = () => stop();
+    const onEnded = () => stop();
+    const onSeeked = () => { const idx = findIdx(audio.currentTime); setActiveAudioCueIdx(idx); };
+
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('pause', onPause);
+    audio.addEventListener('ended', onEnded);
+    audio.addEventListener('seeked', onSeeked);
+    if (!audio.paused) start(); else onSeeked();
     return () => {
-      audio.removeEventListener('timeupdate', onTime);
-      audio.removeEventListener('seeked', onTime);
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('seeked', onSeeked);
+      stop();
     };
   }, [audioCues, audioPreviewTaskId]);
 
