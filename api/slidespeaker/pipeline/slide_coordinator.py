@@ -174,7 +174,12 @@ async def _execute_step(
         logger.info(f"=== Task {task_id} - Executing stage: {display_name} ===")
 
         # Update step status to in_progress
-        await state_manager.update_step_status(file_id, step_name, "in_progress")
+        if task_id:
+            await state_manager.update_step_status_by_task(
+                task_id, step_name, "in_progress"
+            )
+        else:
+            await state_manager.update_step_status(file_id, step_name, "in_progress")
         logger.info(f"Stage '{display_name}' status updated to in_progress")
 
         try:
@@ -222,9 +227,14 @@ async def _execute_step(
                 await compose_video_step(file_id, file_path)
 
             # Mark step as completed
-            await state_manager.update_step_status(
-                file_id, step_name, "completed", data=None
-            )
+            if task_id:
+                await state_manager.update_step_status_by_task(
+                    task_id, step_name, "completed", data=None
+                )
+            else:
+                await state_manager.update_step_status(
+                    file_id, step_name, "completed", data=None
+                )
 
             if task_id:
                 logger.info(f"=== Task {task_id} - Completed: {display_name} ===")

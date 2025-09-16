@@ -39,7 +39,7 @@ async def convert_slides_step(file_id: str, file_path: Path, file_ext: str) -> N
         from slidespeaker.core.task_queue import task_queue
 
         if await task_queue.is_task_cancelled(state["task_id"]):
-            logger.info(
+            logger.debug(
                 f"Task {state['task_id']} was cancelled during slide conversion"
             )
             await state_manager.mark_cancelled(
@@ -70,7 +70,7 @@ async def convert_slides_step(file_id: str, file_path: Path, file_ext: str) -> N
             from slidespeaker.core.task_queue import task_queue
 
             if await task_queue.is_task_cancelled(state["task_id"]):
-                logger.info(
+                logger.debug(
                     f"Task {state['task_id']} was cancelled during slide conversion"
                 )
                 await state_manager.mark_cancelled(
@@ -83,7 +83,7 @@ async def convert_slides_step(file_id: str, file_path: Path, file_ext: str) -> N
 
         # Keep slide images local - only final files should be uploaded to cloud storage
         slide_images.append(str(image_path))
-        logger.info(f"Converted slide {i + 1}: {image_path}")
+        logger.debug(f"Converted slide {i + 1}: {image_path}")
 
     await state_manager.update_step_status(
         file_id, "convert_slides_to_images", "completed", slide_images

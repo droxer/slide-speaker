@@ -110,18 +110,13 @@ class RedisTaskQueue:
         """Get the next task ID from the queue (non-blocking)"""
         task_id: str | None = None
 
-        # First, check if we have any tasks in the queue
-        queue_length = await self.redis_client.llen(self.queue_key)  # type: ignore  # type: ignore
-        logger.info(f"Queue length: {queue_length}")
-
         try:
             # Use rpop to get the task ID without moving it (safer approach)
             task_id_raw = await self.redis_client.brpop(self.queue_key, timeout=1)  # type: ignore
             if task_id_raw:
                 task_id = str(task_id_raw[1])  # brpop returns tuple (key, value)
-                logger.info(f"Retrieved task ID from queue: {task_id}")
             else:
-                logger.info("No tasks in queue")
+                pass  # No tasks in queue
         except Exception as e:
             logger.error(f"Error getting next task: {e}")
 

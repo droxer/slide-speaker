@@ -25,7 +25,7 @@ async def translate_voice_transcripts_step(
     and is suitable for AI avatar presentation.
     """
     if source_language.lower() == target_language.lower():
-        logger.info(
+        logger.debug(
             f"Source and target languages are the same ({target_language}), skipping translation"
         )
         # Just copy the source data to the target state key
@@ -50,7 +50,7 @@ async def translate_voice_transcripts_step(
                 await state_manager.update_step_status(
                     file_id, "translate_voice_transcripts", "completed", source_data
                 )
-                logger.info(
+                logger.debug(
                     "Copied source transcripts to translation step (no translation needed)"
                 )
                 return
@@ -80,7 +80,7 @@ async def translate_subtitle_transcripts_step(
     and formatted for subtitle display.
     """
     if source_language.lower() == target_language.lower():
-        logger.info(
+        logger.debug(
             f"Source and target languages are the same ({target_language}), skipping subtitle translation"
         )
         # Just copy the source data to the target state key
@@ -105,7 +105,7 @@ async def translate_subtitle_transcripts_step(
                 await state_manager.update_step_status(
                     file_id, "translate_subtitle_transcripts", "completed", source_data
                 )
-                logger.info(
+                logger.debug(
                     "Copied source transcripts to subtitle translation step (no translation needed)"
                 )
                 return

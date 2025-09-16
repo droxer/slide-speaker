@@ -761,29 +761,13 @@ async def get_audio_file_by_task(task_id: str, index: int) -> Any:
     )
 
 
-@router.options("/video/{file_id}")
-async def options_video(_file_id: str) -> Response:
-    raise HTTPException(status_code=410, detail="Removed")
+"""All file-id routes removed. Use task-based endpoints."""
 
 
-@router.head("/video/{file_id}")
-async def head_video(_file_id: str) -> Response:
-    raise HTTPException(status_code=410, detail="Removed")
+"""File-id SRT route removed."""
 
 
-@router.options("/subtitles/{file_id}/srt")
-async def options_srt_subtitles(_file_id: str) -> Response:
-    raise HTTPException(status_code=410, detail="Removed")
-
-
-@router.get("/subtitles/{file_id}/srt")
-async def get_srt_subtitles(_file_id: str, _language: str | None = None) -> Response:
-    raise HTTPException(status_code=410, detail="Removed. Use task-based endpoints.")
-
-
-@router.get("/subtitles/{file_id}/vtt")
-async def get_vtt_subtitles(_file_id: str, _language: str | None = None) -> Response:
-    raise HTTPException(status_code=410, detail="Removed. Use task-based endpoints.")
+"""File-id VTT route removed."""
 
 
 @router.get("/tasks/{task_id}/subtitles/srt")
@@ -824,8 +808,53 @@ async def get_srt_subtitles_by_task(
             },
         )
 
-    # Fallback to file-id-based resolution and legacy
-    return await get_srt_subtitles(file_id, subtitle_language)
+    # Fallback: file-id-based storage resolution
+    possible = [
+        f"{file_id}_{locale_code}.srt",
+        f"{file_id}_final_{locale_code}.srt",
+        f"{file_id}_final.srt",
+    ]
+    object_key = next((k for k in possible if sp.file_exists(k)), None)
+    if object_key:
+        subtitle_content = sp.download_bytes(object_key)
+        return Response(
+            content=subtitle_content,
+            media_type="text/plain",
+            headers={
+                "Content-Disposition": f"attachment; filename=presentation_{task_id}_{locale_code}.srt",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
+                "Cache-Control": "public, max-age=3600",
+            },
+        )
+    # Fallback 2: local state paths if upload missing
+    from slidespeaker.core.state_manager import state_manager
+
+    st2 = await state_manager.get_state(file_id)
+    if st2 and "steps" in st2:
+        data_block = None
+        if st2["steps"].get("generate_subtitles"):
+            data_block = st2["steps"]["generate_subtitles"].get("data")
+        elif st2["steps"].get("generate_pdf_subtitles"):
+            data_block = st2["steps"]["generate_pdf_subtitles"].get("data")
+        data = data_block or {}
+        files = data.get("subtitle_files") or []
+        import os
+
+        candidate = next((p for p in files if p.endswith(f"_{locale_code}.srt")), None)
+        if not candidate:
+            candidate = next((p for p in files if p.lower().endswith(".srt")), None)
+        if candidate and os.path.exists(candidate):
+            return FileResponse(
+                candidate,
+                media_type="text/plain",
+                filename=f"presentation_{task_id}_{locale_code}.srt",
+                headers={
+                    "Content-Disposition": f"inline; filename=presentation_{task_id}_{locale_code}.srt"
+                },
+            )
+    raise HTTPException(status_code=404, detail="SRT subtitles not found")
 
 
 @router.get("/tasks/{task_id}/subtitles/srt/download")
@@ -923,8 +952,48 @@ async def get_vtt_subtitles_by_task(
             },
         )
 
-    # Fallback to file-id-based resolution and legacy
-    return await get_vtt_subtitles(file_id, subtitle_language)
+    # Fallback: file-id-based storage resolution
+    possible = [
+        f"{file_id}_{locale_code}.vtt",
+        f"{file_id}_final_{locale_code}.vtt",
+        f"{file_id}_final.vtt",
+    ]
+    object_key = next((k for k in possible if sp.file_exists(k)), None)
+    if object_key:
+        subtitle_content = sp.download_bytes(object_key)
+        return Response(
+            content=subtitle_content,
+            media_type="text/vtt",
+            headers={
+                "Content-Disposition": f"inline; filename=presentation_{task_id}_{locale_code}.vtt",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
+                "Cache-Control": "public, max-age=3600",
+            },
+        )
+    # Fallback 2: local state paths if upload missing
+    from slidespeaker.core.state_manager import state_manager
+
+    st2 = await state_manager.get_state(file_id)
+    if st2 and "steps" in st2 and st2["steps"].get("generate_subtitles"):
+        data = st2["steps"]["generate_subtitles"].get("data") or {}
+        files = data.get("subtitle_files") or []
+        import os
+
+        candidate = next((p for p in files if p.endswith(f"_{locale_code}.vtt")), None)
+        if not candidate:
+            candidate = next((p for p in files if p.lower().endswith(".vtt")), None)
+        if candidate and os.path.exists(candidate):
+            return FileResponse(
+                candidate,
+                media_type="text/vtt",
+                filename=f"presentation_{task_id}_{locale_code}.vtt",
+                headers={
+                    "Content-Disposition": f"inline; filename=presentation_{task_id}_{locale_code}.vtt"
+                },
+            )
+    raise HTTPException(status_code=404, detail="VTT subtitles not found")
 
 
 @router.get("/tasks/{task_id}/subtitles/vtt/download")
@@ -984,9 +1053,11 @@ async def download_vtt_subtitles_by_task(
     )
 
 
-@router.options("/subtitles/{file_id}/vtt")
-async def options_vtt_subtitles(_file_id: str) -> Response:
-    """OPTIONS endpoint to handle CORS preflight requests for VTT subtitles."""
+"""File-id VTT OPTIONS removed."""
+
+
+@router.options("/tasks/{task_id}/subtitles/vtt")
+async def options_vtt_subtitles_by_task(task_id: str) -> Response:
     headers = {
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
@@ -996,216 +1067,67 @@ async def options_vtt_subtitles(_file_id: str) -> Response:
     return Response(status_code=200, headers=headers)
 
 
-@router.options("/tasks/{task_id}/subtitles/vtt")
-async def options_vtt_subtitles_by_task(task_id: str) -> Response:
-    return await options_vtt_subtitles("dummy")
-
-
-@router.head("/subtitles/{file_id}/vtt")
-async def head_vtt_subtitles(_file_id: str, _language: str | None = None) -> Response:
-    """HEAD endpoint to check if VTT subtitle file exists."""
-    # Get the subtitle language from query parameter or file's state
-    from slidespeaker.core.state_manager import state_manager
-
-    subtitle_language = _language
-    if not subtitle_language:
-        # If no language specified, get from file state; default to English (do not reuse voice language)
-        state = await state_manager.get_state(_file_id)
-        if state and "subtitle_language" in state and state["subtitle_language"]:
-            subtitle_language = state["subtitle_language"]
-        else:
-            subtitle_language = "english"  # Default to English
-
-    # Convert language to locale code
-    from slidespeaker.configs.locales import locale_utils
-
-    subtitle_language = locale_utils.normalize_language(subtitle_language)
-    locale_code = locale_utils.get_locale_code(subtitle_language)
-
-    # Try new locale-aware filename first, then fall back to legacy format
-    object_key = f"{_file_id}_{locale_code}.vtt"
-
-    # If the expected file doesn't exist, try to find what actually exists
-    sp: StorageProvider = get_storage_provider()
-    if not sp.file_exists(object_key):
-        # Try other common locale codes that might exist
-        common_locales = [
-            "zh-Hant",
-            "zh-Hans",
-            "en",
-            "ja",
-            "ko",
-            "th",
-            "es",
-            "fr",
-            "de",
-            "it",
-            "pt",
-            "ru",
-            "ar",
-            "hi",
-        ]
-        found_file = False
-        for locale in common_locales:
-            # Prefer new naming
-            test_key = f"{_file_id}_{locale}.vtt"
-            if sp.file_exists(test_key):
-                object_key = test_key
-                found_file = True
-                break
-
-        # If still not found, try legacy format
-        if not found_file:
-            legacy_key = f"{_file_id}_final.vtt"
-            if sp.file_exists(legacy_key):
-                object_key = legacy_key
-            else:
-                raise HTTPException(status_code=404, detail="VTT subtitles not found")
-
-    headers = {
-        "Content-Type": "text/vtt",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-        "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
-        "Cache-Control": "public, max-age=3600",  # Add caching to prevent constant requests
-    }
-    return Response(status_code=200, headers=headers)
+"""File-id VTT HEAD removed."""
 
 
 @router.head("/tasks/{task_id}/subtitles/vtt")
 async def head_vtt_subtitles_by_task(
     task_id: str, language: str | None = None
 ) -> Response:
-    # Prefer task-id-based filenames if present
+    from slidespeaker.configs.locales import locale_utils
+
+    sp: StorageProvider = get_storage_provider()
+    # Determine locale strictly from param (no file-id fallback)
+    subtitle_language = language or "english"
+    locale_code = locale_utils.get_locale_code(subtitle_language)
+    # Check existence by task or file fallback
     file_id = await _file_id_from_task(task_id)
-    from slidespeaker.configs.locales import locale_utils
-    from slidespeaker.core.state_manager import state_manager
-
-    sp: StorageProvider = get_storage_provider()
-
-    subtitle_language = language
-    if not subtitle_language:
-        state = await state_manager.get_state(file_id)
-        subtitle_language = (
-            state["subtitle_language"]
-            if state and state.get("subtitle_language")
-            else "english"
-        )
-    locale_code = locale_utils.get_locale_code(subtitle_language)
-    if sp.file_exists(f"{task_id}_{locale_code}.vtt"):
-        headers = {
-            "Content-Type": "text/vtt",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-            "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
-            "Cache-Control": "public, max-age=3600",
-        }
-        return Response(status_code=200, headers=headers)
-    return await head_vtt_subtitles(file_id, subtitle_language)
-
-
-@router.head("/subtitles/{file_id}/srt")
-async def head_srt_subtitles(_file_id: str, _language: str | None = None) -> Response:
-    """HEAD endpoint to check if SRT subtitle file exists."""
-    # Get the subtitle language from query parameter or file's state
-    from slidespeaker.core.state_manager import state_manager
-
-    subtitle_language = _language
-    if not subtitle_language:
-        # If no language specified, get from file state
-        state = await state_manager.get_state(_file_id)
-        if state and "subtitle_language" in state and state["subtitle_language"]:
-            subtitle_language = state["subtitle_language"]
-        elif state and "voice_language" in state:
-            subtitle_language = state["voice_language"]
-        else:
-            subtitle_language = "english"  # Default to English
-
-    # Convert language to locale code
-    from slidespeaker.configs.locales import locale_utils
-
-    subtitle_language = locale_utils.normalize_language(subtitle_language)
-    locale_code = locale_utils.get_locale_code(subtitle_language)
-
-    # Try new locale-aware filename first, then fall back to legacy format
-    object_key = f"{_file_id}_{locale_code}.srt"
-
-    # Get storage provider
-    sp: StorageProvider = get_storage_provider()
-
-    # If the expected file doesn't exist, try to find what actually exists
-    if not sp.file_exists(object_key):
-        # Try other common locale codes that might exist
-        common_locales = [
-            "zh-Hant",
-            "zh-Hans",
-            "en",
-            "ja",
-            "ko",
-            "th",
-            "es",
-            "fr",
-            "de",
-            "it",
-            "pt",
-            "ru",
-            "ar",
-            "hi",
-        ]
-        found_file = False
-        for locale in common_locales:
-            # Prefer new naming
-            test_key = f"{_file_id}_{locale}.srt"
-            if sp.file_exists(test_key):
-                object_key = test_key
-                found_file = True
-                break
-
-        # If still not found, try legacy format
-        if not found_file:
-            legacy_key = f"{_file_id}_final.srt"
-            if sp.file_exists(legacy_key):
-                object_key = legacy_key
-            else:
-                raise HTTPException(status_code=404, detail="SRT subtitles not found")
-
+    possible = [
+        f"{task_id}_{locale_code}.vtt",
+        f"{file_id}_{locale_code}.vtt",
+        f"{file_id}_final_{locale_code}.vtt",
+        f"{file_id}_final.vtt",
+    ]
+    exists = any(sp.file_exists(k) for k in possible)
+    if not exists:
+        return Response(status_code=404)
     headers = {
-        "Content-Type": "text/plain",
+        "Content-Type": "text/vtt",
         "Access-Control-Allow-Origin": "*",
         "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
         "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
-        "Cache-Control": "public, max-age=3600",  # Add caching to prevent constant requests
+        "Cache-Control": "public, max-age=3600",
     }
     return Response(status_code=200, headers=headers)
+
+
+"""File-id SRT HEAD removed."""
 
 
 @router.head("/tasks/{task_id}/subtitles/srt")
 async def head_srt_subtitles_by_task(
     task_id: str, language: str | None = None
 ) -> Response:
-    # Prefer task-id-based filenames if present
-    file_id = await _file_id_from_task(task_id)
     from slidespeaker.configs.locales import locale_utils
-    from slidespeaker.core.state_manager import state_manager
 
     sp: StorageProvider = get_storage_provider()
-
-    subtitle_language = language
-    if not subtitle_language:
-        state = await state_manager.get_state(file_id)
-        subtitle_language = (
-            state["subtitle_language"]
-            if state and state.get("subtitle_language")
-            else "english"
-        )
+    subtitle_language = language or "english"
     locale_code = locale_utils.get_locale_code(subtitle_language)
-    if sp.file_exists(f"{task_id}_{locale_code}.srt"):
-        headers = {
-            "Content-Type": "text/plain",
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-            "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
-            "Cache-Control": "public, max-age=3600",
-        }
-        return Response(status_code=200, headers=headers)
-    return await head_srt_subtitles(file_id, subtitle_language)
+    file_id = await _file_id_from_task(task_id)
+    possible = [
+        f"{task_id}_{locale_code}.srt",
+        f"{file_id}_{locale_code}.srt",
+        f"{file_id}_final_{locale_code}.srt",
+        f"{file_id}_final.srt",
+    ]
+    exists = any(sp.file_exists(k) for k in possible)
+    if not exists:
+        return Response(status_code=404)
+    headers = {
+        "Content-Type": "text/plain",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
+        "Cache-Control": "public, max-age=3600",
+    }
+    return Response(status_code=200, headers=headers)

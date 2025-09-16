@@ -28,7 +28,7 @@ async def generate_avatar_step(file_id: str) -> None:
     await state_manager.update_step_status(
         file_id, "generate_avatar_videos", "processing"
     )
-    logger.info(f"Starting avatar video generation for file: {file_id}")
+    logger.debug(f"Starting avatar video generation for file: {file_id}")
     state = await state_manager.get_state(file_id)
 
     # Check for task cancellation before starting
@@ -36,7 +36,7 @@ async def generate_avatar_step(file_id: str) -> None:
         from slidespeaker.core.task_queue import task_queue
 
         if await task_queue.is_task_cancelled(state["task_id"]):
-            logger.info(
+            logger.debug(
                 f"Task {state['task_id']} was cancelled during avatar video generation"
             )
             await state_manager.mark_cancelled(
@@ -51,11 +51,11 @@ async def generate_avatar_step(file_id: str) -> None:
 
     # If avatar generation is disabled, skip this step
     if not generate_avatar:
-        logger.info("Avatar generation disabled, skipping avatar video generation")
+        logger.debug("Avatar generation disabled, skipping avatar video generation")
         await state_manager.update_step_status(
             file_id, "generate_avatar_videos", "completed", []
         )
-        logger.info("Stage 'Creating AI presenter videos' skipped (disabled)")
+        logger.debug("Stage 'Creating AI presenter videos' skipped (disabled)")
         return
 
     # Comprehensive null checking for transcripts data
@@ -80,7 +80,7 @@ async def generate_avatar_step(file_id: str) -> None:
             from slidespeaker.core.task_queue import task_queue
 
             if await task_queue.is_task_cancelled(state["task_id"]):
-                logger.info(
+                logger.debug(
                     f"Task {state['task_id']} was cancelled during "
                     f"avatar video generation"
                 )
@@ -103,7 +103,7 @@ async def generate_avatar_step(file_id: str) -> None:
 
                 # Keep avatar videos local - only final files should be uploaded to cloud storage
                 avatar_videos.append(str(video_path))
-                logger.info(f"Generated avatar video for slide {i + 1}: {video_path}")
+                logger.debug(f"Generated avatar video for slide {i + 1}: {video_path}")
 
             except Exception as e:
                 logger.error(f"Failed to generate avatar video for slide {i + 1}: {e}")
@@ -127,7 +127,7 @@ async def generate_avatar_step(file_id: str) -> None:
     await state_manager.update_step_status(
         file_id, "generate_avatar_videos", "completed", avatar_videos
     )
-    logger.info(
+    logger.debug(
         f"Stage 'Creating AI presenter videos' completed successfully with "
         f"{len(avatar_videos)} videos"
     )
@@ -138,11 +138,11 @@ async def generate_avatar_step(file_id: str) -> None:
         updated_state
         and updated_state["steps"]["generate_avatar_videos"]["status"] == "completed"
     ):
-        logger.info(
+        logger.debug(
             f"Successfully updated generate_avatar_videos to completed for {file_id}"
         )
-        logger.info(f"Avatar videos: {avatar_videos}")
+        logger.debug(f"Avatar videos: {avatar_videos}")
         if failed_slides:
-            logger.info(f"Failed slides: {failed_slides}")
+            logger.debug(f"Failed slides: {failed_slides}")
     else:
         logger.error(f"Failed to update generate_avatar_videos state for {file_id}")

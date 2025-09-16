@@ -24,13 +24,13 @@ async def extract_slides_step(file_id: str, file_path: Path, file_ext: str) -> N
     for use in subsequent pipeline steps.
     """
     await state_manager.update_step_status(file_id, "extract_slides", "processing")
-    logger.info(f"Extracting slides for file: {file_id}")
+    logger.debug(f"Extracting slides for file: {file_id}")
     slides = await slide_processor.extract_slides(file_path, file_ext)
-    logger.info(f"Extracted {len(slides)} slides for file: {file_id}")
+    logger.debug(f"Extracted {len(slides)} slides for file: {file_id}")
     await state_manager.update_step_status(
         file_id, "extract_slides", "completed", slides
     )
-    logger.info(
+    logger.debug(
         f"Stage 'Extracting presentation content' completed "
         f"successfully with {len(slides)} slides"
     )
@@ -41,6 +41,6 @@ async def extract_slides_step(file_id: str, file_path: Path, file_ext: str) -> N
         updated_state
         and updated_state["steps"]["extract_slides"]["status"] == "completed"
     ):
-        logger.info(f"Successfully updated extract_slides to completed for {file_id}")
+        logger.debug(f"Successfully updated extract_slides to completed for {file_id}")
     else:
         logger.error(f"Failed to update extract_slides state for {file_id}")

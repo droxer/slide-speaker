@@ -16,7 +16,6 @@ from loguru import logger
 
 from slidespeaker.configs.config import config
 from slidespeaker.configs.locales import locale_utils
-from slidespeaker.configs.redis_config import RedisConfig
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 
@@ -90,20 +89,7 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         async with aiofiles.open(file_path, "wb") as out_file:
             await out_file.write(file_bytes)
 
-        # Create initial state
-        await state_manager.create_state(
-            file_id,
-            file_path,
-            file_ext,
-            filename,
-            voice_language,
-            subtitle_language,
-            video_resolution,
-            generate_avatar,
-            generate_subtitles,
-        )
-
-        # Submit task to Redis task queue
+        # Submit task to Redis task queue first (so we can store state task-first)
         task_id = await task_queue.submit_task(
             "process_presentation",
             file_id=file_id,
@@ -117,30 +103,29 @@ async def upload_file(request: Request) -> dict[str, str | None]:
             generate_subtitles=generate_subtitles,
         )
 
+        # Create initial state (task-first; mirrors to task alias and mappings)
+        await state_manager.create_state(
+            file_id,
+            file_path,
+            file_ext,
+            filename,
+            voice_language,
+            subtitle_language,
+            video_resolution,
+            generate_avatar,
+            generate_subtitles,
+            task_id=task_id,
+        )
+
         logger.info(
             f"File uploaded: {file_id}, type: {file_ext}, task submitted: {task_id}"
         )
 
-        # Persist task_id -> file_id mapping for reliable task-based endpoints
+        # Bind task_id <-> file_id (redundant when create_state passed task_id; kept for safety)
         try:
-            redis = RedisConfig.get_redis_client()
-            await redis.set(
-                f"ss:task2file:{task_id}", file_id, ex=60 * 60 * 24 * 30
-            )  # 30 days
-            await redis.set(
-                f"ss:file2task:{file_id}", task_id, ex=60 * 60 * 24 * 30
-            )  # 30 days
-        except Exception as map_err:
-            logger.warning(f"Failed to persist task→file mapping: {map_err}")
-
-        # Also embed the task_id into state for easier lookup
-        try:
-            state = await state_manager.get_state(file_id)
-            if state is not None:
-                state["task_id"] = task_id
-                await state_manager._save_state(file_id, state)
+            await state_manager.bind_task(file_id, task_id)
         except Exception as save_err:
-            logger.warning(f"Failed to save task_id into state: {save_err}")
+            logger.warning(f"Failed to bind task_id in state manager: {save_err}")
 
         return {
             "file_id": file_id,

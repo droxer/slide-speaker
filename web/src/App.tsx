@@ -52,6 +52,7 @@ interface ProcessingDetails {
   steps: Record<string, StepDetails>;
   errors: ProcessingError[];
   filename?: string;
+  file_ext?: string;
   voice_language?: string;
   subtitle_language?: string;
   created_at: string;
@@ -585,7 +586,7 @@ function App() {
     };
     el.addEventListener('play', onPlay);
     return () => { el.removeEventListener('play', onPlay); };
-  }, [status, taskId, showCompletedBanner]);
+  }, [status, taskId, showCompletedBanner, completedMedia, audioRef]);
 
   // Ensure video subtitles display by default in Completed view
   useEffect(() => {
@@ -799,10 +800,10 @@ function App() {
   useEffect(() => {
     let intervalId: NodeJS.Timeout | null = null;
     
-    if (status === 'processing' && fileId) {
+    if (status === 'processing' && taskId) {
       const checkStatus = async () => {
         try {
-          const response = await axios.get<ProcessingDetails>(`/api/progress/${fileId}`);
+          const response = await axios.get<ProcessingDetails>(`/api/tasks/${taskId}/progress`);
           setProcessingDetails(response.data);
           
           if (response.data.status === 'completed') {
@@ -840,20 +841,16 @@ function App() {
             localStorageUtils.clearTaskState();
           }
         } catch (error) {
-          console.error('Status check error:', error);
-          setStatus('error');
-          setUploading(false);
-          
-          // Clear local storage on error
-          localStorageUtils.clearTaskState();
+          // Avoid forcing error state on transient issues; keep polling.
+          console.warn('Status check error (transient, will retry):', error);
         }
       };
       
       // Check status immediately
       checkStatus();
       
-      // Set up interval to check status every 10 seconds
-      intervalId = setInterval(checkStatus, 10000);
+      // Set up interval to check status frequently for better sync
+      intervalId = setInterval(checkStatus, 3000);
     }
     
     // Cleanup function to clear interval
@@ -862,7 +859,7 @@ function App() {
         clearInterval(intervalId);
       }
     };
-  }, [status, fileId]);
+  }, [status, taskId]);
 
   // Ensure taskId is populated in completed view (fallback via stats search)
   useEffect(() => {
@@ -1046,15 +1043,15 @@ function App() {
 
   const getProcessingStatusMessage = (): string => {
     if (!processingDetails) {
-      return isPdfFile(file?.name || null) 
-        ? 'Bringing Your PDF to Life' 
-        : 'Bringing Your Presentation to Life';
+      const name = (file?.name || '').toLowerCase();
+      const isPdf = name.endsWith('.pdf');
+      return isPdf ? 'Bringing Your PDF to Life' : 'Bringing Your Presentation to Life';
     }
     
     const activeSteps = Object.entries(processingDetails.steps || {})
       .filter(([_, step]) => step.status === 'in_progress' || step.status === 'processing');
     
-    const isPdf = isPdfFile(file?.name || null);
+    const isPdf = (((processingDetails as any)?.file_ext) || (file?.name || '')).toLowerCase().endsWith('.pdf');
     const fileTypeText = isPdf ? 'PDF' : 'PPT';
     
     if (activeSteps.length > 0) {
@@ -1089,19 +1086,7 @@ function App() {
       : 'Bringing Your Presentation to Life';
   };
 
-  const isPdfFile = (filename: string | null): boolean => {
-    // If we have a filename, use it to determine file type
-    if (filename) {
-      const ext = filename.toLowerCase().split('.').pop();
-      return ext === 'pdf';
-    }
-    // If we don't have a filename but have fileType from state, use that
-    if (fileType) {
-      return fileType.toLowerCase() === 'pdf';
-    }
-    // Default to false if we can't determine
-    return false;
-  };
+  // Removed legacy isPdfFile helper; UI now uses backend file_ext
 
   const getFileTypeHint = (filename: string): JSX.Element => {
     const ext = filename.toLowerCase().split('.').pop();
@@ -1379,7 +1364,7 @@ function App() {
                       </span>
                     </div>
                     <div className="meta-badge">
-                      {isPdfFile(file?.name || processingDetails?.filename || null) ? (
+                      {(((processingDetails as any)?.file_ext) || (file?.name || '')).toLowerCase().endsWith('.pdf') ? (
                         <span className="file-type-badge pdf">PDF</span>
                       ) : (
                         <span className="file-type-badge ppt">PPT</span>
@@ -1441,7 +1426,7 @@ function App() {
                     <h4>🌟 Crafting Your Masterpiece</h4>
                     {/* Meta moved into header */}
                     <div className="steps-grid">
-                      {isPdfFile(file?.name || null) ? (
+                      {(((processingDetails as any)?.file_ext) || (file?.name || '')).toLowerCase().endsWith('.pdf') ? (
                         // PDF-specific steps
                         [
                           'segment_pdf_content',
@@ -1716,12 +1701,7 @@ function App() {
                       <span className="info-label">Subtitle Language:</span>
                       <span className="info-value">{processingDetails?.subtitle_language ? getLanguageDisplayName(processingDetails.subtitle_language) : getLanguageDisplayName(subtitleLanguage)}</span>
                     </div>
-                    {isPdfFile(file?.name || null) ? (
-                      <div className="info-item">
-                        <span className="info-label">Document Type:</span>
-                        <span className="info-value">PDF Chapters</span>
-                      </div>
-                    ) : (
+                    {(((processingDetails as any)?.file_ext) || (file?.name || '')).toLowerCase().endsWith('.pdf') ? null : (
                       <div className="info-item">
                         <span className="info-label disabled">AI Avatar:</span>
                         <span className="info-value">{generateAvatar ? '✓ Generated' : '✗ Disabled'}</span>

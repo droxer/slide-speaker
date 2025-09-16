@@ -51,7 +51,17 @@ async def compose_video(
         slide_images = await get_slide_images_func(file_id)
 
         if not audio_files:
-            raise ValueError("No audio files available for video composition")
+            # Fallback: scan local output directory for per-slide audio files
+            try:
+                audio_dir = config.output_dir / file_id / "audio"
+                if audio_dir.exists():
+                    found = sorted(str(p) for p in audio_dir.glob("*.mp3"))
+                    if found:
+                        audio_files = found
+            except Exception:
+                pass
+            if not audio_files:
+                raise ValueError("No audio files available for video composition")
 
         # Prepare output directory
         work_dir = config.output_dir / file_id

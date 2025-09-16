@@ -62,7 +62,7 @@ async def generate_transcripts_step(
             from slidespeaker.core.task_queue import task_queue
 
             if await task_queue.is_task_cancelled(state["task_id"]):
-                logger.info(
+                logger.debug(
                     f"Task {state['task_id']} was cancelled during transcript generation"
                 )
                 await state_manager.mark_cancelled(file_id, cancelled_step=step_name)

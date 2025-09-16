@@ -13,15 +13,33 @@ from loguru import logger
 from slidespeaker.configs.config import config
 from slidespeaker.llm import chat_completion
 
+from .utils import sanitize_transcript
+
 # Language-specific prompts for generating presentation transcripts
 TRANSCRIPT_PROMPTS = {
-    "english": "Create a detailed, comprehensive, and educational presentation transcript in English based on the following content analysis. Provide thorough explanations of topics and key points with relevant examples. Focus on depth of explanation rather than brevity to ensure complete understanding.",  # noqa: E501
+    "english": (
+        "Create a detailed, deeply-understood presentation transcript in English based on the content below. "
+        "Demonstrate true comprehension by:\n"
+        "- Explaining concepts in plain language, then layering nuance\n"
+        "- Defining terms and acronyms the first time they appear\n"
+        "- Making relationships and cause–effect explicit\n"
+        "- Using short, concrete examples or analogies when helpful\n"
+        "- Anticipating likely audience questions or confusions and addressing them\n"
+        "- Paraphrasing slide text (do not read bullets verbatim)\n"
+        "- Keeping a clear narrative flow and signposting transitions\n\n"
+        "Target 80–140 spoken words, optimized for clarity and retention."
+    ),
 }
 
 SYSTEM_ROLES = {
-    "english": "You are a professional presentation transcript writer and educator. "
-    "Create detailed, comprehensive, and educational transcripts for AI avatars based on content analysis. "
-    "Ensure clarity, flow, and appropriate pacing for spoken narration.",
+    "english": (
+        "You are a professional presentation narrator and explainer. "
+        "Your goal is to help listeners truly understand. "
+        "Write natural, spoken transcripts that: (1) prioritize comprehension "
+        "over brevity, (2) preserve technical accuracy, (3) keep pacing and "
+        "structure suitable for audio narration, and (4) avoid greetings/"
+        "closings except at appropriate slides."
+    ),
 }
 
 # Fallback transcripts in different languages
@@ -66,11 +84,51 @@ class TranscriptGenerator:
                 if isinstance(slide_content, dict)
                 else str(slide_content)
             )
-            analysis_text = image_analysis or ""
+
+            # Build content-focused analysis (avoid visual UI/descriptive elements)
+            def _content_only_analysis(ia: Any) -> str:
+                try:
+                    if isinstance(ia, dict):
+                        parts: list[str] = []
+                        pc = ia.get("presentation_context", {}) or {}
+                        cnt = ia.get("content", {}) or {}
+                        # Core ideas and insights
+                        mt = pc.get("main_topic")
+                        if mt:
+                            parts.append(f"Main topic: {mt}")
+                        kis = pc.get("key_insights")
+                        if kis:
+                            parts.append(f"Key insights: {kis}")
+                        # Speaking points (as conceptual cues)
+                        sp = cnt.get("speaking_points")
+                        if sp:
+                            parts.append(f"Speaking points: {sp}")
+                        # Numerical data (evidence)
+                        nums = pc.get("numerical_data")
+                        if nums:
+                            parts.append(f"Evidence: {nums}")
+                        # Transition phrases (narrative cues)
+                        tp = cnt.get("transition_phrases")
+                        if tp:
+                            parts.append(f"Transitions: {tp}")
+                        # Text content fallback
+                        txt = cnt.get("text_content")
+                        if txt:
+                            parts.append(f"Extracted text: {txt}")
+                        return "\n".join(parts)
+                except Exception:
+                    pass
+                return ""
+
+            analysis_text = _content_only_analysis(image_analysis)
+            guidelines = (
+                "CRITICAL: Do not mention slide layout, colors, icons, animations, or phrases like 'on the slide'. "  # noqa: E501
+                "Present the ideas directly, focusing on meaning and explanation."
+            )
             user_content = (
-                f"Slide content:\n{content_text}\n\n"
-                f"Image analysis (if any):\n{analysis_text}\n\n"
-                f"{user_prompt}"
+                f"Slide content (text extraction):\n{content_text}\n\n"
+                f"Content analysis (no visual UI mentions):\n{analysis_text}\n\n"
+                f"{user_prompt}\n\n{guidelines}"
             )
 
             content = chat_completion(
@@ -80,7 +138,7 @@ class TranscriptGenerator:
                     {"role": "user", "content": user_content},
                 ],
             )
-            transcript = content.strip()
+            transcript = sanitize_transcript(content.strip())
             return transcript
         except Exception as e:
             logger.error(f"Transcript generation failed: {e}")

@@ -12,20 +12,34 @@ from loguru import logger
 from slidespeaker.configs.config import config
 from slidespeaker.llm import chat_completion
 
+from .utils import sanitize_transcript
+
 # Language-specific review prompts
 REVIEW_PROMPTS = {
-    "english": "Review and refine the following presentation transcripts to ensure consistency in tone, style, and smooth transitions between slides. CRITICAL: Ensure opening statements (greetings, introductions) appear ONLY on the first slide, and closing statements (summaries, thank-yous, calls-to-action) appear ONLY on the last slide. Middle slides should start directly with content and use smooth transitions without greetings or closings.",  # noqa: E501
-    "simplified_chinese": "审查并优化以下演示文稿，确保语调、风格一致，幻灯片之间过渡自然。关键要求：开场白（问候、介绍）只出现在第一张幻灯片，结尾语（总结、感谢、行动号召）只出现在最后一张幻灯片。中间幻灯片应直接进入内容，使用平滑过渡，避免重复问候或结尾。",  # noqa: E501
-    "traditional_chinese": "審閱並優化以下簡報文稿，確保語調、風格一致，簡報之間過渡自然。關鍵要求：開場白（問候、介紹）只出現在第一張簡報，結尾語（總結、感謝、行動號召）只出現在最後一張簡報。中間簡報應直接進入內容，使用平滑過渡，避免重複問候或結尾。",  # noqa: E501
-    "japanese": "次のプレゼンテーショントランスクリプトをレビューし、トーン、スタイルの一貫性、スライド間のスムーズな移行を確保してください。重要：オープニングステートメント（挨拶、紹介）は最初のスライドにのみ、クロージングステートメント（要約、感謝、アクションコール）は最後のスライドにのみ表示してください。中間スライドは直接コンテンツから始め、挨拶や締めくくりを避けてスムーズに移行してください。",  # noqa: E501
-    "korean": "다음 프레젠테이션 트랜스크립트를 검토하여 톤, 스타일의 일관성과 슬라이드 간의 원활한 전환을 보장하세요. 중요: 오프닝 문장(인사, 소개)은 첫 번째 슬라이드에만, 클로징 문장(요약, 감사, 행동 촉구)은 마지막 슬라이드에만 표시하세요. 중간 슬라이드는 직접 콘텐츠로 시작하고, 인사나 마무리를 피하면서 부드럽게 전환하세요.",  # noqa: E501
-    "thai": "ตรวจสอบและปรับปรุงทรานสคริปต์การนำเสนอต่อไปนี้เพื่อให้มีความสอดคล้องกันในด้านน้ำเสียง สไตล์ และการเปลี่ยนผ่านที่ราบรื่นระหว่างสไลด์ สิ่งสำคัญ: ให้ข้อความเปิด (คำทักทาย การแนะนำ) ปรากฏเฉพาะในสไลด์แรกเท่านั้น และข้อความปิด (สรุป ขอบคุณ การเรียกร้องให้ดำเนินการ) ปรากฏเฉพาะในสไลด์สุดท้ายเท่านั้น สไลด์กลางควรเริ่มต้นโดยตรงด้วยเนื้อหาและใช้การเปลี่ยนผ่านที่ราบรื่นโดยไม่มีคำทักทายหรือการปิดท้าย",  # noqa: E501
+    "english": (
+        "Review and refine the following presentation transcripts to ensure "
+        "consistency in tone, style, and smooth transitions. "
+        "CRITICAL: Remove mentions of slide visuals (layout, colors, icons, "
+        "animations, 'on the slide', 'as shown here'). "
+        "Focus on explaining the content itself. Ensure opening appears only "
+        "on the first slide and closing only on the last."
+    ),  # noqa: E501
+    "simplified_chinese": "审查并优化以下演示文稿，确保语调、风格一致，幻灯片之间过渡自然。避免提及任何可视化界面元素（布局、颜色、图标、动画、‘在幻灯片上’等），专注于内容本身。关键要求：开场白只出现在首页，结尾语只出现在末页。",  # noqa: E501
+    "traditional_chinese": "審閱並優化以下簡報文稿，確保語調、風格一致，簡報之間過渡自然。避免提及任何視覺化介面元素（版面、顏色、圖示、動畫、‘在投影片上’等），專注於內容本身。關鍵要求：開場白僅在首頁，結語僅在末頁。",  # noqa: E501
+    "japanese": "次のトランスクリプトをレビューし、トーンと流れの一貫性を高めてください。UI/視覚要素（レイアウト、色、アイコン、アニメーション、「スライド上で」等）への言及は避け、内容の説明に集中してください。冒頭は最初のスライドのみ、締めは最後のみ。",  # noqa: E501
+    "korean": "다음 트랜스크립트를 검토하여 일관성과 흐름을 개선하세요. UI/시각 요소(레이아웃, 색상, 아이콘, 애니메이션, ‘슬라이드에서’ 등)에 대한 언급을 피하고 내용 설명에 집중하세요. 도입은 첫 슬라이드, 마무리는 마지막 슬라이드에만 포함합니다.",  # noqa: E501
+    "thai": "ตรวจสอบและปรับปรุงสคริปต์โดยหลีกเลี่ยงการกล่าวถึงองค์ประกอบ UI/ภาพ (เลย์เอาต์ สี ไอคอน แอนิเมชัน ‘บนสไลด์’ ฯลฯ) ให้เน้นอธิบายเนื้อหาเท่านั้น ข้อความเปิดเฉพาะสไลด์แรก และปิดเฉพาะสไลด์สุดท้าย",  # noqa: E501
 }
 
 # Language-specific instruction prompts
 INSTRUCTION_PROMPTS = {
-    "english": "Please provide refined versions of each transcript that improve:\n1. Consistency in tone and terminology\n2. Smooth transitions between slides\n3. Professional yet engaging language\n4. Appropriate length (50-100 words per slide)\n5. CRITICAL POSITIONING:\n   - Slide 1 (First): Include engaging opening (greeting, topic introduction)\n   - Slides 2 to N-1 (Middle): Start directly with content, use smooth transitions like 'Next, we'll explore...', 'Moving on to...', 'Building on this...'\n   - Slide N (Last): Include closing summary and call-to-action\n6. ELIMINATE: Remove any duplicate greetings, introductions, or closings from middle slides\n7. FORMAT: Return each transcript as clean, standalone content WITHOUT any \"Slide X:\" prefixes or labels\n\nPlease return the refined transcripts as plain text content only, with each slide's content on its own. Do not include any slide numbers or labels in the output text.",  # noqa: E501
-    "simplified_chinese": "请提供每个演示文稿的精炼版本，改进以下方面：\n1. 语调和术语的一致性\n2. 幻灯片之间的平滑过渡\n3. 专业而又有吸引力的语言\n4. 合适的长度（每张幻灯片50-100字）\n5. 关键位置：\n   - 第一页：包含有吸引力的开场（问候、主题介绍）\n   - 中间页：直接进入内容，使用像“接下来我们将探讨…”，“继续…”，“在此基础上…”等平滑过渡\n   - 最后一页：包含结尾总结和行动号召\n6. 删除：从中间页移除任何重复的问候、介绍或结尾\n7. 格式：只返回纯文本，每张幻灯片的内容单独呈现，不要包含“第X页：”之类的前缀或标签",  # noqa: E501
+    "english": (
+        "Please provide refined versions that: (1) keep tone/terminology consistent, (2) use smooth transitions, (3) are engaging yet precise, "  # noqa: E501
+        "(4) target 80–140 words per slide, and (5) eliminate any references to visual UI (layout, colors, icons, animations, 'on the slide').\n\n"  # noqa: E501
+        "CRITICAL POSITIONING:\n- Slide 1: opening only\n- Slides 2..N-1: direct content, smooth transitions\n- Slide N: closing summary and call-to-action\n\n"  # noqa: E501
+        "FORMAT: Return plain text for each slide’s content only, no labels or numbering."  # noqa: E501
+    ),  # noqa: E501
+    "simplified_chinese": "请提供每页精炼版本：保持术语一致、过渡顺滑、语言专业；每页目标80–140字；禁止提及UI/视觉元素（布局、颜色、图标、动画、“在幻灯片上”等），只解释内容本身。开场仅在第一页，结语仅在最后一页。格式：只返回每页纯文本，无编号标签。",  # noqa: E501
 }
 
 
@@ -70,7 +84,11 @@ class TranscriptReviewer:
             return transcripts
 
         # Simple splitting logic; real implementation may be more advanced
-        paragraphs = [p.strip() for p in reviewed_content.split("\n\n") if p.strip()]
+        paragraphs = [
+            sanitize_transcript(p.strip())
+            for p in reviewed_content.split("\n\n")
+            if p.strip()
+        ]
         num_slides = len(transcripts)
         reviewed_transcripts: list[dict[str, Any]] = []
 
