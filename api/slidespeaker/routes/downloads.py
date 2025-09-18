@@ -109,8 +109,22 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
     file_id = await _file_id_from_task(task_id)
     items: list[dict[str, Any]] = []
 
+    # Decide if this task is allowed to present video (avoid false positives from shared file_id)
+    allow_video = True
+    try:
+        from slidespeaker.core.state_manager import state_manager as sm
+
+        st = await sm.get_state_by_task(task_id)
+        if st is not None:
+            tt = (st.get("task_type") or "").lower()
+            gv = st.get("generate_video")
+            if tt == "podcast" or gv is False:
+                allow_video = False
+    except Exception:
+        pass
+
     # Video
-    if (
+    if allow_video and (
         sp.file_exists(f"{task_id}.mp4")
         or sp.file_exists(f"{file_id}.mp4")
         or sp.file_exists(f"{file_id}_final.mp4")
@@ -134,6 +148,23 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
                 "type": "audio",
                 "url": f"/api/tasks/{task_id}/audio",
                 "download_url": f"/api/tasks/{task_id}/audio/download",
+            }
+        )
+
+    # Podcast MP3 (separate from presentation audio)
+    podcast_exists = sp.file_exists(f"{task_id}_podcast.mp3")
+    if not podcast_exists:
+        try:
+            file_id = await _file_id_from_task(task_id)
+            podcast_exists = sp.file_exists(f"{file_id}_podcast.mp3")
+        except Exception:
+            podcast_exists = False
+    if podcast_exists:
+        items.append(
+            {
+                "type": "podcast",
+                "url": f"/api/tasks/{task_id}/podcast",
+                "download_url": f"/api/tasks/{task_id}/podcast/download",
             }
         )
 
@@ -828,7 +859,66 @@ async def get_srt_subtitles_by_task(
                 "Cache-Control": "public, max-age=3600",
             },
         )
-    # Fallback 2: local state paths if upload missing
+    # Fallback 2: try any available SRT regardless of locale (task-id first)
+    try_any = (
+        [
+            f"{task_id}_{loc}.srt"
+            for loc in [
+                "zh-Hant",
+                "zh-Hans",
+                "en",
+                "ja",
+                "ko",
+                "th",
+                "es",
+                "fr",
+                "de",
+                "it",
+                "pt",
+                "ru",
+                "ar",
+                "hi",
+            ]
+        ]
+        + [
+            f"{file_id}_{loc}.srt"
+            for loc in [
+                "zh-Hant",
+                "zh-Hans",
+                "en",
+                "ja",
+                "ko",
+                "th",
+                "es",
+                "fr",
+                "de",
+                "it",
+                "pt",
+                "ru",
+                "ar",
+                "hi",
+            ]
+        ]
+        + [f"{file_id}_final.srt"]
+    )
+    any_key = next((k for k in try_any if sp.file_exists(k)), None)
+    if any_key:
+        subtitle_content = sp.download_bytes(any_key)
+        return Response(
+            content=subtitle_content,
+            media_type="text/plain",
+            headers={
+                "Content-Disposition": f"attachment; filename=presentation_{task_id}_{locale_code}.srt",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
+                "Cache-Control": "public, max-age=3600",
+                "X-Subtitle-Locale": locale_code,
+                "X-Subtitle-Served-Key": any_key,
+            },
+        )
+
+    # Fallback 3: local state paths if upload missing
     from slidespeaker.core.state_manager import state_manager
 
     st2 = await state_manager.get_state(file_id)
@@ -972,7 +1062,65 @@ async def get_vtt_subtitles_by_task(
                 "Cache-Control": "public, max-age=3600",
             },
         )
-    # Fallback 2: local state paths if upload missing
+    # Fallback 2: try any available VTT regardless of locale (task-id first)
+    try_any = (
+        [
+            f"{task_id}_{loc}.vtt"
+            for loc in [
+                "zh-Hant",
+                "zh-Hans",
+                "en",
+                "ja",
+                "ko",
+                "th",
+                "es",
+                "fr",
+                "de",
+                "it",
+                "pt",
+                "ru",
+                "ar",
+                "hi",
+            ]
+        ]
+        + [
+            f"{file_id}_{loc}.vtt"
+            for loc in [
+                "zh-Hant",
+                "zh-Hans",
+                "en",
+                "ja",
+                "ko",
+                "th",
+                "es",
+                "fr",
+                "de",
+                "it",
+                "pt",
+                "ru",
+                "ar",
+                "hi",
+            ]
+        ]
+        + [f"{file_id}_final.vtt"]
+    )
+    any_key = next((k for k in try_any if sp.file_exists(k)), None)
+    if any_key:
+        subtitle_content = sp.download_bytes(any_key)
+        return Response(
+            content=subtitle_content,
+            media_type="text/vtt",
+            headers={
+                "Content-Disposition": f"inline; filename=presentation_{task_id}_{locale_code}.vtt",
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
+                "Cache-Control": "public, max-age=3600",
+                "X-Subtitle-Locale": locale_code,
+                "X-Subtitle-Served-Key": any_key,
+            },
+        )
+    # Fallback 3: local state paths if upload missing
     from slidespeaker.core.state_manager import state_manager
 
     st2 = await state_manager.get_state(file_id)
@@ -1131,3 +1279,79 @@ async def head_srt_subtitles_by_task(
         "Cache-Control": "public, max-age=3600",
     }
     return Response(status_code=200, headers=headers)
+
+
+@router.get("/tasks/{task_id}/podcast")
+async def get_podcast_by_task(task_id: str, request: Request) -> Any:
+    sp: StorageProvider = get_storage_provider()
+    # Try task-id object key first
+    if sp.file_exists(f"{task_id}_podcast.mp3"):
+        object_key = f"{task_id}_podcast.mp3"
+    else:
+        file_id = await _file_id_from_task(task_id)
+        if not sp.file_exists(f"{file_id}_podcast.mp3"):
+            raise HTTPException(status_code=404, detail="Podcast not found")
+        object_key = f"{file_id}_podcast.mp3"
+
+    if config.storage_provider == "local":
+        actual = config.output_dir / object_key
+        return FileResponse(
+            str(actual),
+            media_type="audio/mpeg",
+            filename=f"podcast_{task_id}.mp3",
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+                "Cache-Control": "public, max-age=3600",
+                "Content-Disposition": f"inline; filename=podcast_{task_id}.mp3",
+            },
+        )
+
+    # Cloud: proxy/redirect
+    if config.proxy_cloud_media:
+        range_header = request.headers.get("Range")
+        return await _proxy_cloud_media(object_key, "audio/mpeg", range_header)
+
+    url = sp.get_file_url(
+        object_key,
+        expires_in=300,
+        content_disposition=f"inline; filename=podcast_{task_id}.mp3",
+        content_type="audio/mpeg",
+    )
+    return Response(
+        status_code=307, headers={"Location": url, "Access-Control-Allow-Origin": "*"}
+    )
+
+
+@router.get("/tasks/{task_id}/podcast/download")
+async def download_podcast_by_task(task_id: str) -> Any:
+    sp: StorageProvider = get_storage_provider()
+    if sp.file_exists(f"{task_id}_podcast.mp3"):
+        object_key = f"{task_id}_podcast.mp3"
+    else:
+        file_id = await _file_id_from_task(task_id)
+        if not sp.file_exists(f"{file_id}_podcast.mp3"):
+            raise HTTPException(status_code=404, detail="Podcast not found")
+        object_key = f"{file_id}_podcast.mp3"
+
+    if config.storage_provider == "local":
+        actual = config.output_dir / object_key
+        return FileResponse(
+            str(actual),
+            media_type="audio/mpeg",
+            filename=f"podcast_{task_id}.mp3",
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Content-Disposition": f"attachment; filename=podcast_{task_id}.mp3",
+            },
+        )
+
+    url = sp.get_file_url(
+        object_key,
+        expires_in=600,
+        content_disposition=f"attachment; filename=podcast_{task_id}.mp3",
+        content_type="audio/mpeg",
+    )
+    return Response(
+        status_code=307, headers={"Location": url, "Access-Control-Allow-Origin": "*"}
+    )

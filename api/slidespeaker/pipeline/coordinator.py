@@ -14,8 +14,9 @@ from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 
 # Import specialized coordinators
-from .pdf_coordinator import process_pdf_file
-from .slide_coordinator import process_slide_file
+from .podcast import from_pdf as podcast_from_pdf
+from .video import from_pdf as video_from_pdf
+from .video import from_slide as video_from_slide
 
 
 async def accept_task(
@@ -24,8 +25,11 @@ async def accept_task(
     file_ext: str,
     voice_language: str = "english",
     subtitle_language: str | None = None,
+    transcript_language: str | None = None,
     generate_avatar: bool = True,
     generate_subtitles: bool = True,
+    generate_podcast: bool = False,
+    generate_video: bool = True,
     task_id: str | None = None,
 ) -> None:
     """
@@ -53,9 +57,21 @@ async def accept_task(
     logger.info(
         f"Voice language: {voice_language}, Subtitle language: {subtitle_language}"
     )
-    logger.info(
-        f"Generate avatar: {generate_avatar}, Generate subtitles: {generate_subtitles}"
-    )
+    # Log options; omit avatar for PDFs to avoid confusion
+    if file_ext.lower() == ".pdf":
+        logger.info(
+            "Generate subtitles: %s, Generate podcast: %s, Generate video: %s",
+            generate_subtitles,
+            generate_podcast,
+            generate_video,
+        )
+    else:
+        logger.info(
+            "Generate avatar: %s, Generate subtitles: %s, Generate podcast: %s",
+            generate_avatar,
+            generate_subtitles,
+            generate_podcast,
+        )
 
     # Log file validation
     if not file_path.exists():
@@ -82,12 +98,14 @@ async def accept_task(
             "hd",  # video_resolution (default to HD)
             generate_avatar,
             generate_subtitles,
+            generate_video,
+            generate_podcast,
         )
         state = await state_manager.get_state(file_id)
         # Store task_id in state for easier access
         if task_id and state:
             state["task_id"] = task_id
-            await state_manager._save_state(file_id, state)
+            await state_manager.save_state(file_id, state)
     else:
         # Update existing state with new parameters (in case they've changed)
         if state:
@@ -95,25 +113,40 @@ async def accept_task(
             state["subtitle_language"] = subtitle_language
             state["generate_avatar"] = generate_avatar
             state["generate_subtitles"] = generate_subtitles
+            state["generate_podcast"] = generate_podcast
+            state["generate_video"] = generate_video
+            if transcript_language is not None:
+                state["podcast_transcript_language"] = transcript_language
             # Store task_id in state for easier access
             if task_id:
                 state["task_id"] = task_id
-            await state_manager._save_state(file_id, state)
+            await state_manager.save_state(file_id, state)
 
     # Delegate to specialized coordinators based on file type
     if file_ext.lower() == ".pdf":
-        # Use PDF-specific coordinator
-        await process_pdf_file(
-            file_id,
-            file_path,
-            voice_language,
-            subtitle_language,
-            generate_subtitles,
-            task_id,
-        )
+        # Run video pipeline if requested
+        if generate_video:
+            await video_from_pdf(
+                file_id,
+                file_path,
+                voice_language,
+                subtitle_language,
+                generate_subtitles,
+                True,  # generate_video
+                task_id,
+            )
+        # Run podcast pipeline if requested
+        if generate_podcast:
+            await podcast_from_pdf(
+                file_id,
+                file_path,
+                voice_language,
+                transcript_language,
+                task_id,
+            )
     else:
-        # Use PPT/PPTX-specific coordinator
-        await process_slide_file(
+        # Slides only support video pipeline
+        await video_from_slide(
             file_id,
             file_path,
             file_ext,

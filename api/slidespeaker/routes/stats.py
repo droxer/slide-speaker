@@ -10,7 +10,9 @@ from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Query
+from redis.exceptions import RedisError
 
+from slidespeaker.core.progress_utils import compute_step_percentage
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 
@@ -31,12 +33,46 @@ async def get_tasks(
 ) -> dict[str, Any]:
     """Get a list of all tasks with optional filtering and pagination."""
 
-    # Get all task IDs from Redis
-    task_keys = await task_queue.redis_client.keys("ss:task:*")
+    # Helper: safely scan Redis keys with fallback when Redis is unavailable
+    async def _safe_scan(pattern: str) -> list[str]:
+        try:
+            cursor: int = 0
+            out: list[str] = []
+            while True:
+                cursor, batch = await task_queue.redis_client.scan(
+                    cursor=cursor, match=pattern, count=500
+                )
+                out.extend([str(k) for k in batch])
+                if cursor == 0:
+                    break
+            return out
+        except (RedisError, TimeoutError, Exception):
+            return []
+
+    # Get all task IDs from Redis (gracefully handle Redis down)
+    task_keys = await _safe_scan("ss:task:*")
     # Exclude transient cancelled flags
     task_keys = [k for k in task_keys if not str(k).endswith(":cancelled")]
+
     # Only list task-based states (legacy file-id states are deprecated)
-    task_state_keys = await state_manager.redis_client.keys("ss:state:task:*")
+    # Only list task-based states (legacy file-id states are deprecated)
+    # Use the same safe scanner on the state manager client
+    async def _safe_state_scan(pattern: str) -> list[str]:
+        try:
+            cursor: int = 0
+            out: list[str] = []
+            while True:
+                cursor, batch = await state_manager.redis_client.scan(
+                    cursor=cursor, match=pattern, count=500
+                )
+                out.extend([str(k) for k in batch])
+                if cursor == 0:
+                    break
+            return out
+        except (RedisError, TimeoutError, Exception):
+            return []
+
+    task_state_keys = await _safe_state_scan("ss:state:task:*")
 
     tasks = []
 
@@ -51,17 +87,56 @@ async def get_tasks(
                 task["file_id"] = file_id
 
                 # Get corresponding state if available
-                state = await state_manager.get_state(file_id)
+                tid = task.get("task_id")
+                state = None
+                if isinstance(tid, str) and tid:
+                    state = await state_manager.get_state_by_task(tid)
+                else:
+                    # Fallback (legacy): try file-id (may alias to last-run)
+                    state = await state_manager.get_state(file_id)
                 if state:
+                    # Derive task_type and flags when missing (legacy defaults)
+                    gv = state.get("generate_video")
+                    gp = state.get("generate_podcast")
+                    steps = state.get("steps") or {}
+                    derived_type: str | None = state.get("task_type")
+                    if (
+                        gv is None
+                        and gp is None
+                        and isinstance(steps, dict)
+                        and "compose_podcast" in steps
+                    ):
+                        gp = True
+                        gv = False
+                        derived_type = "podcast"
+                    if derived_type is None:
+                        if gp is True and gv is True:
+                            derived_type = "both"
+                        elif gp is True:
+                            derived_type = "podcast"
+                        elif gv is True:
+                            derived_type = "video"
+
                     task["state"] = {
                         "status": state["status"],
                         "current_step": state["current_step"],
                         "filename": state.get("filename"),
+                        "source": state.get("source"),
                         "voice_language": state["voice_language"],
                         "subtitle_language": state.get("subtitle_language"),
                         "video_resolution": state.get("video_resolution", "hd"),
                         "generate_avatar": state["generate_avatar"],
                         "generate_subtitles": state["generate_subtitles"],
+                        # Prefer explicit; include derived when available
+                        "generate_video": gv
+                        if gv is not None
+                        else state.get("generate_video"),
+                        "generate_podcast": gp
+                        if gp is not None
+                        else state.get("generate_podcast"),
+                        "task_type": derived_type
+                        if derived_type is not None
+                        else state.get("task_type"),
                         "created_at": state["created_at"],
                         "updated_at": state["updated_at"],
                         "errors": state["errors"],
@@ -81,6 +156,27 @@ async def get_tasks(
         st = await state_manager.get_state_by_task(task_id)
         if st:
             fid = st.get("file_id")
+            # Derive task_type and flags when missing
+            gv = st.get("generate_video")
+            gp = st.get("generate_podcast")
+            steps = st.get("steps") or {}
+            derived_type2: str | None = st.get("task_type")
+            if (
+                gv is None
+                and gp is None
+                and isinstance(steps, dict)
+                and "compose_podcast" in steps
+            ):
+                gp = True
+                gv = False
+                derived_type2 = "podcast"
+            if derived_type2 is None:
+                if gp is True and gv is True:
+                    derived_type2 = "both"
+                elif gp is True:
+                    derived_type2 = "podcast"
+                elif gv is True:
+                    derived_type2 = "video"
             tasks.append(
                 {
                     "task_id": task_id,
@@ -92,11 +188,21 @@ async def get_tasks(
                     "state": {
                         "status": st.get("status"),
                         "current_step": st.get("current_step"),
+                        "source": st.get("source"),
                         "voice_language": st.get("voice_language"),
                         "subtitle_language": st.get("subtitle_language"),
                         "video_resolution": st.get("video_resolution", "hd"),
                         "generate_avatar": st.get("generate_avatar"),
                         "generate_subtitles": st.get("generate_subtitles"),
+                        "generate_video": gv
+                        if gv is not None
+                        else st.get("generate_video"),
+                        "generate_podcast": gp
+                        if gp is not None
+                        else st.get("generate_podcast"),
+                        "task_type": derived_type2
+                        if derived_type2 is not None
+                        else st.get("task_type"),
                         "created_at": st.get("created_at"),
                         "updated_at": st.get("updated_at"),
                         "errors": st.get("errors", []),
@@ -105,11 +211,15 @@ async def get_tasks(
                         "file_id": fid,
                         "file_ext": st.get("file_ext"),
                         "filename": st.get("filename"),
+                        "source": st.get("source"),
                         "voice_language": st.get("voice_language"),
                         "subtitle_language": st.get("subtitle_language"),
                         "video_resolution": st.get("video_resolution", "hd"),
                         "generate_avatar": st.get("generate_avatar"),
                         "generate_subtitles": st.get("generate_subtitles"),
+                        "generate_video": st.get("generate_video"),
+                        "generate_podcast": st.get("generate_podcast"),
+                        "task_type": st.get("task_type"),
                     },
                 }
             )
@@ -139,104 +249,35 @@ async def get_tasks(
     }
 
 
-@router.post("/admin/migrate_state_to_tasks")
-async def migrate_state_to_tasks(delete_file_state: bool = False) -> dict[str, Any]:
-    """One-time migration to mirror legacy file-id states to task-id aliases.
+@router.post("/admin/tasks/{task_id}/set_type")
+async def set_task_type(
+    task_id: str,
+    task_type: str | None = None,
+    generate_video: bool | None = None,
+    generate_podcast: bool | None = None,
+) -> dict[str, Any]:
+    """Admin: update task type flags in state for a given task.
 
-    - For each ss:state:{file_id}:
-      - Determine associated task ids (prefer ss:file2tasks:{file_id};
-        fallback to state.task_id; fallback to scanning tasks).
-      - Bind mappings and write ss:state:task:{task_id} with the same
-        state payload + task_id.
-      - Optionally delete ss:state:{file_id} and legacy single mapping
-        when delete_file_state is True and other tasks remain tracked in the set.
+    Useful to correct legacy tasks where defaults caused mislabeling.
     """
-    migrated = 0
-    skipped = 0
-    errors: list[str] = []
-    file_states = await state_manager.redis_client.keys("ss:state:*")
-
-    # Build task index if needed (fallback scan)
-    async def _tasks_for_file(fid: str) -> list[str]:
-        # Prefer multi-task set mapping
-        try:
-            task_ids = await state_manager.redis_client.smembers(f"ss:file2tasks:{fid}")  # type: ignore
-            if task_ids:
-                return [str(t) for t in task_ids]
-        except Exception:
-            pass
-        # Try legacy single mapping
-        try:
-            single = await state_manager.redis_client.get(f"ss:file2task:{fid}")
-            if single:
-                return [str(single)]
-        except Exception:
-            pass
-        # Fallback: scan all tasks and match kwargs.file_id
-        task_keys = await task_queue.redis_client.keys("ss:task:*")
-        out: list[str] = []
-        for tk in task_keys:
-            if str(tk).endswith(":cancelled"):
-                continue
-            try:
-                data = await task_queue.redis_client.get(tk)
-                if not data:
-                    continue
-                if isinstance(data, bytes):
-                    data = data.decode("utf-8")
-                obj = __import__("json").loads(data)
-                if (obj.get("kwargs") or {}).get("file_id") == fid:
-                    out.append(obj.get("task_id"))
-            except Exception:
-                continue
-        return [t for t in out if isinstance(t, str)]
-
-    for key in file_states:
-        try:
-            fid = str(key).replace("ss:state:", "")
-            # Read raw state payload (do not use get_state to avoid task alias redirection)
-            raw = await state_manager.redis_client.get(key)
-            if not raw:
-                skipped += 1
-                continue
-            if isinstance(raw, bytes):
-                raw = raw.decode("utf-8")
-            try:
-                state = __import__("json").loads(raw)
-            except Exception:
-                skipped += 1
-                continue
-            # Determine tasks
-            task_ids: list[str] = []
-            if isinstance(state, dict) and state.get("task_id"):
-                task_ids = [str(state["task_id"])]
-            else:
-                task_ids = await _tasks_for_file(fid)
-            if not task_ids:
-                skipped += 1
-                continue
-            # Mirror state under each task alias and bind mappings
-            for tid in task_ids:
-                try:
-                    await state_manager.bind_task(fid, tid)
-                    state["task_id"] = tid
-                    await state_manager.redis_client.set(
-                        f"ss:state:task:{tid}",
-                        __import__("json").dumps(state),
-                        ex=86400,
-                    )
-                    migrated += 1
-                except Exception as e:
-                    errors.append(f"Bind/mirror failed for {fid}->{tid}: {e}")
-            # Optionally delete file-id state
-            if delete_file_state:
-                with suppress(Exception):
-                    await state_manager.redis_client.delete(f"ss:state:{fid}")
-        except Exception as e:
-            errors.append(str(e))
-            continue
-
-    return {"migrated": migrated, "skipped": skipped, "errors": errors}
+    st = await state_manager.get_state_by_task(task_id)
+    if not st:
+        return {"updated": False, "error": "state_not_found"}
+    if task_type is not None:
+        st["task_type"] = task_type
+    if generate_video is not None:
+        st["generate_video"] = generate_video
+    if generate_podcast is not None:
+        st["generate_podcast"] = generate_podcast
+    # Persist under task alias and file-id mirror
+    st["task_id"] = task_id
+    await state_manager.redis_client.set(
+        f"ss:state:task:{task_id}", __import__("json").dumps(st), ex=86400
+    )
+    fid = st.get("file_id")
+    if isinstance(fid, str) and fid:
+        await state_manager.save_state(fid, st)
+    return {"updated": True, "task_id": task_id, "state": st}
 
 
 @router.get("/tasks/search")
@@ -441,19 +482,7 @@ async def get_task_details(task_id: str) -> dict[str, Any]:
             task["detailed_state"] = state
 
             # Add step completion percentage
-            total_steps = len(
-                [
-                    step
-                    for step in state["steps"].values()
-                    if step["status"] != "skipped"
-                ]
-            )
-            completed_steps = sum(
-                1 for step in state["steps"].values() if step["status"] == "completed"
-            )
-            task["completion_percentage"] = (
-                int((completed_steps / total_steps) * 100) if total_steps > 0 else 0
-            )
+            task["completion_percentage"] = compute_step_percentage(state)
 
     return task
 

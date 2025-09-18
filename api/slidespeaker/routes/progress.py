@@ -9,6 +9,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
+from slidespeaker.core.progress_utils import compute_step_percentage
 from slidespeaker.core.state_manager import state_manager
 
 router = APIRouter(prefix="/api", tags=["progress"])
@@ -26,18 +27,12 @@ def _progress_from_state(state: dict[str, Any] | None) -> dict[str, Any]:
             "current_step": "unknown",
             "steps": {},
         }
-    # Compute percentage based on non-skipped steps
-    steps = state.get("steps", {}) or {}
-    total_steps = len([s for s in steps.values() if s.get("status") != "skipped"])
-    completed_steps = sum(1 for s in steps.values() if s.get("status") == "completed")
-    progress_percentage = (
-        int((completed_steps / total_steps) * 100) if total_steps > 0 else 0
-    )
+    progress_percentage = compute_step_percentage(state)
     return {
         "status": state.get("status", "unknown"),
         "progress": progress_percentage,
         "current_step": state.get("current_step", "unknown"),
-        "steps": steps,
+        "steps": state.get("steps", {}) or {},
         "errors": state.get("errors", []),
         "filename": state.get("filename"),
         "file_ext": state.get("file_ext"),
@@ -45,6 +40,8 @@ def _progress_from_state(state: dict[str, Any] | None) -> dict[str, Any]:
         "subtitle_language": state.get(
             "subtitle_language", state.get("voice_language")
         ),
+        "generate_podcast": state.get("generate_podcast", False),
+        "generate_video": state.get("generate_video", True),
         "created_at": state.get("created_at"),
         "updated_at": state.get("updated_at"),
     }

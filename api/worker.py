@@ -131,13 +131,19 @@ async def process_task(task_id: str) -> bool:
         file_ext = kwargs.get("file_ext")
         voice_language = kwargs.get("voice_language", "english")
         subtitle_language = kwargs.get("subtitle_language")
+        transcript_language = kwargs.get("transcript_language")
         generate_avatar = kwargs.get("generate_avatar", True)
         generate_subtitles = True  # Always generate subtitles
+        generate_podcast = kwargs.get("generate_podcast", False)
+        generate_video = kwargs.get("generate_video", True)
 
         logger.info(
             f"Task {task_id} parameters extracted - file_id: {file_id}, "
             f"file_ext: {file_ext}, voice_language: {voice_language}, "
-            f"subtitle_language: {subtitle_language}, generate_avatar: {generate_avatar}"
+            f"subtitle_language: {subtitle_language}, "
+            f"generate_avatar: {generate_avatar}, "
+            f"generate_podcast: {generate_podcast}, "
+            f"generate_video: {generate_video}"
         )
 
         # Validate required parameters
@@ -163,13 +169,16 @@ async def process_task(task_id: str) -> bool:
             f"Task {task_id} starting presentation processing for file {file_id}"
         )
         await accept_task(
-            file_id,
-            Path(file_path),
-            file_ext,
-            voice_language,
-            subtitle_language,
-            generate_avatar,
-            generate_subtitles,
+            file_id=file_id,
+            file_path=Path(file_path),
+            file_ext=file_ext,
+            voice_language=voice_language,
+            subtitle_language=subtitle_language,
+            transcript_language=transcript_language,
+            generate_avatar=generate_avatar,
+            generate_subtitles=generate_subtitles,
+            generate_podcast=generate_podcast,
+            generate_video=generate_video,
             task_id=task_id,
         )
 

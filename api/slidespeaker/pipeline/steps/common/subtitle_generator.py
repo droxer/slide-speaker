@@ -242,7 +242,7 @@ async def get_pdf_subtitles_transcripts(
                 "language": language,
                 "source": source_key or "unknown",
             }
-            await state_manager._save_state(file_id, state)
+            await state_manager.save_state(file_id, state)
     except Exception:
         pass
     return chapters
@@ -338,7 +338,7 @@ async def get_slide_subtitles_transcripts(
                 "language": language,
                 "source": source_key or "unknown",
             }
-            await state_manager._save_state(file_id, state)
+            await state_manager.save_state(file_id, state)
     except Exception:
         pass
     return transcripts_data

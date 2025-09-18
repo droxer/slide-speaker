@@ -17,6 +17,8 @@ help:
 	@echo "make start       - Start production server"
 	@echo "make master-worker - Start master worker (automatically manages multiple workers)"
 	@echo "make cli         - Show CLI tool help"
+	@echo "make admin-purge - Remove legacy file-id states (maintenance)"
+	@echo "make admin-set-type TID=<id> [TYPE=video|podcast|both] [VIDEO=0|1] [PODCAST=0|1] - Adjust a task's type flags"
 	@echo "make lint        - Run ruff linter"
 	@echo "make format      - Run ruff formatter"
 	@echo "make typecheck   - Run mypy type checker"
@@ -52,6 +54,20 @@ master-worker: install_dev
 .PHONY: cli
 cli: install
 	$(PYTHON) cli.py --help
+
+# Admin maintenance
+.PHONY: admin-purge
+admin-purge: install
+	$(PYTHON) -m api.scripts.ss_admin purge-legacy-file-states
+
+.PHONY: admin-set-type
+admin-set-type: install
+	@if [ -z "$(TID)" ]; then echo "Usage: make admin-set-type TID=<task_id> [TYPE=video|podcast|both] [VIDEO=0|1] [PODCAST=0|1]"; exit 1; fi; \
+	FLAGS=""; \
+	if [ -n "$(TYPE)" ]; then FLAGS="$$FLAGS --task-type $(TYPE)"; fi; \
+	if [ -n "$(VIDEO)" ]; then if [ "$(VIDEO)" = "0" ] || [ "$(VIDEO)" = "false" ]; then FLAGS="$$FLAGS --no-generate-video"; else FLAGS="$$FLAGS --generate-video"; fi; fi; \
+	if [ -n "$(PODCAST)" ]; then if [ "$(PODCAST)" = "0" ] || [ "$(PODCAST)" = "false" ]; then FLAGS="$$FLAGS --no-generate-podcast"; else FLAGS="$$FLAGS --generate-podcast"; fi; fi; \
+	$(PYTHON) -m api.scripts.ss_admin set-type --task-id $(TID) $$FLAGS
 
 # Linting with ruff
 .PHONY: lint

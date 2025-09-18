@@ -15,6 +15,39 @@ body.ultra-flat {
   --uf-secondary-text: #111827;
   --uf-icon-bg: #111827;
   --uf-icon-text: #ffffff;
+  /* Media controls contrast (Flat) */
+  --media-controls-bg-video: rgba(0, 0, 0, 0.7);
+  --media-controls-bg-audio: #e9edf3;
+}
+
+/* Media geometry: sharp, no elevation in Flat */
+body.ultra-flat .video-preview-block video,
+body.ultra-flat .media-section video {
+  border-radius: 2px !important;
+  box-shadow: none !important;
+  border-color: var(--uf-border) !important;
+}
+
+body.ultra-flat .video-preview-block video::-webkit-media-controls-enclosure,
+body.ultra-flat .media-section video::-webkit-media-controls-enclosure {
+  border-radius: 2px !important;
+}
+
+body.ultra-flat .audio-player-inline audio,
+body.ultra-flat .audio-preview-block audio {
+  border-radius: 2px !important;
+  box-shadow: none !important;
+  border-color: var(--uf-border) !important;
+}
+
+body.ultra-flat .audio-player-inline audio::-webkit-media-controls-panel,
+body.ultra-flat .audio-preview-block audio::-webkit-media-controls-panel {
+  border-radius: 2px !important;
+}
+
+/* Modal player: no elevation in Flat */
+body.ultra-flat .video-player-container {
+  box-shadow: none !important;
 }
 
 body.ultra-flat * {
@@ -224,6 +257,36 @@ body.ultra-flat .preview-button:hover {
   background: #f3f4f6 !important;
   border-color: #d1d5db !important;
 }
+
+/* Preview toggle overrides */
+body.ultra-flat .preview-toggle .toggle-btn {
+  background: #ffffff !important;
+  color: #374151 !important;
+  border: 1px solid var(--uf-border) !important;
+  border-radius: 2px !important;
+}
+body.ultra-flat .preview-toggle .toggle-btn.active {
+  background: var(--uf-btn-bg) !important;
+  color: var(--uf-btn-text) !important;
+  border-color: var(--uf-btn-bg) !important;
+}
+body.ultra-flat .preview-toggle .toggle-btn:not(.active):hover {
+  background: #f3f4f6 !important;
+}
+body.ultra-flat .preview-toggle .toggle-btn:focus-visible {
+  outline: 2px solid var(--uf-accent) !important;
+  outline-offset: 2px !important;
+}
+body.ultra-flat .copy-btn-enhanced:focus-visible,
+body.ultra-flat .task-status:focus-visible,
+body.ultra-flat .task-id:focus-visible {
+  outline: 2px solid var(--uf-accent) !important;
+  outline-offset: 2px !important;
+}
+
+/* Output pills: ensure crisp flat colors */
+body.ultra-flat .output-pill.video { color: #1d4ed8 !important; background: #dbeafe !important; border-color: #bfdbfe !important; }
+body.ultra-flat .output-pill.podcast { color: #6d28d9 !important; background: #ede9fe !important; border-color: #ddd6fe !important; }
 
 /* Processing steps: flatten visuals */
 body.ultra-flat .steps-container {

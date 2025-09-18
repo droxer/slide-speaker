@@ -16,6 +16,7 @@ from slidespeaker.configs.config import config
 from slidespeaker.configs.logging_config import setup_logging
 from slidespeaker.routes.diagnostic import router as diagnostic_router
 from slidespeaker.routes.downloads import router as downloads_router
+from slidespeaker.routes.health import router as health_router
 from slidespeaker.routes.languages import router as languages_router
 from slidespeaker.routes.preview import router as preview_router
 from slidespeaker.routes.progress import router as progress_router
@@ -63,6 +64,7 @@ app.include_router(tasks_router)
 app.include_router(progress_router)
 app.include_router(downloads_router)
 app.include_router(languages_router)
+app.include_router(health_router)
 app.include_router(stats_router)
 app.include_router(transcripts_router)
 app.include_router(tts_router)

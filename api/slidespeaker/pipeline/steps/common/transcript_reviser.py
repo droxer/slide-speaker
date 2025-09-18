@@ -90,7 +90,7 @@ async def revise_transcripts_common(
                     merged, section_label=label, filename=state.get("filename")
                 )
                 state["steps"][state_key]["markdown"] = md
-                await state_manager._save_state(file_id, state)
+                await state_manager.save_state(file_id, state)
         except Exception:
             # Non-fatal metadata
             pass
@@ -115,7 +115,7 @@ async def revise_transcripts_common(
             state = await state_manager.get_state(file_id)
             if state and "steps" in state and state_key in state["steps"]:
                 state["steps"][state_key]["markdown_storage_url"] = url
-                await state_manager._save_state(file_id, state)
+                await state_manager.save_state(file_id, state)
         except Exception as e:
             logger.error(f"Failed to upload transcript markdown to storage: {e}")
         logger.info(

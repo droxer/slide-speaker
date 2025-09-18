@@ -35,15 +35,23 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         # Normalize incoming languages to internal keys
         raw_voice_language = body.get("voice_language", "english")
         raw_subtitle_language = body.get("subtitle_language")
+        raw_transcript_language = body.get("transcript_language")
         voice_language = locale_utils.normalize_language(raw_voice_language)
         subtitle_language = (
             locale_utils.normalize_language(raw_subtitle_language)
             if raw_subtitle_language is not None
             else None
         )  # Don't default to audio language
+        transcript_language = (
+            locale_utils.normalize_language(raw_transcript_language)
+            if raw_transcript_language is not None
+            else None
+        )
         video_resolution = body.get("video_resolution", "hd")  # Default to HD
         generate_avatar = body.get("generate_avatar", True)  # Default to True
         generate_subtitles = True  # Always generate subtitles by default
+        generate_podcast = body.get("generate_podcast", False)
+        generate_video = body.get("generate_video", True)
 
         if not filename or not file_data:
             raise HTTPException(
@@ -54,6 +62,10 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         file_bytes = base64.b64decode(file_data)
 
         file_ext = Path(filename).suffix.lower()
+        # If this is a PDF podcast request and client didn't specify generate_video,
+        # prefer podcast-only to avoid accidental video from default True.
+        if file_ext == ".pdf" and generate_podcast and ("generate_video" not in body):
+            generate_video = False
         if file_ext not in [".pdf", ".pptx", ".ppt"]:
             raise HTTPException(
                 status_code=400, detail="Only PDF and PowerPoint files are supported"
@@ -98,9 +110,12 @@ async def upload_file(request: Request) -> dict[str, str | None]:
             filename=filename,
             voice_language=voice_language,
             subtitle_language=subtitle_language,
+            transcript_language=transcript_language,
             video_resolution=video_resolution,
             generate_avatar=generate_avatar,
             generate_subtitles=generate_subtitles,
+            generate_podcast=generate_podcast,
+            generate_video=generate_video,
         )
 
         # Create initial state (task-first; mirrors to task alias and mappings)
@@ -114,8 +129,18 @@ async def upload_file(request: Request) -> dict[str, str | None]:
             video_resolution,
             generate_avatar,
             generate_subtitles,
+            generate_video,
+            generate_podcast,
             task_id=task_id,
         )
+        # Store transcript language hint for podcast in state if provided
+        try:
+            st = await state_manager.get_state(file_id)
+            if st is not None and transcript_language is not None:
+                st["podcast_transcript_language"] = transcript_language
+                await state_manager.save_state(file_id, st)
+        except Exception:
+            pass
 
         logger.info(
             f"File uploaded: {file_id}, type: {file_ext}, task submitted: {task_id}"

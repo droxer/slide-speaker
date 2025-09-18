@@ -13,6 +13,39 @@ body.subtle-material {
   --sm-on-primary: #ffffff;
   --sm-secondary: #f3f4f6; /* neutral-100 */
   --sm-on-secondary: #0f172a;
+  /* Media controls contrast (Material) */
+  --media-controls-bg-video: rgba(0, 0, 0, 0.55);
+  --media-controls-bg-audio: #eef2f7;
+}
+
+/* Media geometry: rounded with soft elevation in Material */
+body.subtle-material .video-preview-block video,
+body.subtle-material .media-section video {
+  border-radius: 12px !important;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08) !important;
+  border-color: var(--sm-border) !important;
+}
+
+body.subtle-material .video-preview-block video::-webkit-media-controls-enclosure,
+body.subtle-material .media-section video::-webkit-media-controls-enclosure {
+  border-radius: 12px !important;
+}
+
+body.subtle-material .audio-player-inline audio,
+body.subtle-material .audio-preview-block audio {
+  border-radius: 12px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06) !important;
+  border-color: var(--sm-border) !important;
+}
+
+body.subtle-material .audio-player-inline audio::-webkit-media-controls-panel,
+body.subtle-material .audio-preview-block audio::-webkit-media-controls-panel {
+  border-radius: 12px !important;
+}
+
+/* Modal player: softer, larger elevation in Material */
+body.subtle-material .video-player-container {
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.22) !important;
 }
 
 body.subtle-material * {
@@ -179,6 +212,36 @@ body.subtle-material .preview-button {
   border: 1px solid var(--sm-border) !important;
   border-radius: 8px !important;
 }
+
+/* Preview toggle overrides */
+body.subtle-material .preview-toggle .toggle-btn {
+  background: var(--sm-surface) !important;
+  color: #334155 !important;
+  border: 1px solid var(--sm-border) !important;
+  border-radius: 8px !important;
+}
+body.subtle-material .preview-toggle .toggle-btn.active {
+  background: var(--sm-primary) !important;
+  color: var(--sm-on-primary) !important;
+  border-color: var(--sm-primary) !important;
+}
+body.subtle-material .preview-toggle .toggle-btn:not(.active):hover {
+  background: var(--sm-secondary) !important;
+}
+body.subtle-material .preview-toggle .toggle-btn:focus-visible {
+  outline: 2px solid var(--sm-primary) !important;
+  outline-offset: 2px !important;
+}
+body.subtle-material .copy-btn-enhanced:focus-visible,
+body.subtle-material .task-status:focus-visible,
+body.subtle-material .task-id:focus-visible {
+  outline: 2px solid var(--sm-primary) !important;
+  outline-offset: 2px !important;
+}
+
+/* Output pills: match theme */
+body.subtle-material .output-pill.video { color: #3730a3 !important; background: #e0e7ff !important; border-color: #c7d2fe !important; }
+body.subtle-material .output-pill.podcast { color: #5b21b6 !important; background: #ede9fe !important; border-color: #ddd6fe !important; }
 
 /* Video close */
 body.subtle-material .video-close-button {

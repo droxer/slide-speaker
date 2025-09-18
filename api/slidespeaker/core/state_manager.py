@@ -52,23 +52,56 @@ class RedisStateManager:
         video_resolution: str = "hd",
         generate_avatar: bool = True,
         generate_subtitles: bool = True,
+        generate_video: bool = True,
+        generate_podcast: bool = False,
         task_id: str | None = None,
     ) -> dict[str, Any]:
         """Create initial state for a file processing task"""
         # Initialize steps based on file type
         if file_ext.lower() == ".pdf":
             # PDF-specific steps
+            # Avatar is not applicable for PDF
+            generate_avatar = False
             steps = {
                 "segment_pdf_content": {"status": "pending", "data": None},
                 "revise_pdf_transcripts": {"status": "pending", "data": None},
-                "generate_pdf_chapter_images": {"status": "pending", "data": None},
-                "generate_pdf_audio": {"status": "pending", "data": None},
-                "generate_pdf_subtitles": {
-                    "status": "pending" if generate_subtitles else "skipped",
-                    "data": None,
-                },
-                "compose_video": {"status": "pending", "data": None},
             }
+
+            # Video path (optional)
+            if generate_video:
+                steps.update(
+                    {
+                        "generate_pdf_chapter_images": {
+                            "status": "pending",
+                            "data": None,
+                        },
+                        "generate_pdf_audio": {"status": "pending", "data": None},
+                        "generate_pdf_subtitles": {
+                            "status": "pending" if generate_subtitles else "skipped",
+                            "data": None,
+                        },
+                        "compose_video": {"status": "pending", "data": None},
+                    }
+                )
+
+            # Optional podcast steps
+            if generate_podcast:
+                steps.update(
+                    {
+                        "generate_podcast_script": {"status": "pending", "data": None},
+                    }
+                )
+                if voice_language.lower() != "english":
+                    steps["translate_podcast_script"] = {
+                        "status": "pending",
+                        "data": None,
+                    }
+                steps.update(
+                    {
+                        "generate_podcast_audio": {"status": "pending", "data": None},
+                        "compose_podcast": {"status": "pending", "data": None},
+                    }
+                )
 
             # Add translation steps if needed
             if voice_language.lower() != "english":
@@ -131,16 +164,29 @@ class RedisStateManager:
                     }
                 )
 
+        # Derive explicit task_type and source for UI and analytics
+        source = "pdf" if file_ext.lower() == ".pdf" else "slides"
+        if generate_video and generate_podcast:
+            task_type = "both"
+        elif generate_podcast and not generate_video:
+            task_type = "podcast"
+        else:
+            task_type = "video"
+
         state: dict[str, Any] = {
             "file_id": file_id,
             "file_path": str(file_path),
             "file_ext": file_ext,
             "filename": filename,
+            "source": source,
             "voice_language": voice_language,
             "subtitle_language": subtitle_language,
             "video_resolution": video_resolution,
             "generate_avatar": generate_avatar,
             "generate_subtitles": generate_subtitles,
+            "generate_video": generate_video,
+            "generate_podcast": generate_podcast,
+            "task_type": task_type,
             "status": "uploaded",
             "current_step": "segment_pdf_content"
             if file_ext.lower() == ".pdf"
@@ -248,7 +294,7 @@ class RedisStateManager:
         if cancelled_step and cancelled_step in st.get("steps", {}):
             st["steps"][cancelled_step]["status"] = "cancelled"
         for _name, step_data in st.get("steps", {}).items():
-            if step_data.get("status") in ("in_progress", "pending"):
+            if step_data.get("status") in ("processing", "in_progress", "pending"):
                 step_data["status"] = "cancelled"
         await self.redis_client.set(
             self._get_task_key(task_id), json.dumps(st), ex=86400
@@ -429,7 +475,7 @@ class RedisStateManager:
         if cancelled_step and cancelled_step in state.get("steps", {}):
             state["steps"][cancelled_step]["status"] = "cancelled"
         for _step_name, step_data in state.get("steps", {}).items():
-            if step_data.get("status") in ("in_progress", "pending"):
+            if step_data.get("status") in ("processing", "in_progress", "pending"):
                 step_data["status"] = "cancelled"
         task_id = state.get("task_id")
         if isinstance(task_id, str) and task_id:
@@ -445,13 +491,24 @@ class RedisStateManager:
     async def _save_state(self, file_id: str, state: dict[str, Any]) -> None:
         """Save state to Redis with 24-hour expiration"""
         key = self._get_key(file_id)
-        await self.redis_client.set(key, json.dumps(state), ex=86400)  # 24h expiration
-        # If state carries a task_id, also mirror under a task-based key to enable task-first APIs
+        # If state carries a task_id, prefer task-alias as the sole source of truth
         task_id = state.get("task_id") if isinstance(state, dict) else None
         if isinstance(task_id, str) and task_id:
             await self.redis_client.set(
                 self._get_task_key(task_id), json.dumps(state), ex=86400
             )
+            # Proactively remove legacy file-id state to avoid cross-run bleed-through
+            with suppress(Exception):
+                await self.redis_client.delete(key)
+        else:
+            # Legacy path: no task_id available; write by file-id
+            await self.redis_client.set(
+                key, json.dumps(state), ex=86400
+            )  # 24h expiration
+
+    # Public wrapper to avoid external modules calling the private method directly
+    async def save_state(self, file_id: str, state: dict[str, Any]) -> None:
+        await self._save_state(file_id, state)
 
 
 # Global state manager instance
