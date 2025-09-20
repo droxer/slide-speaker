@@ -1,0 +1,54 @@
+/* Applied when body has class `classic` (legacy glossy look) */
+
+body.classic {
+  background: linear-gradient(135deg, #4338ca 0%, #7c3aed 100%);
+}
+
+body.classic .app-header {
+  color: #fff;
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+body.classic .app-header h1 {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+body.classic .app-header p {
+  font-size: 1.15rem;
+  opacity: 0.95;
+  font-weight: 300;
+  letter-spacing: 0.3px;
+}
+
+/* Glassy toggle group */
+body.classic .view-toggle {
+  display: flex;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  border-radius: 14px;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+body.classic .view-toggle .toggle-btn {
+  color: rgba(255, 255, 255, 0.85);
+  background: transparent;
+}
+body.classic .view-toggle .toggle-btn.active {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+/* Task Monitor background flair */
+body.classic .task-monitor {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+}
+

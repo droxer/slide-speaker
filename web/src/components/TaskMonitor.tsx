@@ -1,52 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import './TaskMonitor.scss';
+import { useQueryClient } from '@tanstack/react-query';
+import { getDownloads as apiGetDownloads, headTaskVideo as apiHeadTaskVideo, cancelRun as apiCancelRun, purgeTask as apiPurgeTask } from '../services/client';
+import { useTasksQuery, useStatsQuery, useSearchTasksQuery, useVttQuery, getCachedDownloads } from '../services/queries';
+import '../styles/task-monitor.scss';
 import AudioPlayer from './AudioPlayer';
 import VideoPlayer from './VideoPlayer';
 import PodcastPlayer from './PodcastPlayer';
-import { getStepLabel } from '../utils/stepLabels';
+import TaskCard from './TaskCard';
+import PreviewModal from './PreviewModal';
+// import { getStepLabel } from '../utils/stepLabels';
 
 // Types for task monitoring
-interface TaskState {
-  status: string;
-  current_step: string;
-  filename?: string;
-  voice_language: string;
-  subtitle_language?: string;
-  podcast_transcript_language?: string;
-  video_resolution?: string;
-  generate_avatar: boolean;
-  generate_subtitles: boolean;
-  created_at: string;
-  updated_at: string;
-  errors: string[];
-}
-
-interface Task {
-  task_id: string;
-  file_id: string;
-  task_type: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-  // Optional DB-surfaced language hints (present in /api/tasks rows)
-  voice_language?: string;
-  subtitle_language?: string;
-  kwargs: {
-    file_id: string;
-    file_ext: string;
-    filename?: string;
-    voice_language: string;
-    subtitle_language?: string;
-    video_resolution?: string;
-    generate_avatar: boolean;
-    generate_subtitles: boolean;
-    transcript_language?: string;
-  };
-  state?: TaskState;
-  detailed_state?: any;
-  completion_percentage?: number;
-}
+import type { Task } from '../types';
 
 interface TaskStatistics {
   total_tasks: number;
@@ -94,17 +59,14 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
   const [removingTaskIds, setRemovingTaskIds] = useState<Set<string>>(new Set());
   const [expandedDownloads, setExpandedDownloads] = useState<Set<string>>(new Set());
   const [audioPreviewTaskId, setAudioPreviewTaskId] = useState<string | null>(null);
-  const [podcastAvailableByTask, setPodcastAvailableByTask] = useState<Record<string, boolean>>({});
-  const [videoAvailableByTask, setVideoAvailableByTask] = useState<Record<string, boolean>>({});
-  const [audioAvailableByTask, setAudioAvailableByTask] = useState<Record<string, boolean>>({}); // eslint-disable-line @typescript-eslint/no-unused-vars
+  // Availability is derived from downloads cache (no local maps)
   const [previewModeByTask, setPreviewModeByTask] = useState<Record<string, 'video' | 'audio'>>({}); // eslint-disable-line @typescript-eslint/no-unused-vars
   const [transcriptMdByTask, setTranscriptMdByTask] = useState<Record<string, string>>({});
   const [hasVideoAssetByTask, setHasVideoAssetByTask] = useState<Record<string, boolean>>({}); // eslint-disable-line @typescript-eslint/no-unused-vars
   // Networking controls to avoid duplicate requests
   const tasksControllerRef = React.useRef<AbortController | null>(null);
-  const searchControllerRef = React.useRef<AbortController | null>(null);
-  const searchDebounceRef = React.useRef<number | null>(null);
-  const didInitRef = React.useRef<boolean>(false);
+  const queryClient = useQueryClient();
+  // removed didInitRef; React Query manages initial fetch
   type Cue = { start: number; end: number; text: string };
   const [audioCues, setAudioCues] = useState<Cue[]>([]);
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
@@ -117,86 +79,49 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
   // No modal audio preview; use task-card Listen for audio with transcript
   const prevStatusesRef = React.useRef<Record<string, string>>({});
 
-  // Prefetch downloads info and transcript for a task
+  // Prefetch downloads/transcript/VTT via shared helper
   const prefetchTaskDownloads = async (taskId: string) => {
     try {
-      const resp = await fetch(`${apiBaseUrl}/api/tasks/${taskId}/downloads`);
-      if (!resp.ok) return;
-      const data = await resp.json();
-      const items = Array.isArray(data.items) ? data.items : [];
-      const hasPodcast = items.some((it: any) => it?.type === 'podcast');
-      const hasVideo = items.some((it: any) => it?.type === 'video');
-      const hasAudio = items.some((it: any) => it?.type === 'audio');
-      setPodcastAvailableByTask((m) => ({ ...m, [taskId]: !!hasPodcast }));
-      setVideoAvailableByTask((m) => ({ ...m, [taskId]: !!hasVideo }));
-      setAudioAvailableByTask((m) => ({ ...m, [taskId]: !!hasAudio }));
-      // Fetch conversation transcript for podcast tasks
       const t = tasks.find((x) => x.task_id === taskId);
       const tt = (t?.task_type || (t?.state as any)?.task_type || '').toLowerCase();
-      const isPodcast = hasPodcast || ["podcast","both"].includes(tt);
+      const isPodcast = ["podcast","both"].includes(tt);
+      const lang = (t?.state?.subtitle_language || t?.kwargs?.subtitle_language || t?.kwargs?.voice_language || 'english');
+      await (await import('../services/queries')).prefetchTaskPreview(queryClient, taskId, { language: lang, podcast: isPodcast });
       if (isPodcast) {
-        try {
-          const tr = await fetch(`${apiBaseUrl}/api/tasks/${taskId}/transcripts/markdown`, { headers: { Accept: 'text/markdown' } });
-          if (tr.ok) {
-            const text = await tr.text();
-            setTranscriptMdByTask((m) => ({ ...m, [taskId]: text }));
-          }
-        } catch {}
+        const txt = (queryClient.getQueryData(['transcript', taskId]) as any) || '';
+        if (typeof txt === 'string') setTranscriptMdByTask((m) => ({ ...m, [taskId]: txt }));
       } else {
         setTranscriptMdByTask((m) => { const n={...m}; delete n[taskId]; return n; });
       }
-    } catch {
-      /* ignore */
-    }
+    } catch {}
   };
 
-  // Ensure VTT for non-podcast audio preview is fetched when modal opens (with fallback + logging)
+  // VTT via React Query for selected task (non-podcast)
+  const selectedId = selectedTaskForPreview?.task_id || null;
+  const selectedType = (selectedTaskForPreview?.task_type || (selectedTaskForPreview?.state as any)?.task_type || '').toLowerCase();
+  const selectedLang = (selectedTaskForPreview?.state?.subtitle_language || (selectedTaskForPreview as any)?.kwargs?.subtitle_language || (selectedTaskForPreview as any)?.kwargs?.voice_language || 'english');
+  const vttQuery = useVttQuery(selectedId, selectedLang, Boolean(selectedId) && selectedType !== 'podcast');
   useEffect(() => {
-    const t = selectedTaskForPreview;
-    if (!t) { setAudioCues([]); return; }
-    const taskType = (t.task_type || (t.state as any)?.task_type || '').toLowerCase();
-    if (taskType === 'podcast') { setAudioCues([]); return; }
-    const lang = (t.state?.subtitle_language || t.kwargs?.subtitle_language || t.kwargs?.voice_language || 'english');
-    const urlWithLang = `${apiBaseUrl}/api/tasks/${t.task_id}/subtitles/vtt?language=${encodeURIComponent(lang)}`;
-    const urlNoLang = `${apiBaseUrl}/api/tasks/${t.task_id}/subtitles/vtt`;
-    let cancelled = false;
-    (async () => {
-      try {
-        console.log('[TaskMonitor VTT] try:', urlWithLang);
-        let resp = await fetch(urlWithLang, { headers: { Accept: 'text/vtt,*/*' } });
-        if (!resp.ok) {
-          console.log('[TaskMonitor VTT] fallback:', urlNoLang, 'status', resp.status);
-          resp = await fetch(urlNoLang, { headers: { Accept: 'text/vtt,*/*' } });
-        }
-        if (cancelled) return;
-        if (!resp.ok) { console.warn('[TaskMonitor VTT] failed'); setAudioCues([]); return; }
-        const text = await resp.text();
-        const lines = text.split(/\r?\n/);
-        const cues: Cue[] = [];
-        let i = 0;
-        const timeRe = /(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s+-->\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})/;
-        while (i < lines.length) {
-          const line = lines[i++].trim();
-          if (!line || line.toUpperCase() === 'WEBVTT' || /^\d+$/.test(line)) continue;
-          const m = line.match(timeRe);
-          if (m) {
-            const start = (Number(m[1])*3600 + Number(m[2])*60 + Number(m[3]) + Number(m[4])/1000);
-            const end = (Number(m[5])*3600 + Number(m[6])*60 + Number(m[7]) + Number(m[8])/1000);
-            let textLines: string[] = [];
-            while (i < lines.length && lines[i].trim() && !timeRe.test(lines[i])) {
-              textLines.push(lines[i].trim());
-              i++;
-            }
-            cues.push({ start, end, text: textLines.join(' ') });
-          }
-        }
-        setAudioCues(cues);
-      } catch (e) {
-        if (!cancelled) { console.warn('[TaskMonitor VTT] error', e); setAudioCues([]); }
+    if (!vttQuery.data || selectedType === 'podcast') { setAudioCues([]); return; }
+    const text = String(vttQuery.data);
+    const lines = text.split(/\r?\n/);
+    const cues: Cue[] = [];
+    let i = 0;
+    const timeRe = /(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s+-->\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})/;
+    while (i < lines.length) {
+      const line = lines[i++].trim();
+      if (!line || line.toUpperCase() === 'WEBVTT' || /^\d+$/.test(line)) continue;
+      const m = line.match(timeRe);
+      if (m) {
+        const start = (Number(m[1])*3600 + Number(m[2])*60 + Number(m[3]) + Number(m[4])/1000);
+        const end = (Number(m[5])*3600 + Number(m[6])*60 + Number(m[7]) + Number(m[8])/1000);
+        let textLines: string[] = [];
+        while (i < lines.length && lines[i].trim() && !timeRe.test(lines[i])) { textLines.push(lines[i].trim()); i++; }
+        cues.push({ start, end, text: textLines.join(' ') });
       }
-    })();
-    return () => { cancelled = true; };
-  }, [selectedTaskForPreview, apiBaseUrl]);
+    }
+    setAudioCues(cues);
+  }, [vttQuery.data, selectedType]);
 
   // Derive task outputs (video/podcast) from state, kwargs, availability, or step name
   const deriveTaskOutputs = (task: Task): { video: boolean; podcast: boolean } => {
@@ -211,8 +136,10 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     if (taskType === 'podcast') return { video: false, podcast: true };
     if (taskType === 'both') return { video: true, podcast: true };
     // Fall back to discovered availability or step heuristics only
-    let video: boolean | undefined = videoAvailableByTask[task.task_id];
-    let podcast: boolean | undefined = podcastAvailableByTask[task.task_id];
+    const dl = getCachedDownloads(queryClient, task.task_id);
+    const items = dl?.items;
+    let video: boolean | undefined = Array.isArray(items) ? items.some((it: any) => it?.type === 'video') : undefined;
+    let podcast: boolean | undefined = Array.isArray(items) ? items.some((it: any) => it?.type === 'podcast') : undefined;
     const step = (task.state?.current_step || '').toLowerCase();
     if (video === undefined && /compose_video|generate_pdf_video|compose final video|composing final video/.test(step)) video = true;
     if (podcast === undefined && /podcast/.test(step)) podcast = true;
@@ -244,54 +171,11 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
       }
     } catch {}
     // When opening, fetch downloads to detect podcast/subtitles/video availability
-    (async () => {
+    ;(async () => {
       try {
-        const resp = await fetch(`${apiBaseUrl}/api/tasks/${taskId}/downloads`);
-        if (resp.ok) {
-          const data = await resp.json();
-          const items = Array.isArray(data.items) ? data.items : [];
-          const hasPodcast = items.some((it: any) => it?.type === 'podcast');
-          const hasVideo = items.some((it: any) => it?.type === 'video');
-          const hasAudio = items.some((it: any) => it?.type === 'audio');
-          setPodcastAvailableByTask((m) => ({ ...m, [taskId]: !!hasPodcast }));
-          setVideoAvailableByTask((m) => (m[taskId] === !!hasVideo ? m : { ...m, [taskId]: !!hasVideo }));
-          setAudioAvailableByTask((m) => (m[taskId] === !!hasAudio ? m : { ...m, [taskId]: !!hasAudio }));
-          // Set default inline preview mode: prefer video when available
-          setPreviewModeByTask((m) => {
-            const desired: 'video'|'audio' = hasVideo ? 'video' : 'audio';
-            if (m[taskId] === desired) return m;
-            return { ...m, [taskId]: desired };
-          });
-          // Auto-open audio inline preview for podcast-only tasks once completed
-          const t = tasks.find((x) => x.task_id === taskId);
-          if (t && t.status === 'completed' && (!hasVideo || hasPodcast)) {
-            setAudioPreviewTaskId(taskId);
-          }
-          // Fetch conversation transcript for podcast tasks
-          const tt = ((tasks.find((x)=>x.task_id===taskId)?.task_type) || ((tasks.find((x)=>x.task_id===taskId)?.state as any)?.task_type) || '').toLowerCase();
-          const isPodcast = hasPodcast || ["podcast","both"].includes(tt);
-          if (isPodcast) {
-            try {
-              const tr = await fetch(`${apiBaseUrl}/api/tasks/${taskId}/transcripts/markdown`, { headers: { Accept: 'text/markdown' } });
-              if (tr.ok) {
-                const text = await tr.text();
-                setTranscriptMdByTask((m) => ({ ...m, [taskId]: text }));
-              }
-            } catch {}
-          } else {
-            setTranscriptMdByTask((m) => { const n={...m}; delete n[taskId]; return n; });
-            // For non-podcast, prefetch VTT to enable subtitles in audio preview
-            try {
-              const lang = (t?.state?.subtitle_language || t?.kwargs?.subtitle_language || t?.kwargs?.voice_language || 'english');
-              const vtt1 = `${apiBaseUrl}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(lang || 'english')}`;
-              const vtt2 = `${apiBaseUrl}/api/tasks/${taskId}/subtitles/vtt`;
-              // Fire and forget; parsing happens when modal opens
-              fetch(vtt1, { headers: { Accept: 'text/vtt,*/*' } }).catch(()=>{});
-              fetch(vtt2, { headers: { Accept: 'text/vtt,*/*' } }).catch(()=>{});
-            } catch {}
-          }
-        }
-      } catch {
+        await queryClient.fetchQuery({ queryKey: ['downloads', taskId], queryFn: () => apiGetDownloads(taskId) });
+        // Prefetch handled by shared prefetchTaskPreview; nothing else here
+      } catch (_e) {
         /* ignore */
       }
     })();
@@ -392,19 +276,6 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     console.log('TaskMonitor apiBaseUrl:', apiBaseUrl);
   }, [apiBaseUrl]);
 
-  // Removed periodic health check; rely on fetchTasks errors to show banner
-
-  // Removed explicit subtitle loading; <track> will load VTT on demand
-
-  // Removed prefetching in modal to avoid duplicate network requests
-
-  // Do not force subtitles to display in preview; user can enable via player controls
-
-
-  // No imperative src assignment; <video src> handles local and S3 redirect
-
-  // No Blob URL cleanup necessary
-
   // Always set first text track to showing when present
   useEffect(() => {
     if (!selectedTaskForPreview || !modalVideoRef.current) return;
@@ -450,14 +321,10 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
       }
       const id = selectedTaskForPreview.task_id;
       try {
-        const resp = await fetch(`${apiBaseUrl}/api/tasks/${id}/video`, { method: 'HEAD' });
-        if (!cancelled) {
-          setHasVideoAssetByTask((m) => ({ ...m, [id]: resp.ok }));
-        }
+        const ok = await apiHeadTaskVideo(id);
+        if (!cancelled) setHasVideoAssetByTask((m) => ({ ...m, [id]: ok }));
       } catch {
-        if (!cancelled) {
-          setHasVideoAssetByTask((m) => ({ ...m, [id]: false }));
-        }
+        if (!cancelled) setHasVideoAssetByTask((m) => ({ ...m, [id]: false }));
       }
     })();
     return () => { cancelled = true; };
@@ -491,93 +358,50 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
   }, [selectedTaskForPreview, modalPreviewMode]);
 
   // Fetch paged task list (lightweight)
-  const isFetchingRef = React.useRef(false);
-  const lastParamsRef = React.useRef<string | null>(null);
-  const fetchTasks = React.useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
+  // React Query: tasks list
+  const tasksQuery = useTasksQuery({ status: statusFilter, page: currentPage, limit: tasksPerPage });
 
-      // Fetch task list
-      const params = new URLSearchParams();
-      if (statusFilter !== 'all') {
-        params.append('status', statusFilter);
-      }
-      params.append('limit', tasksPerPage.toString());
-      params.append('offset', ((currentPage - 1) * tasksPerPage).toString());
-      const paramsStr = params.toString();
-      // If an identical request is already in-flight, skip to avoid redundant/canceled calls
-      if (isFetchingRef.current && lastParamsRef.current === paramsStr) {
-        return;
-      }
-      // If a different-params request is in flight, abort it
-      if (isFetchingRef.current && lastParamsRef.current !== paramsStr) {
-        try { tasksControllerRef.current?.abort(); } catch {}
-      }
-      const ctrl = new AbortController();
-      tasksControllerRef.current = ctrl;
-      isFetchingRef.current = true;
-      lastParamsRef.current = paramsStr;
-      const tasksResponse = await axios.get(`${apiBaseUrl}/api/tasks?${paramsStr}`, { signal: ctrl.signal });
-      // Keep only real tasks with valid task_id (exclude synthetic state_* entries)
-      const realTasks = (tasksResponse.data.tasks || []).filter((t: any) => typeof t?.task_id === 'string' && !t.task_id.startsWith('state_'));
-      setTasks(realTasks);
-      setQueueUnavailable(false);
-
-    } catch (err: any) {
-      // Ignore abort errors from superseded calls
-      if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') {
-        return;
-      }
+  // Bridge query state to existing local state fields
+  useEffect(() => {
+    setLoading(tasksQuery.isLoading || tasksQuery.isFetching);
+  }, [tasksQuery.isLoading, tasksQuery.isFetching]);
+  useEffect(() => {
+    if (tasksQuery.isError) {
       setError('Failed to fetch task data');
       setQueueUnavailable(true);
-      console.error('Error fetching tasks:', err);
-    } finally {
-      setLoading(false);
-      isFetchingRef.current = false;
+    } else {
+      setError(null);
     }
-  }, [apiBaseUrl, currentPage, statusFilter, tasksPerPage]);
+  }, [tasksQuery.isError]);
+  useEffect(() => {
+    if (tasksQuery.data) {
+      setTasks(tasksQuery.data);
+      setQueueUnavailable(false);
+    }
+  }, [tasksQuery.data]);
 
   // Fetch overall statistics (decoupled from frequent list polling)
-  const fetchStats = React.useCallback(async () => {
-    try {
-      const statsResponse = await axios.get(`${apiBaseUrl}/api/tasks/statistics`);
-      setStatistics(statsResponse.data);
-    } catch (err) {
-      console.warn('Failed to fetch statistics:', err);
-    }
-  }, [apiBaseUrl]);
+  // React Query: stats (polling every 30s)
+  const statsQuery = useStatsQuery();
+  useEffect(() => {
+    if (statsQuery.data) setStatistics(statsQuery.data as any);
+  }, [statsQuery.data]);
 
   // Lightweight polling while tasks are running to keep UI in sync (list only)
+  // Lightweight polling while tasks are running
   useEffect(() => {
     const hasActive = tasks.some(t => t.status === 'processing' || t.status === 'queued');
-    if (!hasActive) return; // no polling when idle
-
-    const id = setInterval(() => {
-      fetchTasks();
-    }, 60000);
-
+    if (!hasActive) return;
+    const id = setInterval(() => { tasksQuery.refetch(); }, 15000);
     return () => clearInterval(id);
-  }, [tasks, fetchTasks]);
+  }, [tasks, tasksQuery]);
 
   // Initial load and periodic stats refresh (every 30s)
+  // Initial load handled by queries; keep controller cleanup noop
   useEffect(() => {
-    let initTasksTimer: number | undefined;
-    let initStatsTimer: number | undefined;
-    if (!didInitRef.current) {
-      didInitRef.current = true;
-      // Defer initial fetch to avoid React Strict Mode immediate cleanup aborts
-      initTasksTimer = window.setTimeout(() => { fetchTasks(); }, 0);
-      initStatsTimer = window.setTimeout(() => { fetchStats(); }, 0);
-    }
-    const id = setInterval(fetchStats, 30000);
-    return () => {
-      clearInterval(id);
-      if (initTasksTimer) window.clearTimeout(initTasksTimer);
-      if (initStatsTimer) window.clearTimeout(initStatsTimer);
-      try { tasksControllerRef.current?.abort(); } catch {}
-    };
-  }, [fetchTasks, fetchStats]);
+    const ctrl = tasksControllerRef.current;
+    return () => { try { ctrl?.abort(); } catch {} };
+  }, []);
 
   // (Removed) fetching per-task audio tracks; using final audio endpoint directly
 
@@ -620,49 +444,35 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     });
   }, [tasks]);
 
-  // Search tasks
-  const searchTasks = async (query: string) => {
-    const q = query.trim();
-    // Clear any pending debounce
-    if (searchDebounceRef.current) {
-      window.clearTimeout(searchDebounceRef.current);
-      searchDebounceRef.current = null;
+  // Search tasks via React Query (enabled when query present)
+  const hasSearch = searchQuery.trim().length > 0;
+  const searchTasksQuery = useSearchTasksQuery(searchQuery);
+  useEffect(() => {
+    if (!hasSearch) return;
+    setLoading(searchTasksQuery.isLoading || searchTasksQuery.isFetching);
+  }, [hasSearch, searchTasksQuery.isLoading, searchTasksQuery.isFetching]);
+  useEffect(() => {
+    if (!hasSearch) return;
+    if (searchTasksQuery.isError) {
+      setError('Failed to search tasks');
+    } else {
+      setError(null);
     }
-    // Abort in‑flight search
-    try { searchControllerRef.current?.abort(); } catch {}
-
-    if (!q) {
-      // Empty query: reload current list
-      fetchTasks();
-      return;
+  }, [hasSearch, searchTasksQuery.isError]);
+  useEffect(() => {
+    if (!hasSearch) return;
+    const data = searchTasksQuery.data as any;
+    if (data && Array.isArray(data.tasks)) {
+      setTasks(data.tasks as any);
     }
-
-    setLoading(true);
-    setError(null);
-    searchDebounceRef.current = window.setTimeout(async () => {
-      try {
-        const ctrl = new AbortController();
-        searchControllerRef.current = ctrl;
-        const response = await axios.get(`${apiBaseUrl}/api/tasks/search?query=${encodeURIComponent(q)}`,
-          { signal: ctrl.signal }
-        );
-        setTasks(response.data.tasks);
-      } catch (err: any) {
-        if (err?.name === 'CanceledError' || err?.code === 'ERR_CANCELED') return;
-        setError('Failed to search tasks');
-        console.error('Error searching tasks:', err);
-      } finally {
-        setLoading(false);
-      }
-    }, 300);
-  };
+  }, [hasSearch, searchTasksQuery.data]);
 
   // Cancel task
   const cancelTask = async (taskId: string) => {
     try {
-      await axios.delete(`${apiBaseUrl}/api/tasks/${taskId}`);
-      // Refresh task list
-      fetchTasks();
+      await apiCancelRun(taskId);
+      await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      await queryClient.invalidateQueries({ queryKey: ['tasksSearch'] });
     } catch (err) {
       console.error('Error cancelling task:', err);
       alert('Failed to cancel task');
@@ -679,7 +489,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
       setRemovingTaskIds((prev) => new Set(prev).add(taskId));
 
       // Perform deletion request in parallel
-      const doDelete = axios.delete(`${apiBaseUrl}/api/tasks/${taskId}/purge`);
+      const doDelete = (async () => { try { await apiPurgeTask(taskId); } catch (e) { throw e; } })();
 
       // Allow CSS transition to play before we refresh the list
       setTimeout(async () => {
@@ -690,7 +500,8 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
           alert('Failed to delete task');
         } finally {
           // Refresh task list and clear removing flag
-          await fetchTasks();
+          await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+          await queryClient.invalidateQueries({ queryKey: ['tasksSearch'] });
           setRemovingTaskIds((prev) => {
             const next = new Set(prev);
             next.delete(taskId);
@@ -717,8 +528,10 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
           modalModePinnedRef.current = true;
           setModalPreviewMode(mode);
         } else {
-          const hasVideo = !!videoAvailableByTask[task.task_id];
-          const isPodcast = !!podcastAvailableByTask[task.task_id];
+          const dl = getCachedDownloads(queryClient, task.task_id);
+          const items = dl?.items;
+          const hasVideo = Array.isArray(items) ? items.some((it: any) => it?.type === 'video') : false;
+          const isPodcast = Array.isArray(items) ? items.some((it: any) => it?.type === 'podcast') : false;
           setModalPreviewMode(hasVideo ? 'video' : (isPodcast ? 'audio' : 'audio'));
         }
       } catch {}
@@ -760,28 +573,9 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
 
   // Removed unused fmtTime helper
 
-  // Get task status color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'status-completed';
-      case 'processing':
-        return 'status-processing';
-      case 'queued':
-        return 'status-queued';
-      case 'failed':
-        return 'status-failed';
-      case 'cancelled':
-        return 'status-cancelled';
-      default:
-        return 'status-default';
-    }
-  };
+  // getStatusColor removed (unused)
 
-  // Format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString();
-  };
+  // formatDate removed (unused)
 
   // Get language display name
   const getLanguageDisplayName = (languageCode: string): string => {
@@ -806,26 +600,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     return resolutionNames[resolution] || resolution || 'Unknown';
   };
 
-  // Format step name for better readability
-  const formatStepName = (step: string): string => getStepLabel(step);
-
-  // Context-aware step name (collapse translation when languages match)
-  const formatStepNameWithLanguages = (
-    step: string,
-    voiceLang: string,
-    subtitleLang?: string
-  ): string => {
-    const vl = (voiceLang || 'english').toLowerCase();
-    const sl = (subtitleLang || vl).toLowerCase();
-    const same = vl === sl;
-    if (
-      same &&
-      (step === 'translate_voice_transcripts' || step === 'translate_subtitle_transcripts')
-    ) {
-      return 'Translating Transcripts';
-    }
-    return formatStepName(step);
-  };
+  // formatStepNameWithLanguages removed (unused)
 
   // Get file type display name
   const getFileTypeDisplayName = (fileExt: string): string => {
@@ -850,11 +625,9 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
   // Handle search
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      searchTasks(searchQuery);
-    } else {
-      fetchTasks();
-    }
+    // Submit triggers search refetch; queries auto-run on input change too
+    if (searchQuery.trim()) searchTasksQuery.refetch();
+    else tasksQuery.refetch();
   };
 
   // Handle status filter change
@@ -863,15 +636,11 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     setCurrentPage(1);
   };
 
-  useEffect(() => {
-    fetchTasks();
-  }, [currentPage, statusFilter, fetchTasks]);
+  // tasksQuery key already depends on currentPage and statusFilter
 
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      fetchTasks();
-    }
-  }, [searchQuery, fetchTasks]);
+    if (!searchQuery.trim()) tasksQuery.refetch();
+  }, [searchQuery, tasksQuery]);
 
   if (loading && tasks.length === 0) {
     return (
@@ -885,7 +654,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     return (
       <div className="task-monitor">
         <div className="error">{error}</div>
-        <button onClick={fetchTasks} className="retry-button">
+        <button onClick={() => tasksQuery.refetch()} className="retry-button">
           Retry
         </button>
       </div>
@@ -905,6 +674,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="search-input"
             />
+            {/* legacy inline task UI (commented out) */}
             <button type="submit" className="search-button">
               Search
             </button>
@@ -995,356 +765,20 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
           <div className="no-tasks">No tasks found</div>
         ) : (
           tasks.map((task) => (
-            <div key={task.task_id} className={`task-item ${getStatusColor(task.status)} ${removingTaskIds.has(task.task_id) ? 'removing' : ''}`}>
-              <div className="task-header">
-                <div
-                  className="task-id"
-                  tabIndex={0}
-                  role="button"
-                  aria-label={`Task ID: ${task.task_id} (press Enter to copy)`}
-                  title={task.task_id}
-                  onClick={() => {
-                    try {
-                      navigator.clipboard.writeText(task.task_id);
-                      alert('Task ID copied!');
-                    } catch (err) {
-                      console.error('Failed to copy task id', err);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      try {
-                        navigator.clipboard.writeText(task.task_id);
-                        alert('Task ID copied!');
-                      } catch (err) {
-                        console.error('Failed to copy task id', err);
-                      }
-                    }
-                  }}
-                >
-                  Task: {task.task_id}
-                </div>
-                {(() => {
-                  const statusLabel = (
-                    task.status === 'completed' ? 'Completed' :
-                    task.status === 'processing' ? 'Processing' :
-                    task.status === 'queued' ? 'Queued' :
-                    task.status === 'failed' ? 'Failed' :
-                    task.status === 'cancelled' ? 'Cancelled' : String(task.status)
-                  );
-                  const statusContent = (
-                    task.status === 'completed' ? 'Completed' :
-                    task.status === 'processing' ? '⏳ Processing' :
-                    task.status === 'queued' ? '⏸️ Queued' :
-                    task.status === 'failed' ? '❌ Failed' :
-                    task.status === 'cancelled' ? '🚫 Cancelled' : String(task.status)
-                  );
-                  return (
-                    <div
-                      className={`task-status ${getStatusColor(task.status)}`}
-                      tabIndex={0}
-                      aria-label={`Status: ${statusLabel}`}
-                    >
-                      {statusContent}
-                    </div>
-                  );
-                })()}
-              </div>
-              
-              <div className="task-details simple-details">
-                {(() => {
-                  const filename = task.kwargs?.filename || task.state?.filename;
-                  const voiceLang = task.voice_language || task.kwargs?.voice_language || task.state?.voice_language || 'english';
-                  const topSub = task.subtitle_language || task.kwargs?.subtitle_language || task.state?.subtitle_language || voiceLang;
-                  const videoRes = task.kwargs?.video_resolution || task.state?.video_resolution || 'hd';
-                  const { video: isVideoTask, podcast: isPodcastTask } = deriveTaskOutputs(task);
-                  const transcriptLang = isPodcastTask
-                    ? (task.kwargs?.transcript_language
-                        || task.state?.podcast_transcript_language
-                        || task.subtitle_language
-                        || topSub)
-                    : topSub;
-                  return (
-                    <>
-                      {/* Title row: filename + file type */}
-                      <div className="task-title-row">
-                        <div className="task-title" title={filename || task.file_id}>
-                          {filename || task.file_id}
-                        </div>
-                        <div className="output-badges" aria-label="Output type">
-                          {isVideoTask && (
-                            <span className="output-pill video" title="Video task">🎬 Video</span>
-                          )}
-                          {isPodcastTask && (
-                            <span className="output-pill podcast" title="Podcast task">🎧 Podcast</span>
-                          )}
-                          <div className={`file-type-badge ${isPdfFile(task.kwargs?.file_ext) ? 'pdf' : 'ppt'}`}>
-                            {getFileTypeDisplayName(task.kwargs?.file_ext)}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Meta chips */}
-                      <div className="meta-row">
-                        <span className="chip">Voice: {getLanguageDisplayName(voiceLang)}</span>
-                        {isPodcastTask ? (
-                          <span className="chip">Transcript: {getLanguageDisplayName(transcriptLang)}</span>
-                        ) : (
-                          <span className="chip">Subs: {getLanguageDisplayName(transcriptLang)}</span>
-                        )}
-                        <span className="chip">{getVideoResolutionDisplayName(videoRes)}</span>
-                      </div>
-
-                      {/* Current step + progress for non-completed */}
-                      {task.status !== 'completed' && task.state && (
-                        <div className="step-progress">
-                          <div className="step-line" role="status" aria-live="polite">{formatStepNameWithLanguages(task.state.current_step, voiceLang, transcriptLang)}</div>
-                          {task.completion_percentage !== undefined && (
-                            <div className="progress-rail" aria-valuemin={0} aria-valuemax={100} aria-valuenow={task.completion_percentage} role="progressbar">
-                              <div className="progress-fill" style={{ width: `${Math.max(0, Math.min(100, task.completion_percentage))}%` }} />
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Timestamps small and subtle */}
-                      <div className="timestamps-row">
-                        <span className="timestamp">Created: {formatDate(task.created_at)}</span>
-                        <span className="timestamp">Updated: {formatDate(task.updated_at)}</span>
-                      </div>
-                    </>
-                  );
-                })()}
-
-                {task.status === 'completed' && (
-                  <>
-                    <div style={{ display: 'flex', justifyContent: 'flex-start', marginTop: 8 }}>
-                      <button
-                        onClick={() => toggleDownloads(task.task_id)}
-                        className="link-button"
-                        aria-expanded={expandedDownloads.has(task.task_id)}
-                        aria-controls={`downloads-${task.task_id}`}
-                        type="button"
-                        title="Preview"
-                      >
-                        Preview <span className={`chevron ${expandedDownloads.has(task.task_id) ? 'open' : ''}`} aria-hidden="true" />
-                      </button>
-                    </div>
-                    {!expandedDownloads.has(task.task_id) && (() => {
-                      const { podcast: isPodcastTask, video: isVideoTask } = deriveTaskOutputs(task);
-                      return (
-                      <div className="resource-badges" aria-hidden>
-                        {(isVideoTask || videoAvailableByTask[task.task_id]) && <span className="badge">Video</span>}
-                        <span className="badge">{isPodcastTask ? 'Podcast' : 'Audio'}</span>
-                        <span className="badge">Transcript</span>
-                        {!isPodcastTask && <span className="badge">VTT</span>}
-                        {!isPodcastTask && <span className="badge">SRT</span>}
-                      </div>
-                      );
-                    })()}
-                    <div className={`downloads-collapse ${expandedDownloads.has(task.task_id) ? 'open' : ''}`}>
-                      {expandedDownloads.has(task.task_id) && (
-                        <div className="resource-links" id={`downloads-${task.task_id}`}>
-                        {/* Inline Video Preview removed by request; use header preview-button to open modal */}
-                        {/* Inline Audio Preview removed by request; podcast/audio preview opens in modal */}
-                        {/* Video (only if available) */}
-                        {videoAvailableByTask[task.task_id] && (
-                        <div className="url-copy-row">
-                          <span className="resource-label-inline">Video</span>
-                          <input
-                            type="text"
-                            value={`${apiBaseUrl}/api/tasks/${task.task_id}/video`}
-                          readOnly
-                          className="url-input-enhanced"
-                          />
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/video`);
-                              alert('Video URL copied!');
-                            }}
-                            className="copy-btn-enhanced"
-                          >
-                            Copy
-                          </button>
-                        </div>
-                        )}
-
-                        {/* Audio / Podcast */}
-                        <div className="url-copy-row">
-                          <span className="resource-label-inline">{podcastAvailableByTask[task.task_id] ? 'Podcast' : 'Audio'}</span>
-                          <input
-                            type="text"
-                            value={`${apiBaseUrl}/api/tasks/${task.task_id}/${podcastAvailableByTask[task.task_id] ? 'podcast' : 'audio'}`}
-                            readOnly
-                            className="url-input-enhanced"
-                          />
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/${podcastAvailableByTask[task.task_id] ? 'podcast' : 'audio'}`);
-                              alert(`${podcastAvailableByTask[task.task_id] ? 'Podcast' : 'Audio'} URL copied!`);
-                            }}
-                            className="copy-btn-enhanced"
-                          >
-                            Copy
-                          </button>
-                        </div>
-
-                        {/* Transcript */}
-                        <div className="url-copy-row">
-                          <span className="resource-label-inline">Transcript</span>
-                          <input
-                            type="text"
-                            value={`${apiBaseUrl}/api/tasks/${task.task_id}/transcripts/markdown`}
-                            readOnly
-                            className="url-input-enhanced"
-                          />
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/transcripts/markdown`);
-                              alert('Transcript URL copied!');
-                            }}
-                            className="copy-btn-enhanced"
-                          >
-                            Copy
-                          </button>
-                        </div>
-
-                        {/* VTT (hide for podcast-only) */}
-                        {(() => {
-                          const tt = (
-                            (task.task_type || (task.state as any)?.task_type || '')
-                              .toLowerCase()
-                          );
-                          const isPod = ["podcast", "both"].includes(tt) ||
-                            Boolean(podcastAvailableByTask[task.task_id]);
-                          return !isPod;
-                        })() && (
-                        <div className="url-copy-row">
-                          <span className="resource-label-inline">VTT</span>
-                          <input
-                            type="text"
-                            value={`${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/vtt`}
-                            readOnly
-                            className="url-input-enhanced"
-                          />
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/vtt`);
-                              alert('VTT URL copied!');
-                            }}
-                            className="copy-btn-enhanced"
-                          >
-                            Copy
-                          </button>
-                        </div>
-                        )}
-
-                        {/* SRT (hide for podcast-only) */}
-                        {(() => {
-                          const tt = (
-                            (task.task_type || (task.state as any)?.task_type || '')
-                              .toLowerCase()
-                          );
-                          const isPod = ["podcast", "both"].includes(tt) ||
-                            Boolean(podcastAvailableByTask[task.task_id]);
-                          return !isPod;
-                        })() && (
-                        <div className="url-copy-row">
-                          <span className="resource-label-inline">SRT</span>
-                          <input
-                            type="text"
-                            value={`${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/srt`}
-                            readOnly
-                            className="url-input-enhanced"
-                          />
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/srt`);
-                              alert('SRT URL copied!');
-                            }}
-                            className="copy-btn-enhanced"
-                          >
-                            Copy
-                          </button>
-                        </div>
-                        )}
-
-                        
-
-                        
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-              
-              <div className="task-actions">
-                {task.status === 'completed' && deriveTaskOutputs(task).video && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      previewTask(task, 'video');
-                    }}
-                    className="preview-button"
-                    title="Open preview"
-                    type="button"
-                  >
-                    ▶️ Watch
-                  </button>
-                )}
-                {task.status === 'completed' && (
-                  deriveTaskOutputs(task).podcast || (deriveTaskOutputs(task).video)
-                ) && (
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      previewTask(task, 'audio');
-                    }}
-                    className="preview-button"
-                    title="Open preview"
-                    type="button"
-                  >
-                    🎧 Listen
-                  </button>
-                )}
-                {(task.status === 'queued' || task.status === 'processing') && (
-                  <button
-                    onClick={() => cancelTask(task.task_id)}
-                    className="cancel-button"
-                  >
-                    Cancel
-                  </button>
-                )}
-                <button
-                  onClick={() => deleteTask(task.task_id)}
-                  className="delete-button"
-                  title="Delete task"
-                  type="button"
-                  aria-label="Delete task"
-                >
-                  <svg
-                    className="icon"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.343.052.682.106 1.018.162m-1.018-.162L19.5 19.5A2.25 2.25 0 0 1 17.25 21H6.75A2.25 2.25 0 0 1 4.5 19.5L5.77 5.79m13.458 0a48.108 48.108 0 0 0-3.478-.397m-12 .559c.336-.056.675-.11 1.018-.162m0 0A48.11 48.11 0 0 1 9.25 5.25m5.5 0a48.11 48.11 0 0 1 3.482.342m-8.982-.342V4.5A1.5 1.5 0 0 1 10.25 3h3.5A1.5 1.5 0 0 1 15.25 4.5v.75m-8.982 0a48.667 48.667 0 0 0-3.538.397"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-              </div>
-
-            </div>
+          <TaskCard
+            key={task.task_id}
+            task={task}
+            apiBaseUrl={apiBaseUrl}
+            isRemoving={removingTaskIds.has(task.task_id)}
+            isExpanded={expandedDownloads.has(task.task_id)}
+            onToggleDownloads={toggleDownloads}
+            onPreview={previewTask}
+            onCancel={cancelTask}
+            onDelete={deleteTask}
+            deriveTaskOutputs={deriveTaskOutputs}
+            getLanguageDisplayName={getLanguageDisplayName}
+            getVideoResolutionDisplayName={getVideoResolutionDisplayName}
+          />
           ))
         )}
       </div>
@@ -1371,25 +805,19 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
       </div>
 
       {/* Preview Modal (Video or Podcast) */}
-      {selectedTaskForPreview && (
-        <div 
-          className="video-preview-modal" 
-          data-mode={modalPreviewMode}
-          onClick={closePreview}
-          role="dialog"
-          aria-modal="true"
-        >
-          <div 
-            className="video-preview-content" 
-            data-mode={modalPreviewMode}
-            onClick={(e) => e.stopPropagation()}
-            role="document"
-          >
-            {/* Modal header bar: filename + type + optional mode toggle */}
-            {(() => {
+      <PreviewModal
+        open={Boolean(selectedTaskForPreview)}
+        mode={modalPreviewMode}
+        onClose={closePreview}
+        header={(
+                  (() => {
+              if (!selectedTaskForPreview) return null as any;
               const tt = (selectedTaskForPreview.task_type || (selectedTaskForPreview.state as any)?.task_type || '').toLowerCase();
-              const hasVideo = !!videoAvailableByTask[selectedTaskForPreview.task_id];
-              const hasPodcast = !!podcastAvailableByTask[selectedTaskForPreview.task_id];
+              const dl = getCachedDownloads(queryClient, selectedTaskForPreview.task_id);
+              const itemsRaw = (dl as any)?.items;
+              const items = Array.isArray(itemsRaw) ? itemsRaw : [];
+              const hasVideo = items.some((it: any) => it?.type === 'video');
+              const hasPodcast = items.some((it: any) => it?.type === 'podcast');
               const showVideoBadge = hasVideo || ["video","both"].includes(tt);
               const showPodcastBadge = hasPodcast || ["podcast","both"].includes(tt);
               const showToggle = hasVideo && hasPodcast;
@@ -1417,11 +845,12 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                   </div>
                 </div>
               );
-            })()}
-
-            {/* Preview content: video or podcast depending on mode/availability */}
-            <div className="video-player-container">
+            })()
+        )}
+      >
+        {/* Preview content: video or podcast depending on mode/availability */}
               {(() => {
+                if (!selectedTaskForPreview) return null as any;
                 const voiceLanguage = selectedTaskForPreview.kwargs?.voice_language || selectedTaskForPreview.state?.voice_language || 'english';
                 const subtitleLanguage = selectedTaskForPreview.kwargs?.subtitle_language || selectedTaskForPreview.state?.subtitle_language || voiceLanguage;
                 const videoUrl = `${apiBaseUrl}/api/tasks/${selectedTaskForPreview.task_id}/video`;
@@ -1470,17 +899,14 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
                 return (
                   <div className="modal-preview-stack">
                     {isPodcastTask ? (
-                      <PodcastPlayer src={audioUrl} transcriptMarkdown={transcriptMdByTask[selectedTaskForPreview.task_id]} />
+                      <PodcastPlayer src={audioUrl} transcriptMarkdown={(queryClient.getQueryData(['transcript', selectedTaskForPreview.task_id]) as any) ?? transcriptMdByTask[selectedTaskForPreview.task_id]} />
                     ) : (
                       <AudioPlayer src={audioUrl} vttUrl={vttUrl} />
                     )}
                   </div>
                 );
               })()}
-            </div>
-          </div>
-        </div>
-      )}
+      </PreviewModal>
     </div>
   );
 };
