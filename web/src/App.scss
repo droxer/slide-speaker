@@ -596,6 +596,13 @@ body:not(.ultra-flat) .app-footer {
   line-height: 1.4;
 }
 
+/* Collapsible header for Upload block when not idle */
+.upload-collapsible-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
+}
+
 /* Language selector */
 .language-section {
   margin: 2.25rem 0;
@@ -1129,7 +1136,8 @@ body:not(.ultra-flat) .app-footer {
   white-space: pre-wrap;
   margin: 0;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-  font-size: 0.9rem;
+  /* Reduce to align with overall UI scale (~13px) */
+  font-size: 0.8125rem;
   color: #0f172a;
 }
 
@@ -1314,13 +1322,15 @@ body:not(.ultra-flat) .app-footer {
   background: #ffffff;
   text-align: left;
   line-height: 1.5;
+  /* Harmonize transcript text size with task cards */
+  font-size: 13px;
 }
 .podcast-transcript .conv-line { display: flex; gap: 10px; padding: 6px 4px; border-radius: 6px; text-align: left; align-items: flex-start; }
 .podcast-transcript .conv-line + .conv-line { margin-top: 2px; }
 .podcast-transcript .conv-line.active { background: #eff6ff; }
 .podcast-transcript .conv-line[role="button"] { cursor: pointer; }
 .podcast-transcript .conv-line[role="button"]:hover { background: #f1f5f9; }
-.podcast-transcript .conv-speaker { font-weight: 700; color: #1f2937; min-width: 88px; flex: 0 0 auto; }
+.podcast-transcript .conv-speaker { font-weight: 700; color: #1f2937; min-width: 88px; flex: 0 0 auto; font-size: 12px; }
 .podcast-transcript .conv-text { color: #334155; flex: 1 1 auto; word-break: break-word; white-space: normal; }
 
 @media (max-width: 640px) {
@@ -1875,7 +1885,8 @@ body:not(.ultra-flat) .app-footer {
   overflow: hidden;
   box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.3);
   border: 4px solid #f1f5f9;
-  background: transparent;
+  /* Slightly tinted canvas to enhance contrast without feeling heavy */
+  background: linear-gradient(180deg, rgba(17, 24, 39, 0.25) 0%, rgba(2, 6, 23, 0.35) 100%);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -1943,6 +1954,48 @@ body:not(.ultra-flat) .app-footer {
       padding: 12px 16px;
     }
   }
+}
+
+/* Loading/error overlays for Completed view video */
+.video-wrapper {
+  .video-status-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.25);
+    color: #fff;
+    z-index: 4;
+    pointer-events: none;
+    &.loading { display: flex; }
+    &.error {
+      background: rgba(239, 68, 68, 0.85);
+      pointer-events: auto;
+      flex-direction: column;
+      .retry-button {
+        margin-top: 8px;
+        pointer-events: auto;
+      }
+    }
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid rgba(255, 255, 255, 0.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: app-spin 0.9s linear infinite;
+      margin-right: 10px;
+    }
+    .loading-text {
+      font-size: 14px;
+      letter-spacing: 0.2px;
+    }
+  }
+}
+
+@keyframes app-spin {
+  to { transform: rotate(360deg); }
 }
 
 @media (min-width: 768px) {
@@ -2040,7 +2093,8 @@ body:not(.ultra-flat) .app-footer {
   transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 .audio-transcript-pane .t-text {
-  font-size: 14px;
+  /* Reduce for consistency with task card inline preview */
+  font-size: 13px;
   color: #0f172a;
   white-space: pre-wrap;
 }
@@ -2777,6 +2831,34 @@ body:not(.ultra-flat) .app-footer {
   border-color: #10b981;
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
 }
+/* Overlay spinner support for audio in Completed view */
+.media-section.audio-active .audio-section {
+  position: relative;
+}
+.media-section .video-status-overlay.loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  z-index: 4;
+  pointer-events: none;
+}
+.media-section .video-status-overlay.loading .spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: app-spin 0.9s linear infinite;
+  margin-right: 10px;
+}
+.media-section .video-status-overlay.loading .loading-text {
+  font-size: 14px;
+  letter-spacing: 0.2px;
+}
 /* Media control visibility tweaks */
 :root {
   --media-controls-bg-video: rgba(0, 0, 0, 0.6);
@@ -2787,7 +2869,7 @@ body:not(.ultra-flat) .app-footer {
 .video-preview-block video,
 .media-section video {
   width: 100%;
-  background: #000; /* ensures progress stands out on light themes */
+  background: transparent; /* use wrapper/background instead of forcing black */
   border: 1px solid #e2e8f0;
   border-radius: 12px;
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.04);
@@ -2798,4 +2880,57 @@ body:not(.ultra-flat) .app-footer {
 .media-section video::-webkit-media-controls-enclosure {
   background: var(--media-controls-bg-video) !important;
   border-radius: 12px;
+}
+/* Audio transcript under task-card audio preview */
+.audio-transcript {
+  max-height: 240px;
+  overflow: auto;
+  margin-top: 8px;
+  padding: 8px;
+  background: #f8fafc; /* fallback */
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.audio-transcript-row {
+  padding: 4px 6px;
+  border-radius: 6px;
+  color: #0f172a; /* text primary */
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.audio-transcript-row.active {
+  background: #eef2ff; /* subtle highlight */
+}
+
+.audio-transcript-ts {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85em;
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: #e2e8f0; /* neutral badge */
+  color: #1f2937;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.audio-transcript-text {
+  flex: 1 1 auto;
+}
+
+/* Emphasize timestamp for active row */
+.audio-transcript-row.active .audio-transcript-ts {
+  background: #c7d2fe; /* brand-tinted badge */
+  color: #1e3a8a;
+}
+
+/* Ensure audio players and transcripts fill available width in Completed/Modal views */
+.audio-player-inline audio,
+.audio-player-inline .audio-transcript {
+  width: 100%;
+  max-width: 100%;
+  display: block;
 }

@@ -11,12 +11,15 @@ from slidespeaker.pipeline.steps.common.transcript_reviser import (
 )
 
 
-async def revise_transcripts_step(file_id: str, language: str = "english") -> None:
+async def revise_transcripts_step(
+    file_id: str, language: str = "english", task_id: str | None = None
+) -> None:
     await revise_transcripts_common(
         file_id=file_id,
         language=language,
         get_transcripts_func=get_slide_transcripts_for_revision,
         state_key="revise_transcripts",
+        task_id=task_id,
     )
 
 

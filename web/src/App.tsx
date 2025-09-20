@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import axios from "axios";
 import "./App.scss";
 // Ultra-flat design styles
@@ -57,8 +57,6 @@ interface ProcessingDetails {
   file_ext?: string;
   voice_language?: string;
   subtitle_language?: string;
-  generate_video?: boolean;
-  generate_podcast?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -233,6 +231,8 @@ function App() {
   );
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [completedVideoLoading, setCompletedVideoLoading] = useState<boolean>(false);
+  const [completedAudioLoading, setCompletedAudioLoading] = useState<boolean>(false);
   type Cue = { start: number; end: number; text: string };
   const [audioCues, setAudioCues] = useState<Cue[]>([]);
   const [activeAudioCueIdx, setActiveAudioCueIdx] = useState<number | null>(
@@ -307,6 +307,12 @@ function App() {
   const [processingPreviewMode, setProcessingPreviewMode] = useState<
     "video" | "audio"
   >("video");
+  // Completed view: pin user choice to prevent auto-forcing
+  const completedMediaPinnedRef = useRef<boolean>(false);
+  // Completed view: subtitles (VTT) under audio (reuse global Cue/audioCues/activeAudioCueIdx)
+  // Removed unused completedTranscriptRef
+
+  // Studio policy: upload form is shown only when idle
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -368,12 +374,12 @@ function App() {
           generate_subtitles: generateSubtitles,
           ...(uploadMode === "pdf"
             ? {
-                generate_video: pdfOutputMode === "video",
-                generate_podcast: pdfOutputMode === "podcast",
+                task_type: pdfOutputMode === "video" ? "video" : "podcast",
+                source_type: "pdf",
               }
             : {
-                generate_video: true,
-                generate_podcast: false,
+                task_type: "video",
+                source_type: "slides",
               }),
         },
         {
@@ -490,7 +496,11 @@ function App() {
         audioCuesLoaded
       )
         return;
-      if ((processingDetails as any)?.generate_podcast) return; // podcast has no VTT
+      {
+        const tt = ((((processingDetails as any)?.task_type) || '').toLowerCase());
+        const isPodcast = ["podcast", "both"].includes(tt);
+        if (isPodcast) return; // podcast has no VTT
+      }
       try {
         const lang =
           processingDetails?.subtitle_language ||
@@ -724,12 +734,33 @@ function App() {
     };
   }, [status, taskId, showCompletedBanner, completedMedia, audioRef]);
 
+  // Detect actual video availability via HEAD for Completed view (covers legacy tasks)
+  const [hasVideoAsset, setHasVideoAsset] = useState<boolean>(false);
+  useEffect(() => {
+    if (status !== 'completed' || !taskId) { setHasVideoAsset(false); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/video`, { method: 'HEAD' });
+        if (!cancelled) setHasVideoAsset(resp.ok);
+      } catch {
+        if (!cancelled) setHasVideoAsset(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [status, taskId]);
+
+  // Stable task type for dependency-light effects
+  const taskType = useMemo(() => {
+    return ((((processingDetails as any)?.task_type) || '').toLowerCase());
+  }, [processingDetails]);
+
   // Fetch conversation transcript for Completed view when podcast is generated
   const [completedTranscriptMd, setCompletedTranscriptMd] = useState<string | null>(null);
   useEffect(() => {
     const fetchCompletedTranscript = async () => {
       if (status !== 'completed' || !taskId) { setCompletedTranscriptMd(null); return; }
-      if (!(processingDetails as any)?.generate_podcast) { setCompletedTranscriptMd(null); return; }
+      if (!(["podcast","both"].includes(taskType))) { setCompletedTranscriptMd(null); return; }
       try {
         const resp = await fetch(`${API_BASE_URL}/api/tasks/${taskId}/transcripts/markdown`, { headers: { Accept: 'text/markdown' } });
         if (resp.ok) {
@@ -743,7 +774,7 @@ function App() {
       }
     };
     fetchCompletedTranscript();
-  }, [status, taskId, processingDetails]);
+  }, [status, taskId, taskType]);
 
   // Ensure video subtitles display by default in Completed view
   useEffect(() => {
@@ -758,6 +789,25 @@ function App() {
     } catch {}
   }, [status, taskId, videoRef]);
 
+  // Stable subtitle language code for completed view
+  const subtitleLanguageCode = useMemo(() => {
+    const explicit = (processingDetails as any)?.subtitle_language;
+    return explicit || subtitleLanguage || voiceLanguage || 'english';
+  }, [processingDetails, subtitleLanguage, voiceLanguage]);
+
+  const subtitleLocale = useMemo(() => {
+    const lang = (subtitleLanguageCode || '').toLowerCase();
+    if (lang === 'simplified_chinese') return 'zh-Hans';
+    if (lang === 'traditional_chinese') return 'zh-Hant';
+    if (lang === 'japanese') return 'ja';
+    if (lang === 'korean') return 'ko';
+    if (lang === 'thai') return 'th';
+    return 'en';
+  }, [subtitleLanguageCode]);
+
+  const vttUrl = useMemo(() => `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(subtitleLanguageCode)}`,
+    [taskId, subtitleLanguageCode]);
+
   // Persist completed media selection
   useEffect(() => {
     try {
@@ -765,23 +815,33 @@ function App() {
     } catch {}
   }, [completedMedia]);
 
-  // If only podcast is generated (no video), force audio tab in Completed view
+  // If only podcast is generated (no video), force audio tab in Completed view (unless user pinned)
   useEffect(() => {
     if (status !== "completed") return;
-    const genVideo = (processingDetails as any)?.generate_video;
-    if (genVideo === false && completedMedia !== "audio") {
+    if (completedMediaPinnedRef.current) return;
+    const genVideo = ["video", "both"].includes(taskType);
+    if (!genVideo && completedMedia !== "audio") {
       setCompletedMedia("audio");
     }
-  }, [status, processingDetails, completedMedia]);
+  }, [status, taskType, completedMedia]);
 
-  // Default to Video on Completed view when video exists (overrides stored choice)
+  // Default to Video on Completed view when video exists (unless user pinned)
   useEffect(() => {
     if (status !== 'completed') return;
-    const genVideo = (processingDetails as any)?.generate_video;
-    if (genVideo !== false && completedMedia !== 'video') {
+    if (completedMediaPinnedRef.current) return;
+    const genVideo = ["video", "both"].includes(taskType) || hasVideoAsset;
+    if (genVideo && completedMedia !== 'video') {
       setCompletedMedia('video');
     }
-  }, [status, taskId, processingDetails, completedMedia]);
+  }, [status, taskId, taskType, completedMedia, hasVideoAsset]);
+
+  // When user switches to Video tab, show loading until the video is ready
+  useEffect(() => {
+    if (status !== 'completed') return;
+    if (completedMedia === 'video') {
+      setCompletedVideoLoading(true);
+    }
+  }, [status, completedMedia]);
 
   // Also hide banner when video starts playing
   useEffect(() => {
@@ -832,62 +892,124 @@ function App() {
     };
   }, [status, taskId]);
 
-  // Prefetch media when task is completed (respect podcast vs video)
+  // Prefetch media when task is completed (once per taskId). Skips subtitles to avoid duplicate VTT loads.
+  const prefetchDoneRef = useRef<string | null>(null);
   useEffect(() => {
     if (status !== "completed" || !taskId) return;
-
-    // Create an array to hold all the link elements for cleanup
-    const linkElements: HTMLLinkElement[] = [];
-
+    if (prefetchDoneRef.current === taskId) return;
     try {
-      // Prefetch video (only if generated)
-      if ((processingDetails as any)?.generate_video ?? true) {
+      const videoEnabled = ["video", "both"].includes(taskType) || hasVideoAsset;
+      const podcastEnabled = ["podcast", "both"].includes(taskType);
+
+      if (videoEnabled) {
         const videoUrl = `${API_BASE_URL}/api/tasks/${taskId}/video`;
-        const videoLink = document.createElement("link");
-        videoLink.rel = "prefetch";
-        videoLink.href = videoUrl;
-        videoLink.as = "video";
-        document.head.appendChild(videoLink);
-        linkElements.push(videoLink);
-      }
-
-      // Prefetch audio (podcast or narration)
-      const audioUrl = `${API_BASE_URL}/api/tasks/${taskId}/${(processingDetails as any)?.generate_podcast ? "podcast" : "audio"}`;
-      const audioLink = document.createElement("link");
-      audioLink.rel = "prefetch";
-      audioLink.href = audioUrl;
-      audioLink.as = "audio";
-      document.head.appendChild(audioLink);
-      linkElements.push(audioLink);
-
-      // Prefetch subtitles (video only)
-      if ((processingDetails as any)?.generate_video ?? true) {
-        const subtitleLanguageCode =
-          processingDetails?.subtitle_language ||
-          subtitleLanguage ||
-          voiceLanguage ||
-          "english";
-        const subtitleUrl = `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(subtitleLanguageCode)}`;
-        const subtitleLink = document.createElement("link");
-        subtitleLink.rel = "prefetch";
-        subtitleLink.href = subtitleUrl;
-        subtitleLink.as = "track";
-        document.head.appendChild(subtitleLink);
-        linkElements.push(subtitleLink);
-      }
-    } catch (error) {
-      console.warn("Failed to create prefetch links:", error);
-    }
-
-    // Clean up links when component unmounts or taskId changes
-    return () => {
-      linkElements.forEach((link) => {
-        if (document.head.contains(link)) {
-          document.head.removeChild(link);
+        const hasVideoLink = Array.from(document.querySelectorAll('link[rel="prefetch"]')).some((el) => (el as HTMLLinkElement).href === videoUrl);
+        if (!hasVideoLink) {
+          const l = document.createElement('link');
+          l.rel = 'prefetch';
+          l.href = videoUrl;
+          l.as = 'video';
+          document.head.appendChild(l);
         }
-      });
+      }
+      const audioUrl = `${API_BASE_URL}/api/tasks/${taskId}/${podcastEnabled ? 'podcast' : 'audio'}`;
+      const hasAudioLink = Array.from(document.querySelectorAll('link[rel="prefetch"]')).some((el) => (el as HTMLLinkElement).href === audioUrl);
+      if (!hasAudioLink) {
+        const l = document.createElement('link');
+        l.rel = 'prefetch';
+        l.href = audioUrl;
+        l.as = 'audio';
+        document.head.appendChild(l);
+      }
+
+      prefetchDoneRef.current = taskId;
+    } catch (e) {
+      console.warn('Prefetch links failed:', e);
+    }
+  }, [status, taskId, hasVideoAsset, taskType]);
+
+  // Load VTT cues for Completed view when on Audio tab and not a podcast
+  useEffect(() => {
+    if (status !== 'completed' || completedMedia !== 'audio' || !taskId) { setAudioCues([]); return; }
+    const isPodcast = (taskType === 'podcast');
+    if (isPodcast) { setAudioCues([]); return; }
+    const lang = (processingDetails as any)?.subtitle_language || subtitleLanguage || voiceLanguage || 'english';
+    const urlWithLang = `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(lang)}`;
+    const urlNoLang = `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt`;
+    let cancelled = false;
+    (async () => {
+      try {
+        let resp = await fetch(urlWithLang, { headers: { Accept: 'text/vtt,*/*' } });
+        if (!resp.ok) resp = await fetch(urlNoLang, { headers: { Accept: 'text/vtt,*/*' } });
+        if (cancelled) return;
+        if (!resp.ok) { setAudioCues([]); return; }
+        const text = await resp.text();
+        const lines = text.split(/\r?\n/);
+        const cues: any[] = [];
+        let i = 0;
+        const timeRe = /(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s+-->\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})/;
+        while (i < lines.length) {
+          const line = lines[i++].trim();
+          if (!line || line.toUpperCase() === 'WEBVTT' || /^\d+$/.test(line)) continue;
+          const m = line.match(timeRe);
+          if (m) {
+            const start = (Number(m[1])*3600 + Number(m[2])*60 + Number(m[3]) + Number(m[4])/1000);
+            const end = (Number(m[5])*3600 + Number(m[6])*60 + Number(m[7]) + Number(m[8])/1000);
+            let textLines: string[] = [];
+            while (i < lines.length && lines[i].trim() && !timeRe.test(lines[i])) {
+              textLines.push(lines[i].trim());
+              i++;
+            }
+            cues.push({ start, end, text: textLines.join(' ') });
+          }
+        }
+        setAudioCues(cues);
+      } catch { setAudioCues([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [status, completedMedia, taskType, taskId, processingDetails, subtitleLanguage, voiceLanguage]);
+
+  // Sync active cue with audio time and auto-scroll (Completed view)
+  useEffect(() => {
+    if (status !== 'completed' || completedMedia !== 'audio' || audioCues.length === 0) return;
+    const audio = audioRef.current;
+    if (!audio) return;
+    const EPS = 0.03;
+    const findIdx = (t: number): number | null => {
+      let lo = 0, hi = audioCues.length - 1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        const c = audioCues[mid];
+        if (t < c.start - EPS) hi = mid - 1; else if (t > c.end + EPS) lo = mid + 1; else return mid;
+      }
+      return null;
     };
-  }, [status, taskId, processingDetails, subtitleLanguage, voiceLanguage]);
+    let rafId: number | null = null;
+    const tick = () => {
+      const t = audio.currentTime;
+      const idx = findIdx(t);
+      setActiveAudioCueIdx((prev) => (prev !== idx ? idx : prev));
+      rafId = requestAnimationFrame(tick);
+    };
+    const start = () => { if (rafId == null) rafId = requestAnimationFrame(tick); };
+    const stop = () => { if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; } };
+    const onPlay = () => start();
+    const onPause = () => stop();
+    const onEnded = () => stop();
+    const onSeeked = () => { const t = audio.currentTime; const idx = findIdx(t); setActiveAudioCueIdx(idx); };
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('pause', onPause);
+    audio.addEventListener('ended', onEnded);
+    audio.addEventListener('seeked', onSeeked);
+    if (!audio.paused) start(); else onSeeked();
+    return () => {
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('pause', onPause);
+      audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('seeked', onSeeked);
+      stop();
+    };
+  }, [status, completedMedia, audioCues]);
 
   // Sync active cue with audio time (RAF-driven for smoothness)
   useEffect(() => {
@@ -1026,13 +1148,15 @@ function App() {
             setStatus("processing");
             setProgress(response.data.progress);
           } else if (response.data.status === "cancelled") {
-            setStatus("cancelled");
+            // Move back to upload view on cancellation
             setUploading(false);
             setTaskId(null);
+            setFileId(null);
+            setFile(null);
+            setProcessingDetails(null);
             setProgress(0);
-
-            // Clear local storage when cancelled
             localStorageUtils.clearTaskState();
+            setStatus("idle");
           } else if (response.data.status === "failed") {
             setStatus("error");
             setUploading(false);
@@ -1145,7 +1269,12 @@ function App() {
             return;
           }
 
-          // Add VTT subtitle track if subtitles are enabled
+          // Skip dynamic track injection in Completed view; a static <track> is rendered there
+          if (status === 'completed') {
+            return;
+          }
+
+          // Add VTT subtitle track if subtitles are enabled (used during processing)
           const track = document.createElement("track");
           track.kind = "subtitles";
           // Always use absolute URL with explicit language to avoid mismatches
@@ -1428,7 +1557,208 @@ function App() {
               <div
                 className={`content-card ${status === "completed" ? "wide" : ""}`}
               >
-                {status === "idle" && (
+                {/* Upload box visible only in idle */}
+                {status === 'idle' && (
+                <div className="upload-view">
+                  {/* Entry mode toggle: Slides vs PDF are processed differently */}
+                  <div
+                    className="mode-toggle"
+                    role="tablist"
+                    aria-label="Entry Mode"
+                  >
+                    <button
+                      type="button"
+                      className={`toggle-btn ${uploadMode === "slides" ? "active" : ""}`}
+                      onClick={() => setUploadMode("slides")}
+                      role="tab"
+                      aria-selected={uploadMode === "slides"}
+                      aria-controls="slides-mode-panel"
+                    >
+                      🖼️ Slides
+                    </button>
+                    <button
+                      type="button"
+                      className={`toggle-btn ${uploadMode === "pdf" ? "active" : ""}`}
+                      onClick={() => setUploadMode("pdf")}
+                      role="tab"
+                      aria-selected={uploadMode === "pdf"}
+                      aria-controls="pdf-mode-panel"
+                    >
+                      📄 PDF
+                    </button>
+                  </div>
+                  <div className="mode-explainer" aria-live="polite">
+                    {uploadMode === "slides" ? (
+                      <>
+                        <strong>Slides Mode:</strong> Processes each slide
+                        individually for transcripts, audio, subtitles, and
+                        composes a final video.
+                      </>
+                    ) : (
+                      <>
+                        <strong>PDF Mode:</strong> Segments the document into
+                        chapters, then you can generate either a video (with
+                        audio + subtitles) or a 2‑person podcast (MP3).
+                      </>
+                    )}
+                  </div>
+                  {uploadMode === "pdf" && (
+                    <div
+                      className="mode-toggle"
+                      role="tablist"
+                      aria-label="PDF Output"
+                    >
+                      <button
+                        type="button"
+                        className={`toggle-btn ${pdfOutputMode === "video" ? "active" : ""}`}
+                        onClick={() => setPdfOutputMode("video")}
+                        role="tab"
+                        aria-selected={pdfOutputMode === "video"}
+                        aria-controls="pdf-output-video"
+                      >
+                        🎬 Video
+                      </button>
+                      <button
+                        type="button"
+                        className={`toggle-btn ${pdfOutputMode === "podcast" ? "active" : ""}`}
+                        onClick={() => setPdfOutputMode("podcast")}
+                        role="tab"
+                        aria-selected={pdfOutputMode === "podcast"}
+                        aria-controls="pdf-output-podcast"
+                      >
+                        🎧 Podcast
+                      </button>
+                    </div>
+                  )}
+                  {isResumingTask && (
+                    <div className="resume-indicator">
+                      <div className="spinner"></div>
+                      <p>Resuming your last task...</p>
+                    </div>
+                  )}
+
+                  <div className="file-upload-area">
+                    <input
+                      type="file"
+                      id="file-upload"
+                      accept={uploadMode === "pdf" ? ".pdf" : ".pptx,.ppt"}
+                      onChange={handleFileChange}
+                      className="file-input"
+                      disabled={isResumingTask}
+                    />
+                    <label
+                      htmlFor="file-upload"
+                      className={`file-upload-label ${isResumingTask ? "disabled" : ""}`}
+                    >
+                      <div className="upload-icon">📄</div>
+                      <div className="upload-text">
+                        {file
+                          ? file.name
+                          : uploadMode === "pdf"
+                            ? "Choose a PDF file"
+                            : "Choose a PPTX/PPT file"}
+                      </div>
+                      <div className="upload-hint">
+                        {file
+                          ? getFileTypeHint(file.name)
+                          : uploadMode === "pdf"
+                            ? "PDF will be processed into a video or podcast"
+                            : "Slides will be processed into a narrated video"}
+                      </div>
+                    </label>
+
+                    {/* Options */}
+                    <div className="options-panel">
+                      <div className="video-option-card">
+                        <div className="video-option-header">
+                          <span className="video-option-icon">🌐</span>
+                          <span className="video-option-title">AUDIO LANGUAGE</span>
+                        </div>
+                        <select
+                          id="voice-language-select"
+                          value={voiceLanguage}
+                          onChange={(e) => setVoiceLanguage(e.target.value)}
+                          className="video-option-select"
+                        >
+                          <option value="english">English</option>
+                          <option value="simplified_chinese">简体中文</option>
+                          <option value="traditional_chinese">繁體中文</option>
+                          <option value="japanese">日本語</option>
+                          <option value="korean">한국어</option>
+                          <option value="thai">ไทย</option>
+                        </select>
+                      </div>
+
+                      <div className="video-option-card">
+                        <div className="video-option-header">
+                          <span className="video-option-icon">📝</span>
+                          <span className="video-option-title">
+                            {uploadMode === 'pdf' && pdfOutputMode === 'podcast' ? 'Transcript Language' : 'Subtitles Language'}
+                          </span>
+                        </div>
+                        <select
+                          id="subtitle-language-select"
+                          value={uploadMode === 'pdf' && pdfOutputMode === 'podcast' ? transcriptLanguage : subtitleLanguage}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            if (uploadMode === 'pdf' && pdfOutputMode === 'podcast') { setTranscriptLanguage(v); setTranscriptLangTouched(true); }
+                            else setSubtitleLanguage(v);
+                          }}
+                          className="video-option-select"
+                        >
+                          <option value="english">English</option>
+                          <option value="simplified_chinese">简体中文</option>
+                          <option value="traditional_chinese">繁體中文</option>
+                          <option value="japanese">日本語</option>
+                          <option value="korean">한국어</option>
+                          <option value="thai">ไทย</option>
+                        </select>
+                      </div>
+
+                      {(uploadMode !== "pdf" || pdfOutputMode === "video") && (
+                        <div className="video-option-card">
+                          <div className="video-option-header">
+                            <span className="video-option-icon">📺</span>
+                            <span className="video-option-title">Quality</span>
+                          </div>
+                          <select
+                            id="video-resolution-select"
+                            value={videoResolution}
+                            onChange={(e) => setVideoResolution(e.target.value)}
+                            className="video-option-select"
+                          >
+                            <option value="sd">SD (640×480)</option>
+                            <option value="hd">HD (1280×720)</option>
+                            <option value="fullhd">Full HD (1920×1080)</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Subtle AI Disclaimer in Upload View */}
+                  <div className="ai-notice-subtle">
+                    AI-generated content may contain inaccuracies. Review carefully.
+                  </div>
+
+                </div>
+                )}
+
+                {/* Show Create button only when idle and after file selected */}
+                {status === 'idle' && file && (
+                  <button
+                    onClick={handleUpload}
+                    className="primary-btn"
+                    disabled={uploading}
+                  >
+                    {uploadMode === 'pdf'
+                      ? (pdfOutputMode === 'podcast' ? 'Create Podcast' : 'Create Video')
+                      : 'Create Video'}
+                  </button>
+                )}
+
+                {/* Below: Non-idle status panels remain visible below the upload box */}
+                {status === "uploading" && (
                   <div className="upload-view">
                     {/* Entry mode toggle: Slides vs PDF are processed differently */}
                     <div
@@ -1543,9 +1873,7 @@ function App() {
                         <div className="video-option-card">
                           <div className="video-option-header">
                             <span className="video-option-icon">🔊</span>
-                            <span className="video-option-title">
-                              Audio Language
-                            </span>
+                            <span className="video-option-title">AUDIO LANGUAGE</span>
                           </div>
                           <select
                             id="language-select"
@@ -1568,7 +1896,7 @@ function App() {
                           <div className="video-option-header">
                             <span className="video-option-icon">📝</span>
                             <span className="video-option-title">
-                              {uploadMode === 'pdf' && pdfOutputMode === 'podcast' ? 'Transcript Language' : 'Subtitles'}
+                              {uploadMode === 'pdf' && pdfOutputMode === 'podcast' ? 'Transcript Language' : 'Subtitles Language'}
                             </span>
                           </div>
                           <select
@@ -1783,10 +2111,10 @@ function App() {
                         <h4>
                           <span className="steps-title">🌟 Crafting Your Masterpiece</span>
                           <span className="output-badges">
-                            {(((processingDetails as any)?.generate_video) ?? true) && (
+                            {(() => { const tt = (((processingDetails as any)?.task_type)||'').toLowerCase(); const v = ["video","both"].includes(tt); return v; })() && (
                               <span className="output-pill video" title="Video generation enabled">🎬 Video</span>
                             )}
-                            {Boolean((processingDetails as any)?.generate_podcast) && (
+                            {(() => { const tt = (((processingDetails as any)?.task_type)||'').toLowerCase(); const p = ["podcast","both"].includes(tt); return p; })() && (
                               <span className="output-pill podcast" title="Podcast generation enabled">🎧 Podcast</span>
                             )}
                           </span>
@@ -1808,12 +2136,9 @@ function App() {
                                   processingDetails.subtitle_language || vl
                                 ).toLowerCase();
                                 const same = vl === sl;
-                                const genVideo =
-                                  (processingDetails as any)?.generate_video ??
-                                  true;
-                                const genPodcast =
-                                  (processingDetails as any)
-                                    ?.generate_podcast ?? false;
+                                const tt = (((processingDetails as any)?.task_type)||'').toLowerCase();
+                                const genVideo = ["video","both"].includes(tt);
+                                const genPodcast = ["podcast","both"].includes(tt);
                                 const showSectionHeaders = genVideo && genPodcast;
                                 const base: string[] = [
                                   "segment_pdf_content",
@@ -2009,7 +2334,7 @@ function App() {
                                     ref={audioRef}
                                     controls
                                     preload="auto"
-                                    src={`${API_BASE_URL}/api/tasks/${taskId}/${(processingDetails as any)?.generate_podcast ? 'podcast' : 'audio'}`}
+                                    src={`${API_BASE_URL}/api/tasks/${taskId}/${(() => { const tt = (((processingDetails as any)?.task_type)||'').toLowerCase(); const p = ["podcast","both"].includes(tt); return p ? 'podcast' : 'audio'; })()}`}
                                     crossOrigin="anonymous"
                                     aria-label="Audio narration preview"
                                   />
@@ -2070,7 +2395,7 @@ function App() {
                             className="output-badges"
                             aria-label="Outputs included"
                           >
-                            {(processingDetails?.generate_video ?? true) && (
+                            {(() => { const tt = (((processingDetails as any)?.task_type)||'').toLowerCase(); return ["video","both"].includes(tt); })() && (
                               <span
                                 className="output-pill video"
                                 title="Includes video"
@@ -2078,7 +2403,7 @@ function App() {
                                 🎬 Video
                               </span>
                             )}
-                            {(processingDetails as any)?.generate_podcast && (
+                            {(() => { const tt = (((processingDetails as any)?.task_type)||'').toLowerCase(); return ["podcast","both"].includes(tt); })() && (
                               <span
                                 className="output-pill podcast"
                                 title="Includes podcast"
@@ -2122,21 +2447,14 @@ function App() {
                           marginBottom: "8px",
                         }}
                       >
-                        {/*<span className="output-badges" aria-label="Outputs included">
-                      {(processingDetails?.generate_video ?? true) && (
-                        <span className="output-pill video" title="Includes video">🎬 Video</span>
-                      )}
-                      {(processingDetails as any)?.generate_podcast && (
-                        <span className="output-pill podcast" title="Includes podcast">🎧 Podcast</span>
-                      )}
-                    </span>*/}
+                        {/* legacy output badges block removed */}
                       </div>
                       <div className="mode-toggle compact">
-                        {(processingDetails?.generate_video ?? true) && (
+                        {(() => { const tt = (((processingDetails as any)?.task_type)||'').toLowerCase(); return ["video","both"].includes(tt) || hasVideoAsset; })() && (
                           <button
                             type="button"
                             className={`toggle-btn ${completedMedia === "video" ? "active" : ""}`}
-                            onClick={() => setCompletedMedia("video")}
+                            onClick={() => { completedMediaPinnedRef.current = true; setCompletedMedia("video"); }}
                           >
                             🎬 Video
                           </button>
@@ -2144,9 +2462,9 @@ function App() {
                         <button
                           type="button"
                           className={`toggle-btn ${completedMedia === "audio" ? "active" : ""}`}
-                          onClick={() => setCompletedMedia("audio")}
+                          onClick={() => { completedMediaPinnedRef.current = true; setCompletedMedia("audio"); }}
                         >
-                          {processingDetails?.generate_podcast
+                          {(() => { const tt = (((processingDetails as any)?.task_type)||'').toLowerCase(); return ["podcast","both"].includes(tt); })()
                             ? "🎧 Podcast"
                             : "🎧 Audio"}
                         </button>
@@ -2155,7 +2473,7 @@ function App() {
 
                     {/* Video area (shows only in Video mode) */}
                     {completedMedia === "video" &&
-                      (processingDetails?.generate_video ?? true) && (
+                      (() => { const tt = (((processingDetails as any)?.task_type)||'').toLowerCase(); return ["video","both"].includes(tt) || hasVideoAsset; })() && (
                         <div className="media-section video-active">
                           <div className="video-wrapper">
                             <video
@@ -2164,48 +2482,28 @@ function App() {
                               src={`${API_BASE_URL}/api/tasks/${taskId}/video`}
                               crossOrigin="anonymous"
                               className="preview-video-large"
+                              onLoadStart={() => setCompletedVideoLoading(true)}
+                              onLoadedMetadata={() => setCompletedVideoLoading(false)}
+                              onLoadedData={() => setCompletedVideoLoading(false)}
+                              onCanPlay={() => setCompletedVideoLoading(false)}
+                              onPlaying={() => setCompletedVideoLoading(false)}
+                              onWaiting={() => setCompletedVideoLoading(true)}
                             >
                               {/* Always include a subtitles track for the completed view */}
                               <track
                                 kind="subtitles"
-                                src={`${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(processingDetails?.subtitle_language || subtitleLanguage || voiceLanguage || "english")}`}
-                                srcLang={
-                                  (processingDetails?.subtitle_language ||
-                                    subtitleLanguage ||
-                                    voiceLanguage ||
-                                    "english") === "simplified_chinese"
-                                    ? "zh-Hans"
-                                    : (processingDetails?.subtitle_language ||
-                                          subtitleLanguage ||
-                                          voiceLanguage ||
-                                          "english") === "traditional_chinese"
-                                      ? "zh-Hant"
-                                      : (processingDetails?.subtitle_language ||
-                                            subtitleLanguage ||
-                                            voiceLanguage ||
-                                            "english") === "japanese"
-                                        ? "ja"
-                                        : (processingDetails?.subtitle_language ||
-                                              subtitleLanguage ||
-                                              voiceLanguage ||
-                                              "english") === "korean"
-                                          ? "ko"
-                                          : (processingDetails?.subtitle_language ||
-                                                subtitleLanguage ||
-                                                voiceLanguage ||
-                                                "english") === "thai"
-                                            ? "th"
-                                            : "en"
-                                }
-                                label={getLanguageDisplayName(
-                                  processingDetails?.subtitle_language ||
-                                    subtitleLanguage ||
-                                    voiceLanguage ||
-                                    "english",
-                                )}
+                                src={vttUrl}
+                                srcLang={subtitleLocale}
+                                label={getLanguageDisplayName(subtitleLanguageCode)}
                                 default
                               />
                             </video>
+                            {completedVideoLoading && (
+                              <div className="video-status-overlay loading" role="status" aria-live="polite">
+                                <div className="spinner" aria-hidden></div>
+                                <span className="loading-text">Loading video…</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -2213,27 +2511,54 @@ function App() {
                     {/* Audio area (shows only in Audio mode) */}
                     {completedMedia === "audio" && (
                       <div className="media-section audio-active">
-                        <div className="audio-section">
+                        <div className="audio-section" style={{ position: 'relative' }}>
                           {/* Inline audio player for quick listening */}
                           <div className="audio-player-inline">
-                            <audio
-                              ref={audioRef}
-                              controls
-                              preload="auto"
-                              src={`${API_BASE_URL}/api/tasks/${taskId}/${processingDetails?.generate_podcast ? "podcast" : "audio"}`}
-                              crossOrigin="anonymous"
-                              aria-label="Audio narration preview"
-                            >
+                          <audio
+                            ref={audioRef}
+                            controls
+                            preload="auto"
+                            src={`${API_BASE_URL}/api/tasks/${taskId}/${(() => { const tt = ((((processingDetails as any)?.task_type)||'').toLowerCase()); return (tt === 'podcast') ? 'podcast' : 'audio'; })()}`}
+                            crossOrigin="anonymous"
+                            aria-label="Audio narration preview"
+                            onLoadStart={() => setCompletedAudioLoading(true)}
+                            onLoadedData={() => setCompletedAudioLoading(false)}
+                            onCanPlay={() => setCompletedAudioLoading(false)}
+                            onPlaying={() => setCompletedAudioLoading(false)}
+                            onWaiting={() => setCompletedAudioLoading(true)}
+                            onError={() => {
+                              try {
+                                const el = audioRef.current;
+                                if (!el) return;
+                                const isAudio = /\/audio$/.test(el.src);
+                                const alt = isAudio ? el.src.replace(/\/audio$/, '/podcast') : el.src.replace(/\/podcast$/, '/audio');
+                                // Only flip once per mount
+                                if ((el as any)._altTried) return;
+                                (el as any)._altTried = true;
+                                setCompletedAudioLoading(true);
+                                el.src = alt;
+                                el.load();
+                                el.play().catch(() => {});
+                              } catch {}
+                              setCompletedAudioLoading(false);
+                            }}
+                          >
                               Your browser does not support the audio element.
                             </audio>
+                            {completedAudioLoading && (
+                              <div className="video-status-overlay loading" role="status" aria-live="polite">
+                                <div className="spinner" aria-hidden></div>
+                                <span className="loading-text">Loading audio…</span>
+                              </div>
+                            )}
                           </div>
-                          {processingDetails?.generate_podcast && completedTranscriptMd && (
+                          {(() => { const tt = ((((processingDetails as any)?.task_type)||'').toLowerCase()); return (["podcast","both"].includes(tt)) && completedTranscriptMd; })() && (
                             <div style={{ marginTop: '12px' }}>
                               <h4>Transcript (Conversation)</h4>
-                              <PodcastTranscript audioRef={audioRef} markdown={completedTranscriptMd} />
+                              <PodcastTranscript audioRef={audioRef} markdown={completedTranscriptMd ?? ''} />
                             </div>
                           )}
-                          {!processingDetails?.generate_podcast &&
+                          {(() => { const tt = ((((processingDetails as any)?.task_type)||'').toLowerCase()); return !(["podcast","both"].includes(tt)); })() &&
                             showAudioTranscript &&
                             audioCues.length > 0 && (
                               <div
@@ -2404,7 +2729,7 @@ function App() {
                     {/* Resource URLs */}
                     <div className="resource-links">
                       {/* Video */}
-                      {(processingDetails?.generate_video ?? true) && (
+                      {(() => { const tt = ((((processingDetails as any)?.task_type)||'').toLowerCase()); return ["video","both"].includes(tt); })() && (
                         <div className="url-copy-row">
                           <span className="resource-label-inline">Video</span>
                           <input
@@ -2430,24 +2755,22 @@ function App() {
                       {/* Audio/Podcast */}
                       <div className="url-copy-row">
                         <span className="resource-label-inline">
-                          {processingDetails?.generate_podcast
-                            ? "Podcast"
-                            : "Audio"}
+                          {(() => { const tt = (((processingDetails as any)?.task_type)||'').toLowerCase(); return ["podcast","both"].includes(tt) ? 'Podcast' : 'Audio'; })()}
                         </span>
                         <input
                           type="text"
-                          value={`${API_BASE_URL}/api/tasks/${taskId}/${processingDetails?.generate_podcast ? "podcast" : "audio"}`}
+                          value={`${API_BASE_URL}/api/tasks/${taskId}/${(() => { const tt = (((processingDetails as any)?.task_type)||'').toLowerCase(); return ["podcast","both"].includes(tt) ? 'podcast' : 'audio'; })()}`}
                           readOnly
                           className="url-input-enhanced"
                         />
                         <button
                           onClick={() => {
+                            const tt = ((((processingDetails as any)?.task_type)||'').toLowerCase());
+                            const isPod = ["podcast","both"].includes(tt);
                             navigator.clipboard.writeText(
-                              `${API_BASE_URL}/api/tasks/${taskId}/${processingDetails?.generate_podcast ? "podcast" : "audio"}`,
+                              `${API_BASE_URL}/api/tasks/${taskId}/${isPod ? 'podcast' : 'audio'}`,
                             );
-                            alert(
-                              `${processingDetails?.generate_podcast ? "Podcast" : "Audio"} URL copied!`,
-                            );
+                            alert(`${isPod ? 'Podcast' : 'Audio'} URL copied!`);
                           }}
                           className="copy-btn-enhanced"
                         >
@@ -2482,8 +2805,7 @@ function App() {
                       )}
 
                       {/* VTT (hide for podcast-only) */}
-                      {(processingDetails?.generate_video ?? true) &&
-                        !processingDetails?.generate_podcast && (
+                      {(() => { const tt = (((processingDetails as any)?.task_type)||'').toLowerCase(); const v = ["video","both"].includes(tt); const p = ["podcast","both"].includes(tt); return v && !p; })() && (
                           <div className="url-copy-row">
                             <span className="resource-label-inline">VTT</span>
                             <input
@@ -2506,8 +2828,7 @@ function App() {
                           </div>
                         )}
                       {/* SRT (hide for podcast-only) */}
-                      {(processingDetails?.generate_video ?? true) &&
-                        !processingDetails?.generate_podcast &&
+                      {(() => { const tt = (((processingDetails as any)?.task_type)||'').toLowerCase(); const v = ["video","both"].includes(tt); const p = ["podcast","both"].includes(tt); return v && !p; })() &&
                         generateSubtitles &&
                         fileId && (
                           <div className="url-copy-row">

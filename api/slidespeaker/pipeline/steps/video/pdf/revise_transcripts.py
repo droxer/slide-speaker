@@ -11,7 +11,9 @@ from slidespeaker.pipeline.steps.common.transcript_reviser import (
 )
 
 
-async def revise_transcripts_step(file_id: str, language: str = "english") -> None:
+async def revise_transcripts_step(
+    file_id: str, language: str = "english", task_id: str | None = None
+) -> None:
     """
     Revise and refine PDF chapter transcripts for consistency and smooth flow.
 
@@ -24,6 +26,7 @@ async def revise_transcripts_step(file_id: str, language: str = "english") -> No
         language=language,
         get_transcripts_func=get_pdf_transcripts_for_revision,
         state_key="revise_pdf_transcripts",
+        task_id=task_id,
     )
 
 

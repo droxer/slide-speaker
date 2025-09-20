@@ -5,6 +5,7 @@ Preserves speaker labels (Host/Guest) and returns the same structured list
 of dialogue items: [{"speaker": "Host|Guest", "text": "..."}].
 """
 
+import re
 from typing import Any
 
 from loguru import logger
@@ -16,9 +17,11 @@ from slidespeaker.llm import chat_completion
 SYSTEM_PROMPT = (
     "You are a precise translator for podcast dialogues. "
     "Translate the text to the target language while strictly "
-    "preserving speaker labels and structure. Do not add notes or labels; "
-    "return only the translated dialogue lines. Avoid any references to visuals "
-    "or slides; focus purely on content."
+    "preserving speaker labels and structure. Output only lines that start with "
+    "'Host:' or 'Guest:'. Do not add notes or labels; return only the translated "
+    "dialogue lines. Avoid any references to visuals or slides; focus purely on "
+    "content. Do NOT include any standalone labels like 'Transition:'; if present "
+    "in the source, incorporate the idea into the Host/Guest line without the label."
 )
 
 
@@ -38,6 +41,12 @@ def _build_translate_prompt(
         if tx:
             lines.append(f"{sp}: {tx}")
     return "\n".join(lines)
+
+
+def _strip_transition_label(text: str) -> str:
+    t = text.strip()
+    t = re.sub(r"^(transition)\s*[:\-—–]\s*", "", t, flags=re.IGNORECASE)
+    return t.strip()
 
 
 async def translate_podcast_script_step(
@@ -87,6 +96,7 @@ async def translate_podcast_script_step(
                 else ("Guest" if ln.lower().startswith("guest:") else None)
             )
             text = ln.split(":", 1)[1].strip() if ":" in ln else ln
+            text = _strip_transition_label(text)
             if role and text:
                 out.append({"speaker": role, "text": text})
         await state_manager.update_step_status(

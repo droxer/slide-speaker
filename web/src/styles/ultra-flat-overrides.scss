@@ -50,6 +50,12 @@ body.ultra-flat .video-player-container {
   box-shadow: none !important;
 }
 
+/* Completed view: very light canvas in Flat theme */
+body.ultra-flat .video-wrapper {
+  background: rgba(15, 23, 42, 0.06) !important;
+  border-color: #e5e7eb !important;
+}
+
 body.ultra-flat * {
   text-shadow: none !important;
   box-shadow: none !important;

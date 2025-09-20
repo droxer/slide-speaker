@@ -4,12 +4,10 @@ Generate podcast audio segments (Host/Guest) from dialogue.
 Emits per-line MP3 segments and optionally uploads them via storage provider.
 """
 
-from pathlib import Path
-
 from loguru import logger
 
 from slidespeaker.audio.generator import AudioGenerator
-from slidespeaker.configs.config import config, get_storage_provider
+from slidespeaker.configs.config import config
 from slidespeaker.core.state_manager import state_manager
 
 
@@ -19,17 +17,38 @@ async def generate_podcast_audio_step(file_id: str, language: str = "english") -
     )
     logger.info(f"Generating podcast audio for file {file_id}")
 
+    ag = AudioGenerator()
     st = await state_manager.get_state(file_id)
     dialogue: list[dict[str, str]] = []
+    transcript_lang = None
     if st and st.get("steps"):
-        if st["steps"].get("translate_podcast_script") and st["steps"][
-            "translate_podcast_script"
-        ].get("data"):
-            dialogue = st["steps"]["translate_podcast_script"]["data"] or []
-        elif st["steps"].get("generate_podcast_script") and st["steps"][
+        steps = st["steps"]
+        # Base script is always English
+        base_dialogue: list[dict[str, str]] = []
+        if steps.get("generate_podcast_script") and steps[
             "generate_podcast_script"
         ].get("data"):
-            dialogue = st["steps"]["generate_podcast_script"].get("data") or []
+            base_dialogue = steps["generate_podcast_script"].get("data") or []
+        # Existing translated transcript (might be in transcript language)
+        translated_dialogue: list[dict[str, str]] = []
+        if steps.get("translate_podcast_script") and steps[
+            "translate_podcast_script"
+        ].get("data"):
+            translated_dialogue = steps["translate_podcast_script"].get("data") or []
+        transcript_lang = (
+            st.get("podcast_transcript_language")
+            or st.get("subtitle_language")
+            or st.get("voice_language")
+            or "english"
+        ).lower()
+
+        # Prepare dialogue strictly for the audio (voice) language via AudioGenerator utilities
+        dialogue = ag.prepare_dialogue_for_audio(
+            base_dialogue_en=base_dialogue,
+            translated_dialogue=translated_dialogue,
+            transcript_language=transcript_lang,
+            voice_language=language,
+        )
 
     if not dialogue:
         logger.warning("No podcast dialogue found; skipping audio generation")
@@ -41,7 +60,6 @@ async def generate_podcast_audio_step(file_id: str, language: str = "english") -
     work_dir = config.output_dir / file_id / "podcast"
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    ag = AudioGenerator()
     # Select two voices for host/guest
     try:
         voices = ag.get_supported_voices(language) or []
@@ -65,16 +83,8 @@ async def generate_podcast_audio_step(file_id: str, language: str = "english") -
         if ok:
             segment_paths.append(str(out_path))
 
-    # Optionally upload segments
+    # Do NOT upload per-segment MP3s for PDF podcasts; only final composed MP3 is stored
     uploaded_urls: list[str] = []
-    try:
-        sp = get_storage_provider()
-        for p in segment_paths:
-            key = f"{file_id}_podcast_segment_{Path(p).name}"
-            url = sp.upload_file(p, key, "audio/mpeg")
-            uploaded_urls.append(url)
-    except Exception:
-        pass
 
     await state_manager.update_step_status(
         file_id,

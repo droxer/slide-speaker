@@ -6,15 +6,19 @@ including listing tasks, filtering, searching, and retrieving task statistics.
 """
 
 from contextlib import suppress
-from datetime import datetime, timedelta
 from typing import Any
 
 from fastapi import APIRouter, Query
-from redis.exceptions import RedisError
 
 from slidespeaker.core.progress_utils import compute_step_percentage
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
+from slidespeaker.repository.task import (
+    delete_task as db_delete_task,
+)
+from slidespeaker.repository.task import (
+    list_tasks as db_list_tasks,
+)
 
 router = APIRouter(prefix="/api", tags=["stats"])
 
@@ -31,222 +35,37 @@ async def get_tasks(
     ),
     sort_order: str = Query("desc", description="Sort order (asc, desc)"),
 ) -> dict[str, Any]:
-    """Get a list of all tasks with optional filtering and pagination."""
+    """DB-backed task list. Uses repository; no Redis scanning."""
 
-    # Helper: safely scan Redis keys with fallback when Redis is unavailable
-    async def _safe_scan(pattern: str) -> list[str]:
-        try:
-            cursor: int = 0
-            out: list[str] = []
-            while True:
-                cursor, batch = await task_queue.redis_client.scan(
-                    cursor=cursor, match=pattern, count=500
-                )
-                out.extend([str(k) for k in batch])
-                if cursor == 0:
-                    break
-            return out
-        except (RedisError, TimeoutError, Exception):
-            return []
-
-    # Get all task IDs from Redis (gracefully handle Redis down)
-    task_keys = await _safe_scan("ss:task:*")
-    # Exclude transient cancelled flags
-    task_keys = [k for k in task_keys if not str(k).endswith(":cancelled")]
-
-    # Only list task-based states (legacy file-id states are deprecated)
-    # Only list task-based states (legacy file-id states are deprecated)
-    # Use the same safe scanner on the state manager client
-    async def _safe_state_scan(pattern: str) -> list[str]:
-        try:
-            cursor: int = 0
-            out: list[str] = []
-            while True:
-                cursor, batch = await state_manager.redis_client.scan(
-                    cursor=cursor, match=pattern, count=500
-                )
-                out.extend([str(k) for k in batch])
-                if cursor == 0:
-                    break
-            return out
-        except (RedisError, TimeoutError, Exception):
-            return []
-
-    task_state_keys = await _safe_state_scan("ss:state:task:*")
-
-    tasks = []
-
-    # Process task queue items
-    for task_key in task_keys:
-        task_data = await task_queue.redis_client.get(task_key)
-        if task_data:
-            try:
-                task = __import__("json").loads(task_data)
-                # Add file_id from kwargs if available
-                file_id = task.get("kwargs", {}).get("file_id", "unknown")
-                task["file_id"] = file_id
-
-                # Get corresponding state if available
-                tid = task.get("task_id")
-                state = None
-                if isinstance(tid, str) and tid:
-                    state = await state_manager.get_state_by_task(tid)
-                else:
-                    # Fallback (legacy): try file-id (may alias to last-run)
-                    state = await state_manager.get_state(file_id)
-                if state:
-                    # Derive task_type and flags when missing (legacy defaults)
-                    gv = state.get("generate_video")
-                    gp = state.get("generate_podcast")
-                    steps = state.get("steps") or {}
-                    derived_type: str | None = state.get("task_type")
-                    if (
-                        gv is None
-                        and gp is None
-                        and isinstance(steps, dict)
-                        and "compose_podcast" in steps
-                    ):
-                        gp = True
-                        gv = False
-                        derived_type = "podcast"
-                    if derived_type is None:
-                        if gp is True and gv is True:
-                            derived_type = "both"
-                        elif gp is True:
-                            derived_type = "podcast"
-                        elif gv is True:
-                            derived_type = "video"
-
-                    task["state"] = {
-                        "status": state["status"],
-                        "current_step": state["current_step"],
-                        "filename": state.get("filename"),
-                        "source": state.get("source"),
-                        "voice_language": state["voice_language"],
-                        "subtitle_language": state.get("subtitle_language"),
-                        "video_resolution": state.get("video_resolution", "hd"),
-                        "generate_avatar": state["generate_avatar"],
-                        "generate_subtitles": state["generate_subtitles"],
-                        # Prefer explicit; include derived when available
-                        "generate_video": gv
-                        if gv is not None
-                        else state.get("generate_video"),
-                        "generate_podcast": gp
-                        if gp is not None
-                        else state.get("generate_podcast"),
-                        "task_type": derived_type
-                        if derived_type is not None
-                        else state.get("task_type"),
-                        "created_at": state["created_at"],
-                        "updated_at": state["updated_at"],
-                        "errors": state["errors"],
-                    }
-
-                tasks.append(task)
-            except Exception:
-                # Skip malformed tasks
-                continue
-
-    # Process state-only items (task-based states without task queue entries)
-    for state_key in task_state_keys:
-        task_id = str(state_key).replace("ss:state:task:", "")
-        # Skip if we already have this task from the queue list
-        if any(task.get("task_id") == task_id for task in tasks):
-            continue
-        st = await state_manager.get_state_by_task(task_id)
-        if st:
-            fid = st.get("file_id")
-            # Derive task_type and flags when missing
-            gv = st.get("generate_video")
-            gp = st.get("generate_podcast")
-            steps = st.get("steps") or {}
-            derived_type2: str | None = st.get("task_type")
-            if (
-                gv is None
-                and gp is None
-                and isinstance(steps, dict)
-                and "compose_podcast" in steps
-            ):
-                gp = True
-                gv = False
-                derived_type2 = "podcast"
-            if derived_type2 is None:
-                if gp is True and gv is True:
-                    derived_type2 = "both"
-                elif gp is True:
-                    derived_type2 = "podcast"
-                elif gv is True:
-                    derived_type2 = "video"
-            tasks.append(
-                {
-                    "task_id": task_id,
-                    "file_id": fid,
-                    "task_type": "process_presentation",
-                    "status": st.get("status"),
-                    "created_at": st.get("created_at"),
-                    "updated_at": st.get("updated_at"),
-                    "state": {
-                        "status": st.get("status"),
-                        "current_step": st.get("current_step"),
-                        "source": st.get("source"),
-                        "voice_language": st.get("voice_language"),
-                        "subtitle_language": st.get("subtitle_language"),
-                        "video_resolution": st.get("video_resolution", "hd"),
-                        "generate_avatar": st.get("generate_avatar"),
-                        "generate_subtitles": st.get("generate_subtitles"),
-                        "generate_video": gv
-                        if gv is not None
-                        else st.get("generate_video"),
-                        "generate_podcast": gp
-                        if gp is not None
-                        else st.get("generate_podcast"),
-                        "task_type": derived_type2
-                        if derived_type2 is not None
-                        else st.get("task_type"),
-                        "created_at": st.get("created_at"),
-                        "updated_at": st.get("updated_at"),
-                        "errors": st.get("errors", []),
-                    },
-                    "kwargs": {
-                        "file_id": fid,
-                        "file_ext": st.get("file_ext"),
-                        "filename": st.get("filename"),
-                        "source": st.get("source"),
-                        "voice_language": st.get("voice_language"),
-                        "subtitle_language": st.get("subtitle_language"),
-                        "video_resolution": st.get("video_resolution", "hd"),
-                        "generate_avatar": st.get("generate_avatar"),
-                        "generate_subtitles": st.get("generate_subtitles"),
-                        "generate_video": st.get("generate_video"),
-                        "generate_podcast": st.get("generate_podcast"),
-                        "task_type": st.get("task_type"),
-                    },
-                }
-            )
-
-    # Apply status filter if provided
-    if status:
-        tasks = [task for task in tasks if task["status"] == status]
-
-    # Sort tasks
-    reverse = str(sort_order).lower() == "desc"
-    try:
-        tasks.sort(key=lambda x: x.get(str(sort_by), ""), reverse=reverse)
-    except KeyError:
-        # Fallback to created_at if sort field doesn't exist
-        tasks.sort(key=lambda x: x.get("created_at", ""), reverse=reverse)
-
-    # Apply pagination
-    total_tasks = len(tasks)
-    paginated_tasks = tasks[offset : offset + limit]
-
+    db_res = await db_list_tasks(limit=limit, offset=offset, status=status)
     return {
-        "tasks": paginated_tasks,
-        "total": total_tasks,
+        "tasks": db_res["tasks"],
+        "total": db_res["total"],
         "limit": limit,
         "offset": offset,
-        "has_more": offset + limit < total_tasks,
+        "has_more": (db_res["total"] > offset + limit),
     }
+
+
+@router.get("/tasks/db/{task_id}")
+async def get_task_db(task_id: str) -> dict[str, Any]:
+    """DB-only task fetch (no Redis/queue)."""
+    from slidespeaker.repository.task import get_task as db_get_task
+
+    row = await db_get_task(task_id)
+    if not row:
+        return {"error": "not_found", "task_id": task_id}
+    return row
+
+
+@router.delete("/tasks/db/{task_id}")
+async def delete_task_db(task_id: str) -> dict[str, Any]:
+    """DB-only delete for a task row (does not touch Redis/queue/state)."""
+    try:
+        await db_delete_task(task_id)
+        return {"deleted": True, "task_id": task_id}
+    except Exception as e:
+        return {"deleted": False, "task_id": task_id, "error": str(e)}
 
 
 @router.post("/admin/tasks/{task_id}/set_type")
@@ -282,160 +101,46 @@ async def set_task_type(
 
 @router.get("/tasks/search")
 async def search_tasks(
-    query: str = Query(..., description="Search query for file ID or task properties"),
+    query: str = Query(
+        ...,
+        description="Search query for task_id, file_id, status, task_type, or kwargs",
+    ),
     limit: int = Query(20, ge=1, le=100, description="Maximum number of results"),
 ) -> dict[str, Any]:
-    """Search for tasks by file ID or other properties."""
+    """DB-backed search across basic fields. No Redis usage."""
 
-    # Get all tasks
-    all_tasks_result = await get_tasks(
-        status=None, limit=1000, offset=0, sort_by="created_at", sort_order="desc"
-    )  # Get all tasks for searching
+    all_tasks_result = await db_list_tasks(limit=10000, offset=0, status=None)
     all_tasks = all_tasks_result["tasks"]
 
-    # Search in file IDs and task properties
-    matching_tasks = []
-    query_lower = query.lower()
-
-    for task in all_tasks:
-        # Search in file_id
-        if query_lower in task.get("file_id", "").lower():
-            matching_tasks.append(task)
+    q = query.lower()
+    matches: list[dict[str, Any]] = []
+    for t in all_tasks:
+        if q in (t.get("task_id") or "").lower():
+            matches.append(t)
             continue
-
-        # Search in state properties
-        state = task.get("state", {})
-        if query_lower in state.get("status", "").lower():
-            matching_tasks.append(task)
+        if q in (t.get("file_id") or "").lower():
+            matches.append(t)
             continue
-
-        if query_lower in state.get("voice_language", "").lower():
-            matching_tasks.append(task)
+        if q in (t.get("status") or "").lower():
+            matches.append(t)
             continue
-
-        if query_lower in state.get("current_step", "").lower():
-            matching_tasks.append(task)
+        if q in (t.get("task_type") or "").lower():
+            matches.append(t)
             continue
+        kwargs = t.get("kwargs") or {}
+        if kwargs and q in str(kwargs).lower():
+            matches.append(t)
 
-    # Limit results
-    matching_tasks = matching_tasks[:limit]
-
-    return {
-        "tasks": matching_tasks,
-        "query": query,
-        "total_found": len(matching_tasks),
-    }
+    matches = matches[:limit]
+    return {"tasks": matches, "query": query, "total_found": len(matches)}
 
 
 @router.get("/tasks/statistics")
 async def get_task_statistics() -> dict[str, Any]:
-    """Get comprehensive statistics about all tasks."""
+    """Get comprehensive statistics about all tasks (DB only)."""
+    from slidespeaker.repository.task import get_statistics as db_get_statistics
 
-    # Get all tasks
-    all_tasks_result = await get_tasks(
-        status=None, limit=10000, offset=0, sort_by="created_at", sort_order="desc"
-    )  # Get all tasks for stats
-    all_tasks = all_tasks_result["tasks"]
-
-    total_tasks = len(all_tasks)
-
-    if total_tasks == 0:
-        return {
-            "total_tasks": 0,
-            "status_breakdown": {},
-            "language_stats": {},
-            "recent_activity": {
-                "last_24h": 0,
-                "last_7d": 0,
-                "last_30d": 0,
-            },
-            "processing_stats": {
-                "avg_processing_time": None,
-                "success_rate": 0,
-                "failed_rate": 0,
-            },
-        }
-
-    # Status breakdown
-    status_breakdown: dict[str, int] = {}
-    for task in all_tasks:
-        status = task["status"]
-        status_breakdown[status] = status_breakdown.get(status, 0) + 1
-
-    # Language statistics
-    language_stats: dict[str, int] = {}
-    for task in all_tasks:
-        state = task.get("state", {})
-        voice_lang = state.get("voice_language", "unknown")
-        subtitle_lang = state.get("subtitle_language", "unknown")
-
-        language_stats[voice_lang] = language_stats.get(voice_lang, 0) + 1
-        if subtitle_lang != voice_lang:
-            language_stats[subtitle_lang] = language_stats.get(subtitle_lang, 0) + 1
-
-    # Recent activity
-    now = datetime.now()
-    last_24h = sum(
-        1
-        for task in all_tasks
-        if datetime.fromisoformat(task.get("created_at", "").replace("Z", "+00:00"))
-        > now - timedelta(days=1)
-    )
-    last_7d = sum(
-        1
-        for task in all_tasks
-        if datetime.fromisoformat(task.get("created_at", "").replace("Z", "+00:00"))
-        > now - timedelta(days=7)
-    )
-    last_30d = sum(
-        1
-        for task in all_tasks
-        if datetime.fromisoformat(task.get("created_at", "").replace("Z", "+00:00"))
-        > now - timedelta(days=30)
-    )
-
-    # Processing statistics
-    completed_tasks = [task for task in all_tasks if task["status"] == "completed"]
-    failed_tasks = [task for task in all_tasks if task["status"] == "failed"]
-
-    success_rate = len(completed_tasks) / total_tasks * 100 if total_tasks > 0 else 0
-    failed_rate = len(failed_tasks) / total_tasks * 100 if total_tasks > 0 else 0
-
-    # Calculate average processing time for completed tasks
-    avg_processing_time = None
-    if completed_tasks:
-        processing_times = []
-        for task in completed_tasks:
-            try:
-                created = datetime.fromisoformat(
-                    task.get("created_at", "").replace("Z", "+00:00")
-                )
-                updated = datetime.fromisoformat(
-                    task.get("updated_at", "").replace("Z", "+00:00")
-                )
-                processing_time = (updated - created).total_seconds() / 60  # minutes
-                processing_times.append(processing_time)
-            except Exception:
-                continue
-
-        if processing_times:
-            avg_processing_time = sum(processing_times) / len(processing_times)
-
-    return {
-        "total_tasks": total_tasks,
-        "status_breakdown": status_breakdown,
-        "language_stats": language_stats,
-        "recent_activity": {
-            "last_24h": last_24h,
-            "last_7d": last_7d,
-            "last_30d": last_30d,
-        },
-        "processing_stats": {
-            "avg_processing_time_minutes": avg_processing_time,
-            "success_rate": round(success_rate, 2),
-            "failed_rate": round(failed_rate, 2),
-        },
-    }
+    return await db_get_statistics()
 
 
 @router.get("/tasks/{task_id}")
@@ -460,6 +165,7 @@ async def get_task_details(task_id: str) -> dict[str, Any]:
                 "kwargs": {
                     "file_id": file_id,
                     "file_ext": state["file_ext"],
+                    "source_type": state.get("source_type") or state.get("source"),
                     "voice_language": state["voice_language"],
                     "subtitle_language": state.get("subtitle_language"),
                     "generate_avatar": state["generate_avatar"],
@@ -469,10 +175,28 @@ async def get_task_details(task_id: str) -> dict[str, Any]:
             }
 
     if not task:
-        return {
-            "error": "Task not found",
-            "task_id": task_id,
-        }
+        # DB fallback: reconstruct from DB + state
+        from slidespeaker.repository.task import get_task as db_get_task
+
+        row = await db_get_task(task_id)
+        if row:
+            file_id = str(row.get("file_id")) if row.get("file_id") is not None else ""
+            st = await state_manager.get_state(file_id) if file_id else None
+            return {
+                "task_id": row.get("task_id"),
+                "file_id": file_id,
+                "task_type": row.get("task_type"),
+                "status": row.get("status"),
+                "created_at": row.get("created_at"),
+                "updated_at": row.get("updated_at"),
+                "kwargs": row.get("kwargs") or {},
+                "source_type": (st or {}).get("source_type")
+                or (st or {}).get("source")
+                or (row.get("kwargs") or {}).get("source_type"),
+                "state": st,
+                "completion_percentage": compute_step_percentage(st) if st else 0,
+            }
+        return {"error": "Task not found", "task_id": task_id}
 
     # Enrich with detailed state information
     file_id = task.get("kwargs", {}).get("file_id", "unknown")
@@ -483,6 +207,8 @@ async def get_task_details(task_id: str) -> dict[str, Any]:
 
             # Add step completion percentage
             task["completion_percentage"] = compute_step_percentage(state)
+            # Surface source_type at top level for convenience
+            task["source_type"] = state.get("source_type") or state.get("source")
 
     return task
 
@@ -532,9 +258,17 @@ async def purge_task(task_id: str) -> dict[str, Any]:
 
     This removes the task entry, queue references, cancellation flags, and associated state.
     """
-    # Fetch task to get file_id, but proceed even if not found
-    task = await task_queue.get_task(task_id)
-    file_id = task.get("kwargs", {}).get("file_id") if task else None
+    # Resolve file_id via DB first, then queue/state
+    file_id: str | None = None
+    from slidespeaker.repository.task import get_task as db_get_task
+
+    row = await db_get_task(task_id)
+    if row:
+        fid = row.get("file_id")
+        file_id = str(fid) if fid is not None else None
+    if not file_id:
+        task = await task_queue.get_task(task_id)
+        file_id = task.get("kwargs", {}).get("file_id") if task else None
 
     # Build keys
     task_key = f"{task_queue.task_prefix}:{task_id}"
@@ -580,11 +314,9 @@ async def purge_task(task_id: str) -> dict[str, Any]:
 
         # Remove task from file's multi-task set and decide whether to delete file state
         remaining = 0
-        if file_id and file2tasks_set_key:
+        if file_id:
             try:
-                await state_manager.redis_client.srem(file2tasks_set_key, task_id)  # type: ignore
-                left = await state_manager.redis_client.scard(file2tasks_set_key)  # type: ignore
-                remaining = int(left or 0)
+                remaining = await state_manager.unbind_task(file_id, task_id)
             except Exception:
                 remaining = 0
 
@@ -617,6 +349,10 @@ async def purge_task(task_id: str) -> dict[str, Any]:
         if file2tasks_set_key and remaining == 0:
             with suppress(Exception):
                 await state_manager.redis_client.delete(file2tasks_set_key)
+
+        # Also remove from DB
+        with suppress(Exception):
+            await db_delete_task(task_id)
 
         return {
             "message": "Task purged successfully",

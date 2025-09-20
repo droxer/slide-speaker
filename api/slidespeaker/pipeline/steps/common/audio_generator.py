@@ -132,10 +132,35 @@ async def generate_audio_common(
                             outfile.write(chunk)
 
             # Upload to storage with task-id-based key when possible
+            storage_key = f"{base}.mp3"
             storage_provider.upload_file(
-                str(final_local_path), f"{base}.mp3", "audio/mpeg"
+                str(final_local_path), storage_key, "audio/mpeg"
             )
-            logger.info(f"Uploaded final concatenated audio: {final_local_path}")
+
+            # Verify availability with a short retry loop (handles eventual consistency)
+            ok = False
+            try_count = 0
+            import asyncio
+
+            while try_count < 3:
+                try_count += 1
+                try:
+                    if storage_provider.file_exists(storage_key):
+                        ok = True
+                        break
+                except Exception:
+                    # Ignore provider-specific head errors and retry
+                    pass
+                await asyncio.sleep(0.5 * (2 ** (try_count - 1)))
+
+            if ok:
+                logger.info(
+                    f"Final audio uploaded and verified in storage: {storage_key}"
+                )
+            else:
+                logger.warning(
+                    f"Final audio upload could not be verified yet: {storage_key}. Using local fallback."
+                )
     except Exception as e:
         # Non-fatal; streaming fallback in downloads will still work
         logger.error(f"Failed to create/upload final audio: {e}")

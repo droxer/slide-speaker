@@ -10,6 +10,9 @@ from typing import Any, cast
 
 from loguru import logger
 
+from slidespeaker.configs.db import db_enabled
+from slidespeaker.repository.task import insert_task, update_task
+
 
 class RedisTaskQueue:
     """Redis-based task queue for distributed processing of presentation tasks"""
@@ -46,6 +49,13 @@ class RedisTaskQueue:
         task_json = json.dumps(task)
         result = await self.redis_client.set(task_key, task_json)
         logger.info(f"Task {task_id} stored in Redis with result: {result}")
+
+        # Persist in Postgres (optional)
+        if db_enabled:
+            try:
+                await insert_task(task)
+            except Exception as e:
+                logger.warning(f"Failed to persist task {task_id} in DB: {e}")
 
         # Add task ID to queue - use RPUSH to maintain FIFO order
         queue_result = await self.redis_client.rpush(self.queue_key, task_id)  # type: ignore
@@ -104,6 +114,12 @@ class RedisTaskQueue:
         task_key = self._get_task_key(task_id)
         await self.redis_client.set(task_key, json.dumps(task))
         logger.info(f"Task {task_id} status updated to {status}")
+        # Mirror to DB
+        if db_enabled:
+            try:
+                await update_task(task_id, status=status, error=task.get("error"))
+            except Exception as e:
+                logger.warning(f"Failed to update task {task_id} in DB: {e}")
         return True
 
     async def get_next_task(self) -> str | None:

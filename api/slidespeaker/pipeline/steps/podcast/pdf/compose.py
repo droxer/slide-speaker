@@ -80,9 +80,20 @@ async def compose_podcast_step(file_id: str) -> None:
     try:
         sp = get_storage_provider()
         base_id = file_id
+        # Prefer state.task_id
         if st and isinstance(st, dict) and st.get("task_id"):
             base_id = str(st["task_id"])  # prefer task-id naming
-        object_key = f"{base_id}_podcast.mp3"
+        else:
+            # Try Redis mapping file->task
+            try:
+                task_id_hint = await state_manager.redis_client.get(
+                    state_manager._get_file2task_key(file_id)
+                )
+                if task_id_hint:
+                    base_id = str(task_id_hint)
+            except Exception:
+                pass
+        object_key = f"{base_id}.mp3"
         url = sp.upload_file(str(podcast_path), object_key, "audio/mpeg")
     except Exception as e:
         logger.warning(f"Podcast upload failed: {e}")

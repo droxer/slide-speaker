@@ -180,7 +180,7 @@ async def from_pdf(
             if step_name == "segment_pdf_content":
                 await pdf_segment_content_step(file_id, file_path, "english")
             elif step_name == "revise_pdf_transcripts":
-                await pdf_revise_transcripts_step(file_id, "english")
+                await pdf_revise_transcripts_step(file_id, "english", task_id=task_id)
             elif step_name == "translate_voice_transcripts":
                 await pdf_translate_voice_step(
                     file_id, source_language="english", target_language=voice_language
@@ -246,6 +246,9 @@ def _slide_step_name(step: str) -> str:
 def _slide_steps(
     generate_avatar: bool,
     generate_subtitles: bool,
+    *,
+    voice_language: str | None = None,
+    subtitle_language: str | None = None,
 ) -> list[str]:
     steps: list[str] = [
         "extract_slides",
@@ -253,8 +256,14 @@ def _slide_steps(
         "analyze_slides",
         "generate_transcripts",
         "revise_transcripts",
-        "generate_audio",
     ]
+    # Translation steps mirror PDF behavior: translate when target differs from English
+    if (voice_language or "english").lower() != "english":
+        steps.append("translate_voice_transcripts")
+    if subtitle_language and subtitle_language.lower() != "english":
+        steps.append("translate_subtitle_transcripts")
+    # Audio and optional avatar
+    steps.append("generate_audio")
     if generate_avatar:
         steps.append("generate_avatar")
     if generate_subtitles:
@@ -286,7 +295,12 @@ async def from_slide(
         await state_manager.mark_cancelled(file_id)
         return
 
-    steps_order = _slide_steps(generate_avatar, generate_subtitles)
+    steps_order = _slide_steps(
+        generate_avatar,
+        generate_subtitles,
+        voice_language=voice_language,
+        subtitle_language=subtitle_language,
+    )
 
     try:
         for step_name in steps_order:
@@ -319,7 +333,9 @@ async def from_slide(
             elif step_name == "generate_transcripts":
                 await generate_transcripts_step(file_id, voice_language)
             elif step_name == "revise_transcripts":
-                await slide_revise_transcripts_step(file_id, voice_language)
+                await slide_revise_transcripts_step(
+                    file_id, voice_language, task_id=task_id
+                )
             elif step_name == "translate_voice_transcripts":
                 await slide_translate_voice_step(
                     file_id, source_language="english", target_language=voice_language

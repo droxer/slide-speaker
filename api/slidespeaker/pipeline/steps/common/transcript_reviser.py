@@ -20,6 +20,7 @@ async def revise_transcripts_common(
     state_key: str,
     get_transcripts_func: Callable[[str], Any],
     language: str = "english",
+    task_id: str | None = None,
 ) -> None:
     """
     Revise transcripts using shared logic.
@@ -101,12 +102,6 @@ async def revise_transcripts_common(
 
             storage_provider = get_storage_provider()
             # Prefer task-id-based filename when available
-            state2 = await state_manager.get_state(file_id)
-            task_id = None
-            if state2 and isinstance(state2, dict):
-                task_id = state2.get("task_id") or (state2.get("task") or {}).get(
-                    "task_id"
-                )
             base_id = task_id if isinstance(task_id, str) and task_id else file_id
             object_key = f"{base_id}_transcript.md"
             url = storage_provider.upload_bytes(

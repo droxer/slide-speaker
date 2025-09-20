@@ -25,20 +25,37 @@ async def get_final_markdown_transcript_by_task(task_id: str) -> Response:
     """
     from slidespeaker.configs.config import get_storage_provider
     from slidespeaker.core.task_queue import task_queue
+    from slidespeaker.repository.task import get_task as db_get_task
 
     # Resolve file_id and load state (prefer task-based state)
-    task = await task_queue.get_task(task_id)
-    if not task:
-        raise HTTPException(status_code=404, detail="Task not found")
-    file_id = (task.get("kwargs") or {}).get("file_id") or task.get("file_id")
-    if not file_id or not isinstance(file_id, str):
-        raise HTTPException(status_code=404, detail="File not found for task")
-
     state = await state_manager.get_state_by_task(task_id)
+    file_id: str | None = None
+    if not state:
+        # DB fallback: task_id -> file_id
+        row = await db_get_task(task_id)
+        file_id = str(row["file_id"]) if row and row.get("file_id") else None
+        if file_id:
+            state = await state_manager.get_state(file_id)
+    # Queue fallback: task payload mapping
+    if not state:
+        task = await task_queue.get_task(task_id)
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found")
+        file_id = (task.get("kwargs") or {}).get("file_id") or task.get("file_id")
+        if not file_id or not isinstance(file_id, str):
+            raise HTTPException(status_code=404, detail="File not found for task")
+        state = await state_manager.get_state(file_id)
     if state and "steps" in state:
         steps = state["steps"]
-        # Prefer podcast conversation when available
-        pod = steps.get("generate_podcast_script")
+        # Prefer translated podcast conversation when available; else original
+        pod = None
+        pod_translated = steps.get("translate_podcast_script")
+        pod_original = steps.get("generate_podcast_script")
+        if pod_translated and pod_translated.get("status") == "completed":
+            pod = pod_translated
+        elif pod_original and pod_original.get("status") == "completed":
+            pod = pod_original
+
         if pod and pod.get("status") == "completed":
             data = pod.get("data") or []
             if isinstance(data, list) and data:
@@ -150,7 +167,19 @@ async def get_final_markdown_transcript_by_task(task_id: str) -> Response:
 
     # Storage fallback
     sp = get_storage_provider()
-    for key in (f"{task_id}_transcript.md", f"{file_id}_transcript.md"):
+    # Prefer task-id-based transcript filename first; fall back to file-id if known
+    fallback_keys = [
+        f"{task_id}_transcript.md",
+        f"{task_id}_podcast_transcript.md",  # Podcast-specific transcript
+    ]
+    if file_id:
+        fallback_keys.extend(
+            [
+                f"{file_id}_transcript.md",
+                f"{file_id}_podcast_transcript.md",  # Podcast-specific transcript
+            ]
+        )
+    for key in fallback_keys:
         try:
             if sp.file_exists(key):
                 data = sp.download_bytes(key)

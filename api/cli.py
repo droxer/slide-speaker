@@ -7,6 +7,7 @@ This tool provides command-line interface for:
 - Cancelling tasks
 - Deleting task state
 - Viewing task details
+- Migrating tasks from Redis to PostgreSQL
 """
 
 import argparse

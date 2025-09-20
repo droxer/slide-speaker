@@ -49,12 +49,14 @@ class RedisStateManager:
         filename: str | None = None,
         voice_language: str = "english",
         subtitle_language: str | None = None,
+        transcript_language: str | None = None,
         video_resolution: str = "hd",
         generate_avatar: bool = True,
         generate_subtitles: bool = True,
         generate_video: bool = True,
         generate_podcast: bool = False,
         task_id: str | None = None,
+        source_type: str | None = None,
     ) -> dict[str, Any]:
         """Create initial state for a file processing task"""
         # Initialize steps based on file type
@@ -91,7 +93,12 @@ class RedisStateManager:
                         "generate_podcast_script": {"status": "pending", "data": None},
                     }
                 )
-                if voice_language.lower() != "english":
+                # Include transcript translation when transcript_language (preferred)
+                # or voice_language differs from English
+                effective_transcript_lang = (
+                    transcript_language or voice_language or "english"
+                ).lower()
+                if effective_transcript_lang != "english":
                     steps["translate_podcast_script"] = {
                         "status": "pending",
                         "data": None,
@@ -165,7 +172,7 @@ class RedisStateManager:
                 )
 
         # Derive explicit task_type and source for UI and analytics
-        source = "pdf" if file_ext.lower() == ".pdf" else "slides"
+        source = source_type or ("pdf" if file_ext.lower() == ".pdf" else "slides")
         if generate_video and generate_podcast:
             task_type = "both"
         elif generate_podcast and not generate_video:
@@ -179,8 +186,10 @@ class RedisStateManager:
             "file_ext": file_ext,
             "filename": filename,
             "source": source,
+            "source_type": source,
             "voice_language": voice_language,
             "subtitle_language": subtitle_language,
+            "podcast_transcript_language": transcript_language,
             "video_resolution": video_resolution,
             "generate_avatar": generate_avatar,
             "generate_subtitles": generate_subtitles,

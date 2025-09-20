@@ -110,6 +110,7 @@ async def process_task(task_id: str) -> bool:
     logger.info(
         f"Task {task_id} retrieved from Redis with status: {task.get('status', 'unknown')}"
     )
+    logger.info(f"Full task data: {task}")
 
     if task["status"] == "cancelled":
         logger.info(f"Task {task_id} was cancelled, skipping processing")
@@ -126,6 +127,9 @@ async def process_task(task_id: str) -> bool:
 
         # Extract task parameters
         kwargs = task.get("kwargs", {})
+        # task_type indicates requested output mode. If not explicitly provided,
+        # we will honor the explicit generate_* flags from kwargs as-is.
+        task_type = task.get("task_type")
         file_id = kwargs.get("file_id")
         file_path = kwargs.get("file_path")
         file_ext = kwargs.get("file_ext")
@@ -138,8 +142,38 @@ async def process_task(task_id: str) -> bool:
         generate_video = kwargs.get("generate_video", True)
 
         logger.info(
+            f"Raw task parameters - task_type: {task_type}, "
+            f"kwargs generate_video: {kwargs.get('generate_video')}, "
+            f"kwargs generate_podcast: {kwargs.get('generate_podcast')}"
+        )
+
+        # Override generate_podcast and generate_video only when task_type is explicitly provided
+        # - "podcast": podcast only
+        # - "both": podcast + video
+        # - "video": video only
+        # When task_type is missing/None, respect incoming generate_* flags.
+        if task_type is not None:
+            if task_type == "podcast":
+                generate_podcast = True
+                generate_video = False
+            elif task_type == "both":
+                generate_podcast = True
+                generate_video = True
+            else:  # treat any other explicit value as "video"
+                generate_podcast = False
+                generate_video = True
+
+        logger.info(
+            "After task_type processing - task_type: {}, generate_video: {}, generate_podcast: {}",
+            task_type,
+            generate_video,
+            generate_podcast,
+        )
+
+        logger.info(
             f"Task {task_id} parameters extracted - file_id: {file_id}, "
-            f"file_ext: {file_ext}, voice_language: {voice_language}, "
+            f"file_ext: {file_ext}, task_type: {task_type}, "
+            f"voice_language: {voice_language}, "
             f"subtitle_language: {subtitle_language}, "
             f"generate_avatar: {generate_avatar}, "
             f"generate_podcast: {generate_podcast}, "
@@ -172,6 +206,7 @@ async def process_task(task_id: str) -> bool:
             file_id=file_id,
             file_path=Path(file_path),
             file_ext=file_ext,
+            source_type=kwargs.get("source_type"),
             voice_language=voice_language,
             subtitle_language=subtitle_language,
             transcript_language=transcript_language,

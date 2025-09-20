@@ -62,10 +62,33 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         file_bytes = base64.b64decode(file_data)
 
         file_ext = Path(filename).suffix.lower()
-        # If this is a PDF podcast request and client didn't specify generate_video,
-        # prefer podcast-only to avoid accidental video from default True.
-        if file_ext == ".pdf" and generate_podcast and ("generate_video" not in body):
-            generate_video = False
+        # Determine source_type from request or by extension and validate
+        source_type = body.get("source_type")
+        if not source_type:
+            source_type = (
+                "pdf"
+                if file_ext == ".pdf"
+                else ("slides" if file_ext in [".pptx", ".ppt"] else None)
+            )
+        # Validate provided/derived source_type strictly
+        if source_type not in ("pdf", "slides"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid source_type: {source_type}. Must be 'pdf' or 'slides'.",
+            )
+        # For PDF files, if user selects podcast generation, default to podcast-only unless
+        # they explicitly request video as well. This prevents accidental video generation
+        # when user only wants podcast.
+        if file_ext == ".pdf" and generate_podcast:
+            logger.info(
+                f"PDF podcast request: generate_video={body.get('generate_video')}, "
+                f"will generate video: {generate_video}"
+            )
+            # If generate_video is not explicitly set to True, disable video generation
+            # This covers cases where generate_video is False, None, or not present
+            if body.get("generate_video") is not True:
+                generate_video = False
+                logger.info("Disabled video generation for podcast-only request")
         if file_ext not in [".pdf", ".pptx", ".ppt"]:
             raise HTTPException(
                 status_code=400, detail="Only PDF and PowerPoint files are supported"
@@ -101,13 +124,44 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         async with aiofiles.open(file_path, "wb") as out_file:
             await out_file.write(file_bytes)
 
+        # Normalize task_type and flags consistently
+        # Prefer explicit task_type from request body when present; otherwise derive from flags
+        req_task_type = (body.get("task_type") or "").lower() or None
+        if req_task_type in ("video", "podcast", "both"):
+            task_type = req_task_type
+        else:
+            task_type = (
+                "both"
+                if (generate_video and generate_podcast)
+                else (
+                    "podcast" if (generate_podcast and not generate_video) else "video"
+                )
+            )
+
+        # Enforce flags based on task_type, especially for PDFs
+        if task_type == "podcast":
+            generate_podcast = True
+            generate_video = False
+        elif task_type == "both":
+            generate_podcast = True
+            generate_video = True
+        else:  # video
+            generate_podcast = False
+            generate_video = True
+
+        logger.info(
+            f"Upload normalization - source_type: {source_type}, task_type: {task_type}, "
+            f"generate_video: {generate_video}, generate_podcast: {generate_podcast}"
+        )
+
         # Submit task to Redis task queue first (so we can store state task-first)
         task_id = await task_queue.submit_task(
-            "process_presentation",
+            task_type,
             file_id=file_id,
             file_path=str(file_path),
             file_ext=file_ext,
             filename=filename,
+            source_type=source_type,
             voice_language=voice_language,
             subtitle_language=subtitle_language,
             transcript_language=transcript_language,
@@ -126,21 +180,16 @@ async def upload_file(request: Request) -> dict[str, str | None]:
             filename,
             voice_language,
             subtitle_language,
+            transcript_language,
             video_resolution,
             generate_avatar,
             generate_subtitles,
             generate_video,
             generate_podcast,
             task_id=task_id,
+            source_type=source_type,
         )
-        # Store transcript language hint for podcast in state if provided
-        try:
-            st = await state_manager.get_state(file_id)
-            if st is not None and transcript_language is not None:
-                st["podcast_transcript_language"] = transcript_language
-                await state_manager.save_state(file_id, st)
-        except Exception:
-            pass
+        # create_state already persists podcast_transcript_language when provided
 
         logger.info(
             f"File uploaded: {file_id}, type: {file_ext}, task submitted: {task_id}"
