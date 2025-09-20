@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { getDownloads as apiGetDownloads, headTaskVideo as apiHeadTaskVideo, cancelRun as apiCancelRun, purgeTask as apiPurgeTask } from '../services/client';
+import { headTaskVideo as apiHeadTaskVideo, cancelRun as apiCancelRun, purgeTask as apiPurgeTask } from '../services/client';
 import { useTasksQuery, useStatsQuery, useSearchTasksQuery, useVttQuery, getCachedDownloads } from '../services/queries';
 import '../styles/task-monitor.scss';
 import AudioPlayer from './AudioPlayer';
@@ -41,6 +41,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
   const [error, setError] = useState<string | null>(null);
   const [queueUnavailable, setQueueUnavailable] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [tasksPerPage] = useState(10);
@@ -170,15 +171,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
         }
       }
     } catch {}
-    // When opening, fetch downloads to detect podcast/subtitles/video availability
-    ;(async () => {
-      try {
-        await queryClient.fetchQuery({ queryKey: ['downloads', taskId], queryFn: () => apiGetDownloads(taskId) });
-        // Prefetch handled by shared prefetchTaskPreview; nothing else here
-      } catch (_e) {
-        /* ignore */
-      }
-    })();
+    // When opening, rely on TaskCard's React Query hook to fetch downloads.
   };
 
   
@@ -357,9 +350,18 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     }
   }, [selectedTaskForPreview, modalPreviewMode]);
 
-  // Fetch paged task list (lightweight)
-  // React Query: tasks list
-  const tasksQuery = useTasksQuery({ status: statusFilter, page: currentPage, limit: tasksPerPage });
+  // Fetch paged task list (lightweight) with smart polling only when active tasks exist
+  const tasksQuery = useTasksQuery(
+    { status: statusFilter, page: currentPage, limit: tasksPerPage },
+    {
+      refetchInterval: (query: any) => {
+        const data = (query?.state?.data as Task[] | undefined) || [];
+        const hasActive = data.some((t) => t.status === 'processing' || t.status === 'queued');
+        return hasActive ? 15000 : false;
+      },
+      staleTime: 10000,
+    }
+  );
 
   // Bridge query state to existing local state fields
   useEffect(() => {
@@ -374,8 +376,8 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     }
   }, [tasksQuery.isError]);
   useEffect(() => {
-    if (tasksQuery.data) {
-      setTasks(tasksQuery.data);
+    if (Array.isArray(tasksQuery.data)) {
+      setTasks(tasksQuery.data as Task[]);
       setQueueUnavailable(false);
     }
   }, [tasksQuery.data]);
@@ -389,12 +391,7 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
 
   // Lightweight polling while tasks are running to keep UI in sync (list only)
   // Lightweight polling while tasks are running
-  useEffect(() => {
-    const hasActive = tasks.some(t => t.status === 'processing' || t.status === 'queued');
-    if (!hasActive) return;
-    const id = setInterval(() => { tasksQuery.refetch(); }, 15000);
-    return () => clearInterval(id);
-  }, [tasks, tasksQuery]);
+  // React Query handles polling via refetchInterval above
 
   // Initial load and periodic stats refresh (every 30s)
   // Initial load handled by queries; keep controller cleanup noop
@@ -444,9 +441,14 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
     });
   }, [tasks]);
 
-  // Search tasks via React Query (enabled when query present)
-  const hasSearch = searchQuery.trim().length > 0;
-  const searchTasksQuery = useSearchTasksQuery(searchQuery);
+  // Debounced search to avoid excessive calls while typing
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+  // Search tasks via React Query (enabled when debounced query present)
+  const hasSearch = debouncedSearch.length > 0;
+  const searchTasksQuery = useSearchTasksQuery(debouncedSearch);
   useEffect(() => {
     if (!hasSearch) return;
     setLoading(searchTasksQuery.isLoading || searchTasksQuery.isFetching);
@@ -625,9 +627,8 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
   // Handle search
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    // Submit triggers search refetch; queries auto-run on input change too
-    if (searchQuery.trim()) searchTasksQuery.refetch();
-    else tasksQuery.refetch();
+    // On submit, sync debounced input immediately
+    setDebouncedSearch(searchQuery.trim());
   };
 
   // Handle status filter change
@@ -637,10 +638,6 @@ const TaskMonitor: React.FC<TaskMonitorProps> = ({ apiBaseUrl }) => {
   };
 
   // tasksQuery key already depends on currentPage and statusFilter
-
-  useEffect(() => {
-    if (!searchQuery.trim()) tasksQuery.refetch();
-  }, [searchQuery, tasksQuery]);
 
   if (loading && tasks.length === 0) {
     return (

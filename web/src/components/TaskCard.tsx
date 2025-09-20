@@ -176,23 +176,23 @@ const TaskCard: React.FC<Props> = ({
             </div>
           )}
 
-          {/* Downloads toggle */}
-          <div className="downloads-toggle">
-            <button
-              onClick={() => onToggleDownloads(task.task_id)}
-              className="more-toggle"
-              aria-expanded={isExpanded}
-              aria-controls={`downloads-${task.task_id}`}
-              type="button"
-            >
-              {isExpanded ? 'Hide' : 'More'}
-            </button>
-          </div>
-
-          {/* Downloads block */}
-          <div className={`downloads-collapse ${isExpanded ? 'open' : ''}`}>
-            {isExpanded && (
-              <div className="resource-links" id={`downloads-${task.task_id}`}>
+          {/* Downloads toggle + block (native disclosure) */}
+          <details
+            className="downloads-panel"
+            open={isExpanded}
+            onToggle={() => onToggleDownloads(task.task_id)}
+          >
+            <summary className="toggle-summary" aria-controls={`downloads-${task.task_id}`} aria-expanded={isExpanded}>
+              <span className="dl-icon" aria-hidden>⤓</span>
+              <span className="toggle-text">
+                {(() => {
+                  const count = Array.isArray(dlItems) ? dlItems.length : undefined;
+                  return `Downloads${!isExpanded && count ? ` (${count})` : ''}`;
+                })()}
+              </span>
+              <span className="chev" aria-hidden>▾</span>
+            </summary>
+            <div className="resource-links" id={`downloads-${task.task_id}`}>
                 {(dlItems?.some((d) => d.type === 'video') ?? isVideoTask) && (
                   <div className="url-copy-row">
                     <span className="resource-label-inline">Video</span>
@@ -229,9 +229,8 @@ const TaskCard: React.FC<Props> = ({
                     </div>
                   </>
                 )}
-              </div>
-            )}
-          </div>
+            </div>
+          </details>
         </>
       </div>
 

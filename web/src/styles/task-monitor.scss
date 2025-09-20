@@ -219,6 +219,16 @@
     &.danger.failed { border-left-color: #ef4444; }
     &.activity { border-left-color: #8b5cf6; }
   }
+
+  /* Downloads toggle redesign */
+  .downloads-panel { margin-top: 8px; }
+  .toggle-summary { list-style: none; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: #1d4ed8; font-size: 13px; }
+  .toggle-summary::-webkit-details-marker { display: none; }
+  .toggle-summary::marker { content: ''; }
+  .toggle-summary:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; border-radius: 6px; }
+  .toggle-summary .dl-icon { font-size: 14px; line-height: 1; }
+  .downloads-panel .chev { display: inline-block; transition: transform 0.2s ease; }
+  .downloads-panel[open] .chev { transform: rotate(180deg); }
   
   .stat-icon {
     width: 28px;

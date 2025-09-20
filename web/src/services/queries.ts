@@ -11,8 +11,14 @@ export const queries = {
   vtt: (taskId: string, language?: string) => (language ? (['vtt', taskId, language] as const) : (['vtt', taskId] as const)),
 };
 
-export const useTasksQuery = (filters: { status: string; page: number; limit: number }) => {
-  return useQuery({
+export const useTasksQuery = (
+  filters: { status: string; page: number; limit: number },
+  opts?: {
+    refetchInterval?: number | false | ((q: any) => number | false);
+    staleTime?: number;
+  }
+) => {
+  return useQuery<Task[]>({
     queryKey: queries.tasks(filters),
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -23,6 +29,8 @@ export const useTasksQuery = (filters: { status: string; page: number; limit: nu
       const real = (res.tasks || []).filter((t: any) => typeof t?.task_id === 'string' && !t.task_id.startsWith('state_'));
       return real as Task[];
     },
+    refetchInterval: opts?.refetchInterval,
+    staleTime: opts?.staleTime ?? 10000,
   });
 };
 
