@@ -8,7 +8,6 @@ instead of failing requests when Redis is down.
 from __future__ import annotations
 
 import time
-from contextlib import suppress
 from time import perf_counter
 from typing import Any
 
@@ -72,9 +71,5 @@ async def health() -> dict[str, Any]:
         info["db"]["latency_ms"] = round(db_latency_ms, 2)
     if db_error:
         info["db"]["error"] = db_error
-
-    # Also include non-sensitive connection info for visibility
-    with suppress(Exception):
-        info["redis"]["connection"] = RedisConfig.get_connection_info()
 
     return info

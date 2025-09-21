@@ -14,6 +14,14 @@ from slidespeaker.configs.db import db_enabled
 from slidespeaker.repository.task import insert_task, update_task
 
 
+def _filter_db_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Filter out sensitive information from kwargs before storing in database."""
+    filtered = kwargs.copy()
+    # Remove sensitive fields that shouldn't be persisted in database
+    filtered.pop("file_path", None)
+    return filtered
+
+
 class RedisTaskQueue:
     """Redis-based task queue for distributed processing of presentation tasks"""
 
@@ -53,7 +61,10 @@ class RedisTaskQueue:
         # Persist in Postgres (optional)
         if db_enabled:
             try:
-                await insert_task(task)
+                # Filter out sensitive information before storing in database
+                db_task = task.copy()
+                db_task["kwargs"] = _filter_db_kwargs(task.get("kwargs", {}))
+                await insert_task(db_task)
             except Exception as e:
                 logger.warning(f"Failed to persist task {task_id} in DB: {e}")
 
