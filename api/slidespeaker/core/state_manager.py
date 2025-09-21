@@ -41,6 +41,154 @@ class RedisStateManager:
     def _get_file2tasks_set_key(self, file_id: str) -> str:
         return f"ss:file2tasks:{file_id}"
 
+    def _create_pdf_steps(
+        self,
+        file_ext: str,
+        voice_language: str = "english",
+        subtitle_language: str | None = None,
+        transcript_language: str | None = None,
+        generate_subtitles: bool = True,
+        generate_video: bool = True,
+        generate_podcast: bool = False,
+    ) -> dict[str, dict[str, Any]]:
+        """Create steps for PDF processing"""
+        # PDF-specific steps
+        steps = {
+            "segment_pdf_content": {"status": "pending", "data": None},
+            "revise_pdf_transcripts": {"status": "pending", "data": None},
+        }
+
+        # Video path (optional)
+        if generate_video:
+            steps.update(
+                {
+                    "generate_pdf_chapter_images": {
+                        "status": "pending",
+                        "data": None,
+                    },
+                    "generate_pdf_audio": {"status": "pending", "data": None},
+                    "generate_pdf_subtitles": {
+                        "status": "pending" if generate_subtitles else "skipped",
+                        "data": None,
+                    },
+                    "compose_video": {"status": "pending", "data": None},
+                }
+            )
+
+        # Optional podcast steps
+        if generate_podcast:
+            steps.update(
+                {
+                    "generate_podcast_script": {"status": "pending", "data": None},
+                }
+            )
+            # Include transcript translation when transcript_language (preferred)
+            # or voice_language differs from English
+            effective_transcript_lang = (
+                transcript_language or voice_language or "english"
+            ).lower()
+            if effective_transcript_lang != "english":
+                steps["translate_podcast_script"] = {
+                    "status": "pending",
+                    "data": None,
+                }
+            steps.update(
+                {
+                    "generate_podcast_audio": {"status": "pending", "data": None},
+                    "compose_podcast": {"status": "pending", "data": None},
+                }
+            )
+
+        # Add translation steps if needed
+        if voice_language.lower() != "english":
+            steps["translate_voice_transcripts"] = {
+                "status": "pending",
+                "data": None,
+            }
+        if subtitle_language and subtitle_language.lower() != "english":
+            steps["translate_subtitle_transcripts"] = {
+                "status": "pending",
+                "data": None,
+            }
+
+        return steps
+
+    def _create_presentation_steps(
+        self,
+        voice_language: str = "english",
+        subtitle_language: str | None = None,
+        generate_avatar: bool = True,
+        generate_subtitles: bool = True,
+    ) -> dict[str, dict[str, Any]]:
+        """Create steps for presentation processing"""
+        steps = {
+            "extract_slides": {"status": "pending", "data": None},
+            "convert_slides_to_images": {"status": "pending", "data": None},
+            "analyze_slide_images": {
+                "status": "pending" if config.enable_visual_analysis else "skipped",
+                "data": None,
+            },
+            "generate_transcripts": {"status": "pending", "data": None},
+            "revise_transcripts": {"status": "pending", "data": None},
+            "generate_audio": {"status": "pending", "data": None},
+            "generate_avatar_videos": {
+                "status": "pending" if generate_avatar else "skipped",
+                "data": None,
+            },
+            "generate_subtitles": {
+                "status": "pending",  # Always generate subtitles
+                "data": None,
+            },
+            "compose_video": {"status": "pending", "data": None},
+        }
+
+        # Add translation steps
+        if voice_language.lower() != "english":
+            steps["translate_voice_transcripts"] = {
+                "status": "pending",
+                "data": None,
+            }
+        if subtitle_language and subtitle_language.lower() != "english":
+            steps["translate_subtitle_transcripts"] = {
+                "status": "pending",
+                "data": None,
+            }
+
+        # Only include subtitle script generation steps if languages are different
+        # Default to audio language if subtitle language is not specified
+        effective_subtitle_language = (
+            subtitle_language if subtitle_language is not None else voice_language
+        )
+        if voice_language != effective_subtitle_language:
+            steps.update(
+                {
+                    "generate_subtitle_transcripts": {
+                        "status": "pending",
+                        "data": None,
+                    },
+                }
+            )
+
+        return steps
+
+    def _determine_task_type_and_source(
+        self,
+        file_ext: str,
+        generate_video: bool,
+        generate_podcast: bool,
+        source_type: str | None = None,
+    ) -> tuple[str, str]:
+        """Determine task type and source for UI and analytics"""
+        source = source_type or ("pdf" if file_ext.lower() == ".pdf" else "slides")
+        if generate_video and generate_podcast:
+            task_type = "both"
+        elif generate_podcast and not generate_video:
+            task_type = "podcast"
+        else:
+            task_type = "video"
+
+        return task_type, source
+
     async def create_state(
         self,
         file_id: str,
@@ -64,121 +212,27 @@ class RedisStateManager:
             # PDF-specific steps
             # Avatar is not applicable for PDF
             generate_avatar = False
-            steps = {
-                "segment_pdf_content": {"status": "pending", "data": None},
-                "revise_pdf_transcripts": {"status": "pending", "data": None},
-            }
-
-            # Video path (optional)
-            if generate_video:
-                steps.update(
-                    {
-                        "generate_pdf_chapter_images": {
-                            "status": "pending",
-                            "data": None,
-                        },
-                        "generate_pdf_audio": {"status": "pending", "data": None},
-                        "generate_pdf_subtitles": {
-                            "status": "pending" if generate_subtitles else "skipped",
-                            "data": None,
-                        },
-                        "compose_video": {"status": "pending", "data": None},
-                    }
-                )
-
-            # Optional podcast steps
-            if generate_podcast:
-                steps.update(
-                    {
-                        "generate_podcast_script": {"status": "pending", "data": None},
-                    }
-                )
-                # Include transcript translation when transcript_language (preferred)
-                # or voice_language differs from English
-                effective_transcript_lang = (
-                    transcript_language or voice_language or "english"
-                ).lower()
-                if effective_transcript_lang != "english":
-                    steps["translate_podcast_script"] = {
-                        "status": "pending",
-                        "data": None,
-                    }
-                steps.update(
-                    {
-                        "generate_podcast_audio": {"status": "pending", "data": None},
-                        "compose_podcast": {"status": "pending", "data": None},
-                    }
-                )
-
-            # Add translation steps if needed
-            if voice_language.lower() != "english":
-                steps["translate_voice_transcripts"] = {
-                    "status": "pending",
-                    "data": None,
-                }
-            if subtitle_language and subtitle_language.lower() != "english":
-                steps["translate_subtitle_transcripts"] = {
-                    "status": "pending",
-                    "data": None,
-                }
+            steps = self._create_pdf_steps(
+                file_ext,
+                voice_language,
+                subtitle_language,
+                transcript_language,
+                generate_subtitles,
+                generate_video,
+                generate_podcast,
+            )
+            current_step = "segment_pdf_content"
         else:
             # Presentation-specific steps (.ppt, .pptx, etc.)
-            steps = {
-                "extract_slides": {"status": "pending", "data": None},
-                "convert_slides_to_images": {"status": "pending", "data": None},
-                "analyze_slide_images": {
-                    "status": "pending" if config.enable_visual_analysis else "skipped",
-                    "data": None,
-                },
-                "generate_transcripts": {"status": "pending", "data": None},
-                "revise_transcripts": {"status": "pending", "data": None},
-                "generate_audio": {"status": "pending", "data": None},
-                "generate_avatar_videos": {
-                    "status": "pending" if generate_avatar else "skipped",
-                    "data": None,
-                },
-                "generate_subtitles": {
-                    "status": "pending",  # Always generate subtitles
-                    "data": None,
-                },
-                "compose_video": {"status": "pending", "data": None},
-            }
-
-            # Add translation steps
-            if voice_language.lower() != "english":
-                steps["translate_voice_transcripts"] = {
-                    "status": "pending",
-                    "data": None,
-                }
-            if subtitle_language and subtitle_language.lower() != "english":
-                steps["translate_subtitle_transcripts"] = {
-                    "status": "pending",
-                    "data": None,
-                }
-
-            # Only include subtitle script generation steps if languages are different
-            # Default to audio language if subtitle language is not specified
-            effective_subtitle_language = (
-                subtitle_language if subtitle_language is not None else voice_language
+            steps = self._create_presentation_steps(
+                voice_language, subtitle_language, generate_avatar, generate_subtitles
             )
-            if voice_language != effective_subtitle_language:
-                steps.update(
-                    {
-                        "generate_subtitle_transcripts": {
-                            "status": "pending",
-                            "data": None,
-                        },
-                    }
-                )
+            current_step = "extract_slides"
 
         # Derive explicit task_type and source for UI and analytics
-        source = source_type or ("pdf" if file_ext.lower() == ".pdf" else "slides")
-        if generate_video and generate_podcast:
-            task_type = "both"
-        elif generate_podcast and not generate_video:
-            task_type = "podcast"
-        else:
-            task_type = "video"
+        task_type, source = self._determine_task_type_and_source(
+            file_ext, generate_video, generate_podcast, source_type
+        )
 
         state: dict[str, Any] = {
             "file_id": file_id,
@@ -197,9 +251,7 @@ class RedisStateManager:
             "generate_podcast": generate_podcast,
             "task_type": task_type,
             "status": "uploaded",
-            "current_step": "segment_pdf_content"
-            if file_ext.lower() == ".pdf"
-            else "extract_slides",
+            "current_step": current_step,
             "steps": steps,
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat(),

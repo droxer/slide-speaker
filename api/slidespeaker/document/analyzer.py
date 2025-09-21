@@ -6,7 +6,7 @@ It uses AI to understand the content structure and create meaningful segments
 for presentation generation.
 """
 
-from typing import Any
+from typing import Any, cast
 
 from loguru import logger
 from PyPDF2 import PdfReader
@@ -295,6 +295,76 @@ class PDFAnalyzer:
         )
         return chapters
 
+    def _extract_json_from_response(self, content: str) -> dict[str, Any] | None:
+        """Extract JSON from AI response content"""
+        try:
+            import json
+
+            # Extract JSON from response
+            start = content.find("{")
+            end = content.rfind("}") + 1
+            if start != -1 and end > start:
+                json_str = content[start:end]
+                return cast(dict[str, Any], json.loads(json_str))
+        except Exception as e:
+            print(f"Error parsing JSON from response: {e}")
+        return None
+
+    async def _generate_chapter_script(
+        self, chapter: dict[str, Any], language: str
+    ) -> str:
+        """Generate comprehensive script for a chapter"""
+        # Combine title, description, and key points for comprehensive script generation
+        content_for_script = f"""Chapter Topic: {chapter.get("title", "")}
+Chapter Description: {chapter.get("description", "")}
+"""
+        if chapter.get("key_points"):
+            key_points_text = "\n".join(
+                [f"- {point}" for point in chapter["key_points"]]
+            )
+            content_for_script += f"""
+
+Key Points to Cover in Detail:
+{key_points_text}
+"""
+        content_for_script += """
+Please provide a detailed, comprehensive explanation of this chapter topic,
+thoroughly covering all key points with relevant examples where appropriate.
+"""
+
+        script = await self.transcript_generator.generate_transcript(
+            content_for_script, language=language
+        )
+        return script
+
+    def _process_chapter_fields(self, chapter: dict[str, Any]) -> dict[str, Any]:
+        """Ensure chapter has all required fields with proper defaults"""
+        # Ensure key_points exists
+        if "key_points" not in chapter:
+            chapter["key_points"] = []
+        return chapter
+
+    async def _process_chapters_with_scripts(
+        self, base_chapters: list[dict[str, Any]], language: str
+    ) -> list[dict[str, Any]]:
+        """Process chapters to ensure they have all required fields and scripts"""
+        chapters_with_scripts = []
+        for chapter in base_chapters:
+            # Ensure key_points exists
+            chapter = self._process_chapter_fields(chapter)
+
+            # If the model already provided a script, keep it as-is
+            provided_script = str(chapter.get("script", "") or "").strip()
+            if not provided_script:
+                # Otherwise, generate a comprehensive script using the shared script generator
+                chapter["script"] = await self._generate_chapter_script(
+                    chapter, language
+                )
+
+            chapters_with_scripts.append(chapter)
+
+        return chapters_with_scripts
+
     async def _generate_chapters(
         self,
         full_text: str,
@@ -331,58 +401,16 @@ class PDFAnalyzer:
                     {"role": "user", "content": formatted_prompt},
                 ],
             )
+
             # Parse the response
             if content:
-                import json
-
-                # Extract JSON from response
-                start = content.find("{")
-                end = content.rfind("}") + 1
-                if start != -1 and end > start:
-                    json_str = content[start:end]
-                    result = json.loads(json_str)
+                result = self._extract_json_from_response(content)
+                if result:
                     base_chapters = result.get("chapters", [])
-
                     # Process chapters to ensure they have all required fields
-                    chapters_with_scripts = []
-                    for chapter in base_chapters:
-                        # Ensure key_points exists
-                        if "key_points" not in chapter:
-                            chapter["key_points"] = []
-
-                        # If the model already provided a script, keep it as-is
-                        provided_script = str(chapter.get("script", "") or "").strip()
-                        if provided_script:
-                            chapter["script"] = provided_script
-                        else:
-                            # Otherwise, generate a comprehensive script using the shared script generator
-                            # Combine title, description, and key points for comprehensive script generation
-                            content_for_script = f"""Chapter Topic: {chapter.get("title", "")}
-Chapter Description: {chapter.get("description", "")}
-"""
-                            if chapter.get("key_points"):
-                                key_points_text = "\n".join(
-                                    [f"- {point}" for point in chapter["key_points"]]
-                                )
-                                content_for_script += f"""
-
-Key Points to Cover in Detail:
-{key_points_text}
-"""
-                            content_for_script += """
-Please provide a detailed, comprehensive explanation of this chapter topic,
-thoroughly covering all key points with relevant examples where appropriate.
-"""
-
-                            script = (
-                                await self.transcript_generator.generate_transcript(
-                                    content_for_script, language=language
-                                )
-                            )
-                            chapter["script"] = script
-
-                        chapters_with_scripts.append(chapter)
-
+                    chapters_with_scripts = await self._process_chapters_with_scripts(
+                        base_chapters, language
+                    )
                     return chapters_with_scripts
 
             # Fallback if parsing fails

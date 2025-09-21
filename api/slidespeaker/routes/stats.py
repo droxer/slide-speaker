@@ -252,13 +252,8 @@ async def cancel_task(task_id: str) -> dict[str, Any]:
     }
 
 
-@router.delete("/tasks/{task_id}/purge")
-async def purge_task(task_id: str) -> dict[str, Any]:
-    """Permanently delete a task and its state from the system.
-
-    This removes the task entry, queue references, cancellation flags, and associated state.
-    """
-    # Resolve file_id via DB first, then queue/state
+async def _resolve_file_id(task_id: str) -> str | None:
+    """Resolve file_id via DB first, then queue/state"""
     file_id: str | None = None
     from slidespeaker.repository.task import get_task as db_get_task
 
@@ -270,85 +265,151 @@ async def purge_task(task_id: str) -> dict[str, Any]:
         task = await task_queue.get_task(task_id)
         file_id = task.get("kwargs", {}).get("file_id") if task else None
 
-    # Build keys
-    task_key = f"{task_queue.task_prefix}:{task_id}"
-    cancellation_key = f"{task_queue.task_prefix}:{task_id}:cancelled"
-    state_key = f"ss:state:{file_id}" if file_id else None
-    task_state_key = f"ss:state:task:{task_id}"
-    task2file_key = f"ss:task2file:{task_id}"
-    file2task_key = f"ss:file2task:{file_id}" if file_id else None
-    file2tasks_set_key = f"ss:file2tasks:{file_id}" if file_id else None
+    return file_id
 
-    removed = {
-        "queue": 0,
-        "task": 0,
-        "cancel_flag": 0,
-        "state": 0,
-    }
+
+async def _remove_from_queue(task_id: str, removed: dict[str, int]) -> None:
+    """Remove task from queue (all occurrences)"""
+    try:
+        removed_count = await task_queue.redis_client.lrem(
+            task_queue.queue_key,
+            0,
+            task_id,  # type: ignore
+        )
+        removed["queue"] = int(removed_count) if removed_count is not None else 0
+    except Exception:
+        pass
+
+
+async def _delete_task_keys(
+    task_key: str, cancellation_key: str, removed: dict[str, int]
+) -> None:
+    """Delete task key and cancellation flag"""
+    # Delete task key
+    try:
+        del_count = await task_queue.redis_client.delete(task_key)
+        removed["task"] = int(del_count) if del_count is not None else 0
+    except Exception:
+        pass
+
+    # Delete cancellation flag
+    try:
+        del_count = await task_queue.redis_client.delete(cancellation_key)
+        removed["cancel_flag"] = int(del_count) if del_count is not None else 0
+    except Exception:
+        pass
+
+
+async def _handle_state_cleanup(
+    file_id: str | None,
+    task_id: str,
+    state_key: str | None,
+    task_state_key: str,
+    file2task_key: str | None,
+    file2tasks_set_key: str | None,
+    removed: dict[str, int],
+) -> int:
+    """Handle state cleanup and return remaining task count"""
+    # Remove task from file's multi-task set and decide whether to delete file state
+    remaining = 0
+    if file_id:
+        try:
+            remaining = await state_manager.unbind_task(file_id, task_id)
+        except Exception:
+            remaining = 0
+
+    # Delete state key(s) only when no other tasks remain for this file
+    if state_key and remaining == 0:
+        try:
+            del_count = await state_manager.redis_client.delete(state_key)
+            removed["state"] = int(del_count) if del_count is not None else 0
+        except Exception:
+            pass
 
     try:
+        del_count = await state_manager.redis_client.delete(task_state_key)
+        removed["task_state"] = int(del_count) if del_count is not None else 0
+    except Exception:
+        pass
+
+    return remaining
+
+
+async def _delete_task_file_mappings(
+    task2file_key: str,
+    file2task_key: str | None,
+    file2tasks_set_key: str | None,
+    remaining: int,
+    removed: dict[str, int],
+) -> None:
+    """Delete task↔file mappings"""
+    # Delete task↔file mappings
+    try:
+        del_count = await task_queue.redis_client.delete(task2file_key)
+        removed["task2file"] = int(del_count) if del_count is not None else 0
+    except Exception:
+        pass
+
+    if file2task_key and remaining == 0:
+        try:
+            del_count = await task_queue.redis_client.delete(file2task_key)
+            removed["file2task"] = int(del_count) if del_count is not None else 0
+        except Exception:
+            pass
+
+    # If set is empty, also delete the set key
+    if file2tasks_set_key and remaining == 0:
+        with suppress(Exception):
+            await state_manager.redis_client.delete(file2tasks_set_key)
+
+
+@router.delete("/tasks/{task_id}/purge")
+async def purge_task(task_id: str) -> dict[str, Any]:
+    """Permanently delete a task and its state from the system.
+
+    This removes the task entry, queue references, cancellation flags, and associated state.
+    """
+    try:
+        # Resolve file_id via DB first, then queue/state
+        file_id = await _resolve_file_id(task_id)
+
+        # Build keys
+        task_key = f"{task_queue.task_prefix}:{task_id}"
+        cancellation_key = f"{task_queue.task_prefix}:{task_id}:cancelled"
+        state_key = f"ss:state:{file_id}" if file_id else None
+        task_state_key = f"ss:state:task:{task_id}"
+        task2file_key = f"ss:task2file:{task_id}"
+        file2task_key = f"ss:file2task:{file_id}" if file_id else None
+        file2tasks_set_key = f"ss:file2tasks:{file_id}" if file_id else None
+
+        removed = {
+            "queue": 0,
+            "task": 0,
+            "cancel_flag": 0,
+            "state": 0,
+        }
+
         # Remove from queue (all occurrences)
-        try:
-            removed_count = await task_queue.redis_client.lrem(
-                task_queue.queue_key,
-                0,
-                task_id,  # type: ignore
-            )
-            removed["queue"] = int(removed_count) if removed_count is not None else 0
-        except Exception:
-            pass
+        await _remove_from_queue(task_id, removed)
 
-        # Delete task key
-        try:
-            del_count = await task_queue.redis_client.delete(task_key)
-            removed["task"] = int(del_count) if del_count is not None else 0
-        except Exception:
-            pass
+        # Delete task key and cancellation flag
+        await _delete_task_keys(task_key, cancellation_key, removed)
 
-        # Delete cancellation flag
-        try:
-            del_count = await task_queue.redis_client.delete(cancellation_key)
-            removed["cancel_flag"] = int(del_count) if del_count is not None else 0
-        except Exception:
-            pass
-
-        # Remove task from file's multi-task set and decide whether to delete file state
-        remaining = 0
-        if file_id:
-            try:
-                remaining = await state_manager.unbind_task(file_id, task_id)
-            except Exception:
-                remaining = 0
-
-        # Delete state key(s) only when no other tasks remain for this file
-        if state_key and remaining == 0:
-            try:
-                del_count = await state_manager.redis_client.delete(state_key)
-                removed["state"] = int(del_count) if del_count is not None else 0
-            except Exception:
-                pass
-        try:
-            del_count = await state_manager.redis_client.delete(task_state_key)
-            removed["task_state"] = int(del_count) if del_count is not None else 0
-        except Exception:
-            pass
+        # Handle state cleanup
+        remaining = await _handle_state_cleanup(
+            file_id,
+            task_id,
+            state_key,
+            task_state_key,
+            file2task_key,
+            file2tasks_set_key,
+            removed,
+        )
 
         # Delete task↔file mappings
-        try:
-            del_count = await task_queue.redis_client.delete(task2file_key)
-            removed["task2file"] = int(del_count) if del_count is not None else 0
-        except Exception:
-            pass
-        if file2task_key and remaining == 0:
-            try:
-                del_count = await task_queue.redis_client.delete(file2task_key)
-                removed["file2task"] = int(del_count) if del_count is not None else 0
-            except Exception:
-                pass
-        # If set is empty, also delete the set key
-        if file2tasks_set_key and remaining == 0:
-            with suppress(Exception):
-                await state_manager.redis_client.delete(file2tasks_set_key)
+        await _delete_task_file_mappings(
+            task2file_key, file2task_key, file2tasks_set_key, remaining, removed
+        )
 
         # Also remove from DB
         with suppress(Exception):
