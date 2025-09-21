@@ -8,7 +8,6 @@ import VideoPlayer from './VideoPlayer';
 import PodcastPlayer from './PodcastPlayer';
 import TaskCard from './TaskCard';
 import PreviewModal from './PreviewModal';
-// import { getStepLabel } from '../utils/stepLabels';
 
 // Types for task monitoring
 import type { Task } from '../types';

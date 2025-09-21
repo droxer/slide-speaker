@@ -66,19 +66,19 @@ async def accept_task(
     logger.info(
         f"Initiating AI presentation generation for file: {file_id}, format: {file_ext}, source_type: {src}"
     )
-    logger.info(
+    logger.debug(
         f"Voice language: {voice_language}, Subtitle language: {subtitle_language}"
     )
     # Log options; omit avatar for PDFs to avoid confusion
     if file_ext.lower() == ".pdf":
-        logger.info(
+        logger.debug(
             "Generate subtitles: %s, Generate podcast: %s, Generate video: %s",
             generate_subtitles,
             generate_podcast,
             generate_video,
         )
     else:
-        logger.info(
+        logger.debug(
             "Generate avatar: %s, Generate subtitles: %s, Generate podcast: %s",
             generate_avatar,
             generate_subtitles,

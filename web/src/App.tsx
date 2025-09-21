@@ -1,9 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-// import axios from "axios"; // removed: no direct axios usage
 import { upload as apiUpload, cancelRun as apiCancel, getHealth as apiHealth, getTaskProgress as apiGetProgress, getTranscriptMarkdown as apiGetTranscript, headTaskVideo as apiHeadVideo, getVttText as apiGetVttText } from "./services/client";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import "./styles/app.scss";
-// Ultra-flat design styles
 import "./styles/ultra-flat-overrides.scss";
 import "./styles/subtle-material-overrides.scss";
 import "./styles/classic-overrides.scss";

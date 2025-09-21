@@ -34,13 +34,12 @@ async def segment_content_step(
         # Analyze and segment PDF content
         chapters = await analyzer.analyze_and_segment(str(file_path), language)
 
-        # Log chapter data for debugging
+        # Log chapter data for debugging (reduce verbosity)
         logger.debug(f"Generated {len(chapters)} chapters for file {file_id}")
-        if chapters:
-            logger.debug(
-                f"First chapter keys: {chapters[0].keys() if hasattr(chapters[0], 'keys') else type(chapters[0])}"
-            )
-            logger.debug(f"First chapter sample: {str(chapters[0])[:200]}...")
+        if chapters and len(chapters) > 0:
+            # Only log detailed info for first few chapters to reduce verbosity
+            sample_size = min(3, len(chapters))
+            logger.debug(f"Sample of first {sample_size} chapters for file {file_id}")
 
         # Store chapters in state
         await state_manager.update_step_status(

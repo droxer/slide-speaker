@@ -69,19 +69,20 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
             }
         )
 
-    # Final audio - always check for audio files regardless of task type
-    audio_exists = any(
-        sp.file_exists(k)
-        for k in ([f"{task_id}.mp3"] + final_audio_object_keys(file_id))
-    )
-    if audio_exists:
-        items.append(
-            {
-                "type": "audio",
-                "url": f"/api/tasks/{task_id}/audio",
-                "download_url": f"/api/tasks/{task_id}/audio/download",
-            }
+    # Final audio - only for non-podcast tasks (podcast tasks use separate podcast endpoint)
+    if task_type != "podcast":
+        audio_exists = any(
+            sp.file_exists(k)
+            for k in ([f"{task_id}.mp3"] + final_audio_object_keys(file_id))
         )
+        if audio_exists:
+            items.append(
+                {
+                    "type": "audio",
+                    "url": f"/api/tasks/{task_id}/audio",
+                    "download_url": f"/api/tasks/{task_id}/audio/download",
+                }
+            )
 
     # Podcast MP3 (for podcast-only tasks) - use different endpoint
     if task_type == "podcast":
@@ -176,7 +177,7 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
     # Transcript (Markdown) always linkable; handler decides availability
     items.append(
         {
-            "type": "transcript_markdown",
+            "type": "transcript",
             "url": f"/api/tasks/{task_id}/transcripts/markdown",
         }
     )

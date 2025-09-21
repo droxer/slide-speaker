@@ -286,7 +286,7 @@ async def from_slide(
     logger.info(
         f"Voice language: {voice_language}, Subtitle language: {subtitle_language}"
     )
-    logger.info(
+    logger.debug(
         f"Generate avatar: {generate_avatar}, Generate subtitles: {generate_subtitles}"
     )
 

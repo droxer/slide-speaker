@@ -68,7 +68,11 @@ class TaskProgressMonitor:
                             f"updated at: {task.get('updated_at', 'unknown')}"
                         )
                     else:
-                        logger.debug(f"Task {self.task_id} status: {task['status']}")
+                        # Reduce debug logging frequency - only log every 25th check (every 125 seconds)
+                        if check_count % 25 == 0:
+                            logger.debug(
+                                f"Task {self.task_id} status: {task['status']}"
+                            )
 
                     # If task is cancelled, stop monitoring
                     if task.get("status") == "cancelled":
@@ -110,7 +114,7 @@ async def process_task(task_id: str) -> bool:
     logger.info(
         f"Task {task_id} retrieved from Redis with status: {task.get('status', 'unknown')}"
     )
-    logger.info(f"Full task data: {task}")
+    logger.debug(f"Full task data: {task}")
 
     if task["status"] == "cancelled":
         logger.info(f"Task {task_id} was cancelled, skipping processing")
@@ -141,7 +145,7 @@ async def process_task(task_id: str) -> bool:
         generate_podcast = kwargs.get("generate_podcast", False)
         generate_video = kwargs.get("generate_video", True)
 
-        logger.info(
+        logger.debug(
             f"Raw task parameters - task_type: {task_type}, "
             f"kwargs generate_video: {kwargs.get('generate_video')}, "
             f"kwargs generate_podcast: {kwargs.get('generate_podcast')}"
@@ -163,14 +167,14 @@ async def process_task(task_id: str) -> bool:
                 generate_podcast = False
                 generate_video = True
 
-        logger.info(
+        logger.debug(
             "After task_type processing - task_type: {}, generate_video: {}, generate_podcast: {}",
             task_type,
             generate_video,
             generate_podcast,
         )
 
-        logger.info(
+        logger.debug(
             f"Task {task_id} parameters extracted - file_id: {file_id}, "
             f"file_ext: {file_ext}, task_type: {task_type}, "
             f"voice_language: {voice_language}, "
