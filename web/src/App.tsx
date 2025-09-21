@@ -9,6 +9,10 @@ import TaskMonitor from "./components/TaskMonitor";
 import ProcessingView from "./components/ProcessingView";
 import CompletedView from "./components/CompletedView";
 import UploadPanel from "./components/UploadPanel";
+import Header from "./components/Header";
+import Footer from "./components/Footer";
+import ErrorView from "./components/ErrorView";
+import UploadingView from "./components/UploadingView";
 import { getStepLabel } from './utils/stepLabels';
 import { useUI } from './context/UIContext';
 // Players are used within components (CompletedView/TaskMonitor) not here
@@ -257,7 +261,7 @@ function App() {
   const healthQuery = useQuery({
     queryKey: ['health'],
     queryFn: apiHealth,
-    refetchInterval: 15000,
+    refetchInterval: 300000, // Check every 5 minutes instead of every 15 seconds
     refetchOnWindowFocus: false,
   });
   const queueUnavailable = !((healthQuery.data as any)?.redis?.ok === true || (healthQuery.data as any)?.redis_ok === true);
@@ -964,53 +968,7 @@ function App() {
 
   return (
     <div className="App">
-      <header className="app-header">
-        <div className="header-content">
-          <div className="header-left">
-            {/* Spacer to balance the layout */}
-          </div>
-          <div className="header-center">
-            <h1>SlideSpeaker AI</h1>
-            <p>Transform slides into AI-powered videos</p>
-          </div>
-          <div className="header-right">
-            <div
-              className="view-toggle"
-              role="tablist"
-              aria-label="View Toggle"
-            >
-              <button
-                onClick={() => setShowTaskMonitor(false)}
-                className={`toggle-btn ${!showTaskMonitor ? "active" : ""}`}
-                title="Studio"
-                role="tab"
-                aria-selected={!showTaskMonitor}
-                aria-controls="studio-panel"
-                id="studio-tab"
-              >
-                <span className="toggle-icon" aria-hidden="true">
-                  ▶
-                </span>
-                <span className="toggle-text">Studio</span>
-              </button>
-              <button
-                onClick={() => setShowTaskMonitor(true)}
-                className={`toggle-btn ${showTaskMonitor ? "active" : ""}`}
-                title="Task Monitor"
-                role="tab"
-                aria-selected={showTaskMonitor}
-                aria-controls="monitor-panel"
-                id="monitor-tab"
-              >
-                <span className="toggle-icon" aria-hidden="true">
-                  📊
-                </span>
-                <span className="toggle-text">Monitor</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <Header showTaskMonitor={showTaskMonitor} setShowTaskMonitor={setShowTaskMonitor} />
 
       <main className="main-content">
         {showTaskMonitor ? (
@@ -1048,258 +1006,13 @@ function App() {
                   />
                 )}
 
-                
 
-                {/* Show Create button only when idle and after file selected */}
-                
+
+                                
 
                 {/* Below: Non-idle status panels remain visible below the upload box */}
                 {status === "uploading" && (
-                  <div className="upload-view">
-                    {/* Entry mode toggle: Slides vs PDF are processed differently */}
-                    <div
-                      className="mode-toggle"
-                      role="tablist"
-                      aria-label="Entry Mode"
-                    >
-                      <button
-                        type="button"
-                        className={`toggle-btn ${uploadMode === "slides" ? "active" : ""}`}
-                        onClick={() => setUploadMode("slides")}
-                        role="tab"
-                        aria-selected={uploadMode === "slides"}
-                        aria-controls="slides-mode-panel"
-                      >
-                        🖼️ Slides
-                      </button>
-                      <button
-                        type="button"
-                        className={`toggle-btn ${uploadMode === "pdf" ? "active" : ""}`}
-                        onClick={() => setUploadMode("pdf")}
-                        role="tab"
-                        aria-selected={uploadMode === "pdf"}
-                        aria-controls="pdf-mode-panel"
-                      >
-                        📄 PDF
-                      </button>
-                    </div>
-                    <div className="mode-explainer" aria-live="polite">
-                      {uploadMode === "slides" ? (
-                        <>
-                          <strong>Slides Mode:</strong> Processes each slide
-                          individually for transcripts, audio, subtitles, and
-                          composes a final video.
-                        </>
-                      ) : (
-                        <>
-                          <strong>PDF Mode:</strong> Segments the document into
-                          chapters, then you can generate either a video (with
-                          audio + subtitles) or a 2‑person podcast (MP3).
-                        </>
-                      )}
-                    </div>
-                    {uploadMode === "pdf" && (
-                      <div
-                        className="mode-toggle"
-                        role="tablist"
-                        aria-label="PDF Output"
-                      >
-                        <button
-                          type="button"
-                          className={`toggle-btn ${pdfOutputMode === "video" ? "active" : ""}`}
-                          onClick={() => setPdfOutputMode("video")}
-                          role="tab"
-                          aria-selected={pdfOutputMode === "video"}
-                          aria-controls="pdf-output-video"
-                        >
-                          🎬 Video
-                        </button>
-                        <button
-                          type="button"
-                          className={`toggle-btn ${pdfOutputMode === "podcast" ? "active" : ""}`}
-                          onClick={() => setPdfOutputMode("podcast")}
-                          role="tab"
-                          aria-selected={pdfOutputMode === "podcast"}
-                          aria-controls="pdf-output-podcast"
-                        >
-                          🎧 Podcast
-                        </button>
-                      </div>
-                    )}
-                    {isResumingTask && (
-                      <div className="resume-indicator">
-                        <div className="spinner"></div>
-                        <p>Resuming your last task...</p>
-                      </div>
-                    )}
-
-                    <div className="file-upload-area">
-                      <input
-                        type="file"
-                        id="file-upload"
-                        accept={uploadMode === "pdf" ? ".pdf" : ".pptx,.ppt"}
-                        onChange={handleFileChange}
-                        className="file-input"
-                        disabled={isResumingTask}
-                      />
-                      <label
-                        htmlFor="file-upload"
-                        className={`file-upload-label ${isResumingTask ? "disabled" : ""}`}
-                      >
-                        <div className="upload-icon">📄</div>
-                        <div className="upload-text">
-                          {file
-                            ? file.name
-                            : uploadMode === "pdf"
-                              ? "Choose a PDF file"
-                              : "Choose a PPTX/PPT file"}
-                        </div>
-                        <div className="upload-hint">
-                          {file
-                            ? getFileTypeHint(file.name)
-                            : uploadMode === "pdf"
-                              ? "PDF will be processed as chapters for video + audio + subtitles"
-                              : "Slides will be processed per slide for video + audio + subtitles"}
-                        </div>
-                      </label>
-                    </div>
-
-                    <div className="video-options-section">
-                      <div className="video-options-grid">
-                        <div className="video-option-card">
-                          <div className="video-option-header">
-                            <span className="video-option-icon">🔊</span>
-                            <span className="video-option-title">AUDIO LANGUAGE</span>
-                          </div>
-                          <select
-                            id="language-select"
-                            value={voiceLanguage}
-                            onChange={(e) => setVoiceLanguage(e.target.value)}
-                            className="video-option-select"
-                          >
-                            <option value="english">English</option>
-                            <option value="simplified_chinese">简体中文</option>
-                            <option value="traditional_chinese">
-                              繁體中文
-                            </option>
-                            <option value="japanese">日本語</option>
-                            <option value="korean">한국어</option>
-                            <option value="thai">ไทย</option>
-                          </select>
-                        </div>
-
-                        <div className="video-option-card">
-                          <div className="video-option-header">
-                            <span className="video-option-icon">📝</span>
-                            <span className="video-option-title">
-                              {uploadMode === 'pdf' && pdfOutputMode === 'podcast' ? 'Transcript Language' : 'Subtitles Language'}
-                            </span>
-                          </div>
-                          <select
-                            id="subtitle-language-select"
-                            value={uploadMode === 'pdf' && pdfOutputMode === 'podcast' ? transcriptLanguage : subtitleLanguage}
-                            onChange={(e) => {
-                              const v = e.target.value;
-                              if (uploadMode === 'pdf' && pdfOutputMode === 'podcast') { setTranscriptLanguage(v); setTranscriptLangTouched(true); }
-                              else setSubtitleLanguage(v);
-                            }}
-                            className="video-option-select"
-                          >
-                            <option value="english">English</option>
-                            <option value="simplified_chinese">简体中文</option>
-                            <option value="traditional_chinese">繁體中文</option>
-                            <option value="japanese">日本語</option>
-                            <option value="korean">한국어</option>
-                            <option value="thai">ไทย</option>
-                          </select>
-                        </div>
-
-                        {(uploadMode !== "pdf" ||
-                          pdfOutputMode === "video") && (
-                          <div className="video-option-card">
-                            <div className="video-option-header">
-                              <span className="video-option-icon">📺</span>
-                              <span className="video-option-title">
-                                Quality
-                              </span>
-                            </div>
-                            <select
-                              id="video-resolution-select"
-                              value={videoResolution}
-                              onChange={(e) =>
-                                setVideoResolution(e.target.value)
-                              }
-                              className="video-option-select"
-                            >
-                              <option value="sd">SD (640×480)</option>
-                              <option value="hd">HD (1280×720)</option>
-                              <option value="fullhd">
-                                Full HD (1920×1080)
-                              </option>
-                            </select>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {uploadMode !== "pdf" && (
-                      <div className="option-item minimal">
-                        <input
-                          type="checkbox"
-                          id="generate-avatar"
-                          checked={generateAvatar}
-                          onChange={(e) => setGenerateAvatar(e.target.checked)}
-                          disabled
-                          title="AI Avatar is not available yet"
-                        />
-                        <label
-                          htmlFor="generate-avatar"
-                          className="minimal-label"
-                        >
-                          AI Avatar
-                        </label>
-                      </div>
-                    )}
-
-                    {/* Subtle AI Disclaimer in Upload View */}
-                    <div className="ai-notice-subtle">
-                      AI-generated content may contain inaccuracies. Review
-                      carefully.
-                    </div>
-
-                    {file && (
-                      <button
-                        onClick={handleUpload}
-                        className="primary-btn"
-                        disabled={uploading}
-                      >
-                        {uploadMode === "pdf"
-                          ? pdfOutputMode === "podcast"
-                            ? "Create Podcast"
-                            : "Create Video"
-                          : "Create Video"}
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {status === "uploading" && (
-                  <div className="processing-view">
-                    <div className="spinner"></div>
-                    <h3>Uploading Your Presentation</h3>
-                    <div className="progress-container">
-                      <div className="progress-bar">
-                        <div
-                          className="progress-fill"
-                          style={{ width: `${progress}%` }}
-                        ></div>
-                      </div>
-                      <p className="progress-text">{progress}% Uploaded</p>
-                      <p className="processing-status">
-                        Preparing your content for AI transformation...
-                      </p>
-                    </div>
-                  </div>
+                  <UploadingView progress={progress} />
                 )}
 
                 {status === "processing" && processingDetails && (
@@ -1341,17 +1054,7 @@ function App() {
                 
 
                 {status === "error" && (
-                  <div className="error-view">
-                    <div className="error-icon">⚠️</div>
-                    <h3>Processing Failed</h3>
-                    <p className="error-message">
-                      Something went wrong during video generation. Please try
-                      again with a different file.
-                    </p>
-                    <button onClick={resetForm} className="primary-btn">
-                      Try Again
-                    </button>
-                  </div>
+                  <ErrorView onResetForm={resetForm} />
                 )}
               </div>
             </div>
@@ -1359,62 +1062,12 @@ function App() {
         )}
       </main>
 
-      {/* Footer with note + Theme toggle at the bottom */}
-      <footer className="app-footer" role="contentinfo">
-        <div className="footer-content">
-          <p className="footer-note">
-            Powered by SlideSpeaker AI • Where presentations become your
-            masterpiece
-          </p>
-          <div className="footer-right">
-            <div
-              className="health-indicator"
-              role="status"
-              aria-live="polite"
-              title={queueUnavailable ? 'Queue unavailable' : (redisLatencyMs != null ? `Queue OK • ${redisLatencyMs}ms` : 'Queue OK')}
-            >
-              <span className={`dot ${queueUnavailable ? 'down' : 'ok'}`} aria-hidden />
-              <span className="label">{queueUnavailable ? 'Queue: Unavailable' : 'Queue: OK'}</span>
-            </div>
-            <div
-              className="view-toggle theme-toggle"
-              role="tablist"
-              aria-label="Theme Toggle"
-            >
-            <button
-              onClick={() => setUiTheme("classic")}
-              className={`toggle-btn ${uiTheme === "classic" ? "active" : ""}`}
-              title="Classic Theme"
-              role="tab"
-              aria-selected={uiTheme === "classic"}
-              aria-controls="classic-theme-panel"
-            >
-              <span className="toggle-text">Classic</span>
-            </button>
-            <button
-              onClick={() => setUiTheme("flat")}
-              className={`toggle-btn ${uiTheme === "flat" ? "active" : ""}`}
-              title="Flat Theme"
-              role="tab"
-              aria-selected={uiTheme === "flat"}
-              aria-controls="flat-theme-panel"
-            >
-              <span className="toggle-text">Flat</span>
-            </button>
-            <button
-              onClick={() => setUiTheme("material")}
-              className={`toggle-btn ${uiTheme === "material" ? "active" : ""}`}
-              title="Material Theme"
-              role="tab"
-              aria-selected={uiTheme === "material"}
-              aria-controls="material-theme-panel"
-            >
-              <span className="toggle-text">Material</span>
-            </button>
-            </div>
-          </div>
-        </div>
-      </footer>
+      <Footer
+        queueUnavailable={queueUnavailable}
+        redisLatencyMs={redisLatencyMs}
+        uiTheme={uiTheme}
+        setUiTheme={setUiTheme}
+      />
     </div>
   );
 }

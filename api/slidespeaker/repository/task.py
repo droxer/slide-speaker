@@ -15,6 +15,14 @@ from slidespeaker.configs.db import get_session
 from slidespeaker.core.models import TaskRow
 
 
+def _filter_sensitive_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Filter out sensitive information from kwargs before returning in API responses."""
+    filtered = kwargs.copy()
+    # Remove sensitive fields that shouldn't be exposed to clients
+    filtered.pop("file_path", None)
+    return filtered
+
+
 async def create_tables() -> None:
     from sqlalchemy import text
 
@@ -158,7 +166,7 @@ async def get_task(task_id: str) -> dict[str, Any] | None:
             "file_id": row.file_id,
             "task_type": row.task_type,
             "status": row.status,
-            "kwargs": row.kwargs or {},
+            "kwargs": _filter_sensitive_kwargs(row.kwargs or {}),
             "error": row.error,
             "voice_language": row.voice_language,
             "subtitle_language": row.subtitle_language,
@@ -241,7 +249,7 @@ async def list_tasks(
                 "status": r.status,
                 "created_at": r.created_at.isoformat(),
                 "updated_at": r.updated_at.isoformat(),
-                "kwargs": r.kwargs or {},
+                "kwargs": _filter_sensitive_kwargs(r.kwargs or {}),
                 # Surface language hints for UI if needed in the future
                 "voice_language": r.voice_language,
                 "subtitle_language": r.subtitle_language,

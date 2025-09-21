@@ -20,6 +20,15 @@ from slidespeaker.repository.task import (
     list_tasks as db_list_tasks,
 )
 
+
+def _filter_sensitive_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Filter out sensitive information from kwargs before returning in API responses."""
+    filtered = kwargs.copy()
+    # Remove sensitive fields that shouldn't be exposed to clients
+    filtered.pop("file_path", None)
+    return filtered
+
+
 router = APIRouter(prefix="/api", tags=["stats"])
 
 
@@ -182,6 +191,9 @@ async def get_task_details(task_id: str) -> dict[str, Any]:
         if row:
             file_id = str(row.get("file_id")) if row.get("file_id") is not None else ""
             st = await state_manager.get_state(file_id) if file_id else None
+            # Filter sensitive information from kwargs
+            filtered_kwargs = _filter_sensitive_kwargs(row.get("kwargs") or {})
+
             return {
                 "task_id": row.get("task_id"),
                 "file_id": file_id,
@@ -189,10 +201,10 @@ async def get_task_details(task_id: str) -> dict[str, Any]:
                 "status": row.get("status"),
                 "created_at": row.get("created_at"),
                 "updated_at": row.get("updated_at"),
-                "kwargs": row.get("kwargs") or {},
+                "kwargs": filtered_kwargs,
                 "source_type": (st or {}).get("source_type")
                 or (st or {}).get("source")
-                or (row.get("kwargs") or {}).get("source_type"),
+                or (filtered_kwargs.get("source_type")),
                 "state": st,
                 "completion_percentage": compute_step_percentage(st) if st else 0,
             }
