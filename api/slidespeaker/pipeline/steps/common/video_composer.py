@@ -51,7 +51,17 @@ async def compose_video(
         slide_images = await get_slide_images_func(file_id)
 
         if not audio_files:
-            raise ValueError("No audio files available for video composition")
+            # Fallback: scan local output directory for per-slide audio files
+            try:
+                audio_dir = config.output_dir / file_id / "audio"
+                if audio_dir.exists():
+                    found = sorted(str(p) for p in audio_dir.glob("*.mp3"))
+                    if found:
+                        audio_files = found
+            except Exception:
+                pass
+            if not audio_files:
+                raise ValueError("No audio files available for video composition")
 
         # Prepare output directory
         work_dir = config.output_dir / file_id
@@ -94,7 +104,7 @@ async def compose_video(
         if not final_video_path.exists():
             raise ValueError(f"Failed to compose video: {final_video_path}")
 
-        # Upload to storage (prefer task-id based key if available)
+        # Upload to storage (use task-id based key if available, otherwise file_id)
         storage_provider = get_storage_provider()
         base_id = file_id
         try:
@@ -107,17 +117,6 @@ async def compose_video(
         storage_url = storage_provider.upload_file(
             str(final_video_path), storage_key, "video/mp4"
         )
-        # Backward-compatibility: also upload under file_id-based key if different
-        try:
-            if base_id != file_id:
-                storage_provider.upload_file(
-                    str(final_video_path), f"{file_id}.mp4", "video/mp4"
-                )
-        except Exception as compat_err:
-            # Non-fatal; primary task-id object exists
-            logger.warning(
-                f"Compat upload (file-id key) failed for video: {compat_err}"
-            )
 
         # Store in state
         video_data = {"local_path": str(final_video_path), "storage_url": storage_url}

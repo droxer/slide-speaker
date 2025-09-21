@@ -68,7 +68,11 @@ class TaskProgressMonitor:
                             f"updated at: {task.get('updated_at', 'unknown')}"
                         )
                     else:
-                        logger.debug(f"Task {self.task_id} status: {task['status']}")
+                        # Reduce debug logging frequency - only log every 25th check (every 125 seconds)
+                        if check_count % 25 == 0:
+                            logger.debug(
+                                f"Task {self.task_id} status: {task['status']}"
+                            )
 
                     # If task is cancelled, stop monitoring
                     if task.get("status") == "cancelled":
@@ -110,6 +114,7 @@ async def process_task(task_id: str) -> bool:
     logger.info(
         f"Task {task_id} retrieved from Redis with status: {task.get('status', 'unknown')}"
     )
+    logger.debug(f"Full task data: {task}")
 
     if task["status"] == "cancelled":
         logger.info(f"Task {task_id} was cancelled, skipping processing")
@@ -126,18 +131,57 @@ async def process_task(task_id: str) -> bool:
 
         # Extract task parameters
         kwargs = task.get("kwargs", {})
+        # task_type indicates requested output mode. If not explicitly provided,
+        # we will honor the explicit generate_* flags from kwargs as-is.
+        task_type = task.get("task_type")
         file_id = kwargs.get("file_id")
         file_path = kwargs.get("file_path")
         file_ext = kwargs.get("file_ext")
         voice_language = kwargs.get("voice_language", "english")
         subtitle_language = kwargs.get("subtitle_language")
+        transcript_language = kwargs.get("transcript_language")
         generate_avatar = kwargs.get("generate_avatar", True)
         generate_subtitles = True  # Always generate subtitles
+        generate_podcast = kwargs.get("generate_podcast", False)
+        generate_video = kwargs.get("generate_video", True)
 
-        logger.info(
+        logger.debug(
+            f"Raw task parameters - task_type: {task_type}, "
+            f"kwargs generate_video: {kwargs.get('generate_video')}, "
+            f"kwargs generate_podcast: {kwargs.get('generate_podcast')}"
+        )
+
+        # Override generate_podcast and generate_video only when task_type is explicitly provided
+        # - "podcast": podcast only
+        # - "both": podcast + video
+        # - "video": video only
+        # When task_type is missing/None, respect incoming generate_* flags.
+        if task_type is not None:
+            if task_type == "podcast":
+                generate_podcast = True
+                generate_video = False
+            elif task_type == "both":
+                generate_podcast = True
+                generate_video = True
+            else:  # treat any other explicit value as "video"
+                generate_podcast = False
+                generate_video = True
+
+        logger.debug(
+            "After task_type processing - task_type: {}, generate_video: {}, generate_podcast: {}",
+            task_type,
+            generate_video,
+            generate_podcast,
+        )
+
+        logger.debug(
             f"Task {task_id} parameters extracted - file_id: {file_id}, "
-            f"file_ext: {file_ext}, voice_language: {voice_language}, "
-            f"subtitle_language: {subtitle_language}, generate_avatar: {generate_avatar}"
+            f"file_ext: {file_ext}, task_type: {task_type}, "
+            f"voice_language: {voice_language}, "
+            f"subtitle_language: {subtitle_language}, "
+            f"generate_avatar: {generate_avatar}, "
+            f"generate_podcast: {generate_podcast}, "
+            f"generate_video: {generate_video}"
         )
 
         # Validate required parameters
@@ -163,13 +207,17 @@ async def process_task(task_id: str) -> bool:
             f"Task {task_id} starting presentation processing for file {file_id}"
         )
         await accept_task(
-            file_id,
-            Path(file_path),
-            file_ext,
-            voice_language,
-            subtitle_language,
-            generate_avatar,
-            generate_subtitles,
+            file_id=file_id,
+            file_path=Path(file_path),
+            file_ext=file_ext,
+            source_type=kwargs.get("source_type"),
+            voice_language=voice_language,
+            subtitle_language=subtitle_language,
+            transcript_language=transcript_language,
+            generate_avatar=generate_avatar,
+            generate_subtitles=generate_subtitles,
+            generate_podcast=generate_podcast,
+            generate_video=generate_video,
             task_id=task_id,
         )
 

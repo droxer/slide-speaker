@@ -12,7 +12,7 @@ from loguru import logger
 
 from slidespeaker.configs.config import config
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.services import TranslationService
+from slidespeaker.translation import TranslationService
 
 
 async def translate_transcripts_common(

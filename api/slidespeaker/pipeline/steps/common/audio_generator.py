@@ -104,32 +104,8 @@ async def generate_audio_common(
         f"Audio generation completed successfully with {len(audio_files)} files"
     )
 
-    # Upload generated audio to storage provider (best-effort) without changing data shape
-    try:
-        storage_provider = get_storage_provider()
-        storage_urls: list[str] = []
-        # Read task_id if present to prefer task-based object keys
-        state = await state_manager.get_state(file_id)
-        task_id = None
-        if state and isinstance(state, dict):
-            task_id = state.get("task_id") or (state.get("task") or {}).get("task_id")
-        for i, path in enumerate(audio_files, start=1):
-            base = task_id if isinstance(task_id, str) and task_id else file_id
-            object_key = f"{base}_audio_{i}.mp3"
-            try:
-                url = storage_provider.upload_file(path, object_key, "audio/mpeg")
-                storage_urls.append(url)
-            except Exception as upload_err:
-                logger.error(
-                    f"Failed to upload audio file to storage: {path} - {upload_err}"
-                )
-        state = await state_manager.get_state(file_id)
-        if state and "steps" in state and state_key in state["steps"]:
-            state["steps"][state_key]["storage_urls"] = storage_urls
-            await state_manager._save_state(file_id, state)
-            logger.info(f"Uploaded {len(storage_urls)} audio files to storage")
-    except Exception as e:
-        logger.error(f"Audio storage upload encountered an error: {e}")
+    # Do NOT upload per-track audio files; only the final concatenated audio is uploaded below
+    # This reduces storage usage and avoids exposing intermediate artifacts.
 
     # Create and upload a single final audio file by concatenating per-track MP3s
     try:
@@ -156,20 +132,35 @@ async def generate_audio_common(
                             outfile.write(chunk)
 
             # Upload to storage with task-id-based key when possible
+            storage_key = f"{base}.mp3"
             storage_provider.upload_file(
-                str(final_local_path), f"{base}.mp3", "audio/mpeg"
+                str(final_local_path), storage_key, "audio/mpeg"
             )
-            # Backward-compatibility: also upload under file_id-based key if different
-            try:
-                if base != file_id:
-                    storage_provider.upload_file(
-                        str(final_local_path), f"{file_id}.mp3", "audio/mpeg"
-                    )
-            except Exception as compat_err:
-                logger.warning(
-                    f"Compat upload (file-id key) failed for final audio: {compat_err}"
+
+            # Verify availability with a short retry loop (handles eventual consistency)
+            ok = False
+            try_count = 0
+            import asyncio
+
+            while try_count < 3:
+                try_count += 1
+                try:
+                    if storage_provider.file_exists(storage_key):
+                        ok = True
+                        break
+                except Exception:
+                    # Ignore provider-specific head errors and retry
+                    pass
+                await asyncio.sleep(0.5 * (2 ** (try_count - 1)))
+
+            if ok:
+                logger.info(
+                    f"Final audio uploaded and verified in storage: {storage_key}"
                 )
-            logger.info(f"Uploaded final concatenated audio: {final_local_path}")
+            else:
+                logger.warning(
+                    f"Final audio upload could not be verified yet: {storage_key}. Using local fallback."
+                )
     except Exception as e:
         # Non-fatal; streaming fallback in downloads will still work
         logger.error(f"Failed to create/upload final audio: {e}")

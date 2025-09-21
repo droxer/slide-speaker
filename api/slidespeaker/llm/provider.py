@@ -14,7 +14,7 @@ from .openai_client import OpenAILLMClient
 _llm_client: LLMClient | None = None
 
 
-def get_llm() -> LLMClient:
+def _get_llm() -> LLMClient:
     global _llm_client
     if _llm_client is not None:
         return _llm_client
@@ -41,7 +41,7 @@ def chat_completion(
     timeout: float | None = None,
     **kwargs: dict[str, object],
 ) -> str:
-    return get_llm().chat_completion(
+    return _get_llm().chat_completion(
         messages, model, retries=retries, backoff=backoff, timeout=timeout, **kwargs
     )
 
@@ -56,7 +56,7 @@ def image_generate(
     backoff: float | None = None,
     timeout: float | None = None,
 ) -> list[str]:
-    return get_llm().image_generate(
+    return _get_llm().image_generate(
         prompt, model, size=size, n=n, retries=retries, backoff=backoff, timeout=timeout
     )
 
@@ -70,6 +70,6 @@ def tts_speech_stream(
     backoff: float | None = None,
     timeout: float | None = None,
 ) -> Iterable[bytes]:
-    return get_llm().tts_speech_stream(
+    return _get_llm().tts_speech_stream(
         model, voice, input_text, retries=retries, backoff=backoff, timeout=timeout
     )

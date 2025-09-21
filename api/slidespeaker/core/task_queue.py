@@ -10,6 +10,9 @@ from typing import Any, cast
 
 from loguru import logger
 
+from slidespeaker.configs.db import db_enabled
+from slidespeaker.repository.task import insert_task, update_task
+
 
 class RedisTaskQueue:
     """Redis-based task queue for distributed processing of presentation tasks"""
@@ -46,6 +49,13 @@ class RedisTaskQueue:
         task_json = json.dumps(task)
         result = await self.redis_client.set(task_key, task_json)
         logger.info(f"Task {task_id} stored in Redis with result: {result}")
+
+        # Persist in Postgres (optional)
+        if db_enabled:
+            try:
+                await insert_task(task)
+            except Exception as e:
+                logger.warning(f"Failed to persist task {task_id} in DB: {e}")
 
         # Add task ID to queue - use RPUSH to maintain FIFO order
         queue_result = await self.redis_client.rpush(self.queue_key, task_id)  # type: ignore
@@ -104,24 +114,25 @@ class RedisTaskQueue:
         task_key = self._get_task_key(task_id)
         await self.redis_client.set(task_key, json.dumps(task))
         logger.info(f"Task {task_id} status updated to {status}")
+        # Mirror to DB
+        if db_enabled:
+            try:
+                await update_task(task_id, status=status, error=task.get("error"))
+            except Exception as e:
+                logger.warning(f"Failed to update task {task_id} in DB: {e}")
         return True
 
     async def get_next_task(self) -> str | None:
         """Get the next task ID from the queue (non-blocking)"""
         task_id: str | None = None
 
-        # First, check if we have any tasks in the queue
-        queue_length = await self.redis_client.llen(self.queue_key)  # type: ignore  # type: ignore
-        logger.info(f"Queue length: {queue_length}")
-
         try:
             # Use rpop to get the task ID without moving it (safer approach)
             task_id_raw = await self.redis_client.brpop(self.queue_key, timeout=1)  # type: ignore
             if task_id_raw:
                 task_id = str(task_id_raw[1])  # brpop returns tuple (key, value)
-                logger.info(f"Retrieved task ID from queue: {task_id}")
             else:
-                logger.info("No tasks in queue")
+                pass  # No tasks in queue
         except Exception as e:
             logger.error(f"Error getting next task: {e}")
 

@@ -6,7 +6,7 @@ It uses AI to understand the content structure and create meaningful segments
 for presentation generation.
 """
 
-from typing import Any
+from typing import Any, cast
 
 from loguru import logger
 from PyPDF2 import PdfReader
@@ -20,10 +20,10 @@ from slidespeaker.transcript import TranscriptGenerator
 # Language-specific prompts for PDF analysis
 LANGUAGE_PROMPTS = {
     "english": {
-        "system": "You are an expert content analyzer and presentation designer. "
-        + "Your task is to carefully analyze the entire document content and segment it into logical "
-        + "chapters for presentation purposes. Focus on identifying key themes, concepts, and logical "
-        + "breakpoints in the content to create meaningful, coherent chapters.",
+        "system": """You are an expert content analyzer and presentation designer.
+Your task is to carefully analyze the entire document content and segment it into
+logical chapters for presentation purposes. Focus on identifying key themes,
+concepts, and logical breakpoints in the content to create meaningful, coherent chapters.""",
         "prompt": """
                 Carefully analyze the following document titled "{doc_title}" and segment it into
                 less than {max_num_of_segments} logical chapters that would work well for a presentation.
@@ -71,7 +71,9 @@ LANGUAGE_PROMPTS = {
         """,
     },
     "simplified_chinese": {
-        "system": "您是一位专业的文档内容分析师和演示文稿设计师。您的任务是仔细分析整个文档内容并将其分割成适合演示的逻辑章节。重点是识别关键主题、概念和内容中的逻辑断点，以创建有意义、连贯的章节。",  # noqa: E501
+        "system": """您是一位专业的文档内容分析师和演示文稿设计师。您的任务是仔细分析整个文档内容
+并将其分割成适合演示的逻辑章节。重点是识别关键主题、概念和内容中的逻辑断点，
+以创建有意义、连贯的章节。""",
         "prompt": """
         请仔细分析以下名为"{doc_title}"的文档，并将其分割成不超过{max_num_of_segments}个适合演示的逻辑章节。您的分析应涵盖整个文档内容以确保全面覆盖。
 
@@ -113,7 +115,9 @@ LANGUAGE_PROMPTS = {
         """,
     },
     "traditional_chinese": {
-        "system": "您是一位專業的文件內容分析師和簡報設計師。您的任務是仔細分析整個文件內容並將其分割成適合簡報的邏輯章節。重點是識別關鍵主題、概念和內容中的邏輯斷點，以創建有意義、連貫的章節。",  # noqa: E501
+        "system": """您是一位專業的文件內容分析師和簡報設計師。您的任務是仔細分析整個文件內容
+並將其分割成適合簡報的邏輯章節。重點是識別關鍵主題、概念和內容中的邏輯斷點，
+以創建有意義、連貫的章節。""",
         "prompt": """
         請仔細分析以下名為"{doc_title}"的文件，並將其分割成不超過{max_num_of_segments}個適合簡報的邏輯章節。您的分析應涵蓋整個文件內容以確保全面覆蓋。
 
@@ -291,6 +295,76 @@ class PDFAnalyzer:
         )
         return chapters
 
+    def _extract_json_from_response(self, content: str) -> dict[str, Any] | None:
+        """Extract JSON from AI response content"""
+        try:
+            import json
+
+            # Extract JSON from response
+            start = content.find("{")
+            end = content.rfind("}") + 1
+            if start != -1 and end > start:
+                json_str = content[start:end]
+                return cast(dict[str, Any], json.loads(json_str))
+        except Exception as e:
+            print(f"Error parsing JSON from response: {e}")
+        return None
+
+    async def _generate_chapter_script(
+        self, chapter: dict[str, Any], language: str
+    ) -> str:
+        """Generate comprehensive script for a chapter"""
+        # Combine title, description, and key points for comprehensive script generation
+        content_for_script = f"""Chapter Topic: {chapter.get("title", "")}
+Chapter Description: {chapter.get("description", "")}
+"""
+        if chapter.get("key_points"):
+            key_points_text = "\n".join(
+                [f"- {point}" for point in chapter["key_points"]]
+            )
+            content_for_script += f"""
+
+Key Points to Cover in Detail:
+{key_points_text}
+"""
+        content_for_script += """
+Please provide a detailed, comprehensive explanation of this chapter topic,
+thoroughly covering all key points with relevant examples where appropriate.
+"""
+
+        script = await self.transcript_generator.generate_transcript(
+            content_for_script, language=language
+        )
+        return script
+
+    def _process_chapter_fields(self, chapter: dict[str, Any]) -> dict[str, Any]:
+        """Ensure chapter has all required fields with proper defaults"""
+        # Ensure key_points exists
+        if "key_points" not in chapter:
+            chapter["key_points"] = []
+        return chapter
+
+    async def _process_chapters_with_scripts(
+        self, base_chapters: list[dict[str, Any]], language: str
+    ) -> list[dict[str, Any]]:
+        """Process chapters to ensure they have all required fields and scripts"""
+        chapters_with_scripts = []
+        for chapter in base_chapters:
+            # Ensure key_points exists
+            chapter = self._process_chapter_fields(chapter)
+
+            # If the model already provided a script, keep it as-is
+            provided_script = str(chapter.get("script", "") or "").strip()
+            if not provided_script:
+                # Otherwise, generate a comprehensive script using the shared script generator
+                chapter["script"] = await self._generate_chapter_script(
+                    chapter, language
+                )
+
+            chapters_with_scripts.append(chapter)
+
+        return chapters_with_scripts
+
     async def _generate_chapters(
         self,
         full_text: str,
@@ -327,55 +401,16 @@ class PDFAnalyzer:
                     {"role": "user", "content": formatted_prompt},
                 ],
             )
+
             # Parse the response
             if content:
-                import json
-
-                # Extract JSON from response
-                start = content.find("{")
-                end = content.rfind("}") + 1
-                if start != -1 and end > start:
-                    json_str = content[start:end]
-                    result = json.loads(json_str)
+                result = self._extract_json_from_response(content)
+                if result:
                     base_chapters = result.get("chapters", [])
-
                     # Process chapters to ensure they have all required fields
-                    chapters_with_scripts = []
-                    for chapter in base_chapters:
-                        # Ensure key_points exists
-                        if "key_points" not in chapter:
-                            chapter["key_points"] = []
-
-                        # If the model already provided a script, keep it as-is
-                        provided_script = str(chapter.get("script", "") or "").strip()
-                        if provided_script:
-                            chapter["script"] = provided_script
-                        else:
-                            # Otherwise, generate a comprehensive script using the shared script generator
-                            # Combine title, description, and key points for comprehensive script generation
-                            content_for_script = (
-                                f"Chapter Topic: {chapter.get('title', '')}\n"
-                            )
-                            content_for_script += f"Chapter Description: {chapter.get('description', '')}\n"
-                            if chapter.get("key_points"):
-                                key_points_text = "\n".join(
-                                    [f"- {point}" for point in chapter["key_points"]]
-                                )
-                                content_for_script += f"\nKey Points to Cover in Detail:\n{key_points_text}\n"
-                            content_for_script += (
-                                "\nPlease provide a detailed, comprehensive explanation of this chapter topic, "
-                                "thoroughly covering all key points with relevant examples where appropriate."
-                            )
-
-                            script = (
-                                await self.transcript_generator.generate_transcript(
-                                    content_for_script, language=language
-                                )
-                            )
-                            chapter["script"] = script
-
-                        chapters_with_scripts.append(chapter)
-
+                    chapters_with_scripts = await self._process_chapters_with_scripts(
+                        base_chapters, language
+                    )
                     return chapters_with_scripts
 
             # Fallback if parsing fails
@@ -432,19 +467,22 @@ class PDFAnalyzer:
         chapters_with_scripts = []
         for chapter in base_chapters:
             # Combine title, description, and key points for comprehensive script generation
-            content_for_script = f"Chapter Topic: {chapter['title']}\n"
-            content_for_script += f"Chapter Description: {chapter['description']}\n"
+            content_for_script = f"""Chapter Topic: {chapter["title"]}
+Chapter Description: {chapter["description"]}
+"""
             if chapter.get("key_points"):
                 key_points_text = "\n".join(
                     [f"- {point}" for point in chapter["key_points"]]
                 )
-                content_for_script += (
-                    f"\nKey Points to Cover in Detail:\n{key_points_text}\n"
-                )
-            content_for_script += (
-                "\nPlease provide a detailed, comprehensive explanation of this chapter topic, "
-                "thoroughly covering all key points with relevant examples where appropriate."
-            )
+                content_for_script += f"""
+
+Key Points to Cover in Detail:
+{key_points_text}
+"""
+            content_for_script += """
+Please provide a detailed, comprehensive explanation of this chapter topic,
+thoroughly covering all key points with relevant examples where appropriate.
+"""
 
             script = await self.transcript_generator.generate_transcript(
                 content_for_script, language=language

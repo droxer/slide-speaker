@@ -34,6 +34,8 @@ class Config:
         self.ffmpeg_audio_bitrate = os.getenv("FFMPEG_AUDIO_BITRATE", "128k")
         self.ffmpeg_codec = os.getenv("FFMPEG_CODEC", "libx264")
         self.ffmpeg_audio_codec = os.getenv("FFMPEG_AUDIO_CODEC", "aac")
+        # Performance optimization flags
+        self.ffmpeg_fast_mode = os.getenv("FFMPEG_FAST_MODE", "false").lower() == "true"
 
         # Logging / runtime
         self.log_level = os.getenv("LOG_LEVEL", "INFO").upper()

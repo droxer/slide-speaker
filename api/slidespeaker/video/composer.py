@@ -7,8 +7,10 @@ full-featured presentations with AI avatars and simpler image+audio presentation
 """
 
 import asyncio
+import contextlib
 import gc
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
@@ -34,7 +36,9 @@ class VideoComposer:
 
     def __init__(self, max_memory_mb: int = 500):
         self.max_memory_mb = max_memory_mb
-        self.executor = ThreadPoolExecutor(max_workers=2)
+        # Use more workers for parallel processing, but limit to avoid memory issues
+        max_workers = min(4, (os.cpu_count() or 2) + 1)
+        self.executor = ThreadPoolExecutor(max_workers=max_workers)
         self.storage_provider = get_storage_provider()
         self.temp_files: list[Path] = []
 
@@ -190,6 +194,19 @@ class VideoComposer:
                 logger.warning(f"Failed to cleanup temp file {temp_file}: {e}")
         self.temp_files.clear()
 
+    def _safe_close_clip(self, clip: Any) -> None:
+        """Safely close a MoviePy clip and handle any exceptions."""
+        try:
+            if hasattr(clip, "close"):
+                clip.close()
+        except Exception as e:
+            logger.debug(f"Error closing clip: {e}")
+
+    def _safe_close_clips(self, clips: list[Any]) -> None:
+        """Safely close multiple MoviePy clips."""
+        for clip in clips:
+            self._safe_close_clip(clip)
+
     async def create_images_only_video(
         self, slide_images: list[Path], output_path: Path, video_resolution: str = "hd"
     ) -> None:
@@ -233,10 +250,11 @@ class VideoComposer:
         video_resolution: str = "hd",
     ) -> None:
         def _compose_video_from_segments_sync() -> None:
+            video_clips: list[Any] = []
             try:
                 if not segments:
                     raise ValueError("No segments provided for video composition")
-                video_clips = []
+                # video_clips initialized above to ensure it's always defined
                 for segment in segments:
                     duration = float(segment.get("duration", 0))
                     if duration <= 0:
@@ -276,13 +294,19 @@ class VideoComposer:
                 final_clip_resized = final_clip.with_effects(
                     [Resize(width=target_width, height=target_height)]
                 )
+                # Use fast mode settings when enabled for development/testing
+                ffmpeg_preset = config.ffmpeg_preset
+                ffmpeg_threads = config.ffmpeg_threads
+                if config.ffmpeg_fast_mode:
+                    ffmpeg_preset = "ultrafast"
+                    ffmpeg_threads = max(ffmpeg_threads, (os.cpu_count() or 2))
                 final_clip_resized.write_videofile(
                     output_path,
                     fps=config.ffmpeg_fps,
                     codec=config.ffmpeg_codec,
                     audio_codec=config.ffmpeg_audio_codec,
-                    threads=config.ffmpeg_threads,
-                    preset=config.ffmpeg_preset,
+                    threads=ffmpeg_threads,
+                    preset=ffmpeg_preset,
                     bitrate=config.ffmpeg_bitrate,
                     audio_bitrate=config.ffmpeg_audio_bitrate,
                     temp_audiofile=str(Path(output_path).parent / "temp_audio.m4a"),
@@ -293,15 +317,15 @@ class VideoComposer:
                 logger.error(f"Video composition error: {e}")
                 raise
             finally:
-                try:
-                    for clip in video_clips:
-                        clip.close()
-                    if "final_clip" in locals():
-                        final_clip.close()
-                    if "final_clip_resized" in locals():
-                        final_clip_resized.close()
-                except Exception:
-                    pass
+                # Safely close all clips
+                with contextlib.suppress(Exception):
+                    self._safe_close_clips(video_clips)
+                if "final_clip" in locals():
+                    self._safe_close_clip(final_clip)
+                if "final_clip_resized" in locals():
+                    self._safe_close_clip(final_clip_resized)
+                if "watermark" in locals():
+                    self._safe_close_clip(watermark)
                 gc.collect()
 
         loop = asyncio.get_event_loop()
@@ -316,6 +340,50 @@ class VideoComposer:
                     "Video composition timed out after 30 minutes"
                 ) from None
 
+    def _create_image_clips(
+        self,
+        slide_images: list[Path],
+        audio_files: list[Path],
+    ) -> list[Any]:
+        """Create video clips from images and audio files"""
+        video_clips: list[Any] = []
+        for i, image_path in enumerate(slide_images):
+            image_path = Path(image_path)
+            if not image_path.exists():
+                continue
+            duration = 5.0
+            if i < len(audio_files):
+                ap = Path(audio_files[i])
+                if ap.exists():
+                    try:
+                        with AudioFileClip(str(ap)) as ac:
+                            duration = ac.duration
+                    except Exception:
+                        pass
+            video_clip = ImageClip(str(image_path), duration=duration)
+            if i < len(audio_files):
+                ap = Path(audio_files[i])
+                if ap.exists():
+                    from contextlib import suppress
+
+                    with suppress(Exception):
+                        video_clip = video_clip.with_audio(AudioFileClip(str(ap)))
+            video_clips.append(video_clip)
+        return video_clips
+
+    def _apply_watermark_to_clip(self, final_clip: Any) -> Any:
+        """Apply watermark to the final clip if configured"""
+        watermark = self._create_watermark(final_clip)
+        if watermark is not None:
+            try:
+                original_audio = final_clip.audio
+                final_clip = CompositeVideoClip([final_clip, watermark])
+                if original_audio is not None:
+                    final_clip = final_clip.with_audio(original_audio)
+            except Exception:
+                pass
+        return final_clip
+
     def _create_video_sync(
         self,
         slide_images: list[Path],
@@ -324,67 +392,213 @@ class VideoComposer:
         video_resolution: str = "hd",
     ) -> None:
         """Synchronous method to create video from images and audio files."""
+        video_clips: list[Any] = []
+        final_clip: Any = None
+        final_clip_resized: Any = None
+        watermark: Any = None
+
         try:
             if not slide_images:
                 raise ValueError("No slide images provided")
-            video_clips = []
-            for i, image_path in enumerate(slide_images):
-                image_path = Path(image_path)
-                if not image_path.exists():
-                    continue
-                duration = 5.0
-                if i < len(audio_files):
-                    ap = Path(audio_files[i])
-                    if ap.exists():
-                        try:
-                            with AudioFileClip(str(ap)) as ac:
-                                duration = ac.duration
-                        except Exception:
-                            pass
-                video_clip = ImageClip(str(image_path), duration=duration)
-                if i < len(audio_files):
-                    ap = Path(audio_files[i])
-                    if ap.exists():
-                        from contextlib import suppress
 
-                        with suppress(Exception):
-                            video_clip = video_clip.with_audio(AudioFileClip(str(ap)))
-                video_clips.append(video_clip)
+            # Create image clips
+            video_clips = self._create_image_clips(slide_images, audio_files)
+
             if not video_clips:
                 raise ValueError("No valid clips for video creation")
+
             final_clip = concatenate_videoclips(video_clips, method="compose")
-            watermark = self._create_watermark(final_clip)
-            if watermark is not None:
-                try:
-                    original_audio = final_clip.audio
-                    final_clip = CompositeVideoClip([final_clip, watermark])
-                    if original_audio is not None:
-                        final_clip = final_clip.with_audio(original_audio)
-                except Exception:
-                    pass
+            final_clip = self._apply_watermark_to_clip(final_clip)
+
             target_width, target_height = self._get_resolution_dimensions(
                 video_resolution
             )
             final_clip_resized = final_clip.with_effects(
                 [Resize(width=target_width, height=target_height)]
             )
+
+            # Get FFmpeg settings
+            ffmpeg_preset, ffmpeg_threads = self._get_ffmpeg_settings()
+
+            # Write video file
             final_clip_resized.write_videofile(
                 str(output_path),
                 fps=config.ffmpeg_fps,
                 codec=config.ffmpeg_codec,
                 audio_codec=config.ffmpeg_audio_codec,
-                threads=config.ffmpeg_threads,
-                preset=config.ffmpeg_preset,
+                threads=ffmpeg_threads,
+                preset=ffmpeg_preset,
                 bitrate=config.ffmpeg_bitrate,
                 audio_bitrate=config.ffmpeg_audio_bitrate,
                 temp_audiofile=str(Path(output_path).parent / "temp_audio.m4a"),
                 remove_temp=True,
                 logger=None,
             )
+
         except Exception as e:
             logger.error(f"Error creating video: {e}")
             raise
         finally:
+            # Safely close all clips
+            with contextlib.suppress(Exception):
+                self._safe_close_clips(video_clips)
+            if final_clip is not None:
+                self._safe_close_clip(final_clip)
+            if final_clip_resized is not None:
+                self._safe_close_clip(final_clip_resized)
+            if watermark is not None:
+                self._safe_close_clip(watermark)
+            gc.collect()
+
+    def _validate_video_inputs(
+        self,
+        slide_images: list[Path],
+        avatar_videos: list[Path],
+        audio_files: list[Path],
+    ) -> None:
+        """Validate video composition inputs"""
+        if not slide_images:
+            raise ValueError("No slide images provided")
+
+        if len(slide_images) != len(avatar_videos) or len(slide_images) != len(
+            audio_files
+        ):
+            logger.warning("Mismatched counts; attempting best-effort composition")
+
+    def _create_composite_clips(
+        self,
+        slide_images: list[Path],
+        avatar_videos: list[Path],
+        audio_files: list[Path],
+    ) -> list[Any]:
+        """Create composite video clips from images, avatars, and audio"""
+        video_clips: list[Any] = []
+        num_segments = min(len(slide_images), len(avatar_videos), len(audio_files))
+
+        for i in range(num_segments):
+            image_path = slide_images[i]
+            avatar_path = avatar_videos[i]
+            audio_path = audio_files[i]
+            if not image_path.exists() or not avatar_path.exists():
+                continue
+
+            bg_clip = ImageClip(str(image_path))
+            with AudioFileClip(str(audio_path)) as audio_clip:
+                duration = audio_clip.duration
+            bg_clip = bg_clip.with_duration(duration)
+            fg_clip = VideoFileClip(str(avatar_path)).with_duration(duration)
+            fg_clip = fg_clip.resize(height=int(bg_clip.h * 0.9))
+            fg_clip = fg_clip.with_position(
+                (
+                    int((bg_clip.w - fg_clip.w) / 2),
+                    int((bg_clip.h - fg_clip.h) / 2),
+                )
+            )
+            comp_clip = CompositeVideoClip([bg_clip, fg_clip])
+            from contextlib import suppress
+
+            with suppress(Exception):
+                comp_clip = comp_clip.with_audio(AudioFileClip(str(audio_path)))
+            video_clips.append(comp_clip)
+
+        return video_clips
+
+    def _apply_watermark(self, final_clip: Any) -> Any:
+        """Apply watermark to the final clip if configured"""
+        watermark = self._create_watermark(final_clip)
+        if watermark is not None:
+            try:
+                original_audio = final_clip.audio
+                final_clip = CompositeVideoClip([final_clip, watermark])
+                if original_audio is not None:
+                    final_clip = final_clip.with_audio(original_audio)
+            except Exception:
+                pass
+        return final_clip
+
+    def _get_ffmpeg_settings(self) -> tuple[str, int]:
+        """Get FFmpeg settings, applying fast mode if enabled"""
+        ffmpeg_preset = config.ffmpeg_preset
+        ffmpeg_threads = config.ffmpeg_threads
+        if config.ffmpeg_fast_mode:
+            ffmpeg_preset = "ultrafast"
+            ffmpeg_threads = max(ffmpeg_threads, (os.cpu_count() or 2))
+        return ffmpeg_preset, ffmpeg_threads
+
+    def _compose_video_sync(
+        self,
+        slide_images: list[Path],
+        avatar_videos: list[Path],
+        audio_files: list[Path],
+        output_path: Path,
+        video_resolution: str = "hd",
+    ) -> None:
+        """Synchronous video composition implementation"""
+        video_clips: list[Any] = []
+        final_clip: Any = None
+        final_clip_resized: Any = None
+        watermark: Any = None
+
+        try:
+            # Validate inputs
+            self._validate_video_inputs(slide_images, avatar_videos, audio_files)
+
+            # If no avatar videos, fall back to simple image+audio video creation
+            if not avatar_videos:
+                self._create_video_sync(
+                    slide_images, audio_files, output_path, video_resolution
+                )
+                return
+
+            # Create composite clips
+            video_clips = self._create_composite_clips(
+                slide_images, avatar_videos, audio_files
+            )
+
+            if not video_clips:
+                raise ValueError("No valid clips for composition")
+
+            final_clip = concatenate_videoclips(video_clips, method="compose")
+            final_clip = self._apply_watermark(final_clip)
+
+            target_width, target_height = self._get_resolution_dimensions(
+                video_resolution
+            )
+            final_clip_resized = final_clip.with_effects(
+                [Resize(width=target_width, height=target_height)]
+            )
+
+            # Get FFmpeg settings
+            ffmpeg_preset, ffmpeg_threads = self._get_ffmpeg_settings()
+
+            # Write video file
+            final_clip_resized.write_videofile(
+                str(output_path),
+                fps=config.ffmpeg_fps,
+                codec=config.ffmpeg_codec,
+                audio_codec=config.ffmpeg_audio_codec,
+                threads=ffmpeg_threads,
+                preset=ffmpeg_preset,
+                bitrate=config.ffmpeg_bitrate,
+                audio_bitrate=config.ffmpeg_audio_bitrate,
+                temp_audiofile=str(Path(output_path).parent / "temp_audio.m4a"),
+                remove_temp=True,
+                logger=None,
+            )
+
+        except Exception as e:
+            logger.error(f"Error composing video: {e}")
+            raise
+        finally:
+            # Safely close all clips
+            with contextlib.suppress(Exception):
+                self._safe_close_clips(video_clips)
+            if final_clip is not None:
+                self._safe_close_clip(final_clip)
+            if final_clip_resized is not None:
+                self._safe_close_clip(final_clip_resized)
+            if watermark is not None:
+                self._safe_close_clip(watermark)
             gc.collect()
 
     async def _compose_video_with_local_files(
@@ -395,92 +609,22 @@ class VideoComposer:
         output_path: Path,
         video_resolution: str = "hd",
     ) -> None:
-        def _compose_video_sync() -> None:
-            try:
-                if not slide_images:
-                    raise ValueError("No slide images provided")
-                # If no avatar videos, fall back to simple image+audio video creation
-                if not avatar_videos:
-                    self._create_video_sync(
-                        slide_images, audio_files, output_path, video_resolution
-                    )
-                    return
-                if len(slide_images) != len(avatar_videos) or len(slide_images) != len(
-                    audio_files
-                ):
-                    logger.warning(
-                        "Mismatched counts; attempting best-effort composition"
-                    )
-                video_clips = []
-                num_segments = min(
-                    len(slide_images), len(avatar_videos), len(audio_files)
-                )
-                for i in range(num_segments):
-                    image_path = slide_images[i]
-                    avatar_path = avatar_videos[i]
-                    audio_path = audio_files[i]
-                    if not image_path.exists() or not avatar_path.exists():
-                        continue
-                    bg_clip = ImageClip(str(image_path))
-                    with AudioFileClip(str(audio_path)) as audio_clip:
-                        duration = audio_clip.duration
-                    bg_clip = bg_clip.with_duration(duration)
-                    fg_clip = VideoFileClip(str(avatar_path)).with_duration(duration)
-                    fg_clip = fg_clip.resize(height=int(bg_clip.h * 0.9))
-                    fg_clip = fg_clip.with_position(
-                        (
-                            int((bg_clip.w - fg_clip.w) / 2),
-                            int((bg_clip.h - fg_clip.h) / 2),
-                        )
-                    )
-                    comp_clip = CompositeVideoClip([bg_clip, fg_clip])
-                    from contextlib import suppress
-
-                    with suppress(Exception):
-                        comp_clip = comp_clip.with_audio(AudioFileClip(str(audio_path)))
-                    video_clips.append(comp_clip)
-                if not video_clips:
-                    raise ValueError("No valid clips for composition")
-                final_clip = concatenate_videoclips(video_clips, method="compose")
-                watermark = self._create_watermark(final_clip)
-                if watermark is not None:
-                    try:
-                        original_audio = final_clip.audio
-                        final_clip = CompositeVideoClip([final_clip, watermark])
-                        if original_audio is not None:
-                            final_clip = final_clip.with_audio(original_audio)
-                    except Exception:
-                        pass
-                target_width, target_height = self._get_resolution_dimensions(
-                    video_resolution
-                )
-                final_clip_resized = final_clip.with_effects(
-                    [Resize(width=target_width, height=target_height)]
-                )
-                final_clip_resized.write_videofile(
-                    str(output_path),
-                    fps=config.ffmpeg_fps,
-                    codec=config.ffmpeg_codec,
-                    audio_codec=config.ffmpeg_audio_codec,
-                    threads=config.ffmpeg_threads,
-                    preset=config.ffmpeg_preset,
-                    bitrate=config.ffmpeg_bitrate,
-                    audio_bitrate=config.ffmpeg_audio_bitrate,
-                    temp_audiofile=str(Path(output_path).parent / "temp_audio.m4a"),
-                    remove_temp=True,
-                    logger=None,
-                )
-            except Exception as e:
-                logger.error(f"Error composing video: {e}")
-                raise
-            finally:
-                gc.collect()
-
+        """Compose video with local files using thread pool executor"""
         loop = asyncio.get_event_loop()
         with ThreadPoolExecutor(max_workers=1) as executor:
             try:
                 await asyncio.wait_for(
-                    loop.run_in_executor(executor, _compose_video_sync), timeout=1800
+                    loop.run_in_executor(
+                        executor,
+                        lambda: self._compose_video_sync(
+                            slide_images,
+                            avatar_videos,
+                            audio_files,
+                            output_path,
+                            video_resolution,
+                        ),
+                    ),
+                    timeout=1800,
                 )
             except TimeoutError:
                 raise Exception(

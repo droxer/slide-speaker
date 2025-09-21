@@ -1,28 +1,20 @@
 """
-Subtitle generation module for SlideSpeaker (subtitle package).
+Subtitle generation facade for SlideSpeaker.
 
-Generates SRT and VTT subtitles from scripts and audio, using
-multilingual sentence splitting and locale-aware timing allocation.
+Delegates SRT and VTT content creation to dedicated modules to avoid duplication.
 """
 
-from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
 from loguru import logger
 
-from ..audio import AudioGenerator
-from ..configs.locales import locale_utils
-from .text_segmentation import split_sentences
-from .timing import calculate_chunk_durations
+from .srt_generator import generate_srt_content
+from .vtt_generator import generate_vtt_content
 
 
 class SubtitleGenerator:
-    """Generate SRT and VTT subtitle files from scripts and audio files"""
-
-    def __init__(self) -> None:
-        # Reuse shared audio duration helper to avoid duplication
-        self.audio_generator = AudioGenerator()
+    """Generate SRT and VTT subtitle files from scripts and audio files."""
 
     def generate_subtitles(
         self,
@@ -32,245 +24,62 @@ class SubtitleGenerator:
         language: str = "english",
     ) -> tuple[str, str]:
         """
-        Generate SRT and VTT subtitle files
+        Generate SRT and VTT subtitle files and write them next to `video_path`.
 
-        Args:
-            scripts: List of script dictionaries with slide_number and script content
-            audio_files: List of audio file paths corresponding to each script
-            video_path: Path to the final video file (used for naming subtitles)
-            language: Language of the subtitles
-
-        Returns:
-            Tuple of (srt_path, vtt_path) paths to generated subtitle files
+        Returns tuple of (srt_path, vtt_path) as strings.
         """
         try:
             logger.info(
                 f"Generating subtitles for {len(scripts)} scripts and {len(audio_files)} audio files"
             )
-            # Validate inputs
-            if not scripts:
-                logger.warning("No scripts provided for subtitle generation")
-                scripts = []
 
-            if not audio_files:
-                logger.warning("No audio files provided for subtitle generation")
-                audio_files = []
+            # Normalize inputs
+            scripts = scripts or []
+            audio_files = audio_files or []
 
-            # Filter out empty scripts
-            valid_scripts = []
-            valid_audio_files = []
-
+            # Filter to scripts with non-empty text; align audio list by index
+            valid_scripts: list[dict[str, Any]] = []
+            valid_audio_files: list[Path] = []
             for i, script_data in enumerate(scripts):
-                script_text = (
-                    script_data.get("script", "").strip() if script_data else ""
-                )
-                if script_text:
-                    valid_scripts.append(script_data)
-                    # Match with corresponding audio file if available
-                    if i < len(audio_files):
-                        valid_audio_files.append(audio_files[i])
-                    else:
-                        # Use a dummy path if no audio file is available
-                        valid_audio_files.append(
-                            Path(f"/tmp/dummy_audio_{len(valid_audio_files)}.mp3")
-                        )
+                text = (script_data or {}).get("script", "").strip()
+                if not text:
+                    continue
+                valid_scripts.append(script_data)
+                if i < len(audio_files):
+                    valid_audio_files.append(audio_files[i])
+
+            srt_path = video_path.with_suffix(".srt")
+            vtt_path = video_path.with_suffix(".vtt")
 
             if not valid_scripts:
-                logger.warning("No valid scripts found for subtitle generation")
                 # Create empty subtitle files
-                srt_path = video_path.with_suffix(".srt")
-                vtt_path = video_path.with_suffix(".vtt")
-
-                # Write empty SRT file with header only
                 with open(srt_path, "w", encoding="utf-8") as f:
                     f.write("")
-
-                # Write empty VTT file with header only
                 with open(vtt_path, "w", encoding="utf-8") as f:
                     f.write("WEBVTT\n\n")
-
                 logger.info(f"Created empty subtitle files: {srt_path}, {vtt_path}")
                 return str(srt_path), str(vtt_path)
 
-            logger.info(f"Generating subtitles for {len(valid_scripts)} valid scripts")
-
-            # Generate SRT subtitles
-            srt_content = self._generate_srt_content(
+            # Build contents via dedicated modules
+            srt_content = generate_srt_content(
                 valid_scripts, valid_audio_files, language
             )
-            srt_path = video_path.with_suffix(".srt")
+            vtt_content = generate_vtt_content(
+                valid_scripts, valid_audio_files, language
+            )
 
-            # Write SRT file
+            # Write files
             with open(srt_path, "w", encoding="utf-8") as f:
                 f.write(srt_content)
-
-            # Generate VTT subtitles
-            vtt_content = self._generate_vtt_content(
-                valid_scripts, valid_audio_files, language
-            )
-            vtt_path = video_path.with_suffix(".vtt")
-
-            # Write VTT file
             with open(vtt_path, "w", encoding="utf-8") as f:
                 f.write(vtt_content)
 
-            logger.info(f"Generated subtitles for {len(valid_scripts)} scripts")
-            logger.info(f"SRT path: {srt_path}")
-            logger.info(f"VTT path: {vtt_path}")
-
-            # Verify files were created
-            import os
-
-            if os.path.exists(srt_path):
-                logger.info(
-                    f"SRT file created successfully, size: {os.path.getsize(srt_path)} bytes"
-                )
-            else:
-                logger.error(f"Failed to create SRT file at {srt_path}")
-
-            if os.path.exists(vtt_path):
-                logger.info(
-                    f"VTT file created successfully, size: {os.path.getsize(vtt_path)} bytes"
-                )
-            else:
-                logger.error(f"Failed to create VTT file at {vtt_path}")
+            logger.info(
+                f"Generated subtitles: SRT={srt_path} (len={len(srt_content)}), VTT={vtt_path} (len={len(vtt_content)})"
+            )
 
             return str(srt_path), str(vtt_path)
 
         except Exception as e:
             logger.error(f"Error generating subtitles: {e}")
             raise
-
-    def _generate_srt_content(
-        self,
-        scripts: list[dict[str, Any]],
-        audio_files: list[Path],
-        language: str = "english",
-    ) -> str:
-        """
-        Generate SRT subtitle content with text splitting for reasonable length
-        """
-        if not scripts or not audio_files:
-            return ""
-
-        logger.info(f"Generating SRT content for language: {language}")
-
-        srt_lines = []
-        start_time = timedelta(seconds=0)
-        subtitle_number = 1
-
-        for _i, (script_data, audio_path) in enumerate(
-            zip(scripts, audio_files, strict=False)
-        ):
-            script_text = script_data.get("script", "").strip()
-            if not script_text:
-                continue
-
-            duration = self.audio_generator._get_audio_duration(audio_path)
-
-            text_chunks = self._split_text_for_subtitles(script_text, language)
-            chunk_durations = calculate_chunk_durations(
-                duration, text_chunks, script_text, language
-            )
-
-            for j, (chunk, chunk_duration) in enumerate(
-                zip(text_chunks, chunk_durations, strict=False)
-            ):
-                chunk_start_time = start_time
-                if j == len(text_chunks) - 1:
-                    elapsed_time = sum(chunk_durations[:j])
-                    chunk_end_time = start_time + timedelta(
-                        seconds=duration - elapsed_time
-                    )
-                else:
-                    chunk_end_time = start_time + timedelta(seconds=chunk_duration)
-
-                start_timestamp = self._format_srt_timestamp(chunk_start_time)
-                end_timestamp = self._format_srt_timestamp(chunk_end_time)
-
-                srt_lines.append(str(subtitle_number))
-                srt_lines.append(f"{start_timestamp} --> {end_timestamp}")
-                srt_lines.append(chunk)
-                srt_lines.append("")
-
-                subtitle_number += 1
-                start_time = chunk_end_time
-
-        return "\n".join(srt_lines)
-
-    def _generate_vtt_content(
-        self,
-        scripts: list[dict[str, Any]],
-        audio_files: list[Path],
-        language: str = "english",
-    ) -> str:
-        """Generate VTT subtitle content with text splitting for reasonable length"""
-        if not scripts or not audio_files:
-            return "WEBVTT\n\n"
-
-        logger.info(f"Generating VTT content for language: {language}")
-
-        lang_code = locale_utils.get_locale_code(language)
-        vtt_lines = [f"WEBVTT Language: {lang_code}", ""]
-        start_time = timedelta(seconds=0)
-
-        for _i, (script_data, audio_path) in enumerate(
-            zip(scripts, audio_files, strict=False)
-        ):
-            script_text = script_data.get("script", "").strip()
-            if not script_text:
-                continue
-
-            duration = self.audio_generator._get_audio_duration(audio_path)
-
-            text_chunks = self._split_text_for_subtitles(script_text, language)
-            chunk_durations = calculate_chunk_durations(
-                duration, text_chunks, script_text, language
-            )
-
-            for j, (chunk, chunk_duration) in enumerate(
-                zip(text_chunks, chunk_durations, strict=False)
-            ):
-                chunk_start_time = start_time
-                if j == len(text_chunks) - 1:
-                    elapsed_time = sum(chunk_durations[:j])
-                    chunk_end_time = start_time + timedelta(
-                        seconds=duration - elapsed_time
-                    )
-                else:
-                    chunk_end_time = start_time + timedelta(seconds=chunk_duration)
-
-                start_timestamp = self._format_vtt_timestamp(chunk_start_time)
-                end_timestamp = self._format_vtt_timestamp(chunk_end_time)
-
-                vtt_lines.append(f"{start_timestamp} --> {end_timestamp}")
-                vtt_lines.append(chunk)
-                vtt_lines.append("")
-
-                start_time = chunk_end_time
-
-        return "\n".join(vtt_lines)
-
-    def _split_text_for_subtitles(self, text: str, language: str) -> list[str]:
-        # Use the shared sentence splitter with fallback chunk length tailored
-        # Slightly shorter fallback for readability
-        chunks = split_sentences(text, max_fallback_len=60)
-        if chunks:
-            return chunks
-        return [text]
-
-    def _format_srt_timestamp(self, td: timedelta) -> str:
-        total_seconds = td.total_seconds()
-        hours = int(total_seconds // 3600)
-        minutes = int((total_seconds % 3600) // 60)
-        seconds = int(total_seconds % 60)
-        milliseconds = int((total_seconds % 1) * 1000)
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d},{milliseconds:03d}"
-
-    def _format_vtt_timestamp(self, td: timedelta) -> str:
-        total_seconds = td.total_seconds()
-        hours = int(total_seconds // 3600)
-        minutes = int((total_seconds % 3600) // 60)
-        seconds = int(total_seconds % 60)
-        milliseconds = int((total_seconds % 1) * 1000)
-        return f"{hours:02d}:{minutes:02d}:{seconds:02d}.{milliseconds:03d}"

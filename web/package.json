@@ -7,6 +7,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.51.0",
     "@testing-library/jest-dom": "^5.16.4",
     "@testing-library/react": "^13.3.0",
     "@testing-library/user-event": "^13.5.0",
@@ -50,13 +51,8 @@
   },
   "proxy": "http://localhost:8000",
   "devDependencies": {
-    "sass": "^1.92.0",
+    "sass": "1.92.0",
     "sass-embedded": "^1.77.0",
-    "pre-commit": "^3.5.0"
-  },
-  "pnpm": {
-    "overrides": {
-      "sass-loader": "^13.3.2"
-    }
+    "sass-loader": "12.6.0"
   }
 }

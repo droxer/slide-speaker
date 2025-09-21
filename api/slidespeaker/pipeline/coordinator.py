@@ -14,18 +14,23 @@ from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 
 # Import specialized coordinators
-from .pdf_coordinator import process_pdf_file
-from .slide_coordinator import process_slide_file
+from .podcast import from_pdf as podcast_from_pdf
+from .video import from_pdf as video_from_pdf
+from .video import from_slide as video_from_slide
 
 
 async def accept_task(
     file_id: str,
     file_path: Path,
     file_ext: str,
+    source_type: str | None = None,
     voice_language: str = "english",
     subtitle_language: str | None = None,
+    transcript_language: str | None = None,
     generate_avatar: bool = True,
     generate_subtitles: bool = True,
+    generate_podcast: bool = False,
+    generate_video: bool = True,
     task_id: str | None = None,
 ) -> None:
     """
@@ -46,16 +51,39 @@ async def accept_task(
         if subtitle_language is not None
         else None
     )
-
-    logger.info(
-        f"Initiating AI presentation generation for file: {file_id}, format: {file_ext}"
+    transcript_language = (
+        locale_utils.normalize_language(transcript_language)
+        if transcript_language is not None
+        else None
     )
+
+    # Require a valid source_type. No implicit fallback.
+    if not source_type or str(source_type).lower() not in {"pdf", "slides"}:
+        raise ValueError(
+            f"source_type is required and must be 'pdf' or 'slides' (got: {source_type!r} for file_ext {file_ext})"
+        )
+    src = str(source_type).lower()
     logger.info(
+        f"Initiating AI presentation generation for file: {file_id}, format: {file_ext}, source_type: {src}"
+    )
+    logger.debug(
         f"Voice language: {voice_language}, Subtitle language: {subtitle_language}"
     )
-    logger.info(
-        f"Generate avatar: {generate_avatar}, Generate subtitles: {generate_subtitles}"
-    )
+    # Log options; omit avatar for PDFs to avoid confusion
+    if file_ext.lower() == ".pdf":
+        logger.debug(
+            "Generate subtitles: %s, Generate podcast: %s, Generate video: %s",
+            generate_subtitles,
+            generate_podcast,
+            generate_video,
+        )
+    else:
+        logger.debug(
+            "Generate avatar: %s, Generate subtitles: %s, Generate podcast: %s",
+            generate_avatar,
+            generate_subtitles,
+            generate_podcast,
+        )
 
     # Log file validation
     if not file_path.exists():
@@ -79,15 +107,18 @@ async def accept_task(
             file_path.name,
             voice_language,
             subtitle_language,
+            transcript_language,
             "hd",  # video_resolution (default to HD)
             generate_avatar,
             generate_subtitles,
+            generate_video,
+            generate_podcast,
         )
         state = await state_manager.get_state(file_id)
         # Store task_id in state for easier access
         if task_id and state:
             state["task_id"] = task_id
-            await state_manager._save_state(file_id, state)
+            await state_manager.save_state(file_id, state)
     else:
         # Update existing state with new parameters (in case they've changed)
         if state:
@@ -95,25 +126,45 @@ async def accept_task(
             state["subtitle_language"] = subtitle_language
             state["generate_avatar"] = generate_avatar
             state["generate_subtitles"] = generate_subtitles
+            state["generate_podcast"] = generate_podcast
+            state["generate_video"] = generate_video
+            if transcript_language is not None:
+                state["podcast_transcript_language"] = transcript_language
             # Store task_id in state for easier access
             if task_id:
                 state["task_id"] = task_id
-            await state_manager._save_state(file_id, state)
+            await state_manager.save_state(file_id, state)
 
     # Delegate to specialized coordinators based on file type
-    if file_ext.lower() == ".pdf":
-        # Use PDF-specific coordinator
-        await process_pdf_file(
-            file_id,
-            file_path,
-            voice_language,
-            subtitle_language,
-            generate_subtitles,
-            task_id,
+    if src == "pdf":
+        logger.info(
+            f"PDF processing - generate_video: {generate_video}, generate_podcast: {generate_podcast}"
         )
+        # Run video pipeline if requested
+        if generate_video:
+            logger.info(f"Starting video pipeline for PDF file {file_id}")
+            await video_from_pdf(
+                file_id,
+                file_path,
+                voice_language,
+                subtitle_language,
+                generate_subtitles,
+                generate_video,  # Pass the actual parameter
+                task_id,
+            )
+        # Run podcast pipeline if requested
+        if generate_podcast:
+            logger.info(f"Starting podcast pipeline for PDF file {file_id}")
+            await podcast_from_pdf(
+                file_id,
+                file_path,
+                voice_language,
+                transcript_language,
+                task_id,
+            )
     else:
-        # Use PPT/PPTX-specific coordinator
-        await process_slide_file(
+        # Slides only support video pipeline
+        await video_from_slide(
             file_id,
             file_path,
             file_ext,

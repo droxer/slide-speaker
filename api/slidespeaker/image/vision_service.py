@@ -11,45 +11,43 @@ from pathlib import Path
 from typing import Any
 
 from loguru import logger
-from openai import OpenAI
 
 from slidespeaker.configs.config import config
 from slidespeaker.llm import chat_completion
 
 # Prompt for slide image analysis optimized for script generation
 SLIDE_ANALYSIS_PROMPT = """
-Analyze this presentation slide image specifically for creating an engaging presentation script.
+Analyze this presentation slide to enable a deeply understood, audience-friendly narration.
 
-Focus on these presentation-specific aspects:
-1. **Slide Type**: Identify if this is a title slide, content slide, transition slide, or conclusion
-2. **Speaking Points**: Extract key talking points in the order they should be presented
-3. **Visual Emphasis**: Identify what's visually emphasized that should be verbally highlighted
-4. **Slide Flow**: How does this slide connect to the overall presentation narrative?
-5. **Audience Engagement**: What elements would benefit from explanation or elaboration?
-6. **Context Clues**: What background context would help explain this slide's content?
-7. **Transition Cues**: How should the speaker transition to/from this slide?
+Your analysis must uncover meaning beyond surface text:
+1) Slide Role: title / core content / transition / conclusion, and its objective
+2) Core Ideas: the few essential concepts the audience must grasp
+3) Relationships: cause–effect, comparisons, sequences, part–whole structures
+4) Definitions: clarify jargon, acronyms, and domain-specific terms
+5) Evidence: numbers, visuals, or examples that support claims; explain what they show
+6) Likely Questions: anticipate confusions and what to address to resolve them
+7) Narrative Flow: how to lead into this slide and where to go next (transition cues)
 
-Text Content (extract exactly as shown):
-- All visible text including titles, bullet points, labels, and captions
-- Any code snippets or technical terms that need pronunciation guidance
-- Numbers, statistics, and data labels
+Text Extraction (verbatim where possible):
+- Titles, bullets, labels, captions, axis labels, legends, footnotes
+- Code or formulas that may need clarification or pronunciation notes
 
-Visual Analysis:
-- Charts/graphs: Describe the data story and key insights
-- Diagrams: Explain the process or relationships shown
-- Images: Describe what's shown and why it's relevant
-- Layout: How visual hierarchy guides the presentation flow
+Visual Interpretation:
+- Charts/graphs: describe the story in the data (trend, comparison, outliers)
+- Diagrams: explain the process or relationships
+- Images: describe what’s shown and why it matters here
+- Layout: what the visual hierarchy suggests for speaking order
 
-Provide your analysis in a structured format that directly supports script generation,
-focusing on what a presenter should say about each element.
+Return a structured analysis optimized for script generation.
+Do not write the script; extract the insights a narrator needs to explain
+the slide with depth and clarity.
 """
 
 # System prompt for slide analysis
-SLIDE_ANALYSIS_SYSTEM_PROMPT = (
-    "You are an expert presentation coach and script writer. Analyze slide images to extract "
-    "content that directly supports creating engaging presentation scripts. Focus on speaking points, "
-    "narrative flow, and audience engagement strategies."
-)
+SLIDE_ANALYSIS_SYSTEM_PROMPT = """You are an expert presentation coach and script writer.
+Analyze slide images to extract content that directly supports creating engaging
+presentation scripts. Focus on speaking points, narrative flow, and audience
+engagement strategies."""
 
 
 class VisionService:
@@ -57,12 +55,13 @@ class VisionService:
 
     def __init__(self) -> None:
         """Initialize the vision service with configured provider"""
-        self.client: OpenAI | None = None
+        # Client is managed by shared LLM helpers (chat_completion). Keep attribute
+        # for backward compatibility but don't require it at runtime.
+        self.client = None
         if not config.openai_api_key:
-            logger.error("OPENAI_API_KEY not set; vision analysis will fallback")
-        else:
-            # Client obtained via llm helpers; keep attribute unused for backward compat
-            self.client = None
+            logger.warning(
+                "OPENAI_API_KEY not set; vision analysis will fall back gracefully"
+            )
 
     def _encode_image(self, image_path: Path) -> str:
         """Encode image to base64 for OpenAI API"""
@@ -97,7 +96,7 @@ Additional Context from Slide Text Extraction:
 
 Use this extracted text to enhance your analysis and ensure consistency between visual and textual content."""
 
-            assert self.client is not None
+            # Use shared chat_completion helper; do not depend on self.client
             model_name = config.vision_model
             analysis_text = chat_completion(
                 model=model_name,
