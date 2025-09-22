@@ -28,6 +28,9 @@ dependencies = [
     "SQLAlchemy>=2.0.30",
     "asyncpg>=0.29.0",
     "greenlet>=3.2.4",
+    "authlib>=1.2.0",
+    "httpx>=0.24.0",
+    "itsdangerous>=2.1.2",
 ]
 
 [project.optional-dependencies]

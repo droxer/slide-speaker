@@ -205,6 +205,24 @@ function App() {
     },
   );
 
+  // Handle Google OAuth callback
+  useEffect(() => {
+    // Check if we have auth parameters in the URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionToken = urlParams.get('session_token');
+
+    if (sessionToken) {
+      // Save session token to localStorage
+      localStorage.setItem('slidespeaker_session_token', sessionToken);
+
+      // Clear URL parameters to avoid token leakage
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      // Reload the page to show the authenticated view
+      window.location.reload();
+    }
+  }, []);
+
   // Apply/remove theme classes on body
   useEffect(() => {
     const isFlat = uiTheme === "flat";

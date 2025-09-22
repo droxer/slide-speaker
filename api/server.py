@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from slidespeaker.configs.config import config
 from slidespeaker.configs.logging_config import setup_logging
 from slidespeaker.routes.audio_downloads import router as audio_downloads_router
+from slidespeaker.routes.auth import router as auth_router
 from slidespeaker.routes.diagnostic import router as diagnostic_router
 from slidespeaker.routes.downloads import router as downloads_router
 from slidespeaker.routes.health import router as health_router
@@ -63,6 +64,7 @@ app.add_middleware(
 )
 
 # Include all route modules
+app.include_router(auth_router)
 app.include_router(upload_router)
 app.include_router(tasks_router)
 app.include_router(progress_router)
