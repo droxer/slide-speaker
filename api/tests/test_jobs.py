@@ -4,8 +4,8 @@ Unit tests for the background jobs package.
 
 from unittest.mock import patch
 
-from slidespeaker.background_jobs import file_purger
-from slidespeaker.background_jobs.file_purger import FilePurger
+from slidespeaker.jobs import file_purger
+from slidespeaker.jobs.file_purger import FilePurger
 
 
 class TestBackgroundJobs:
@@ -19,8 +19,8 @@ class TestBackgroundJobs:
         """Test that FilePurger can be instantiated."""
         with (
             patch("slidespeaker.storage.StorageConfig"),
-            patch("slidespeaker.background_jobs.file_purger.get_storage_provider"),
-            patch("slidespeaker.background_jobs.file_purger.config"),
+            patch("slidespeaker.jobs.file_purger.get_storage_provider"),
+            patch("slidespeaker.jobs.file_purger.config"),
         ):
             purger = FilePurger()
             assert isinstance(purger, FilePurger)

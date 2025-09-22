@@ -259,7 +259,7 @@ async def process_file_purge_task(task_id: str, task: dict[str, Any]) -> bool:
             return False
 
         # Import and use file purger
-        from slidespeaker.background_jobs.file_purger import file_purger
+        from slidespeaker.jobs.file_purger import file_purger
 
         await file_purger.purge_task_files(file_id)
 

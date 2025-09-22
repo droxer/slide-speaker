@@ -197,3 +197,4 @@ OSS_REGION=...
 
 -- do NOT git commit
 -- do NOT check the node_modules and .venv
+- always use uv for python, pnpm for frontend

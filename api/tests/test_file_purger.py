@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from slidespeaker.background_jobs.file_purger import FilePurger
+from slidespeaker.jobs.file_purger import FilePurger
 
 
 class TestFilePurger:
@@ -17,8 +17,8 @@ class TestFilePurger:
         """Create a FilePurger instance with mocked dependencies."""
         with (
             patch("slidespeaker.storage.StorageConfig"),
-            patch("slidespeaker.background_jobs.file_purger.get_storage_provider"),
-            patch("slidespeaker.background_jobs.file_purger.config"),
+            patch("slidespeaker.jobs.file_purger.get_storage_provider"),
+            patch("slidespeaker.jobs.file_purger.config"),
         ):
             purger = FilePurger()
             purger.storage_provider = MagicMock()
@@ -29,9 +29,7 @@ class TestFilePurger:
     async def test_enqueue_file_purge_success(self, file_purger):
         """Test that enqueue_file_purge successfully submits a task."""
         # Mock the task queue
-        with patch(
-            "slidespeaker.background_jobs.file_purger.task_queue"
-        ) as mock_task_queue:
+        with patch("slidespeaker.jobs.file_purger.task_queue") as mock_task_queue:
             mock_task_queue.submit_task = AsyncMock(return_value="test_task_id")
 
             # Call the method
@@ -47,9 +45,7 @@ class TestFilePurger:
     async def test_enqueue_file_purge_failure(self, file_purger):
         """Test that enqueue_file_purge handles submission failures gracefully."""
         # Mock the task queue to raise an exception
-        with patch(
-            "slidespeaker.background_jobs.file_purger.task_queue"
-        ) as mock_task_queue:
+        with patch("slidespeaker.jobs.file_purger.task_queue") as mock_task_queue:
             mock_task_queue.submit_task = AsyncMock(side_effect=Exception("Test error"))
 
             # Call the method
@@ -65,11 +61,9 @@ class TestFilePurger:
         mock_state = {"file_path": "/test/path/file.pdf"}
 
         with (
-            patch(
-                "slidespeaker.background_jobs.file_purger.state_manager"
-            ) as mock_state_manager,
-            patch("slidespeaker.background_jobs.file_purger.config") as mock_config,
-            patch("slidespeaker.background_jobs.file_purger.shutil") as mock_shutil,
+            patch("slidespeaker.jobs.file_purger.state_manager") as mock_state_manager,
+            patch("slidespeaker.jobs.file_purger.config") as mock_config,
+            patch("slidespeaker.jobs.file_purger.shutil") as mock_shutil,
         ):
             mock_state_manager.get_state = AsyncMock(return_value=mock_state)
             mock_config.storage_provider = "local"
@@ -85,9 +79,7 @@ class TestFilePurger:
     async def test_purge_task_files_no_state(self, file_purger):
         """Test that purge_task_files handles missing state gracefully."""
         # Mock state manager to return None
-        with patch(
-            "slidespeaker.background_jobs.file_purger.state_manager"
-        ) as mock_state_manager:
+        with patch("slidespeaker.jobs.file_purger.state_manager") as mock_state_manager:
             mock_state_manager.get_state = AsyncMock(return_value=None)
 
             # Call the method (should not raise an exception)
@@ -99,9 +91,7 @@ class TestFilePurger:
         # Mock state manager to return state without file_path
         mock_state = {}
 
-        with patch(
-            "slidespeaker.background_jobs.file_purger.state_manager"
-        ) as mock_state_manager:
+        with patch("slidespeaker.jobs.file_purger.state_manager") as mock_state_manager:
             mock_state_manager.get_state = AsyncMock(return_value=mock_state)
 
             # Call the method (should not raise an exception)

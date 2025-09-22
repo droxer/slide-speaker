@@ -263,7 +263,7 @@ async def cancel_task(task_id: str) -> dict[str, Any]:
             remaining_tasks = int(remaining_tasks_result or 0)
             if remaining_tasks == 0:
                 # No remaining tasks, enqueue file purge
-                from slidespeaker.background_jobs.file_purger import file_purger
+                from slidespeaker.jobs.file_purger import file_purger
 
                 await file_purger.enqueue_file_purge(file_id)
         except Exception as e:
@@ -445,7 +445,7 @@ async def purge_task(task_id: str) -> dict[str, Any]:
         if file_id and remaining == 0:
             try:
                 # Import here to avoid circular imports
-                from slidespeaker.background_jobs.file_purger import file_purger
+                from slidespeaker.jobs.file_purger import file_purger
 
                 await file_purger.enqueue_file_purge(file_id)
             except Exception as e:
