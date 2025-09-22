@@ -6,6 +6,7 @@ It handles task submission, status tracking, and distributed processing coordina
 
 import json
 import uuid
+from pathlib import Path
 from typing import Any, cast
 
 from loguru import logger
@@ -67,6 +68,57 @@ class RedisTaskQueue:
                 await insert_task(db_task)
             except Exception as e:
                 logger.warning(f"Failed to persist task {task_id} in DB: {e}")
+
+        # Handle state management for presentation processing tasks
+        if task_type in ["video", "podcast", "both"]:
+            try:
+                # Import here to avoid circular imports
+                from slidespeaker.core.state_manager import state_manager
+
+                # Extract state-related parameters
+                file_id = kwargs.get("file_id")
+                file_path = kwargs.get("file_path")
+                file_ext = kwargs.get("file_ext")
+                filename = kwargs.get("filename")
+                source_type = kwargs.get("source_type")
+                voice_language = kwargs.get("voice_language", "english")
+                subtitle_language = kwargs.get("subtitle_language")
+                transcript_language = kwargs.get("transcript_language")
+                video_resolution = kwargs.get("video_resolution", "hd")
+                generate_avatar = kwargs.get("generate_avatar", True)
+                generate_subtitles = kwargs.get("generate_subtitles", True)
+                generate_video = kwargs.get("generate_video", True)
+                generate_podcast = kwargs.get("generate_podcast", False)
+
+                if file_id and file_path and file_ext:
+                    # Create initial state (task-first; mirrors to task alias and mappings)
+                    await state_manager.create_state(
+                        file_id,
+                        Path(file_path),
+                        file_ext,
+                        filename,
+                        voice_language,
+                        subtitle_language,
+                        transcript_language,
+                        video_resolution,
+                        generate_avatar,
+                        generate_subtitles,
+                        generate_video,
+                        generate_podcast,
+                        task_id=task_id,
+                        source_type=source_type,
+                    )
+
+                    # Bind task_id <-> file_id (redundant when create_state passed task_id; kept for safety)
+                    try:
+                        await state_manager.bind_task(file_id, task_id)
+                    except Exception as save_err:
+                        logger.warning(
+                            f"Failed to bind task_id in state manager: {save_err}"
+                        )
+
+            except Exception as e:
+                logger.warning(f"Failed to create state for task {task_id}: {e}")
 
         # Add task ID to queue - use RPUSH to maintain FIFO order
         queue_result = await self.redis_client.rpush(self.queue_key, task_id)  # type: ignore

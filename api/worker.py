@@ -9,6 +9,7 @@ import asyncio
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -115,6 +116,10 @@ async def process_task(task_id: str) -> bool:
         f"Task {task_id} retrieved from Redis with status: {task.get('status', 'unknown')}"
     )
     logger.debug(f"Full task data: {task}")
+
+    # Handle file purge tasks separately
+    if task.get("task_type") == "file_purge":
+        return await process_file_purge_task(task_id, task)
 
     if task["status"] == "cancelled":
         logger.info(f"Task {task_id} was cancelled, skipping processing")
@@ -233,6 +238,42 @@ async def process_task(task_id: str) -> bool:
         progress_monitor.stop_monitoring()
         if not monitor_task.done():
             monitor_task.cancel()
+
+
+async def process_file_purge_task(task_id: str, task: dict[str, Any]) -> bool:
+    """Process a file purge task"""
+    try:
+        logger.info(f"Processing file purge task {task_id}")
+
+        # Update task status to processing
+        await task_queue.update_task_status(task_id, "processing")
+
+        # Extract file_id from task kwargs
+        kwargs = task.get("kwargs", {})
+        file_id = kwargs.get("file_id")
+
+        if not file_id:
+            error_msg = "Missing file_id for file purge task"
+            logger.error(error_msg)
+            await task_queue.update_task_status(task_id, "failed", error=error_msg)
+            return False
+
+        # Import and use file purger
+        from slidespeaker.background_jobs.file_purger import file_purger
+
+        await file_purger.purge_task_files(file_id)
+
+        # Mark task as completed
+        await task_queue.update_task_status(task_id, "completed")
+        logger.info(
+            f"File purge task {task_id} completed successfully for file_id: {file_id}"
+        )
+        return True
+
+    except Exception as e:
+        logger.error(f"File purge task {task_id} failed: {e}")
+        await task_queue.update_task_status(task_id, "failed", error=str(e))
+        return False
 
 
 async def main() -> None:

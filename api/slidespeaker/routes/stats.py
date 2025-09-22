@@ -9,6 +9,7 @@ from contextlib import suppress
 from typing import Any
 
 from fastapi import APIRouter, Query
+from loguru import logger
 
 from slidespeaker.core.progress_utils import compute_step_percentage
 from slidespeaker.core.state_manager import state_manager
@@ -249,13 +250,26 @@ async def cancel_task(task_id: str) -> dict[str, Any]:
     # Cancel the task
     await task_queue.update_task_status(task_id, "cancelled")
 
-    # Update state via task-id first (and file-id fallback)
+    # Check if this is the last task for the file and enqueue file purge if so
     file_id = task.get("kwargs", {}).get("file_id")
-    try:
-        await state_manager.mark_cancelled_by_task(task_id)
-    except Exception:
-        if file_id:
-            await state_manager.mark_cancelled(file_id)
+    if file_id:
+        try:
+            # Check if there are any remaining tasks for this file
+            from slidespeaker.core.state_manager import state_manager
+
+            remaining_tasks_result = await state_manager.redis_client.scard(
+                f"ss:file2tasks:{file_id}"
+            )  # type: ignore
+            remaining_tasks = int(remaining_tasks_result or 0)
+            if remaining_tasks == 0:
+                # No remaining tasks, enqueue file purge
+                from slidespeaker.background_jobs.file_purger import file_purger
+
+                await file_purger.enqueue_file_purge(file_id)
+        except Exception as e:
+            logger.error(
+                f"Error checking remaining tasks or enqueuing file purge for file_id {file_id}: {e}"
+            )
 
     return {
         "message": "Task cancelled successfully",
@@ -426,6 +440,16 @@ async def purge_task(task_id: str) -> dict[str, Any]:
         # Also remove from DB
         with suppress(Exception):
             await db_delete_task(task_id)
+
+        # Enqueue file purge task if this was the last task for the file
+        if file_id and remaining == 0:
+            try:
+                # Import here to avoid circular imports
+                from slidespeaker.background_jobs.file_purger import file_purger
+
+                await file_purger.enqueue_file_purge(file_id)
+            except Exception as e:
+                logger.error(f"Error enqueuing file purge for file_id {file_id}: {e}")
 
         return {
             "message": "Task purged successfully",
