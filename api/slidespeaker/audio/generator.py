@@ -51,7 +51,6 @@ class AudioGenerator:
             print("Error: TTS service not available")
             return False
         if not text.strip():
-            print("Warning: Empty text provided for audio generation")
             return False
         try:
             output_path_obj = Path(output_path)
@@ -59,26 +58,7 @@ class AudioGenerator:
             await self.tts_service.generate_speech(
                 text, output_path_obj, language, voice
             )
-            if output_path_obj.exists() and output_path_obj.stat().st_size > 0:
-                file_size = output_path_obj.stat().st_size
-                print(f"Generated audio file: {output_path_obj} ({file_size} bytes)")
-                duration = self._get_audio_duration(output_path_obj)
-                if duration > 0:
-                    print(f"Audio duration: {duration:.2f} seconds")
-                    word_count = len(text.split())
-                    if duration > 0:
-                        wpm = (word_count / duration) * 60
-                        print(f"Speech rate: {wpm:.0f} words per minute")
-                        if wpm < 100 or wpm > 300:
-                            print(
-                                f"Warning: Unusual speech rate detected ({wpm:.0f} WPM)"
-                            )
-                return True
-            else:
-                print(
-                    f"Warning: Audio file was not created or is empty at {output_path_obj}"
-                )
-                return False
+            return output_path_obj.exists() and output_path_obj.stat().st_size > 0
         except Exception as e:
             print(f"Error generating audio: {e}")
             return False
@@ -205,7 +185,6 @@ class AudioGenerator:
     def _get_audio_duration(self, audio_path: Path) -> float:
         try:
             if not audio_path.exists() or audio_path.stat().st_size == 0:
-                print(f"Warning: Audio file unavailable or empty: {audio_path}")
                 return self._estimate_duration_from_text(audio_path)
             max_retries = 5
             for attempt in range(max_retries):
@@ -223,8 +202,6 @@ class AudioGenerator:
                         "-show_streams",
                         str(audio_path),
                     ]
-                    if attempt == 0:
-                        print(f"Info: Running ffprobe for {audio_path.name}")
                     result = subprocess.run(
                         cmd, capture_output=True, text=True, timeout=15
                     )

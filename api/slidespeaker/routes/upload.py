@@ -78,16 +78,14 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         # For PDF files, if user selects podcast generation, default to podcast-only unless
         # they explicitly request video as well. This prevents accidental video generation
         # when user only wants podcast.
-        if file_ext == ".pdf" and generate_podcast:
-            logger.info(
-                f"PDF podcast request: generate_video={body.get('generate_video')}, "
-                f"will generate video: {generate_video}"
-            )
+        if (
+            file_ext == ".pdf"
+            and generate_podcast
+            and body.get("generate_video") is not True
+        ):
             # If generate_video is not explicitly set to True, disable video generation
             # This covers cases where generate_video is False, None, or not present
-            if body.get("generate_video") is not True:
-                generate_video = False
-                logger.info("Disabled video generation for podcast-only request")
+            generate_video = False
         if file_ext not in [".pdf", ".pptx", ".ppt"]:
             raise HTTPException(
                 status_code=400, detail="Only PDF and PowerPoint files are supported"
@@ -147,11 +145,6 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         else:  # video
             generate_podcast = False
             generate_video = True
-
-        logger.info(
-            f"Upload normalization - source_type: {source_type}, task_type: {task_type}, "
-            f"generate_video: {generate_video}, generate_podcast: {generate_podcast}"
-        )
 
         # Submit task to Redis task queue (state management is handled internally)
         task_id = await task_queue.submit_task(

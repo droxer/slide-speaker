@@ -56,8 +56,8 @@ class RedisTaskQueue:
         # Store task in Redis
         task_key = self._get_task_key(task_id)
         task_json = json.dumps(task)
-        result = await self.redis_client.set(task_key, task_json)
-        logger.info(f"Task {task_id} stored in Redis with result: {result}")
+        await self.redis_client.set(task_key, task_json)
+        logger.info(f"Task {task_id} stored in Redis")
 
         # Persist in Postgres (optional)
         if db_enabled:
@@ -121,24 +121,12 @@ class RedisTaskQueue:
                 logger.warning(f"Failed to create state for task {task_id}: {e}")
 
         # Add task ID to queue - use RPUSH to maintain FIFO order
-        queue_result = await self.redis_client.rpush(self.queue_key, task_id)  # type: ignore
-        logger.info(
-            f"Task ID {task_id} added to queue {self.queue_key} with RPUSH, result: {queue_result}"
-        )
+        await self.redis_client.rpush(self.queue_key, task_id)  # type: ignore
+        logger.info(f"Task ID {task_id} added to queue")
 
         # Log task summary
         file_id = kwargs.get("file_id", "unknown")
-        logger.info(f"New task {task_id} created for file {file_id} at {created_at}")
-
-        # Verify task was stored and queued
-        stored_task = await self.redis_client.get(task_key)
-        queue_length = await self.redis_client.llen(self.queue_key)  # type: ignore
-        logger.debug(
-            f"Task verification - task stored: {stored_task is not None}, queue length: {queue_length}"
-        )
-
-        if not stored_task:
-            logger.warning(f"Failed to verify task storage for {task_key}")
+        logger.info(f"New task {task_id} created for file {file_id}")
 
         return task_id
 

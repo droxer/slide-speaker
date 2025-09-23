@@ -62,18 +62,11 @@ class TaskProgressMonitor:
                         )
                         last_status = current_status
 
-                    # Log detailed status every 5 checks (every 25 seconds)
-                    if check_count % 5 == 0:
+                    # Log detailed status every 15 checks (every 75 seconds) - reduced from every 5 checks
+                    if check_count % 15 == 0:
                         logger.info(
-                            f"Task {self.task_id} status check #{check_count}: {task['status']}, "
-                            f"updated at: {task.get('updated_at', 'unknown')}"
+                            f"Task {self.task_id} status check #{check_count}: {task['status']}"
                         )
-                    else:
-                        # Reduce debug logging frequency - only log every 25th check (every 125 seconds)
-                        if check_count % 25 == 0:
-                            logger.debug(
-                                f"Task {self.task_id} status: {task['status']}"
-                            )
 
                     # If task is cancelled, stop monitoring
                     if task.get("status") == "cancelled":
@@ -90,8 +83,8 @@ class TaskProgressMonitor:
                         )
                         break
 
-                # Wait before next check
-                await asyncio.sleep(5)  # Check every 5 seconds for faster response
+                # Wait before next check - increased from 5 to 15 seconds
+                await asyncio.sleep(15)
 
             except Exception as e:
                 logger.error(f"Error monitoring task {self.task_id}: {e}")
@@ -115,7 +108,6 @@ async def process_task(task_id: str) -> bool:
     logger.info(
         f"Task {task_id} retrieved from Redis with status: {task.get('status', 'unknown')}"
     )
-    logger.debug(f"Full task data: {task}")
 
     # Handle file purge tasks separately
     if task.get("task_type") == "file_purge":
@@ -150,12 +142,6 @@ async def process_task(task_id: str) -> bool:
         generate_podcast = kwargs.get("generate_podcast", False)
         generate_video = kwargs.get("generate_video", True)
 
-        logger.debug(
-            f"Raw task parameters - task_type: {task_type}, "
-            f"kwargs generate_video: {kwargs.get('generate_video')}, "
-            f"kwargs generate_podcast: {kwargs.get('generate_podcast')}"
-        )
-
         # Override generate_podcast and generate_video only when task_type is explicitly provided
         # - "podcast": podcast only
         # - "both": podcast + video
@@ -171,23 +157,6 @@ async def process_task(task_id: str) -> bool:
             else:  # treat any other explicit value as "video"
                 generate_podcast = False
                 generate_video = True
-
-        logger.debug(
-            "After task_type processing - task_type: {}, generate_video: {}, generate_podcast: {}",
-            task_type,
-            generate_video,
-            generate_podcast,
-        )
-
-        logger.debug(
-            f"Task {task_id} parameters extracted - file_id: {file_id}, "
-            f"file_ext: {file_ext}, task_type: {task_type}, "
-            f"voice_language: {voice_language}, "
-            f"subtitle_language: {subtitle_language}, "
-            f"generate_avatar: {generate_avatar}, "
-            f"generate_podcast: {generate_podcast}, "
-            f"generate_video: {generate_video}"
-        )
 
         # Validate required parameters
         missing_params = []

@@ -231,6 +231,7 @@ See `api/.env.example` for a complete list of configuration options.
   - Classes: `PascalCase`
   - Constants: `UPPER_SNAKE_CASE`
 - Use centralized LLM helpers in `slidespeaker/llm/` instead of direct API calls
+- Minimize excessive logging - use `logger.debug` for detailed information and `logger.info` only for important events
 
 ### Frontend (TypeScript/React)
 - ESLint and TypeScript for code quality
@@ -238,6 +239,18 @@ See `api/.env.example` for a complete list of configuration options.
 - SCSS files for styling with matching component names
 - Use React Query for data fetching
 - Keep functions small and well-typed
+
+### Logging Best Practices
+
+To reduce excessive logging output while maintaining visibility into important events:
+
+1. Use `logger.debug` for detailed information that's useful for troubleshooting but not needed in normal operation
+2. Use `logger.info` for important events that indicate progress or significant state changes
+3. Use `logger.warning` for recoverable issues that might need attention
+4. Use `logger.error` for unrecoverable errors that affect functionality
+5. Avoid logging sensitive information like API keys or user data
+6. Reduce the frequency of periodic status updates (e.g., from every 5 seconds to every 15-30 seconds)
+7. Remove redundant logging statements that provide the same information
 
 ### Testing
 - Backend: Use pytest for tests in `api/tests/`
