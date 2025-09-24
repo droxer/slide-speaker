@@ -467,3 +467,11 @@ The watermark can be configured using the following environment variables:
 - `WATERMARK_TEXT`: Text to display in the watermark (default: "SlideSpeaker AI")
 - `WATERMARK_OPACITY`: Opacity of the watermark (0.0-1.0, default: 0.95)
 - `WATERMARK_SIZE`: Font size of the watermark in pixels (default: 64)
+
+### Watermark Features
+
+- **High visibility**: Thick stroke and high contrast for maximum visibility
+- **Positioning**: Fixed position in bottom-right corner of the video
+- **Scalability**: Automatically sized based on video dimensions
+- **Memory efficient**: Optimized for long videos without memory issues
+- **Fallback support**: Multiple fallback mechanisms for font compatibility

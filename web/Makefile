@@ -17,6 +17,7 @@ help:
 	@echo "make lint-fix     - Run ESLint with auto-fix"
 	@echo "make typecheck    - Run TypeScript type checking"
 	@echo "make check        - Run both linting and type checking"
+	@echo "make test        - Run unit tests"
 
 # Install dependencies
 .PHONY: install
@@ -87,6 +88,15 @@ check:
 		pnpm run check; \
 	else \
 		npm run check; \
+	fi
+
+# Run tests
+.PHONY: test
+test:
+	@if command -v pnpm >/dev/null 2>&1; then \
+		pnpm test; \
+	else \
+		npm test; \
 	fi
 
 .DEFAULT_GOAL := help

@@ -13,17 +13,18 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from dotenv import load_dotenv
-from loguru import logger
-
-# Load environment variables from .env file
-load_dotenv()
-
 # Add the current directory to Python path so we can import slidespeaker modules
 sys.path.insert(0, str(Path(__file__).parent))
 
-from slidespeaker.configs.config import config  # noqa: E402
-from slidespeaker.configs.logging_config import setup_logging  # noqa: E402
+from dotenv import load_dotenv
+from loguru import logger
+
+from slidespeaker.configs.config import config
+from slidespeaker.configs.logging_config import setup_logging
+from slidespeaker.core.task_queue import task_queue
+
+# Load environment variables from .env file
+load_dotenv()
 
 log_file = config.log_file
 setup_logging(
@@ -32,8 +33,6 @@ setup_logging(
     enable_file_logging=log_file is not None,
     component="master_worker",
 )
-
-from slidespeaker.core.task_queue import task_queue  # noqa: E402
 
 
 class MasterWorker:
@@ -66,16 +65,12 @@ class MasterWorker:
         )
 
         self.worker_processes[task_id] = process
-        logger.info(
-            f"Started worker process for task {task_id} with PID {process.pid}, "
-            f"total workers now: {len(self.worker_processes)}/{self.max_workers}"
-        )
+        logger.info(f"Started worker process for task {task_id} with PID {process.pid}")
         return process
 
     def cleanup_workers(self) -> None:
         """Clean up all worker processes"""
         if not self.worker_processes:
-            logger.debug("No worker processes to clean up")
             return
 
         logger.info(f"Cleaning up {len(self.worker_processes)} worker processes")
@@ -105,19 +100,17 @@ class MasterWorker:
 
         # Test Redis connection
         try:
-            ping_result = await task_queue.redis_client.ping()
-            logger.debug(f"Master worker Redis ping result: {ping_result}")
-
-            # Log Redis config
-            config_info = task_queue.redis_client.connection_pool.connection_kwargs
-            logger.debug(f"Master worker Redis config: {config_info}")
+            await task_queue.redis_client.ping()
+            logger.debug("Master worker Redis connection established")
 
             # Check for existing tasks (debug-level on startup)
             keys = await task_queue.redis_client.keys("ss:task:*")
-            logger.debug(f"Found {len(keys)} existing task keys")
+            if len(keys) > 0:
+                logger.debug(f"Found {len(keys)} existing task keys")
 
             queue_items = await task_queue.redis_client.lrange("ss:task_queue", 0, -1)  # type: ignore
-            logger.debug(f"Found {len(queue_items)} items in task queue")
+            if len(queue_items) > 0:
+                logger.debug(f"Found {len(queue_items)} items in task queue")
 
         except Exception as e:
             logger.error(f"Master worker Redis connection error: {e}")
@@ -130,22 +123,12 @@ class MasterWorker:
 
         try:
             while not self.should_stop:
-                # Log current worker status (debug to reduce verbosity)
-                active_workers = len(self.worker_processes)
-                logger.debug(
-                    f"Master worker status: {active_workers}/{self.max_workers} active, "
-                    f"tasks: {list(self.worker_processes.keys())}"
-                )
-
                 # Check for completed workers
                 await self.check_completed_workers()
 
                 # If we have capacity, look for new tasks
                 active_workers = len(self.worker_processes)
                 if active_workers < self.max_workers:
-                    logger.debug(
-                        f"Worker capacity available: {active_workers}/{self.max_workers}"
-                    )
                     task_id = await task_queue.get_next_task()
                     if task_id:
                         # Check if task is cancelled before starting worker
@@ -162,17 +145,13 @@ class MasterWorker:
                         await asyncio.sleep(0.5)
 
                         self.start_worker_process(task_id)
-                        logger.debug(f"Worker process started for task {task_id}")
                     else:
                         # No tasks available, sleep briefly
-                        logger.debug("No tasks available in queue, waiting...")
+                        await asyncio.sleep(2)
                 else:
                     # At max capacity, just check for completed workers
-                    logger.debug(
-                        "At maximum worker capacity, checking for completions..."
-                    )
                     await self.check_completed_workers()
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(5)
 
         except Exception as e:
             logger.error(f"Master worker encountered an error: {e}")
@@ -209,7 +188,6 @@ class MasterWorker:
         # Remove completed workers
         for task_id in completed_tasks:
             del self.worker_processes[task_id]
-            logger.info(f"Removed completed worker for task {task_id}")
 
 
 if __name__ == "__main__":

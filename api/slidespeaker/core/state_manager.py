@@ -10,8 +10,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
-from loguru import logger
-
 from slidespeaker.configs.config import config
 
 
@@ -445,14 +443,9 @@ class RedisStateManager:
         """Update status of a specific processing step (task-first)."""
         state = await self.get_state(file_id)
         if not state:
-            logger.warning(
-                f"Cannot update step status for non-existent state: {file_id}"
-            )
             return
         if step_name not in state.get("steps", {}):
-            logger.warning(f"Step {step_name} not found in state for file {file_id}")
             return
-        old_status = state["steps"][step_name]["status"]
         state["steps"][step_name]["status"] = status
         if data is not None:
             state["steps"][step_name]["data"] = data
@@ -465,15 +458,9 @@ class RedisStateManager:
             )
         else:
             await self._save_state(file_id, state)
-        logger.debug(
-            f"Step {step_name} status updated from '{old_status}' to '{status}' for file {file_id}"
-        )
 
     async def add_error(self, file_id: str, error: str, step: str) -> None:
         """Add error to state for a specific processing step"""
-        logger.warning(
-            f"Adding error to state for file {file_id}, step {step}: {error}"
-        )
         state = await self.get_state(file_id)
         if state:
             state["errors"].append(
@@ -481,16 +468,12 @@ class RedisStateManager:
             )
             state["updated_at"] = datetime.now().isoformat()
             await self._save_state(file_id, state)
-            logger.info(
-                f"Error added to state for file {file_id}, now has {len(state['errors'])} errors"
-            )
 
     async def mark_completed(self, file_id: str) -> None:
         """Mark processing as completed successfully (task-first)"""
         state = await self.get_state(file_id)
         if not state:
             return
-        old_status = state.get("status")
         state["status"] = "completed"
         state["updated_at"] = datetime.now().isoformat()
         task_id = state.get("task_id")
@@ -500,16 +483,12 @@ class RedisStateManager:
             )
         else:
             await self._save_state(file_id, state)
-        logger.info(
-            f"Processing marked as completed for file {file_id} (was {old_status})"
-        )
 
     async def mark_failed(self, file_id: str) -> None:
         """Mark processing as failed with errors (task-first)"""
         state = await self.get_state(file_id)
         if not state:
             return
-        old_status = state.get("status")
         state["status"] = "failed"
         state["updated_at"] = datetime.now().isoformat()
         task_id = state.get("task_id")
@@ -519,9 +498,6 @@ class RedisStateManager:
             )
         else:
             await self._save_state(file_id, state)
-        logger.error(
-            f"Processing marked as failed for file {file_id} (was {old_status})"
-        )
 
     async def mark_cancelled(
         self, file_id: str, cancelled_step: str | None = None
@@ -530,7 +506,6 @@ class RedisStateManager:
         state = await self.get_state(file_id)
         if not state:
             return
-        old_status = state.get("status")
         state["status"] = "cancelled"
         state["updated_at"] = datetime.now().isoformat()
         if cancelled_step and cancelled_step in state.get("steps", {}):
@@ -545,9 +520,6 @@ class RedisStateManager:
             )
         else:
             await self._save_state(file_id, state)
-        logger.info(
-            f"Processing marked as cancelled for file {file_id} (was {old_status})"
-        )
 
     async def _save_state(self, file_id: str, state: dict[str, Any]) -> None:
         """Save state to Redis with 24-hour expiration"""

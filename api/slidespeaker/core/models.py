@@ -32,3 +32,18 @@ class TaskRow(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=False))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=False))
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    picture: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), default=datetime.now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=False), default=datetime.now, onupdate=datetime.now
+    )

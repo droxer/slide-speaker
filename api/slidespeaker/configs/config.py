@@ -130,6 +130,13 @@ class Config:
             os.getenv("ENABLE_VISUAL_ANALYSIS", "true").lower() == "true"
         )
 
+        # Google OAuth settings
+        self.google_client_id = os.getenv("GOOGLE_CLIENT_ID")
+        self.google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
+        self.google_redirect_uri = os.getenv(
+            "GOOGLE_REDIRECT_URI", "http://localhost:3000/auth/callback"
+        )
+
     @property
     def output_dir(self) -> Path:
         if self._output_dir is None:

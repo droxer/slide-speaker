@@ -1,0 +1,57 @@
+.google-login-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fff;
+  color: #757575;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.3s, box-shadow 0.3s;
+  box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto;
+
+  &:hover {
+    background-color: #f8f8f8;
+    box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.2);
+  }
+
+  &:active {
+    background-color: #eeeeee;
+  }
+
+  &:disabled {
+    background-color: #f5f5f5;
+    color: #bdbdbd;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 2px 6px 0 rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(66, 133, 244, 0.3);
+  }
+}
+
+.google-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+}
+
+.google-icon {
+  display: block;
+}
+
+.google-button-text {
+  display: block;
+  flex: 1;
+  text-align: center;
+}

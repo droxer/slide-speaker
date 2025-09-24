@@ -7,7 +7,6 @@ database is configured and available.
 
 from __future__ import annotations
 
-from contextlib import suppress
 from datetime import datetime
 from typing import Any
 
@@ -23,68 +22,7 @@ def _filter_sensitive_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
     return filtered
 
 
-async def create_tables() -> None:
-    from sqlalchemy import text
-
-    async with get_session() as s:
-        # Create table
-        await s.execute(
-            text(
-                """
-                CREATE TABLE IF NOT EXISTS tasks (
-                  task_id VARCHAR(64) PRIMARY KEY,
-                  file_id VARCHAR(64) NOT NULL,
-                  task_type VARCHAR(64) NOT NULL,
-                  status VARCHAR(32) NOT NULL,
-                  kwargs JSONB,
-                  error TEXT,
-                  generate_video BOOLEAN,
-                  generate_podcast BOOLEAN,
-                  voice_language VARCHAR(64),
-                  subtitle_language VARCHAR(64),
-                  created_at TIMESTAMP NOT NULL,
-                  updated_at TIMESTAMP NOT NULL
-                )
-                """
-            )
-        )
-
-        # Create indexes
-        await s.execute(
-            text("CREATE INDEX IF NOT EXISTS idx_tasks_file_id ON tasks(file_id)")
-        )
-        await s.execute(
-            text("CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)")
-        )
-        await s.execute(
-            text("CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks(created_at)")
-        )
-        await s.execute(
-            text("CREATE INDEX IF NOT EXISTS idx_tasks_updated_at ON tasks(updated_at)")
-        )
-
-        # Add columns if they don't exist (backfill)
-        with suppress(Exception):
-            await s.execute(
-                text(
-                    "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS voice_language VARCHAR(64)"
-                )
-            )
-
-        with suppress(Exception):
-            await s.execute(
-                text(
-                    "ALTER TABLE tasks ADD COLUMN IF NOT EXISTS subtitle_language VARCHAR(64)"
-                )
-            )
-
-        # generate_* columns deprecated; task_type is the source of truth
-
-        await s.commit()
-
-
 async def insert_task(task: dict[str, Any]) -> None:
-    await create_tables()
     async with get_session() as s:
         now = datetime.now()
 
@@ -152,7 +90,6 @@ async def get_task(task_id: str) -> dict[str, Any] | None:
 
     Returns a plain dict or None when not found.
     """
-    await create_tables()
     from sqlalchemy import select
 
     async with get_session() as s:
@@ -264,7 +201,6 @@ async def get_statistics() -> dict[str, Any]:
     """Compute aggregate statistics from the DB."""
     from sqlalchemy import func, select, text
 
-    await create_tables()
     async with get_session() as s:
         # Total
         total = (

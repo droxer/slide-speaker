@@ -16,7 +16,6 @@ from loguru import logger
 
 from slidespeaker.configs.config import config
 from slidespeaker.configs.locales import locale_utils
-from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 
 router = APIRouter(prefix="/api", tags=["upload"])
@@ -79,16 +78,14 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         # For PDF files, if user selects podcast generation, default to podcast-only unless
         # they explicitly request video as well. This prevents accidental video generation
         # when user only wants podcast.
-        if file_ext == ".pdf" and generate_podcast:
-            logger.info(
-                f"PDF podcast request: generate_video={body.get('generate_video')}, "
-                f"will generate video: {generate_video}"
-            )
+        if (
+            file_ext == ".pdf"
+            and generate_podcast
+            and body.get("generate_video") is not True
+        ):
             # If generate_video is not explicitly set to True, disable video generation
             # This covers cases where generate_video is False, None, or not present
-            if body.get("generate_video") is not True:
-                generate_video = False
-                logger.info("Disabled video generation for podcast-only request")
+            generate_video = False
         if file_ext not in [".pdf", ".pptx", ".ppt"]:
             raise HTTPException(
                 status_code=400, detail="Only PDF and PowerPoint files are supported"
@@ -149,12 +146,7 @@ async def upload_file(request: Request) -> dict[str, str | None]:
             generate_podcast = False
             generate_video = True
 
-        logger.info(
-            f"Upload normalization - source_type: {source_type}, task_type: {task_type}, "
-            f"generate_video: {generate_video}, generate_podcast: {generate_podcast}"
-        )
-
-        # Submit task to Redis task queue first (so we can store state task-first)
+        # Submit task to Redis task queue (state management is handled internally)
         task_id = await task_queue.submit_task(
             task_type,
             file_id=file_id,
@@ -172,34 +164,9 @@ async def upload_file(request: Request) -> dict[str, str | None]:
             generate_video=generate_video,
         )
 
-        # Create initial state (task-first; mirrors to task alias and mappings)
-        await state_manager.create_state(
-            file_id,
-            file_path,
-            file_ext,
-            filename,
-            voice_language,
-            subtitle_language,
-            transcript_language,
-            video_resolution,
-            generate_avatar,
-            generate_subtitles,
-            generate_video,
-            generate_podcast,
-            task_id=task_id,
-            source_type=source_type,
-        )
-        # create_state already persists podcast_transcript_language when provided
-
         logger.info(
             f"File uploaded: {file_id}, type: {file_ext}, task submitted: {task_id}"
         )
-
-        # Bind task_id <-> file_id (redundant when create_state passed task_id; kept for safety)
-        try:
-            await state_manager.bind_task(file_id, task_id)
-        except Exception as save_err:
-            logger.warning(f"Failed to bind task_id in state manager: {save_err}")
 
         return {
             "file_id": file_id,

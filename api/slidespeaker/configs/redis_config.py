@@ -40,6 +40,15 @@ class RedisConfig:
 
     @classmethod
     def get_connection_info(cls) -> dict[str, Any]:
+        """Return non-sensitive Redis connection information for internal use only.
+
+        WARNING: This method should not be exposed via public endpoints as it may
+        reveal infrastructure details. For public health checks, only expose
+        connectivity status without specific configuration details.
+
+        Returns:
+            dict: Connection information (for internal use only)
+        """
         return {
             "host": config.redis_host,
             "port": config.redis_port,

@@ -29,6 +29,8 @@ help:
 	@echo "make format      - Run ruff formatter"
 	@echo "make typecheck   - Run mypy type checker"
 	@echo "make check       - Run both linting and type checking"
+	@echo "make test        - Run unit tests"
+	@echo "make test-cov    - Run unit tests with coverage report"
 	@echo "make clean       - Clean temporary files"
 
 # Install dependencies
@@ -121,6 +123,16 @@ typecheck: install
 # Combined check (linting and type checking)
 .PHONY: check
 check: lint typecheck
+
+# Run tests
+.PHONY: test
+test: install
+	uv run pytest tests/ -v
+
+# Run tests with coverage
+.PHONY: test-cov
+test-cov: install
+	uv run pytest tests/ -v --cov=slidespeaker --cov-report=term-missing
 
 # Clean temporary files
 .PHONY: clean

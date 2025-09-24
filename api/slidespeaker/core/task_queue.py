@@ -6,12 +6,21 @@ It handles task submission, status tracking, and distributed processing coordina
 
 import json
 import uuid
+from pathlib import Path
 from typing import Any, cast
 
 from loguru import logger
 
 from slidespeaker.configs.db import db_enabled
 from slidespeaker.repository.task import insert_task, update_task
+
+
+def _filter_db_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
+    """Filter out sensitive information from kwargs before storing in database."""
+    filtered = kwargs.copy()
+    # Remove sensitive fields that shouldn't be persisted in database
+    filtered.pop("file_path", None)
+    return filtered
 
 
 class RedisTaskQueue:
@@ -47,35 +56,77 @@ class RedisTaskQueue:
         # Store task in Redis
         task_key = self._get_task_key(task_id)
         task_json = json.dumps(task)
-        result = await self.redis_client.set(task_key, task_json)
-        logger.info(f"Task {task_id} stored in Redis with result: {result}")
+        await self.redis_client.set(task_key, task_json)
+        logger.info(f"Task {task_id} stored in Redis")
 
         # Persist in Postgres (optional)
         if db_enabled:
             try:
-                await insert_task(task)
+                # Filter out sensitive information before storing in database
+                db_task = task.copy()
+                db_task["kwargs"] = _filter_db_kwargs(task.get("kwargs", {}))
+                await insert_task(db_task)
             except Exception as e:
                 logger.warning(f"Failed to persist task {task_id} in DB: {e}")
 
+        # Handle state management for presentation processing tasks
+        if task_type in ["video", "podcast", "both"]:
+            try:
+                # Import here to avoid circular imports
+                from slidespeaker.core.state_manager import state_manager
+
+                # Extract state-related parameters
+                file_id = kwargs.get("file_id")
+                file_path = kwargs.get("file_path")
+                file_ext = kwargs.get("file_ext")
+                filename = kwargs.get("filename")
+                source_type = kwargs.get("source_type")
+                voice_language = kwargs.get("voice_language", "english")
+                subtitle_language = kwargs.get("subtitle_language")
+                transcript_language = kwargs.get("transcript_language")
+                video_resolution = kwargs.get("video_resolution", "hd")
+                generate_avatar = kwargs.get("generate_avatar", True)
+                generate_subtitles = kwargs.get("generate_subtitles", True)
+                generate_video = kwargs.get("generate_video", True)
+                generate_podcast = kwargs.get("generate_podcast", False)
+
+                if file_id and file_path and file_ext:
+                    # Create initial state (task-first; mirrors to task alias and mappings)
+                    await state_manager.create_state(
+                        file_id,
+                        Path(file_path),
+                        file_ext,
+                        filename,
+                        voice_language,
+                        subtitle_language,
+                        transcript_language,
+                        video_resolution,
+                        generate_avatar,
+                        generate_subtitles,
+                        generate_video,
+                        generate_podcast,
+                        task_id=task_id,
+                        source_type=source_type,
+                    )
+
+                    # Bind task_id <-> file_id (redundant when create_state passed task_id; kept for safety)
+                    try:
+                        await state_manager.bind_task(file_id, task_id)
+                    except Exception as save_err:
+                        logger.warning(
+                            f"Failed to bind task_id in state manager: {save_err}"
+                        )
+
+            except Exception as e:
+                logger.warning(f"Failed to create state for task {task_id}: {e}")
+
         # Add task ID to queue - use RPUSH to maintain FIFO order
-        queue_result = await self.redis_client.rpush(self.queue_key, task_id)  # type: ignore
-        logger.info(
-            f"Task ID {task_id} added to queue {self.queue_key} with RPUSH, result: {queue_result}"
-        )
+        await self.redis_client.rpush(self.queue_key, task_id)  # type: ignore
+        logger.info(f"Task ID {task_id} added to queue")
 
         # Log task summary
         file_id = kwargs.get("file_id", "unknown")
-        logger.info(f"New task {task_id} created for file {file_id} at {created_at}")
-
-        # Verify task was stored and queued
-        stored_task = await self.redis_client.get(task_key)
-        queue_length = await self.redis_client.llen(self.queue_key)  # type: ignore
-        logger.debug(
-            f"Task verification - task stored: {stored_task is not None}, queue length: {queue_length}"
-        )
-
-        if not stored_task:
-            logger.warning(f"Failed to verify task storage for {task_key}")
+        logger.info(f"New task {task_id} created for file {file_id}")
 
         return task_id
 
