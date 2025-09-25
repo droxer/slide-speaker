@@ -30,6 +30,15 @@ const LANGS = [
   'thai',
 ];
 
+const shortenFileName = (name?: string, max = 48): string => {
+  if (!name) return 'Selected file';
+  const base = name.replace(/\.(pdf|pptx?|PPTX?|PDF)$/,'');
+  if (base.length <= max) return base;
+  const head = Math.max(12, Math.floor((max - 1) / 2));
+  const tail = max - head - 1;
+  return base.slice(0, head) + '…' + base.slice(-tail);
+};
+
 const RunTaskModal: React.FC<Props> = ({ open, isPdf, defaults, onClose, onSubmit, filename, submitting }) => {
   const [taskType, setTaskType] = useState<'video'|'podcast'>(defaults.task_type as any || 'video');
   const [voiceLang, setVoiceLang] = useState<string>(defaults.voice_language || 'english');
@@ -46,6 +55,24 @@ const RunTaskModal: React.FC<Props> = ({ open, isPdf, defaults, onClose, onSubmi
     setResolution(defaults.video_resolution || 'hd');
     // no avatar config in upload view; keep defaults as-is (not exposed)
   }, [open, isPdf, defaults.task_type, defaults.voice_language, defaults.subtitle_language, defaults.transcript_language, defaults.video_resolution]);
+
+  // Close on ESC and lock body scroll while open
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' || (e as any).keyCode === 27) {
+        e.preventDefault();
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [open, onClose]);
 
   if (!open) return null;
 
@@ -67,13 +94,12 @@ const RunTaskModal: React.FC<Props> = ({ open, isPdf, defaults, onClose, onSubmi
   };
 
   return (
-    <div className="video-preview-modal config-modal" data-mode="video" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="video-preview-content config-modal" data-mode="video" onClick={(e) => e.stopPropagation()} role="document">
+    <div className="run-task-modal" onClick={onClose} role="dialog" aria-modal="true">
+      <div className="run-task-content" onClick={(e) => e.stopPropagation()} role="document">
         <div className="modal-header-bar" data-kind={taskType}>
           <div className="header-left">
             <span className="header-icon" aria-hidden>{taskType === 'podcast' ? '🎧' : '🎬'}</span>
-            <span>{taskType === 'podcast' ? 'Run Podcast Task' : 'Run Video Task'}</span>
-            {filename && <span style={{ color: '#64748b', marginLeft: 8, fontWeight: 600 }}>— {filename}</span>}
+            <span>{taskType === 'podcast' ? 'Create Podcast' : 'Create Video'}</span>
           </div>
           <div className="header-right">
             <button type="button" className="modal-close-btn" aria-label="Close" title="Close" onClick={onClose}>
@@ -88,7 +114,7 @@ const RunTaskModal: React.FC<Props> = ({ open, isPdf, defaults, onClose, onSubmi
           <div className="run-config">
             <div className="run-left">
               <div className="run-summary">
-                <div className="file-name" title={filename || ''}>{filename || 'Selected file'}</div>
+                <div className="file-name" title={filename || ''}>{shortenFileName(filename)}</div>
                 {/* Mode is selected by which button opened the modal (Video/Podcast). No toggle here. */}
                 <div className="hint">Mode is set by your choice above. Configure options, then press Run.</div>
               </div>
@@ -135,7 +161,7 @@ const RunTaskModal: React.FC<Props> = ({ open, isPdf, defaults, onClose, onSubmi
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
                 <button className="secondary-btn" onClick={onClose} disabled={submitting}>Cancel</button>
                 <button className="primary-btn" onClick={run} disabled={submitting}>
-                  {submitting ? 'Running…' : 'Run'}
+                  {submitting ? 'Creating…' : 'Create'}
                 </button>
               </div>
             </div>

@@ -12,7 +12,7 @@ type Props = {
   apiBaseUrl: string;
   isRemoving: boolean;
   isExpanded: boolean;
-  onToggleDownloads: (taskId: string) => void;
+  onToggleDownloads: (task: Task) => void;
   onPreview: (task: Task, mode: 'video'|'audio') => void;
   onCancel: (taskId: string) => void;
   onDelete: (taskId: string) => void;
@@ -21,8 +21,7 @@ type Props = {
   getVideoResolutionDisplayName: (res: string) => string;
 };
 
-const isPdfFile = (ext?: string) => (ext || '').toLowerCase() === '.pdf';
-const getFileTypeDisplayName = (ext?: string) => (isPdfFile(ext) ? 'PDF' : 'Slides');
+// File type badge removed per new design
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -64,7 +63,6 @@ const TaskCard: React.FC<Props> = ({
   getLanguageDisplayName,
   getVideoResolutionDisplayName,
 }) => {
-  const filename = task.kwargs?.filename || task.state?.filename;
   const { voiceLanguage: voiceLang, transcriptLanguage } = resolveLanguages(task);
   const videoRes = task.kwargs?.video_resolution || task.state?.video_resolution || 'hd';
   const { video: isVideoTask, podcast: isPodcastTask } = deriveTaskOutputs(task);
@@ -94,7 +92,6 @@ const TaskCard: React.FC<Props> = ({
     task.status === 'cancelled' ? 'Cancelled' : String(task.status)
   );
   const statusContent = (
-    task.status === 'completed' ? 'Completed' :
     task.status === 'processing' ? '⏳ Processing' :
     task.status === 'queued' ? '⏸️ Queued' :
     task.status === 'failed' ? '❌ Failed' :
@@ -120,36 +117,33 @@ const TaskCard: React.FC<Props> = ({
             }
           }}
         >
-          Task: {task.task_id}
+          {/* Output badges inline before task id (one line) */}
+          {(isVideoTask || (dlItems?.some((d) => d.type === 'video') ?? false)) && (
+            <span className="output-inline"><span className="output-dot video" aria-hidden></span>Video</span>
+          )}
+          {(isPodcastTask || (dlItems?.some((d) => d.type === 'podcast') ?? false)) && (
+            <span className="output-inline"><span className="output-dot podcast" aria-hidden></span>Podcast</span>
+          )}
+          <span className="task-id-text">Task: {task.task_id}</span>
         </div>
-        <div
-          className={`task-status ${getStatusColor(task.status)}`}
-          tabIndex={0}
-          aria-label={`Status: ${statusLabel}`}
-        >
-          {statusContent}
-        </div>
+        {task.status !== 'completed' && task.status !== 'queued' && (
+          <div
+            className={`task-status ${getStatusColor(task.status)}`}
+            tabIndex={0}
+            aria-label={`Status: ${statusLabel}`}
+          >
+            {statusContent}
+          </div>
+        )}
       </div>
 
       <div className="task-details simple-details">
         <>
-          {/* Title row */}
-          <div className="task-title-row">
-            <div className="task-title" title={filename || task.file_id}>
-              {filename || task.file_id}
-            </div>
-            <div className="output-badges" aria-label="Output type">
-              {(isVideoTask || (dlItems?.some((d) => d.type === 'video') ?? false)) && (
-                <span className="output-pill video" title="Video task">🎬 Video</span>
-              )}
-              {(isPodcastTask || (dlItems?.some((d) => d.type === 'podcast') ?? false)) && (
-                <span className="output-pill podcast" title="Podcast task">🎧 Podcast</span>
-              )}
-              <div className={`file-type-badge ${isPdfFile(task.kwargs?.file_ext) ? 'pdf' : 'ppt'}`}>
-                {getFileTypeDisplayName(task.kwargs?.file_ext)}
-              </div>
-            </div>
-          </div>
+          {/* Queued note (lightweight, no pill) */}
+          {task.status === 'queued' && (
+            <div className="queued-note" role="status" aria-live="polite">Queued • Waiting to start</div>
+          )}
+          {/* Filename omitted (shown on file group header) */}
 
           {/* Meta chips */}
           <div className="meta-row">
@@ -162,8 +156,8 @@ const TaskCard: React.FC<Props> = ({
             <span className="chip">{getVideoResolutionDisplayName(videoRes)}</span>
           </div>
 
-          {/* Progress */}
-          {task.status !== 'completed' && task.state && (
+          {/* Progress shown only while processing */}
+          {task.status === 'processing' && task.state && (
             <div className="step-progress">
               <div className="step-line" role="status" aria-live="polite">
                 {formatStepNameWithLanguages(task.state.current_step, voiceLang, transcriptLang)}
@@ -176,11 +170,32 @@ const TaskCard: React.FC<Props> = ({
             </div>
           )}
 
+          {/* Exact steps timeline (shown while processing) */}
+          {task.status === 'processing' && (task.state as any)?.steps && (
+            <ul className="steps-timeline" aria-label="Processing steps">
+              {Object.entries((task.state as any).steps).map(([name, info]: any) => {
+                const s = (info?.status || 'pending').toLowerCase();
+                const icon = s === 'completed' ? '✓' : s === 'processing' ? '⏳' : s === 'failed' ? '❌' : s === 'cancelled' ? '⛔' : s === 'skipped' ? '⤼' : '•';
+                return (
+                  <li key={name} className={`step-item s-${s}`}><span className="step-icon" aria-hidden>{icon}</span><span className="step-name">{getStepLabel(name)}</span></li>
+                );
+              })}
+            </ul>
+          )}
+
+          {/* Timestamps */}
+          <div className="timestamps-row">
+            <span className="timestamp">Created: {new Date(task.created_at).toLocaleString()}</span>
+            {task.status === 'completed' && (
+              <span className="timestamp">Completed: {new Date(task.updated_at).toLocaleString()}</span>
+            )}
+          </div>
+
           {/* Downloads toggle + block (native disclosure) */}
           <details
             className="downloads-panel"
             open={isExpanded}
-            onToggle={() => onToggleDownloads(task.task_id)}
+            onToggle={() => onToggleDownloads(task)}
           >
             <summary className="toggle-summary" aria-controls={`downloads-${task.task_id}`} aria-expanded={isExpanded}>
               <span className="dl-icon" aria-hidden>⤓</span>

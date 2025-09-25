@@ -53,6 +53,11 @@ export const upload = async (payload: any) => {
   return res.data as { file_id: string; task_id: string };
 };
 
+export const runFile = async (fileId: string, payload: any) => {
+  const res = await api.post(`/api/files/${encodeURIComponent(fileId)}/run`, payload, { headers: { 'Content-Type': 'application/json' } });
+  return res.data as { file_id: string; task_id: string };
+};
+
 export const getHealth = async () => {
   const res = await api.get(`/api/health`, { headers: { Accept: 'application/json' } });
   return res.data as any;
@@ -75,4 +80,3 @@ export const getVttText = async (taskId: string, language?: string) => {
   const res = await api.get(path, { headers: { Accept: 'text/vtt,*/*' } });
   return String(res.data || '');
 };
-

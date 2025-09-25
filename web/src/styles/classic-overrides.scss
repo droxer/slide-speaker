@@ -52,3 +52,26 @@ body.classic .task-monitor {
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
 }
 
+/* Creations file groups (classic: light glass) */
+body.classic .file-group { background: rgba(255,255,255,0.9) !important; border: 1px solid rgba(255,255,255,0.6) !important; border-radius: 12px !important; box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important; }
+body.classic .file-group-header { background: rgba(255,255,255,0.8) !important; border-bottom: 1px solid rgba(255,255,255,0.6) !important; }
+body.classic .file-ext-chip { background: rgba(255,255,255,0.9) !important; color: #111827 !important; border-color: rgba(255,255,255,0.8) !important; }
+body.classic .file-id-chip { background: rgba(255,255,255,0.8) !important; border-color: rgba(255,255,255,0.7) !important; color: #111827 !important; }
+body.classic .file-group-actions .mini-btn { background: rgba(255,255,255,0.95) !important; color: #111827 !important; border: 1px solid rgba(255,255,255,0.8) !important; border-radius: 10px !important; }
+body.classic .file-group-actions .mini-btn:hover { background: rgba(255,255,255,1) !important; }
+
+/* Run modal in classic: keep subtle glass backdrop */
+body.classic .run-task-modal { background: rgba(0, 0, 0, 0.25) !important; backdrop-filter: blur(8px) !important; }
+body.classic .run-task-content { background: rgba(255,255,255,0.95) !important; border: 1px solid rgba(255,255,255,0.7) !important; border-radius: 12px !important; box-shadow: 0 12px 40px rgba(0,0,0,0.2) !important; }
+
+/* Watch/Listen buttons: neutral style consistent with actions */
+body.classic .preview-button {
+  background: rgba(99,102,241,0.85) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,0.7) !important;
+  border-radius: 10px !important;
+}
+body.classic .preview-button:hover {
+  background: rgba(79,70,229,0.95) !important; /* indigo-600 */
+  border-color: rgba(255,255,255,0.85) !important;
+}

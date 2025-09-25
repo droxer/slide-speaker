@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient, QueryClient } from '@tanstack/react-query';
-import { getTasks, getStats, searchTasks, getDownloads, getTranscriptMarkdown, getVttText, cancelRun, purgeTask, upload } from './client';
+import { getTasks, getStats, searchTasks, getDownloads, getTranscriptMarkdown, getVttText, cancelRun, purgeTask, upload, runFile } from './client';
 import type { Task } from '../types';
 
 export const queries = {
@@ -188,11 +188,7 @@ export const useFilesQuery = (
 export const useRunFileTaskMutation = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ fileId, payload }: { fileId: string; payload: any }) => {
-      // Run task for existing file by making a request to the upload endpoint with file_id
-      // This would simulate reprocessing an existing file
-      return upload({ file_id: fileId, ...payload });
-    },
+    mutationFn: ({ fileId, payload }: { fileId: string; payload: any }) => runFile(fileId, payload),
     onSettled: async () => {
       await qc.invalidateQueries({ queryKey: ['files'] as any, exact: false });
       await qc.invalidateQueries({ queryKey: queries.tasks({ status: 'all', page: 1, limit: 10 }) as any, exact: false });

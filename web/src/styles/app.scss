@@ -1,5 +1,14 @@
 @import './GoogleLoginButton.scss';
 
+/* Brand color tokens (override in themes as needed) */
+:root {
+  --brand-1: #6366f1; /* indigo-500 */
+  --brand-2: #06b6d4; /* cyan-500 */
+  --brand-3: #22c55e; /* green-500 */
+  --brand-aurora-a: rgba(99, 102, 241, 0.25); /* indigo */
+  --brand-aurora-b: rgba(56, 189, 248, 0.18); /* sky/cyan */
+}
+
 /* Reset and base styles */
 * {
     margin: 0;
@@ -140,6 +149,62 @@
         0 12px 40px rgba(0, 0, 0, 0.15),
         inset 0 1px 0 rgba(255, 255, 255, 0.15);
     }
+  }
+
+  /* AI-styled toggle variant */
+  .view-toggle.ai-toggle {
+    background: rgba(17, 24, 39, 0.35);
+    border: 1px solid color-mix(in srgb, var(--brand-1) 35%, transparent);
+    border-radius: 14px;
+    padding: 6px;
+    box-shadow: 0 10px 30px rgba(99, 102, 241, 0.18), inset 0 1px 0 rgba(255,255,255,0.06);
+    backdrop-filter: blur(12px);
+  }
+  .view-toggle.ai-toggle .toggle-btn {
+    border-radius: 10px;
+    background: radial-gradient(120% 120% at 0% 0%, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.02) 100%);
+    color: #e5e7eb;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+  }
+  .view-toggle.ai-toggle .toggle-btn .toggle-icon { filter: none; }
+  .view-toggle.ai-toggle .toggle-btn:hover {
+    background: radial-gradient(120% 120% at 0% 0%, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.04) 100%);
+    border-color: rgba(148,163,184,0.4);
+  }
+  .view-toggle.ai-toggle .toggle-btn.active {
+    color: #ffffff;
+    border-color: color-mix(in srgb, var(--brand-1) 75%, transparent);
+    background:
+      radial-gradient(120% 120% at 100% 0%, color-mix(in srgb, var(--brand-1) 22%, transparent) 0%, color-mix(in srgb, var(--brand-1) 8%, transparent) 60%, color-mix(in srgb, var(--brand-1) 4%, transparent) 100%),
+      radial-gradient(120% 120% at 0% 100%, color-mix(in srgb, var(--brand-2) 18%, transparent) 0%, color-mix(in srgb, var(--brand-2) 6%, transparent) 60%, color-mix(in srgb, var(--brand-2) 2%, transparent) 100%);
+    box-shadow:
+      0 10px 30px rgba(99,102,241,0.25),
+      inset 0 1px 0 rgba(255,255,255,0.18);
+    position: relative;
+    overflow: hidden;
+  }
+  /* Animated aurora shimmer */
+  @keyframes ai-aurora {
+    0% { transform: translateX(-120%); }
+    50% { transform: translateX(0%); }
+    100% { transform: translateX(120%); }
+  }
+  .view-toggle.ai-toggle .toggle-btn.active::before {
+    content: "";
+    position: absolute;
+    inset: -40% -10% -40% -60%;
+    background: linear-gradient(120deg, transparent 0%, var(--brand-aurora-a) 50%, transparent 100%);
+    filter: blur(24px);
+    animation: ai-aurora 3.6s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .view-toggle.ai-toggle .toggle-btn.active::before { animation: none; display: none; }
+  }
+  .view-toggle.ai-toggle .toggle-btn:focus-visible { outline: 2px solid rgba(99,102,241,0.6); outline-offset: 2px; }
+  @media (max-width: 768px) {
+    .view-toggle.ai-toggle { background: rgba(31, 41, 55, 0.5); }
+    .view-toggle.ai-toggle .toggle-btn { color: #f3f4f6; }
   }
   
   .toggle-btn {

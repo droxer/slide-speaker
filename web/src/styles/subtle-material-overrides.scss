@@ -101,6 +101,18 @@ body.subtle-material {
     box-shadow: none !important;
     backdrop-filter: none !important;
   }
+
+  /* Creations file groups */
+  body.subtle-material .file-group { background: var(--sm-surface) !important; border: 1px solid var(--sm-border) !important; border-radius: 8px !important; }
+  body.subtle-material .file-group-header { background: var(--sm-surface) !important; border-bottom: 1px solid var(--sm-border) !important; }
+  body.subtle-material .file-ext-chip { background: #eef2ff !important; color: #3730a3 !important; border-color: #c7d2fe !important; }
+  body.subtle-material .file-id-chip { background: var(--sm-secondary) !important; border-color: var(--sm-border) !important; color: #475569 !important; }
+  body.subtle-material .file-group-actions .mini-btn { background: var(--sm-surface) !important; color: #334155 !important; border: 1px solid var(--sm-border) !important; border-radius: 8px !important; }
+  body.subtle-material .file-group-actions .mini-btn:hover { background: var(--sm-secondary) !important; }
+
+  /* Run modal integration */
+  body.subtle-material .run-task-modal { background: rgba(15, 23, 42, 0.2) !important; }
+  body.subtle-material .run-task-content { background: var(--sm-surface) !important; border-color: var(--sm-border) !important; }
   
   body.subtle-material .view-toggle .toggle-btn {
     color: #334155 !important;
@@ -498,3 +510,14 @@ body.subtle-material {
     body.subtle-material .retry-button { width: 100% !important; }
   }
   
+  /* Watch/Listen buttons: brand outline for contrast */
+  body.subtle-material .preview-button {
+    background: var(--sm-primary) !important;
+    color: var(--sm-on-primary) !important;
+    border: 1px solid var(--sm-primary) !important;
+    border-radius: 8px !important;
+  }
+  body.subtle-material .preview-button:hover {
+    background: var(--sm-primary-hover) !important;
+    border-color: var(--sm-primary-hover) !important;
+  }

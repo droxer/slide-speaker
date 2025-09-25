@@ -57,7 +57,7 @@ const Header: React.FC<HeaderProps> = ({ showTaskMonitor, setShowTaskMonitor }) 
         </div>
         <div className="header-right">
           <div
-            className="view-toggle"
+            className="view-toggle ai-toggle"
             role="tablist"
             aria-label="View Toggle"
           >
@@ -78,16 +78,16 @@ const Header: React.FC<HeaderProps> = ({ showTaskMonitor, setShowTaskMonitor }) 
             <button
               onClick={() => setShowTaskMonitor(true)}
               className={`toggle-btn ${showTaskMonitor ? "active" : ""}`}
-              title="Task Monitor"
+              title="Creations"
               role="tab"
               aria-selected={showTaskMonitor}
               aria-controls="monitor-panel"
               id="monitor-tab"
             >
               <span className="toggle-icon" aria-hidden="true">
-                📊
+                🎬
               </span>
-              <span className="toggle-text">Monitor</span>
+              <span className="toggle-text">Creations</span>
             </button>
           </div>
         </div>
