@@ -5,7 +5,7 @@ import "./styles/app.scss";
 import "./styles/ultra-flat-overrides.scss";
 import "./styles/subtle-material-overrides.scss";
 import "./styles/classic-overrides.scss";
-import TaskMonitor from "./components/TaskMonitor";
+import Creations from "./components/Creations";
 import ProcessingView from "./components/ProcessingView";
 import CompletedView from "./components/CompletedView";
 import UploadPanel from "./components/UploadPanel";
@@ -15,7 +15,7 @@ import ErrorView from "./components/ErrorView";
 import UploadingView from "./components/UploadingView";
 import { getStepLabel } from './utils/stepLabels';
 import { useUI } from './context/UIContext';
-// Players are used within components (CompletedView/TaskMonitor) not here
+// Players are used within components (CompletedView/Creations) not here
 
 // Constants for local storage keys
 const LOCAL_STORAGE_KEYS = {
@@ -991,7 +991,7 @@ function App() {
       <main className="main-content">
         {showTaskMonitor ? (
           <div id="monitor-panel" role="tabpanel" aria-labelledby="monitor-tab">
-            <TaskMonitor apiBaseUrl={API_BASE_URL} />
+            <Creations apiBaseUrl={API_BASE_URL} />
           </div>
         ) : (
           <div id="studio-panel" role="tabpanel" aria-labelledby="studio-tab">

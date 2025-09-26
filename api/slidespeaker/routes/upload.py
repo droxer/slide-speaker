@@ -121,6 +121,27 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         async with aiofiles.open(file_path, "wb") as out_file:
             await out_file.write(file_bytes)
 
+        # Persist original to storage for future reruns
+        try:
+            sp = config.get_storage_provider()
+            object_key = f"uploads/{file_id}{file_ext}"
+            # Infer a reasonable content-type
+            content_type = (
+                "application/pdf"
+                if file_ext == ".pdf"
+                else (
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    if file_ext == ".pptx"
+                    else (
+                        "application/vnd.ms-powerpoint" if file_ext == ".ppt" else None
+                    )
+                )
+            )
+            sp.upload_file(str(file_path), object_key, content_type=content_type)
+        except Exception as e:
+            # Non-fatal: log and continue
+            logger.warning(f"Failed to upload original to storage: {e}")
+
         # Normalize task_type and flags consistently
         # Prefer explicit task_type from request body when present; otherwise derive from flags
         req_task_type = (body.get("task_type") or "").lower() or None

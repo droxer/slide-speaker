@@ -2,6 +2,10 @@
 
 body.classic {
   background: linear-gradient(135deg, #4338ca 0%, #7c3aed 100%);
+  /* Map brand tokens to classic palette */
+  --brand-1: #7c3aed; /* violet */
+  --brand-2: #06b6d4; /* cyan */
+  --brand-3: #22c55e; /* green */
 }
 
 body.classic .app-header {
@@ -52,3 +56,47 @@ body.classic .task-monitor {
   background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
 }
 
+/* Creations file groups (classic: light glass) */
+body.classic .file-group {
+  background: linear-gradient(145deg, rgba(255,255,255,0.92), rgba(255,255,255,0.75)) !important;
+  border: 1px solid rgba(255,255,255,0.65) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 14px 36px rgba(17, 24, 39, 0.18) !important;
+}
+body.classic .file-group-header {
+  background: rgba(255,255,255,0.78) !important;
+}
+body.classic .file-toggle .file-title {
+  color: #0b1120 !important;
+}
+body.classic .file-id-chip {
+  background: rgba(255,255,255,0.88) !important;
+  border-color: rgba(255,255,255,0.65) !important;
+  color: #0b1120 !important;
+}
+body.classic .task-count {
+  background: rgba(124,58,237,0.12) !important;
+  border-color: rgba(124,58,237,0.2) !important;
+  color: #4338ca !important;
+}
+body.classic .file-group-actions .mini-btn {
+  border-color: rgba(124,58,237,0.45) !important;
+  background: linear-gradient(135deg, rgba(124,58,237,0.95), rgba(6,182,212,0.85)) !important;
+  color: #f8fafc !important;
+}
+
+/* Run modal in classic: keep subtle glass backdrop */
+body.classic .run-task-modal { background: rgba(0, 0, 0, 0.25) !important; backdrop-filter: blur(8px) !important; }
+body.classic .run-task-content { background: rgba(255,255,255,0.95) !important; border: 1px solid rgba(255,255,255,0.7) !important; border-radius: 12px !important; box-shadow: 0 12px 40px rgba(0,0,0,0.2) !important; }
+
+/* Watch/Listen buttons: neutral style consistent with actions */
+body.classic .preview-button {
+  background: rgba(99,102,241,0.85) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255,255,255,0.7) !important;
+  border-radius: 10px !important;
+}
+body.classic .preview-button:hover {
+  background: rgba(79,70,229,0.95) !important; /* indigo-600 */
+  border-color: rgba(255,255,255,0.85) !important;
+}

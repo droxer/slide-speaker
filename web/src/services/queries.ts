@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient, QueryClient } from '@tanstack/react-query';
-import { getTasks, getStats, searchTasks, getDownloads, getTranscriptMarkdown, getVttText, cancelRun, purgeTask } from './client';
+import { getTasks, getStats, searchTasks, getDownloads, getTranscriptMarkdown, getVttText, cancelRun, purgeTask, runFile } from './client';
 import type { Task } from '../types';
 
 export const queries = {
@@ -126,6 +126,71 @@ export const useCancelTaskMutation = () => {
   return useMutation({
     mutationFn: (taskId: string) => cancelRun(taskId),
     onSettled: async () => {
+      await qc.invalidateQueries({ queryKey: queries.tasks({ status: 'all', page: 1, limit: 10 }) as any, exact: false });
+      await qc.invalidateQueries({ queryKey: queries.search('') as any, exact: false });
+    },
+  });
+};
+
+export const useFilesQuery = (
+  filters: { page: number; limit: number; includeTasks?: boolean; q?: string },
+  opts?: {
+    refetchInterval?: number | false | ((q: any) => number | false);
+    staleTime?: number;
+  }
+) => {
+  return useQuery({
+    queryKey: ['files', filters] as const,
+    queryFn: async () => {
+      // First get all tasks
+      const params = new URLSearchParams();
+      if (filters.q) params.append('q', filters.q);
+      params.append('limit', String(filters.limit));
+      params.append('offset', String((filters.page - 1) * filters.limit));
+      
+      const res = await getTasks(Object.fromEntries(params));
+      const allTasks = (res.tasks || []).filter((t: any) => typeof t?.task_id === 'string' && !t.task_id.startsWith('state_'));
+      
+      // Group tasks by file_id to create a file-based structure
+      const filesMap = new Map<string, { file_id: string; filename?: string; file_ext?: string; tasks?: Task[] }>();
+      
+      for (const task of allTasks) {
+        const fileId = task.file_id || task.kwargs?.file_id;
+        const key = fileId || `unknown:${task.kwargs?.filename || 'Unknown'}`;
+        
+        if (!filesMap.has(key)) {
+          filesMap.set(key, {
+            file_id: fileId,
+            filename: task.kwargs?.filename || task.state?.filename,
+            file_ext: task.kwargs?.file_ext,
+            tasks: []
+          });
+        }
+        
+        const file = filesMap.get(key)!;
+        if (!file.tasks) file.tasks = [];
+        file.tasks.push(task);
+      }
+      
+      // Convert map to array
+      const files = Array.from(filesMap.values());
+      
+      return { 
+        files,
+        has_more: res.has_more 
+      };
+    },
+    refetchInterval: opts?.refetchInterval,
+    staleTime: opts?.staleTime ?? 10000,
+  });
+};
+
+export const useRunFileTaskMutation = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ fileId, payload }: { fileId: string; payload: any }) => runFile(fileId, payload),
+    onSettled: async () => {
+      await qc.invalidateQueries({ queryKey: ['files'] as any, exact: false });
       await qc.invalidateQueries({ queryKey: queries.tasks({ status: 'all', page: 1, limit: 10 }) as any, exact: false });
       await qc.invalidateQueries({ queryKey: queries.search('') as any, exact: false });
     },

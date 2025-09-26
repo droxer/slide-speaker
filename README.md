@@ -4,6 +4,19 @@ Turn slides/PDFs into narrated videos — transcripts, TTS, subtitles, and optio
 
 SlideSpeaker is an AI-powered platform that transforms your presentations into engaging video content. Whether you have PowerPoint slides or PDF documents, SlideSpeaker can automatically generate narrated videos with optional AI avatars, synchronized subtitles, and professional-quality audio.
 
+## ⚠️ Project Status
+
+SlideSpeaker is under active development. Expect rapid iteration, breaking changes, and incomplete tooling while we work toward production readiness.
+
+## ✨ Features
+
+- Automated script generation from slide decks or PDFs
+- Natural-sounding text-to-speech narration with configurable voices
+- Optional AI avatars synced to narration for presenter-style videos
+- Podcast-ready audio exports for sharing beyond video platforms
+- Subtitle outputs in VTT/SRT formats aligned to the narration
+- Task-based API that coordinates the full processing pipeline end-to-end
+
 ## 🚀 Quick Start
 
 ### Backend (API)

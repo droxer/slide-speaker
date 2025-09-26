@@ -13,6 +13,10 @@ body.subtle-material {
     --sm-on-primary: #ffffff;
     --sm-secondary: #f3f4f6; /* neutral-100 */
     --sm-on-secondary: #0f172a;
+    /* Map brand tokens to theme */
+    --brand-1: var(--sm-primary);
+    --brand-2: #06b6d4;
+    --brand-3: #22c55e;
     /* Media controls contrast (Material) */
     --media-controls-bg-video: rgba(0, 0, 0, 0.55);
     --media-controls-bg-audio: #eef2f7;
@@ -101,6 +105,35 @@ body.subtle-material {
     box-shadow: none !important;
     backdrop-filter: none !important;
   }
+
+  /* Creations file groups */
+body.subtle-material .file-group {
+  background: var(--sm-surface) !important;
+  border: 1px solid var(--sm-border) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08) !important;
+}
+body.subtle-material .file-toggle .file-title {
+  color: #1e293b !important;
+}
+body.subtle-material .file-id-chip {
+  background: var(--sm-secondary) !important;
+  border-color: var(--sm-border) !important;
+  color: #475569 !important;
+}
+body.subtle-material .task-count {
+  background: rgba(99,102,241,0.08) !important;
+  border-color: rgba(99,102,241,0.18) !important;
+  color: #4338ca !important;
+}
+body.subtle-material .file-group-actions .mini-btn {
+  border-color: rgba(99,102,241,0.35) !important;
+  background: linear-gradient(135deg, var(--sm-primary), rgba(6,182,212,0.9)) !important;
+}
+
+  /* Run modal integration */
+  body.subtle-material .run-task-modal { background: rgba(15, 23, 42, 0.2) !important; }
+  body.subtle-material .run-task-content { background: var(--sm-surface) !important; border-color: var(--sm-border) !important; }
   
   body.subtle-material .view-toggle .toggle-btn {
     color: #334155 !important;
@@ -498,3 +531,14 @@ body.subtle-material {
     body.subtle-material .retry-button { width: 100% !important; }
   }
   
+  /* Watch/Listen buttons: brand outline for contrast */
+  body.subtle-material .preview-button {
+    background: var(--sm-primary) !important;
+    color: var(--sm-on-primary) !important;
+    border: 1px solid var(--sm-primary) !important;
+    border-radius: 8px !important;
+  }
+  body.subtle-material .preview-button:hover {
+    background: var(--sm-primary-hover) !important;
+    border-color: var(--sm-primary-hover) !important;
+  }

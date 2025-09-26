@@ -11,6 +11,7 @@ export interface TaskState {
   created_at: string;
   updated_at: string;
   errors: string[];
+  steps?: Record<string, { status?: string; data?: any }>;
 }
 
 export interface Task {

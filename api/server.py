@@ -18,6 +18,7 @@ from slidespeaker.routes.audio_downloads import router as audio_downloads_router
 from slidespeaker.routes.auth import router as auth_router
 from slidespeaker.routes.diagnostic import router as diagnostic_router
 from slidespeaker.routes.downloads import router as downloads_router
+from slidespeaker.routes.files import router as files_router
 from slidespeaker.routes.health import router as health_router
 from slidespeaker.routes.languages import router as languages_router
 from slidespeaker.routes.podcast_downloads import router as podcast_downloads_router
@@ -66,6 +67,7 @@ app.add_middleware(
 # Include all route modules
 app.include_router(auth_router)
 app.include_router(upload_router)
+app.include_router(files_router)
 app.include_router(tasks_router)
 app.include_router(progress_router)
 app.include_router(downloads_router)

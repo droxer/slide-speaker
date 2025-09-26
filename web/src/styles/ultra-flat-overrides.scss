@@ -18,6 +18,10 @@ body.ultra-flat {
     /* Media controls contrast (Flat) */
     --media-controls-bg-video: rgba(0, 0, 0, 0.7);
     --media-controls-bg-audio: #e9edf3;
+    /* Map brand tokens to theme */
+    --brand-1: var(--uf-accent);
+    --brand-2: color-mix(in srgb, var(--uf-accent) 50%, #06b6d4 50%);
+    --brand-3: #22c55e;
   }
   
   /* Media geometry: sharp, no elevation in Flat */
@@ -81,18 +85,149 @@ body.ultra-flat {
   body.ultra-flat .content-card,
   body.ultra-flat .video-option-card,
   body.ultra-flat .statistics-summary,
-  body.ultra-flat .stat-card,
-  body.ultra-flat .monitor-header {
+  body.ultra-flat .stat-card {
     background: #ffffff !important;
     border: 1px solid var(--uf-border) !important;
     border-radius: 4px !important;
   }
+
+  body.ultra-flat .monitor-header {
+    background: #ffffff !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--uf-border) !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* Creations file groups */
+body.ultra-flat .file-group {
+  background: #ffffff !important;
+  border: 1px solid var(--uf-border) !important;
+  border-radius: 6px !important;
+  box-shadow: none !important;
+}
+body.ultra-flat .file-group-header {
+  padding: 14px 16px !important;
+  background: var(--uf-secondary-bg) !important;
+  border-bottom: 1px solid var(--uf-border) !important;
+  gap: 10px !important;
+}
+body.ultra-flat .file-group.open {
+  border-color: var(--uf-border) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+body.ultra-flat .file-task-list {
+  background: #ffffff !important;
+}
+body.ultra-flat .file-toggle {
+  position: relative !important;
+  grid-template-columns: minmax(0, 1fr) auto !important;
+  gap: 6px !important;
+  align-items: center !important;
+  padding: 12px 16px 12px 28px !important;
+  color: var(--uf-secondary-text) !important;
+  background: #ffffff !important;
+  border: 1px solid var(--uf-border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04) !important;
+  transition:
+    border-color 0.18s ease,
+    background-color 0.18s ease,
+    box-shadow 0.18s ease !important;
+}
+body.ultra-flat .file-toggle::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: 12px;
+  width: 4px;
+  border-radius: 8px;
+  background: transparent;
+  transition: background-color 0.18s ease;
+}
+body.ultra-flat .file-toggle .file-title {
+  color: #111827 !important;
+}
+body.ultra-flat .file-toggle .file-meta {
+  color: #6b7280 !important;
+}
+body.ultra-flat .file-toggle:hover,
+body.ultra-flat .file-toggle[aria-expanded='true'] {
+  border-color: color-mix(in srgb, var(--uf-accent) 40%, var(--uf-border) 60%) !important;
+  background: color-mix(in srgb, #ffffff 85%, var(--uf-secondary-bg) 15%) !important;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06) !important;
+}
+body.ultra-flat .file-toggle:hover::before,
+body.ultra-flat .file-toggle[aria-expanded='true']::before {
+  background: var(--uf-accent) !important;
+}
+body.ultra-flat .file-toggle:focus-visible {
+  outline: none !important;
+  border-color: color-mix(in srgb, var(--uf-accent) 55%, var(--uf-border) 45%) !important;
+  background: color-mix(in srgb, #ffffff 75%, var(--uf-secondary-bg) 25%) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--uf-accent) 22%, transparent) !important;
+}
+body.ultra-flat .file-toggle:focus-visible::before {
+  background: var(--uf-accent) !important;
+}
+body.ultra-flat .file-toggle .chev {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 999px !important;
+  background: #eef2f7 !important;
+  color: #4b5563 !important;
+  font-size: 12px !important;
+  transition:
+    transform 0.2s ease,
+    background-color 0.18s ease,
+    color 0.18s ease !important;
+}
+body.ultra-flat .file-toggle:hover .chev,
+body.ultra-flat .file-toggle[aria-expanded='true'] .chev,
+body.ultra-flat .file-toggle:focus-visible .chev {
+  background: var(--uf-accent) !important;
+  color: var(--uf-btn-text) !important;
+}
+body.ultra-flat .file-id-chip {
+  background: #f3f4f6 !important;
+  border-color: var(--uf-border) !important;
+  color: #1f2937 !important;
+  border-radius: 4px !important;
+}
+body.ultra-flat .task-count {
+  background: #f9fafb !important;
+  border-color: var(--uf-border) !important;
+  color: #111827 !important;
+}
+body.ultra-flat .file-group-actions .mini-btn {
+  border-radius: 4px !important;
+  border: 1px solid var(--uf-border) !important;
+  background: #111827 !important;
+  color: #f8fafc !important;
+  box-shadow: none !important;
+}
+body.ultra-flat .file-group-actions .mini-btn:hover {
+  background: #000000 !important;
+  border-color: #111827 !important;
+}
+
+  /* Run modal integration */
+  body.ultra-flat .run-task-modal { background: rgba(17, 24, 39, 0.15) !important; }
+  body.ultra-flat .run-task-content { background: #ffffff !important; border-color: var(--uf-border) !important; border-radius: 4px !important; box-shadow: none !important; }
   
   /* Remove decorative gradients/overlays */
-  body.ultra-flat .task-monitor,
-  body.ultra-flat .stat-card::before {
+body.ultra-flat .task-monitor,
+body.ultra-flat .stat-card::before {
     background: none !important;
-  }
+}
+body.ultra-flat .task-monitor {
+    background-color: #ffffff !important;
+}
   
   /* Toggle (Process/Monitor) */
   body.ultra-flat .view-toggle {
@@ -254,14 +389,14 @@ body.ultra-flat {
   
   /* Watch (preview) button contains a black triangle emoji; keep light */
   body.ultra-flat .preview-button {
-    background: #ffffff !important;
-    color: #111827 !important;
-    border: 1px solid var(--uf-border) !important;
+    background: var(--uf-btn-bg) !important;
+    color: var(--uf-btn-text) !important;
+    border: 1px solid var(--uf-btn-bg) !important;
   }
   
   body.ultra-flat .preview-button:hover {
-    background: #f3f4f6 !important;
-    border-color: #d1d5db !important;
+    background: var(--uf-btn-bg-hover) !important;
+    border-color: var(--uf-btn-bg-hover) !important;
   }
   
   /* Preview toggle overrides */
