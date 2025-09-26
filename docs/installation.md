@@ -5,7 +5,8 @@
 - Python 3.12+
 - Node.js 20+
 - Redis server
-- FFmpeg
+- FFmpeg (required for media muxing and waveform generation)
+- LibreOffice (needed for PPT/PPTX to PDF conversion via `soffice`)
 - API keys for:
   - OpenAI (for transcript generation)
   - ElevenLabs or OpenAI TTS (for audio generation)
