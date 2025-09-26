@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient, QueryClient } from '@tanstack/react-query';
-import { getTasks, getStats, searchTasks, getDownloads, getTranscriptMarkdown, getVttText, cancelRun, purgeTask, upload, runFile } from './client';
+import { getTasks, getStats, searchTasks, getDownloads, getTranscriptMarkdown, getVttText, cancelRun, purgeTask, runFile } from './client';
 import type { Task } from '../types';
 
 export const queries = {

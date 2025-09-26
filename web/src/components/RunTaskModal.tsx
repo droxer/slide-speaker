@@ -99,7 +99,7 @@ const RunTaskModal: React.FC<Props> = ({ open, isPdf, defaults, onClose, onSubmi
         <div className="modal-header-bar" data-kind={taskType}>
           <div className="header-left">
             <span className="header-icon" aria-hidden>{taskType === 'podcast' ? '🎧' : '🎬'}</span>
-            <span>{taskType === 'podcast' ? 'Create Podcast' : 'Create Video'}</span>
+            <span>{taskType === 'podcast' ? 'Generate Podcast' : 'Generate Video'}</span>
           </div>
           <div className="header-right">
             <button type="button" className="modal-close-btn" aria-label="Close" title="Close" onClick={onClose}>
@@ -114,9 +114,18 @@ const RunTaskModal: React.FC<Props> = ({ open, isPdf, defaults, onClose, onSubmi
           <div className="run-config">
             <div className="run-left">
               <div className="run-summary">
-                <div className="file-name" title={filename || ''}>{shortenFileName(filename)}</div>
-                {/* Mode is selected by which button opened the modal (Video/Podcast). No toggle here. */}
-                <div className="hint">Mode is set by your choice above. Configure options, then press Run.</div>
+                <div className="run-tag" data-kind={taskType}>{taskType === 'podcast' ? 'Podcast' : 'Video'} task</div>
+                <dl className="summary-fields">
+                  <div>
+                    <dt>Source</dt>
+                    <dd title={filename || ''}>{shortenFileName(filename)}</dd>
+                  </div>
+                  <div>
+                    <dt>Output</dt>
+                    <dd>{taskType === 'podcast' ? 'Audio narrative' : 'Narrated video'}</dd>
+                  </div>
+                </dl>
+                <div className="hint">Adjust the generation options and press Generate when you are ready.</div>
               </div>
             </div>
             <div className="run-right">
@@ -161,7 +170,7 @@ const RunTaskModal: React.FC<Props> = ({ open, isPdf, defaults, onClose, onSubmi
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
                 <button className="secondary-btn" onClick={onClose} disabled={submitting}>Cancel</button>
                 <button className="primary-btn" onClick={run} disabled={submitting}>
-                  {submitting ? 'Creating…' : 'Create'}
+                  {submitting ? 'Generating…' : 'Generate'}
                 </button>
               </div>
             </div>

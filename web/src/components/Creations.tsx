@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { cancelRun as apiCancelRun, purgeTask as apiPurgeTask } from '../services/client';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { cancelRun as apiCancelRun, purgeTask as apiPurgeTask, getHealth } from '../services/client';
 import { getCachedDownloads, useFilesQuery, useRunFileTaskMutation, useSearchTasksQuery, useTranscriptQuery } from '../services/queries';
 import '../styles/task-monitor.scss';
 import TaskCard from './TaskCard';
@@ -32,6 +32,11 @@ const shortBaseName = (name?: string, max = 42): string => {
   const tail = max - head - 1;
   return base.slice(0, head) + '…' + base.slice(-tail);
 };
+const shortId = (id?: string) => {
+  if (!id) return '';
+  if (id.length <= 12) return id;
+  return `${id.slice(0, 6)}…${id.slice(-4)}`;
+};
 
 const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
   const [search, setSearch] = useState('');
@@ -48,7 +53,6 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
   const [runDefaults, setRunDefaults] = useState<any>({});
   const [runSubmitting, setRunSubmitting] = useState(false);
   const queryClient = useQueryClient();
-  const videoRef = useRef<HTMLVideoElement|null>(null);
 
   useEffect(() => { const t = setTimeout(() => setDebounced(search.trim()), 350); return () => clearTimeout(t); }, [search]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2600); return () => clearTimeout(t); }, [toast]);
@@ -63,6 +67,18 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
   );
   const searchQuery = useSearchTasksQuery(debounced);
   const searching = debounced.length > 0;
+
+  // Health indicator (Redis/DB)
+  const healthQuery = useQuery({ queryKey: ['health'], queryFn: getHealth, refetchInterval: 30000, staleTime: 20000 });
+  const health = (healthQuery.data as any) || {};
+  const overall = String(health.status || 'unknown');
+  const redisOk = Boolean(health?.redis?.ok);
+  const dbOk = Boolean(health?.db?.ok);
+  const redisLatency = health?.redis?.latency_ms as number | undefined;
+  const dbLatency = health?.db?.latency_ms as number | undefined;
+  const redisError = health?.redis?.error as string | undefined;
+  const dbError = health?.db?.error as string | undefined;
+  const overallLabel = overall === 'ok' ? 'All systems nominal' : overall === 'degraded' ? 'Partial availability' : overall === 'down' ? 'Systems offline' : 'Status unknown';
 
   // Selected preview transcript (podcast listen)
   const selectedIsPodcast = useMemo(() => {
@@ -160,25 +176,37 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
             const vis = (status === 'all' ? g.tasks : g.tasks.filter((t) => t.status === status));
             if (!vis.length) return null;
             return (
-              <section key={key} className="file-group">
-                <header className="file-group-header" role="button" onClick={() => toggleFile(key)}>
-                  <div className="file-title" title={g.filename || 'Unknown file'}>
-                    <span className="file-title-text">{shortBaseName(g.filename)}</span>
-                    {g.filename && /\.(pdf|pptx?|PPTX?|PDF)$/.test(g.filename) && (
-                      <span className="file-ext-chip">{g.filename.slice(g.filename.lastIndexOf('.')).toUpperCase()}</span>
-                    )}
-                    {g.file_id && (<span className="file-id-chip" title={g.file_id}>ID: <span className="id-mono">{g.file_id}</span></span>)}
-                  </div>
-                  <div className="task-count">{vis.length} {vis.length === 1 ? 'task' : 'tasks'}</div>
-                  <div className="chev" aria-hidden>{expandedFiles.has(key) ? '▴' : '▾'}</div>
-                  <div className="file-group-actions" onClick={(e) => e.stopPropagation()}>
-                    {!!g.file_id && (
-                      <>
-                        <button className="mini-btn" title="Create Video" onClick={() => onRun(g.file_id!, g.filename, g.file_ext, 'video')}>Create Video</button>
-                        {isPdf(g.file_ext) && <button className="mini-btn" title="Create Podcast" onClick={() => onRun(g.file_id!, g.filename, g.file_ext, 'podcast')}>Create Podcast</button>}
-                      </>
-                    )}
-                  </div>
+              <section key={key} className={`file-group ${expandedFiles.has(key) ? 'open' : ''}`}>
+                <header className="file-group-header">
+                  <button
+                    type="button"
+                    className="file-toggle"
+                    aria-expanded={expandedFiles.has(key)}
+                    onClick={() => toggleFile(key)}
+                  >
+                    <div className="file-title" title={g.filename || 'Unknown file'}>
+                      <span className="file-title-text">{shortBaseName(g.filename, 48)}</span>
+                    </div>
+                    <div className="file-meta">
+                      <span className="file-id-chip" title={g.file_id || ''}>{g.file_id ? `ID ${shortId(g.file_id)}` : 'Untracked file'}</span>
+                      <span className="task-count">{vis.length} {vis.length === 1 ? 'creation' : 'creations'}</span>
+                    </div>
+                    <span className="chev" aria-hidden>▾</span>
+                  </button>
+                  {!!g.file_id && (
+                    <div className="file-group-actions" onClick={(e) => e.stopPropagation()}>
+                      <button className="mini-btn" title="Generate Video" onClick={() => onRun(g.file_id!, g.filename, g.file_ext, 'video')}>
+                        <span aria-hidden>🎬</span>
+                        <span>Generate Video</span>
+                      </button>
+                      {isPdf(g.file_ext) && (
+                        <button className="mini-btn" title="Generate Podcast" onClick={() => onRun(g.file_id!, g.filename, g.file_ext, 'podcast')}>
+                          <span aria-hidden>🎧</span>
+                          <span>Generate Podcast</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </header>
                 {expandedFiles.has(key) && (
                   <div className="file-task-list">
@@ -216,25 +244,37 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
           const vis = (status === 'all' ? tasks : tasks.filter((t) => t.status === status));
           if (!vis.length) return null;
           return (
-            <section key={key} className="file-group">
-              <header className="file-group-header" role="button" onClick={() => toggleFile(key)}>
-                <div className="file-title" title={f.filename || 'Unknown file'}>
-                  <span className="file-title-text">{shortBaseName(f.filename)}</span>
-                  {f.filename && /\.(pdf|pptx?|PPTX?|PDF)$/.test(f.filename) && (
-                    <span className="file-ext-chip">{f.filename.slice(f.filename.lastIndexOf('.')).toUpperCase()}</span>
-                  )}
-                  {f.file_id && (<span className="file-id-chip" title={f.file_id}>ID: <span className="id-mono">{f.file_id}</span></span>)}
-                </div>
-                <div className="task-count">{vis.length} {vis.length === 1 ? 'task' : 'tasks'}</div>
-                <div className="chev" aria-hidden>{expandedFiles.has(key) ? '▴' : '▾'}</div>
-                <div className="file-group-actions" onClick={(e) => e.stopPropagation()}>
-                  {!!f.file_id && (
-                    <>
-                      <button className="mini-btn" title="Create Video" onClick={() => onRun(f.file_id!, f.filename, f.file_ext, 'video')}>Create Video</button>
-                      {isPdf(f.file_ext) && <button className="mini-btn" title="Create Podcast" onClick={() => onRun(f.file_id!, f.filename, f.file_ext, 'podcast')}>Create Podcast</button>}
-                    </>
-                  )}
-                </div>
+              <section key={key} className={`file-group ${expandedFiles.has(key) ? 'open' : ''}`}>
+                <header className="file-group-header">
+                <button
+                  type="button"
+                  className="file-toggle"
+                  aria-expanded={expandedFiles.has(key)}
+                  onClick={() => toggleFile(key)}
+                >
+                  <div className="file-title" title={f.filename || 'Unknown file'}>
+                    <span className="file-title-text">{shortBaseName(f.filename, 48)}</span>
+                  </div>
+                  <div className="file-meta">
+                    <span className="file-id-chip" title={f.file_id || ''}>{f.file_id ? `ID ${shortId(f.file_id)}` : 'Untracked file'}</span>
+                    <span className="task-count">{vis.length} {vis.length === 1 ? 'creation' : 'creations'}</span>
+                  </div>
+                  <span className="chev" aria-hidden>▾</span>
+                </button>
+                {!!f.file_id && (
+                  <div className="file-group-actions" onClick={(e) => e.stopPropagation()}>
+                    <button className="mini-btn" title="Generate Video" onClick={() => onRun(f.file_id!, f.filename, f.file_ext, 'video')}>
+                      <span aria-hidden>🎬</span>
+                      <span>Generate Video</span>
+                    </button>
+                    {isPdf(f.file_ext) && (
+                      <button className="mini-btn" title="Generate Podcast" onClick={() => onRun(f.file_id!, f.filename, f.file_ext, 'podcast')}>
+                        <span aria-hidden>🎧</span>
+                        <span>Generate Podcast</span>
+                      </button>
+                    )}
+                  </div>
+                )}
               </header>
               {expandedFiles.has(key) && (
                 <div className="file-task-list">
@@ -283,6 +323,24 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
             <option value="cancelled">Cancelled</option>
           </select>
         </div>
+      </div>
+      {/* Health indicator */}
+      <div className="health-indicator" role="status" aria-live="polite">
+        <span className={`hi-dot ${overall === 'ok' ? 'ok' : overall === 'degraded' ? 'warn' : 'down'}`} aria-hidden></span>
+        <span className="hi-label">Status</span>
+        <span className={`hi-chip overall ${overall}`} title={overallLabel}>{overall === 'ok' ? 'OK' : overall === 'degraded' ? 'Degraded' : overall === 'down' ? 'Down' : 'Unknown'}</span>
+        <span
+          className={`hi-chip ${redisOk ? 'ok' : 'down'}`}
+          title={redisOk ? `Queue latency: ${redisLatency ?? 'n/a'} ms` : (redisError || 'Queue unavailable')}
+        >
+          Queue
+        </span>
+        <span
+          className={`hi-chip ${dbOk ? 'ok' : 'down'}`}
+          title={dbOk ? `Database latency: ${dbLatency ?? 'n/a'} ms` : (dbError || 'Database unavailable')}
+        >
+          Database
+        </span>
       </div>
 
       <div className="task-list">

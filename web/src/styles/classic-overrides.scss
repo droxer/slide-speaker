@@ -2,6 +2,10 @@
 
 body.classic {
   background: linear-gradient(135deg, #4338ca 0%, #7c3aed 100%);
+  /* Map brand tokens to classic palette */
+  --brand-1: #7c3aed; /* violet */
+  --brand-2: #06b6d4; /* cyan */
+  --brand-3: #22c55e; /* green */
 }
 
 body.classic .app-header {
@@ -53,12 +57,33 @@ body.classic .task-monitor {
 }
 
 /* Creations file groups (classic: light glass) */
-body.classic .file-group { background: rgba(255,255,255,0.9) !important; border: 1px solid rgba(255,255,255,0.6) !important; border-radius: 12px !important; box-shadow: 0 8px 24px rgba(0,0,0,0.08) !important; }
-body.classic .file-group-header { background: rgba(255,255,255,0.8) !important; border-bottom: 1px solid rgba(255,255,255,0.6) !important; }
-body.classic .file-ext-chip { background: rgba(255,255,255,0.9) !important; color: #111827 !important; border-color: rgba(255,255,255,0.8) !important; }
-body.classic .file-id-chip { background: rgba(255,255,255,0.8) !important; border-color: rgba(255,255,255,0.7) !important; color: #111827 !important; }
-body.classic .file-group-actions .mini-btn { background: rgba(255,255,255,0.95) !important; color: #111827 !important; border: 1px solid rgba(255,255,255,0.8) !important; border-radius: 10px !important; }
-body.classic .file-group-actions .mini-btn:hover { background: rgba(255,255,255,1) !important; }
+body.classic .file-group {
+  background: linear-gradient(145deg, rgba(255,255,255,0.92), rgba(255,255,255,0.75)) !important;
+  border: 1px solid rgba(255,255,255,0.65) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 14px 36px rgba(17, 24, 39, 0.18) !important;
+}
+body.classic .file-group-header {
+  background: rgba(255,255,255,0.78) !important;
+}
+body.classic .file-toggle .file-title {
+  color: #0b1120 !important;
+}
+body.classic .file-id-chip {
+  background: rgba(255,255,255,0.88) !important;
+  border-color: rgba(255,255,255,0.65) !important;
+  color: #0b1120 !important;
+}
+body.classic .task-count {
+  background: rgba(124,58,237,0.12) !important;
+  border-color: rgba(124,58,237,0.2) !important;
+  color: #4338ca !important;
+}
+body.classic .file-group-actions .mini-btn {
+  border-color: rgba(124,58,237,0.45) !important;
+  background: linear-gradient(135deg, rgba(124,58,237,0.95), rgba(6,182,212,0.85)) !important;
+  color: #f8fafc !important;
+}
 
 /* Run modal in classic: keep subtle glass backdrop */
 body.classic .run-task-modal { background: rgba(0, 0, 0, 0.25) !important; backdrop-filter: blur(8px) !important; }
