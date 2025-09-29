@@ -1,20 +1,19 @@
+'use client';
+
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { upload as apiUpload, cancelRun as apiCancel, getHealth as apiHealth, getTaskProgress as apiGetProgress, getTranscriptMarkdown as apiGetTranscript, headTaskVideo as apiHeadVideo, getVttText as apiGetVttText } from "./services/client";
+import { upload as apiUpload, cancelRun as apiCancel, getHealth as apiHealth, getTaskProgress as apiGetProgress, getTranscriptMarkdown as apiGetTranscript, headTaskVideo as apiHeadVideo, getVttText as apiGetVttText } from "@/services/client";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import "./styles/app.scss";
-import "./styles/ultra-flat-overrides.scss";
-import "./styles/subtle-material-overrides.scss";
-import "./styles/classic-overrides.scss";
-import Creations from "./components/Creations";
-import ProcessingView from "./components/ProcessingView";
-import CompletedView from "./components/CompletedView";
-import UploadPanel from "./components/UploadPanel";
-import Header from "./components/Header";
-import Footer from "./components/Footer";
-import ErrorView from "./components/ErrorView";
-import UploadingView from "./components/UploadingView";
-import { getStepLabel } from './utils/stepLabels';
-import { useUI } from './context/UIContext';
+import Creations from "@/components/Creations";
+import ProcessingView from "@/components/ProcessingView";
+import CompletedView from "@/components/CompletedView";
+import UploadPanel from "@/components/UploadPanel";
+import Header, { AppView } from "@/components/Header";
+import Footer from "@/components/Footer";
+import ErrorView from "@/components/ErrorView";
+import UploadingView from "@/components/UploadingView";
+import { getStepLabel } from '@/utils/stepLabels';
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl';
+import type { HealthStatus } from '@/types/health';
 // Players are used within components (CompletedView/Creations) not here
 
 // Constants for local storage keys
@@ -29,17 +28,7 @@ const LOCAL_STORAGE_KEYS = {
 };
 
 // API configuration – prefer same-origin when served over HTTPS to avoid mixed-content blocks
-const API_BASE_URL = (() => {
-  const env = process.env.REACT_APP_API_BASE_URL;
-  if (env !== undefined) return env;
-  const { protocol, hostname } = window.location;
-  if (protocol === "https:") {
-    // Use same-origin '/api' paths; rely on reverse proxy in production
-    return "";
-  }
-  // Local dev over HTTP
-  return `${protocol}//${hostname}:8000`;
-})();
+const API_BASE_URL = resolveApiBaseUrl();
 
 // UI Theme key
 const THEME_STORAGE_KEY = "slidespeaker_ui_theme"; // 'flat' | 'classic' | 'material'
@@ -77,6 +66,12 @@ type AppStatus =
   | "completed"
   | "error"
   | "cancelled";
+
+type AppProps = {
+  activeView?: AppView;
+  onNavigate?: (view: AppView) => void;
+  initialHealth?: HealthStatus | null;
+};
 
 // Local storage utility functions
 const localStorageUtils = {
@@ -191,7 +186,7 @@ const localStorageUtils = {
   },
 };
 
-function App() {
+function App({ activeView = 'studio', onNavigate, initialHealth }: AppProps) {
   const queryClient = useQueryClient();
   // UI theme: 'classic' (Modern, default), 'flat', or 'material'
   const [uiTheme, setUiTheme] = useState<"flat" | "classic" | "material">(
@@ -254,7 +249,12 @@ function App() {
   const [generateAvatar, setGenerateAvatar] = useState<boolean>(false);
   const [generateSubtitles, setGenerateSubtitles] = useState<boolean>(true);
   const [isResumingTask, setIsResumingTask] = useState<boolean>(false);
-  const { showTaskMonitor, setShowTaskMonitor } = useUI();
+  const showTaskMonitor = activeView === 'creations';
+  const handleViewChange = (view: AppView) => {
+    if (view !== activeView) {
+      onNavigate?.(view);
+    }
+  };
   const [uploadMode, setUploadMode] = useState<"slides" | "pdf">("slides");
   const [pdfOutputMode, setPdfOutputMode] = useState<"video" | "podcast">(
     "video",
@@ -276,17 +276,21 @@ function App() {
     }
   }, [uploadMode, pdfOutputMode]);
   // Global health (footer indicator) via React Query
-  const healthQuery = useQuery({
+  const initialHealthData = initialHealth ?? null;
+
+  const healthQuery = useQuery<HealthStatus | null>({
     queryKey: ['health'],
     queryFn: apiHealth,
-    refetchInterval: 300000, // Check every 5 minutes instead of every 15 seconds
+    refetchInterval: 300_000,
     refetchOnWindowFocus: false,
+    staleTime: 300_000,
+    initialData: initialHealthData ?? undefined,
   });
-  const queueUnavailable = !((healthQuery.data as any)?.redis?.ok === true || (healthQuery.data as any)?.redis_ok === true);
+  const healthData = healthQuery.data ?? null;
+  const queueUnavailable = !(healthData?.redis?.ok === true);
   const redisLatencyMs = (() => {
-    const d: any = healthQuery.data;
-    const latRaw = (d?.redis && d.redis.latency_ms) ?? d?.redis_latency_ms;
-    return typeof latRaw === 'number' ? Math.round(latRaw) : null;
+    const latency = healthData?.redis?.latency_ms;
+    return typeof latency === 'number' ? Math.round(latency) : null;
   })();
   // Audio transcript UI is handled by reusable components
   // Completed banner visibility (dismissible)
@@ -986,7 +990,7 @@ function App() {
 
   return (
     <div className="App">
-      <Header showTaskMonitor={showTaskMonitor} setShowTaskMonitor={setShowTaskMonitor} />
+      <Header activeView={activeView} onNavigate={handleViewChange} />
 
       <main className="main-content">
         {showTaskMonitor ? (
@@ -996,10 +1000,7 @@ function App() {
         ) : (
           <div id="studio-panel" role="tabpanel" aria-labelledby="studio-tab">
             <div className="card-container">
-              <div
-                className={`content-card ${status === "completed" ? "wide" : ""}`}
-              >
-                {/* Upload box visible only in idle */}
+              <div className={`content-card ${status === "completed" ? "wide" : ""}`}>
                 {status === 'idle' && (
                   <UploadPanel
                     uploadMode={uploadMode}
@@ -1024,13 +1025,8 @@ function App() {
                   />
                 )}
 
-
-
-                                
-
-                {/* Below: Non-idle status panels remain visible below the upload box */}
                 {status === "uploading" && (
-                  <UploadingView progress={progress} />
+                  <UploadingView progress={progress} fileName={file?.name || null} />
                 )}
 
                 {status === "processing" && processingDetails && (
@@ -1069,11 +1065,7 @@ function App() {
                   />
                 )}
 
-                
-
-                {status === "error" && (
-                  <ErrorView onResetForm={resetForm} />
-                )}
+                {status === "error" && <ErrorView onResetForm={resetForm} />}
               </div>
             </div>
           </div>

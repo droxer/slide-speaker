@@ -1,8 +1,9 @@
 import React from 'react';
-import { getStepLabel } from '../utils/stepLabels';
-import { resolveLanguages, getLanguageDisplayName as displayName } from '../utils/language';
-import type { Task, DownloadItem } from '../types';
-import { useDownloadsQuery, useTranscriptQuery, hasCachedVtt, prefetchTaskPreview } from '../services/queries';
+import Link from 'next/link';
+import { getStepLabel } from '@/utils/stepLabels';
+import { resolveLanguages, getLanguageDisplayName as displayName } from '@/utils/language';
+import type { Task, DownloadItem } from '@/types';
+import { useDownloadsQuery, useTranscriptQuery, hasCachedVtt, prefetchTaskPreview } from '@/services/queries';
 import { useQueryClient } from '@tanstack/react-query';
 
 type Outputs = { video: boolean; podcast: boolean };
@@ -67,6 +68,7 @@ const TaskCard: React.FC<Props> = ({
   const videoRes = task.kwargs?.video_resolution || task.state?.video_resolution || 'hd';
   const { video: isVideoTask, podcast: isPodcastTask } = deriveTaskOutputs(task);
   const transcriptLang = transcriptLanguage;
+  const filename = task.kwargs?.filename || task.state?.filename || 'Unknown file';
   // Prefer cache-driven downloads when the card is expanded
   const queryClient = useQueryClient();
   const { data: dlData } = useDownloadsQuery(task.task_id, isExpanded);
@@ -101,22 +103,7 @@ const TaskCard: React.FC<Props> = ({
   return (
     <div className={`task-item ${getStatusColor(task.status)} ${isRemoving ? 'removing' : ''}`}>
       <div className="task-header">
-        <div
-          className="task-id"
-          tabIndex={0}
-          role="button"
-          aria-label={`Task ID: ${task.task_id} (press Enter to copy)`}
-          title={task.task_id}
-          onClick={() => {
-            try { navigator.clipboard.writeText(task.task_id); alert('Task ID copied!'); } catch {}
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              try { navigator.clipboard.writeText(task.task_id); alert('Task ID copied!'); } catch {}
-            }
-          }}
-        >
+        <div className="task-id">
           {/* Output badges inline before task id (one line) */}
           {(isVideoTask || (dlItems?.some((d) => d.type === 'video') ?? false)) && (
             <span className="output-inline"><span className="output-dot video" aria-hidden></span>Video</span>
@@ -124,7 +111,28 @@ const TaskCard: React.FC<Props> = ({
           {(isPodcastTask || (dlItems?.some((d) => d.type === 'podcast') ?? false)) && (
             <span className="output-inline"><span className="output-dot podcast" aria-hidden></span>Podcast</span>
           )}
-          <span className="task-id-text">Task: {task.task_id}</span>
+          <Link
+            href={`/tasks/${task.task_id}`}
+            className="task-id-link"
+            title={`Open task ${task.task_id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Task: {task.task_id}
+          </Link>
+          <button
+            type="button"
+            className="copy-task-id"
+            aria-label="Copy task ID"
+            title="Copy task ID"
+            onClick={() => {
+              try {
+                navigator.clipboard.writeText(task.task_id);
+              } catch {}
+            }}
+          >
+            Copy
+          </button>
         </div>
         {task.status !== 'completed' && task.status !== 'queued' && (
           <div
@@ -143,7 +151,10 @@ const TaskCard: React.FC<Props> = ({
           {task.status === 'queued' && (
             <div className="queued-note" role="status" aria-live="polite">Queued • Waiting to start</div>
           )}
-          {/* Filename omitted (shown on file group header) */}
+          <div className="task-filename" title={filename}>
+            <span className="task-filename__icon" aria-hidden>📄</span>
+            <span className="task-filename__text">{filename}</span>
+          </div>
 
           {/* Meta chips */}
           <div className="meta-row">

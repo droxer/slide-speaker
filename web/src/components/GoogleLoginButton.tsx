@@ -1,6 +1,4 @@
 import React from "react";
-import "../styles/GoogleLoginButton.scss";
-
 interface GoogleLoginButtonProps {
   onClick: () => void;
   disabled?: boolean;

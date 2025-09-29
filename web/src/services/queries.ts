@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient, QueryClient } from '@tanstack/react-query';
-import { getTasks, getStats, searchTasks, getDownloads, getTranscriptMarkdown, getVttText, cancelRun, purgeTask, runFile } from './client';
+import { getTasks, getStats, searchTasks, getDownloads, getTranscriptMarkdown, getVttText, cancelRun, purgeTask, runFile, getTaskById } from './client';
 import type { Task } from '../types';
 
 export const queries = {
@@ -9,6 +9,7 @@ export const queries = {
   downloads: (taskId: string) => ['downloads', taskId] as const,
   transcript: (taskId: string) => ['transcript', taskId] as const,
   vtt: (taskId: string, language?: string) => (language ? (['vtt', taskId, language] as const) : (['vtt', taskId] as const)),
+  task: (taskId: string) => ['task', taskId] as const,
 };
 
 export const useTasksQuery = (
@@ -77,6 +78,26 @@ export const useDownloadsQuery = (taskId: string | null, enabled = true) => {
 export const useTranscriptQuery = (taskId: string | null, enabled = true) => {
   const id = taskId || '';
   return useQuery({ queryKey: queries.transcript(id), queryFn: () => getTranscriptMarkdown(id), enabled: Boolean(taskId) && enabled });
+};
+
+export const useTaskQuery = (taskId: string, initialData?: Task | null) => {
+  return useQuery<Task | null>({
+    queryKey: queries.task(taskId),
+    queryFn: async () => {
+      if (!taskId) return null;
+      try {
+        return await getTaskById(taskId);
+      } catch (error: any) {
+        if (error?.response?.status === 404) {
+          return null;
+        }
+        throw error;
+      }
+    },
+    enabled: Boolean(taskId),
+    staleTime: 30_000,
+    initialData: initialData ?? undefined,
+  });
 };
 
 // Cache selectors (helpers)

@@ -40,6 +40,11 @@ const CompletedView: React.FC<CompletedViewProps> = ({
   const [completedVideoLoading, setCompletedVideoLoading] = React.useState<boolean>(false);
 
   const taskType = String((processingDetails as any)?.task_type || '').toLowerCase();
+  const filename =
+    (processingDetails as any)?.filename ||
+    (processingDetails as any)?.kwargs?.filename ||
+    (processingDetails as any)?.state?.filename ||
+    null;
 
   return (
     <div className="completed-view">
@@ -69,6 +74,13 @@ const CompletedView: React.FC<CompletedViewProps> = ({
           >
             ✕
           </button>
+        </div>
+      )}
+
+      {filename && (
+        <div className="completed-filename" title={filename}>
+          <span className="completed-filename__icon" aria-hidden>📄</span>
+          <span className="completed-filename__text">{filename}</span>
         </div>
       )}
 
@@ -182,4 +194,3 @@ const CompletedView: React.FC<CompletedViewProps> = ({
 };
 
 export default CompletedView;
-

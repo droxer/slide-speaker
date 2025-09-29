@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import GoogleLoginButton from './GoogleLoginButton';
 import { initiateGoogleLogin, getCurrentUser, logout } from '../services/auth';
 
+export type AppView = 'studio' | 'creations';
+
 type HeaderProps = {
-  showTaskMonitor: boolean;
-  setShowTaskMonitor: (show: boolean) => void;
+  activeView: AppView;
+  onNavigate: (view: AppView) => void;
 };
 
-const Header: React.FC<HeaderProps> = ({ showTaskMonitor, setShowTaskMonitor }) => {
+const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
   const [user, setUser] = useState<any>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
 
@@ -62,11 +64,11 @@ const Header: React.FC<HeaderProps> = ({ showTaskMonitor, setShowTaskMonitor }) 
             aria-label="View Toggle"
           >
             <button
-              onClick={() => setShowTaskMonitor(false)}
-              className={`toggle-btn ${!showTaskMonitor ? "active" : ""}`}
+              onClick={() => onNavigate('studio')}
+              className={`toggle-btn ${activeView === 'studio' ? "active" : ""}`}
               title="Studio"
               role="tab"
-              aria-selected={!showTaskMonitor}
+              aria-selected={activeView === 'studio'}
               aria-controls="studio-panel"
               id="studio-tab"
             >
@@ -76,11 +78,11 @@ const Header: React.FC<HeaderProps> = ({ showTaskMonitor, setShowTaskMonitor }) 
               <span className="toggle-text">Studio</span>
             </button>
             <button
-              onClick={() => setShowTaskMonitor(true)}
-              className={`toggle-btn ${showTaskMonitor ? "active" : ""}`}
+              onClick={() => onNavigate('creations')}
+              className={`toggle-btn ${activeView === 'creations' ? "active" : ""}`}
               title="Creations"
               role="tab"
-              aria-selected={showTaskMonitor}
+              aria-selected={activeView === 'creations'}
               aria-controls="monitor-panel"
               id="monitor-tab"
             >

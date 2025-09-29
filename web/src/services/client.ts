@@ -1,7 +1,12 @@
 import axios from 'axios';
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl';
+import type { HealthStatus } from '@/types/health';
+import type { Task, DownloadsResponse } from '@/types';
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 export const api = axios.create({
-  baseURL: '', // same-origin (proxy)
+  baseURL: API_BASE_URL.length > 0 ? API_BASE_URL : undefined,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -22,7 +27,7 @@ export const searchTasks = async (query: string, limit = 20) => {
 
 export const getDownloads = async (taskId: string) => {
   const res = await api.get(`/api/tasks/${taskId}/downloads`);
-  return res.data as { items: Array<{ type: string; url: string; download_url?: string }> };
+  return res.data as DownloadsResponse;
 };
 
 export const getTranscriptMarkdown = async (taskId: string) => {
@@ -33,6 +38,11 @@ export const getTranscriptMarkdown = async (taskId: string) => {
 export const getStats = async () => {
   const res = await api.get(`/api/tasks/statistics`);
   return res.data as any;
+};
+
+export const getTaskById = async (taskId: string): Promise<Task> => {
+  const res = await api.get(`/api/task/${encodeURIComponent(taskId)}`);
+  return res.data as Task;
 };
 
 export const deleteTask = async (taskId: string) => {
@@ -58,9 +68,9 @@ export const runFile = async (fileId: string, payload: any) => {
   return res.data as { file_id: string; task_id: string };
 };
 
-export const getHealth = async () => {
-  const res = await api.get(`/api/health`, { headers: { Accept: 'application/json' } });
-  return res.data as any;
+export const getHealth = async (): Promise<HealthStatus> => {
+  const res = await api.get<HealthStatus>(`/api/health`, { headers: { Accept: 'application/json' } });
+  return res.data;
 };
 
 export const headTaskVideo = async (taskId: string) => {
