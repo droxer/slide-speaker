@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useI18n } from '@/i18n/hooks';
+import { getLanguageDisplayName } from '../utils/language';
 
 type UploadPanelProps = {
   uploadMode: 'slides' | 'pdf';
   setUploadMode: (v: 'slides' | 'pdf') => void;
   pdfOutputMode: 'video' | 'podcast';
   setPdfOutputMode: (v: 'video' | 'podcast') => void;
-  isResumingTask: boolean;
   file: File | null;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   voiceLanguage: string;
@@ -22,12 +23,29 @@ type UploadPanelProps = {
   getFileTypeHint: (filename: string) => JSX.Element;
 };
 
+const LANGS = [
+  'english',
+  'simplified_chinese',
+  'traditional_chinese',
+  'japanese',
+  'korean',
+  'thai',
+];
+
+const LANGUAGE_KEY_BY_CODE: Record<string, string> = {
+  english: 'language.english',
+  simplified_chinese: 'language.simplified',
+  traditional_chinese: 'language.traditional',
+  japanese: 'language.japanese',
+  korean: 'language.korean',
+  thai: 'language.thai',
+};
+
 const UploadPanel: React.FC<UploadPanelProps> = ({
   uploadMode,
   setUploadMode,
   pdfOutputMode,
   setPdfOutputMode,
-  isResumingTask,
   file,
   onFileChange,
   voiceLanguage,
@@ -43,10 +61,41 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
   onCreate,
   getFileTypeHint,
 }) => {
+  const { t } = useI18n();
+  const subtitleTitle = uploadMode === 'pdf' && pdfOutputMode === 'podcast'
+    ? t('runTask.transcriptLanguage')
+    : t('runTask.subtitleLanguage');
+
+  const displayLanguage = (code: string) => {
+    const normalized = (code || '').toLowerCase();
+    const key = LANGUAGE_KEY_BY_CODE[normalized];
+    const fallback = getLanguageDisplayName(code);
+    if (key) return t(key, undefined, fallback);
+    return fallback || t('common.unknown', undefined, 'Unknown');
+  };
+
+  const fileLabel = useMemo(() => {
+    if (file) return file.name;
+    return uploadMode === 'pdf'
+      ? t('upload.file.choosePdf', undefined, 'Choose a PDF file')
+      : t('upload.file.chooseSlides', undefined, 'Choose a PPTX/PPT file');
+  }, [file, t, uploadMode]);
+
+  const fileHint = useMemo(() => {
+    if (file) return getFileTypeHint(file.name);
+    return uploadMode === 'pdf'
+      ? t('upload.file.hintPdf', undefined, 'PDF will be processed into a video or podcast')
+      : t('upload.file.hintSlides', undefined, 'Slides will be processed into a narrated video');
+  }, [file, getFileTypeHint, t, uploadMode]);
+
+  const pdfCreateLabel = pdfOutputMode === 'podcast'
+    ? t('upload.createPodcast', undefined, 'Create Podcast')
+    : t('upload.createVideo', undefined, 'Create Video');
+
   return (
     <>
       <div className="upload-view">
-        <div className="mode-toggle" role="tablist" aria-label="Entry Mode">
+        <div className="mode-toggle" role="tablist" aria-label={t('upload.modeToggle.aria', undefined, 'Entry Mode')}>
           <button
             type="button"
             className={`toggle-btn ${uploadMode === 'slides' ? 'active' : ''}`}
@@ -55,7 +104,7 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
             aria-selected={uploadMode === 'slides'}
             aria-controls="slides-mode-panel"
           >
-            🖼️ Slides
+            🖼️ {t('upload.mode.slides', undefined, 'Slides')}
           </button>
           <button
             type="button"
@@ -65,22 +114,22 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
             aria-selected={uploadMode === 'pdf'}
             aria-controls="pdf-mode-panel"
           >
-            📄 PDF
+            📄 {t('upload.mode.pdf', undefined, 'PDF')}
           </button>
         </div>
         <div className="mode-explainer" aria-live="polite">
           {uploadMode === 'slides' ? (
             <>
-              <strong>Slides Mode:</strong> Processes each slide individually for transcripts, audio, subtitles, and composes a final video.
+              <strong>{t('upload.mode.slidesHeading', undefined, 'Slides Mode:')}</strong> {t('upload.mode.slidesDescription', undefined, 'Processes each slide individually for transcripts, audio, subtitles, and composes a final video.')}
             </>
           ) : (
             <>
-              <strong>PDF Mode:</strong> Segments the document into chapters, then you can generate either a video (with audio + subtitles) or a 2‑person podcast (MP3).
+              <strong>{t('upload.mode.pdfHeading', undefined, 'PDF Mode:')}</strong> {t('upload.mode.pdfDescription', undefined, 'Segments the document into chapters; generate a video (audio + subtitles) or a two-speaker podcast (MP3).')}
             </>
           )}
         </div>
         {uploadMode === 'pdf' && (
-          <div className="mode-toggle" role="tablist" aria-label="PDF Output">
+          <div className="mode-toggle" role="tablist" aria-label={t('upload.pdfOutput.aria', undefined, 'PDF Output')}>
             <button
               type="button"
               className={`toggle-btn ${pdfOutputMode === 'video' ? 'active' : ''}`}
@@ -89,7 +138,7 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
               aria-selected={pdfOutputMode === 'video'}
               aria-controls="pdf-output-video"
             >
-              🎬 Video
+              🎬 {t('task.list.videoLabel')}
             </button>
             <button
               type="button"
@@ -99,17 +148,10 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
               aria-selected={pdfOutputMode === 'podcast'}
               aria-controls="pdf-output-podcast"
             >
-              🎧 Podcast
+              🎧 {t('task.list.podcastLabel')}
             </button>
           </div>
         )}
-        {isResumingTask && (
-          <div className="resume-indicator">
-            <div className="spinner"></div>
-            <p>Resuming your last task...</p>
-          </div>
-        )}
-
         <div className="file-upload-area">
           <input
             type="file"
@@ -117,16 +159,11 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
             accept={uploadMode === 'pdf' ? '.pdf' : '.pptx,.ppt'}
             onChange={onFileChange}
             className="file-input"
-            disabled={isResumingTask}
           />
-          <label htmlFor="file-upload" className={`file-upload-label ${isResumingTask ? 'disabled' : ''}`}>
+          <label htmlFor="file-upload" className="file-upload-label">
             <div className="upload-icon">📄</div>
-            <div className="upload-text">
-              {file ? file.name : uploadMode === 'pdf' ? 'Choose a PDF file' : 'Choose a PPTX/PPT file'}
-            </div>
-            <div className="upload-hint">
-              {file ? getFileTypeHint(file.name) : uploadMode === 'pdf' ? 'PDF will be processed into a video or podcast' : 'Slides will be processed into a narrated video'}
-            </div>
+            <div className="upload-text">{fileLabel}</div>
+            <div className="upload-hint">{fileHint}</div>
           </label>
         </div>
 
@@ -134,22 +171,19 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
           <div className="video-option-card">
             <div className="video-option-header">
               <span className="video-option-icon">🌐</span>
-              <span className="video-option-title">AUDIO LANGUAGE</span>
+              <span className="video-option-title">{t('runTask.voiceLanguage')}</span>
             </div>
             <select id="voice-language-select" value={voiceLanguage} onChange={(e) => setVoiceLanguage(e.target.value)} className="video-option-select">
-              <option value="english">English</option>
-              <option value="simplified_chinese">简体中文</option>
-              <option value="traditional_chinese">繁體中文</option>
-              <option value="japanese">日本語</option>
-              <option value="korean">한국어</option>
-              <option value="thai">ไทย</option>
+              {LANGS.map((code) => (
+                <option key={code} value={code}>{displayLanguage(code)}</option>
+              ))}
             </select>
           </div>
 
           <div className="video-option-card">
             <div className="video-option-header">
               <span className="video-option-icon">📝</span>
-              <span className="video-option-title">{uploadMode === 'pdf' && pdfOutputMode === 'podcast' ? 'Transcript Language' : 'Subtitles Language'}</span>
+              <span className="video-option-title">{subtitleTitle}</span>
             </div>
             <select
               id="subtitle-language-select"
@@ -165,12 +199,9 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
               }}
               className="video-option-select"
             >
-              <option value="english">English</option>
-              <option value="simplified_chinese">简体中文</option>
-              <option value="traditional_chinese">繁體中文</option>
-              <option value="japanese">日本語</option>
-              <option value="korean">한국어</option>
-              <option value="thai">ไทย</option>
+              {LANGS.map((code) => (
+                <option key={code} value={code}>{displayLanguage(code)}</option>
+              ))}
             </select>
           </div>
 
@@ -178,23 +209,23 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
             <div className="video-option-card">
               <div className="video-option-header">
                 <span className="video-option-icon">📺</span>
-                <span className="video-option-title">Quality</span>
+                <span className="video-option-title">{t('runTask.videoResolution')}</span>
               </div>
               <select id="video-resolution-select" value={videoResolution} onChange={(e) => setVideoResolution(e.target.value)} className="video-option-select">
-                <option value="sd">SD (640×480)</option>
-                <option value="hd">HD (1280×720)</option>
-                <option value="fullhd">Full HD (1920×1080)</option>
+                <option value="sd">{t('runTask.resolution.sd')}</option>
+                <option value="hd">{t('runTask.resolution.hd')}</option>
+                <option value="fullhd">{t('runTask.resolution.fullhd')}</option>
               </select>
             </div>
           )}
         </div>
       </div>
 
-      <div className="ai-notice-subtle">AI-generated content may contain inaccuracies. Review carefully.</div>
+      <div className="ai-notice-subtle">{t('upload.notice', undefined, 'AI-generated content may contain inaccuracies. Review carefully.')}</div>
 
       {file && (
         <button onClick={onCreate} className="primary-btn" disabled={uploading}>
-          {uploadMode === 'pdf' ? (pdfOutputMode === 'podcast' ? 'Create Podcast' : 'Create Video') : 'Create Video'}
+          {uploadMode === 'pdf' ? pdfCreateLabel : t('upload.createVideo', undefined, 'Create Video')}
         </button>
       )}
     </>
@@ -202,4 +233,3 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
 };
 
 export default UploadPanel;
-

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useI18n } from '@/i18n/hooks';
 
 type FooterProps = {
   queueUnavailable: boolean;
@@ -8,22 +9,27 @@ type FooterProps = {
 };
 
 const Footer: React.FC<FooterProps> = ({ queueUnavailable, redisLatencyMs, uiTheme, setUiTheme }) => {
+  const { t } = useI18n();
+  const systemStatusLabel = queueUnavailable ? t('footer.queueUnavailable') : t('footer.queueOk');
+  const systemStatusTitle = queueUnavailable
+    ? t('footer.queueTooltipUnavailable')
+    : redisLatencyMs != null
+      ? t('footer.queueTooltipLatency', { latency: redisLatencyMs }, `System status OK • ${redisLatencyMs}ms`)
+      : t('footer.queueTooltipOk');
+
   return (
     <footer className="app-footer" role="contentinfo">
       <div className="footer-content">
-        <p className="footer-note">
-          Powered by SlideSpeaker AI • Where presentations become your
-          masterpiece
-        </p>
+        <p className="footer-note">{t('footer.slogan')}</p>
         <div className="footer-right">
           <div
             className="health-indicator"
             role="status"
             aria-live="polite"
-            title={queueUnavailable ? 'Queue unavailable' : (redisLatencyMs != null ? `Queue OK • ${redisLatencyMs}ms` : 'Queue OK')}
+            title={systemStatusTitle}
           >
             <span className={`dot ${queueUnavailable ? 'down' : 'ok'}`} aria-hidden />
-            <span className="label">{queueUnavailable ? 'Queue: Unavailable' : 'Queue: OK'}</span>
+            <span className="label">{systemStatusLabel}</span>
           </div>
           <div
             className="view-toggle theme-toggle"
@@ -33,32 +39,32 @@ const Footer: React.FC<FooterProps> = ({ queueUnavailable, redisLatencyMs, uiThe
             <button
               onClick={() => setUiTheme("classic")}
               className={`toggle-btn ${uiTheme === "classic" ? "active" : ""}`}
-              title="Classic Theme"
+              title={t('footer.theme.classic')}
               role="tab"
               aria-selected={uiTheme === "classic"}
               aria-controls="classic-theme-panel"
             >
-              <span className="toggle-text">Classic</span>
+              <span className="toggle-text">{t('footer.theme.classic')}</span>
             </button>
             <button
               onClick={() => setUiTheme("flat")}
               className={`toggle-btn ${uiTheme === "flat" ? "active" : ""}`}
-              title="Flat Theme"
+              title={t('footer.theme.flat')}
               role="tab"
               aria-selected={uiTheme === "flat"}
               aria-controls="flat-theme-panel"
             >
-              <span className="toggle-text">Flat</span>
+              <span className="toggle-text">{t('footer.theme.flat')}</span>
             </button>
             <button
               onClick={() => setUiTheme("material")}
               className={`toggle-btn ${uiTheme === "material" ? "active" : ""}`}
-              title="Material Theme"
+              title={t('footer.theme.material')}
               role="tab"
               aria-selected={uiTheme === "material"}
               aria-controls="material-theme-panel"
             >
-              <span className="toggle-text">Material</span>
+              <span className="toggle-text">{t('footer.theme.material')}</span>
             </button>
           </div>
         </div>

@@ -7,7 +7,6 @@ const API_BASE_URL = resolveApiBaseUrl();
 
 export const api = axios.create({
   baseURL: API_BASE_URL.length > 0 ? API_BASE_URL : undefined,
-  headers: { 'Content-Type': 'application/json' },
 });
 
 export type TaskRow = any;
@@ -58,8 +57,15 @@ export const cancelRun = async (taskId: string) => {
   return res.data;
 };
 
-export const upload = async (payload: any) => {
-  const res = await api.post(`/api/upload`, payload, { headers: { 'Content-Type': 'application/json' } });
+export const upload = async (payload: FormData | Record<string, unknown>) => {
+  if (typeof FormData !== 'undefined' && payload instanceof FormData) {
+    const res = await api.post(`/api/upload`, payload);
+    return res.data as { file_id: string; task_id: string };
+  }
+
+  const res = await api.post(`/api/upload`, payload, {
+    headers: { 'Content-Type': 'application/json' },
+  });
   return res.data as { file_id: string; task_id: string };
 };
 

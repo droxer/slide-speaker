@@ -99,6 +99,22 @@
   flex-wrap: wrap;
 }
 
+.task-detail-card__actions .language-switcher {
+  margin-right: 0;
+}
+
+.task-detail-card__actions .language-switcher__select {
+  background: #ffffff;
+  color: #1f2937;
+  border: 1px solid #cbd5e1;
+  padding: 0.35rem 1.25rem 0.35rem 0.75rem;
+}
+
+.task-detail-card__actions .language-switcher__select:hover {
+  border-color: #94a3b8;
+  background: #f8fafc;
+}
+
 .task-detail-card__btn {
   padding: 0.55rem 1.2rem;
   border-radius: 0.6rem;

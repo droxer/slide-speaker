@@ -209,13 +209,10 @@ describe('ClientService', () => {
 
   describe('purgeTask', () => {
     it('should successfully purge a task', async () => {
-      // Mock the actual function implementation
       (client.purgeTask as jest.Mock).mockResolvedValue(undefined);
 
-      // Call the function
       await client.purgeTask('test_task_id');
 
-      // Verify the function was called
       expect(client.purgeTask).toHaveBeenCalledWith('test_task_id');
     });
   });

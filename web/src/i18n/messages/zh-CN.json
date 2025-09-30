@@ -1,0 +1,295 @@
+{
+  "header": {
+    "title": "幻灯演说 AI",
+    "subtitle": "将幻灯片转化为 AI 驱动的视频",
+    "login": "使用 Google 登录",
+    "logout": "退出登录",
+    "welcome": "欢迎，{name}",
+    "view": {
+      "studio": "创作室",
+      "creations": "作品库"
+    }
+  },
+  "language": {
+    "english": "English",
+    "simplified": "简体中文",
+    "traditional": "繁體中文",
+    "japanese": "日语",
+    "korean": "韩语",
+    "thai": "泰语",
+    "switcher": {
+      "label": "界面语言",
+      "tooltip": "切换语言"
+    },
+    "unknown": "{code}"
+  },
+  "common": {
+    "unknown": "未知",
+    "unknownFile": "未知文件",
+    "untrackedFile": "未关联文件",
+    "disabled": "已停用"
+  },
+  "task": {
+    "detail": {
+      "breadcrumb": {
+        "task": "任务"
+      },
+      "videoPreview": "视频预览",
+      "podcastPreview": "播客预览",
+      "audioPreview": "音频预览",
+      "previewTabs": "预览切换",
+      "cancel": "取消任务",
+      "cancelling": "正在取消…",
+      "currentProgress": "当前进度",
+      "steps": "处理步骤",
+      "downloads": "下载内容",
+      "loadingDownloads": "正在加载下载内容…",
+      "noDownloads": "暂无可用下载。",
+      "created": "创建时间",
+      "updated": "更新时间",
+      "voice": "配音语言",
+      "subtitles": "字幕语言",
+      "subtitlesFormats": "VTT / SRT",
+      "transcript": "脚本语言",
+      "metadataAria": "任务信息"
+    },
+    "status": {
+      "completed": "已完成",
+      "processing": "处理中",
+      "queued": "排队中",
+      "failed": "失败",
+      "cancelled": "已取消",
+      "pending": "待处理",
+      "skipped": "已跳过"
+    },
+    "list": {
+      "copyId": "复制任务 ID",
+      "voice": "配音：{language}",
+      "transcript": "脚本：{language}",
+      "subtitles": "字幕：{language}",
+      "downloads": "下载",
+      "videoLabel": "视频",
+      "podcastLabel": "播客",
+      "audioLabel": "音频",
+      "transcriptLabel": "脚本",
+      "vttLabel": "VTT 字幕",
+      "srtLabel": "SRT 字幕",
+      "idPrefix": "任务：{id}",
+      "openTaskTitle": "打开任务 {id}",
+      "queuedMessage": "排队中 • 等待开始",
+      "createdStamp": "创建时间：{timestamp}",
+      "completedStamp": "完成时间：{timestamp}",
+      "statusAria": "状态：{status}"
+    },
+    "preview": {
+      "watch": "观看",
+      "listen": "收听",
+      "videoAria": "任务 {taskId} 的视频预览",
+      "audioAria": "音频讲解预览"
+    }
+  },
+  "actions": {
+    "copy": "复制",
+    "openPreview": "打开预览",
+    "generateVideo": "生成视频",
+    "generatePodcast": "生成播客",
+    "generate": "生成",
+    "generating": "正在生成…",
+    "cancel": "取消",
+    "close": "关闭"
+  },
+  "notifications": {
+    "videoCopied": "视频链接已复制！",
+    "audioCopied": "音频链接已复制！",
+    "podcastCopied": "播客链接已复制！",
+    "transcriptCopied": "脚本链接已复制！",
+    "vttCopied": "VTT 链接已复制！",
+    "srtCopied": "SRT 链接已复制！"
+  },
+  "filters": {
+    "status": {
+      "all": "全部状态"
+    }
+  },
+  "runTask": {
+    "adjustHint": "调整生成选项后点击“生成”。",
+    "tagSuffix": "任务",
+    "source": "来源",
+    "output": {
+      "video": "配音视频",
+      "podcast": "音频讲解",
+      "label": "输出"
+    },
+    "voiceLanguage": "配音语言",
+    "subtitleLanguage": "字幕语言",
+    "transcriptLanguage": "脚本语言",
+    "videoResolution": "视频分辨率",
+    "sameAsVoice": "与配音一致",
+    "resolution": {
+      "sd": "标清 (640×480)",
+      "hd": "高清 (1280×720)",
+      "fullhd": "全高清 (1920×1080)"
+    },
+    "noFileSelected": "所选文件"
+  },
+  "creations": {
+    "health": {
+      "overall": {
+        "okLabel": "系统正常",
+        "degradedLabel": "部分可用",
+        "downLabel": "系统离线",
+        "unknownLabel": "状态未知",
+        "ok": "正常",
+        "degraded": "降级",
+        "down": "离线",
+        "unknown": "未知"
+      },
+      "status": "系统状态",
+      "queue": "队列",
+      "database": "数据库",
+      "queueLatency": "队列延迟：{latency} 毫秒",
+      "databaseLatency": "数据库延迟：{latency} 毫秒",
+      "queueUnavailable": "队列不可用",
+      "databaseUnavailable": "数据库不可用"
+    },
+    "title": "作品库",
+    "summary": "{files} 个文件 · {creations} 个作品 · {running} 个运行中",
+    "empty": "暂无任务",
+    "file": {
+      "idChip": "ID {id}",
+      "count": {
+        "one": "{count} 个作品",
+        "other": "{count} 个作品"
+      }
+    },
+    "toast": {
+      "taskCreated": "任务已创建：{id}",
+      "createFailed": "创建任务失败",
+      "cancelFailed": "取消任务失败",
+      "deleteFailed": "删除任务失败"
+    },
+    "confirm": {
+      "delete": "此操作将永久删除任务及其状态，确定继续吗？"
+    }
+  },
+  "search": {
+    "placeholder": "搜索任务...",
+    "submit": "搜索"
+  },
+  "completed": {
+    "redirecting": "正在打开任务详情…"
+  },
+  "processing": {
+    "title": "正在为您打造作品",
+    "stop": "停止",
+    "errorsHeading": "出现错误",
+    "meta": {
+      "aria": "任务详情",
+      "locating": "（定位中…）",
+      "locatingHint": "来源文件 {id}"
+    },
+    "file": {
+      "untitled": "未命名"
+    },
+    "stepsHeading": "处理步骤",
+    "metadataAria": "任务信息",
+    "progressLabel": "整体进度",
+    "progressStatus": "正在为您的演示生成精彩内容…",
+    "steps": {
+      "extract_slides": "提取幻灯片",
+      "analyze_slide_images": "分析内容",
+      "generate_transcripts": "生成逐字稿",
+      "revise_transcripts": "润色逐字稿",
+      "translate_voice_transcripts": "翻译配音稿",
+      "translate_subtitle_transcripts": "翻译字幕稿",
+      "generate_subtitle_transcripts": "生成字幕稿",
+      "generate_audio": "生成音频",
+      "generate_avatar_videos": "创建虚拟主播",
+      "convert_slides_to_images": "转换幻灯片",
+      "generate_subtitles": "生成字幕",
+      "compose_video": "合成视频",
+      "segment_pdf_content": "分段内容",
+      "revise_pdf_transcripts": "润色稿件",
+      "generate_pdf_chapter_images": "生成章节画面",
+      "generate_pdf_audio": "生成音频",
+      "generate_pdf_subtitles": "生成字幕",
+      "generate_podcast_script": "生成播客脚本",
+      "translate_podcast_script": "翻译播客脚本",
+      "generate_podcast_audio": "生成播客音频",
+      "compose_podcast": "合成播客",
+      "unknown": "初始化"
+    },
+    "step": {
+      "translatingTranscripts": "正在翻译文本"
+    },
+    "preview": {
+      "videoEnabled": "已启用视频生成",
+      "podcastEnabled": "已启用播客生成"
+    }
+  },
+  "uploading": {
+    "title": "正在上传演示文稿",
+    "status": "正在为 AI 转换准备内容…",
+    "progress": "已上传 {progress}%",
+    "progressLabel": "上传进度",
+    "summaryLabel": "上传摘要",
+    "modeLabel": "模式",
+    "fileSizeLabel": "文件大小",
+    "outputsLabel": "输出内容"
+  },
+  "upload": {
+    "modeToggle": {
+      "aria": "模式选择"
+    },
+    "mode": {
+      "slides": "幻灯片",
+      "pdf": "PDF",
+      "slidesHeading": "幻灯片模式：",
+      "slidesDescription": "逐页处理幻灯片，生成脚本、音频、字幕并合成最终视频。",
+      "pdfHeading": "PDF 模式：",
+      "pdfDescription": "按章节解析文档，可生成视频（音频+字幕）或双人播客（MP3）。"
+    },
+    "pdfOutput": {
+      "aria": "PDF 输出"
+    },
+    "file": {
+      "choosePdf": "选择一个 PDF 文件",
+      "chooseSlides": "选择一个 PPTX/PPT 文件",
+      "hintPdf": "PDF 将被转换为视频或播客",
+      "hintSlides": "幻灯片将被转换为配音视频",
+      "pdfBadge": "PDF",
+      "pdfDescription": "AI 会分析 PDF，生成带旁白和字幕的精彩视频章节。",
+      "pptBadge": "PPT",
+      "pptDescription": "AI 会将幻灯片转换为带配音的视频。",
+      "supportedBadge": "支持的文件",
+      "supportedDescription": "支持 PDF、PPTX 和 PPT 文件"
+    },
+    "notice": "AI 生成内容可能存在不准确，请仔细检查。",
+    "createPodcast": "创建播客",
+    "createVideo": "创建视频"
+  },
+  "footer": {
+    "slogan": "SlideSpeaker AI 让演示焕然一新",
+    "queueUnavailable": "系统状态：不可用",
+    "queueOk": "系统状态：正常",
+    "queueTooltipUnavailable": "系统状态不可用",
+    "queueTooltipOk": "系统状态正常",
+    "queueTooltipLatency": "系统状态正常 • {latency}ms",
+    "theme": {
+      "classic": "经典",
+      "flat": "扁平",
+      "material": "质感"
+    }
+  },
+  "pagination": {
+    "previous": "上一页",
+    "next": "下一页",
+    "page": "第 {page} 页"
+  },
+  "modal": {
+    "previewTitle": "媒体预览"
+  },
+  "alerts": {
+    "previewUnavailable": "仅已完成的任务可预览。"
+  }
+}

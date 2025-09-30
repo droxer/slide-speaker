@@ -1,0 +1,295 @@
+{
+  "header": {
+    "title": "SlideSpeaker AI",
+    "subtitle": "Transform slides into AI-powered videos",
+    "login": "Sign in with Google",
+    "logout": "Logout",
+    "welcome": "Welcome, {name}",
+    "view": {
+      "studio": "Studio",
+      "creations": "Creations"
+    }
+  },
+  "language": {
+    "english": "English",
+    "simplified": "简体中文",
+    "traditional": "繁體中文",
+    "japanese": "Japanese",
+    "korean": "Korean",
+    "thai": "Thai",
+    "switcher": {
+      "label": "Interface language",
+      "tooltip": "Switch language"
+    },
+    "unknown": "{code}"
+  },
+  "common": {
+    "unknown": "Unknown",
+    "unknownFile": "Unknown file",
+    "untrackedFile": "Untracked file",
+    "disabled": "Disabled"
+  },
+  "task": {
+    "detail": {
+      "breadcrumb": {
+        "task": "Task"
+      },
+      "videoPreview": "Video Preview",
+      "podcastPreview": "Podcast Preview",
+      "audioPreview": "Audio Preview",
+      "previewTabs": "Preview tab switcher",
+      "cancel": "Cancel Task",
+      "cancelling": "Cancelling…",
+      "currentProgress": "Current Progress",
+      "steps": "Steps",
+      "downloads": "Downloads",
+      "loadingDownloads": "Loading downloads…",
+      "noDownloads": "No downloads available yet.",
+      "created": "Created",
+      "updated": "Updated",
+      "voice": "Voice",
+      "subtitles": "Subtitles",
+      "subtitlesFormats": "VTT / SRT",
+      "transcript": "Transcript",
+      "metadataAria": "Task metadata"
+    },
+    "status": {
+      "completed": "Completed",
+      "processing": "Processing",
+      "queued": "Queued",
+      "failed": "Failed",
+      "cancelled": "Cancelled",
+      "pending": "Pending",
+      "skipped": "Skipped"
+    },
+    "list": {
+      "copyId": "Copy task ID",
+      "voice": "Voice: {language}",
+      "transcript": "Transcript: {language}",
+      "subtitles": "Subs: {language}",
+      "downloads": "Downloads",
+      "videoLabel": "Video",
+      "podcastLabel": "Podcast",
+      "audioLabel": "Audio",
+      "transcriptLabel": "Transcript",
+      "vttLabel": "VTT",
+      "srtLabel": "SRT",
+      "idPrefix": "Task: {id}",
+      "openTaskTitle": "Open task {id}",
+      "queuedMessage": "Queued • Waiting to start",
+      "createdStamp": "Created: {timestamp}",
+      "completedStamp": "Completed: {timestamp}",
+      "statusAria": "Status: {status}"
+    },
+    "preview": {
+      "watch": "Watch",
+      "listen": "Listen",
+      "videoAria": "Video preview for task {taskId}",
+      "audioAria": "Audio narration preview"
+    }
+  },
+  "actions": {
+    "copy": "Copy",
+    "openPreview": "Open preview",
+    "generateVideo": "Generate Video",
+    "generatePodcast": "Generate Podcast",
+    "generate": "Generate",
+    "generating": "Generating…",
+    "cancel": "Cancel",
+    "close": "Close"
+  },
+  "notifications": {
+    "videoCopied": "Video URL copied!",
+    "audioCopied": "Audio URL copied!",
+    "podcastCopied": "Podcast URL copied!",
+    "transcriptCopied": "Transcript URL copied!",
+    "vttCopied": "VTT URL copied!",
+    "srtCopied": "SRT URL copied!"
+  },
+  "filters": {
+    "status": {
+      "all": "All statuses"
+    }
+  },
+  "runTask": {
+    "adjustHint": "Adjust the generation options and press Generate when you are ready.",
+    "tagSuffix": "task",
+    "source": "Source",
+    "output": {
+      "video": "Narrated video",
+      "podcast": "Audio narrative",
+      "label": "Output"
+    },
+    "voiceLanguage": "Voice language",
+    "subtitleLanguage": "Subtitle language",
+    "transcriptLanguage": "Transcript language",
+    "videoResolution": "Video resolution",
+    "sameAsVoice": "Same as voice",
+    "noFileSelected": "Selected file",
+    "resolution": {
+      "sd": "SD (640×480)",
+      "hd": "HD (1280×720)",
+      "fullhd": "Full HD (1920×1080)"
+    }
+  },
+  "creations": {
+    "health": {
+      "overall": {
+        "okLabel": "All systems nominal",
+        "degradedLabel": "Partial availability",
+        "downLabel": "Systems offline",
+        "unknownLabel": "Status unknown",
+        "ok": "OK",
+        "degraded": "Degraded",
+        "down": "Down",
+        "unknown": "Unknown"
+      },
+      "status": "Status",
+      "queue": "Queue",
+      "database": "Database",
+      "queueLatency": "Queue latency: {latency} ms",
+      "databaseLatency": "Database latency: {latency} ms",
+      "queueUnavailable": "Queue unavailable",
+      "databaseUnavailable": "Database unavailable"
+    },
+    "title": "Creations",
+    "summary": "{files} files · {creations} creations · {running} running",
+    "empty": "No tasks found",
+    "file": {
+      "idChip": "ID {id}",
+      "count": {
+        "one": "{count} creation",
+        "other": "{count} creations"
+      }
+    },
+    "toast": {
+      "taskCreated": "Task created: {id}",
+      "createFailed": "Failed to create task",
+      "cancelFailed": "Failed to cancel task",
+      "deleteFailed": "Failed to delete task"
+    },
+    "confirm": {
+      "delete": "This will permanently remove the task and its state. Continue?"
+    }
+  },
+  "search": {
+    "placeholder": "Search tasks...",
+    "submit": "Search"
+  },
+  "completed": {
+    "redirecting": "Opening task details…"
+  },
+  "processing": {
+    "title": "Crafting Your Masterpiece",
+    "stop": "Stop",
+    "errorsHeading": "Errors encountered",
+    "meta": {
+      "aria": "Task details",
+      "locating": "(locating…)",
+      "locatingHint": "from file {id}"
+    },
+    "file": {
+      "untitled": "Untitled"
+    },
+    "stepsHeading": "Processing steps",
+    "metadataAria": "Task metadata",
+    "progressLabel": "Overall progress",
+    "progressStatus": "We are bringing your presentation to life…",
+    "steps": {
+      "extract_slides": "Extracting Slides",
+      "analyze_slide_images": "Analyzing Content",
+      "generate_transcripts": "Generating Transcripts",
+      "revise_transcripts": "Revising Transcripts",
+      "translate_voice_transcripts": "Translating Voice Transcripts",
+      "translate_subtitle_transcripts": "Translating Subtitle Transcripts",
+      "generate_subtitle_transcripts": "Generating Subtitle Transcripts",
+      "generate_audio": "Generating Audio",
+      "generate_avatar_videos": "Creating Avatar",
+      "convert_slides_to_images": "Converting Slides",
+      "generate_subtitles": "Creating Subtitles",
+      "compose_video": "Composing Video",
+      "segment_pdf_content": "Segmenting Content",
+      "revise_pdf_transcripts": "Revising Transcripts",
+      "generate_pdf_chapter_images": "Creating Video Frames",
+      "generate_pdf_audio": "Generating Audio",
+      "generate_pdf_subtitles": "Creating Subtitles",
+      "generate_podcast_script": "Generating Podcast Script",
+      "translate_podcast_script": "Translating Podcast Script",
+      "generate_podcast_audio": "Generating Podcast Audio",
+      "compose_podcast": "Composing Podcast",
+      "unknown": "Initializing"
+    },
+    "preview": {
+      "videoEnabled": "Video generation enabled",
+      "podcastEnabled": "Podcast generation enabled"
+    },
+    "step": {
+      "translatingTranscripts": "Translating Transcripts"
+    }
+  },
+  "uploading": {
+    "title": "Uploading Your Presentation",
+    "status": "Preparing your content for AI transformation...",
+    "progress": "{progress}% Uploaded",
+    "progressLabel": "Upload progress",
+    "summaryLabel": "Upload summary",
+    "modeLabel": "Mode",
+    "fileSizeLabel": "File size",
+    "outputsLabel": "Outputs"
+  },
+  "upload": {
+    "modeToggle": {
+      "aria": "Entry mode"
+    },
+    "mode": {
+      "slides": "Slides",
+      "pdf": "PDF",
+      "slidesHeading": "Slides Mode:",
+      "slidesDescription": "Processes each slide individually for transcripts, audio, subtitles, and composes a final video.",
+      "pdfHeading": "PDF Mode:",
+      "pdfDescription": "Segments the document into chapters; generate a video (audio + subtitles) or a two-speaker podcast (MP3)."
+    },
+    "pdfOutput": {
+      "aria": "PDF output"
+    },
+    "file": {
+      "choosePdf": "Choose a PDF file",
+      "chooseSlides": "Choose a PPTX/PPT file",
+      "hintPdf": "PDF will be processed into a video or podcast",
+      "hintSlides": "Slides will be processed into a narrated video",
+      "pdfBadge": "PDF",
+      "pdfDescription": "AI will analyze and convert your PDF into engaging video chapters with narration and subtitles.",
+      "pptBadge": "PPT",
+      "pptDescription": "AI will convert your slides into a narrated video.",
+      "supportedBadge": "Supported File",
+      "supportedDescription": "Supports PDF, PPTX, and PPT files"
+    },
+    "notice": "AI-generated content may contain inaccuracies. Review carefully.",
+    "createPodcast": "Create Podcast",
+    "createVideo": "Create Video"
+  },
+  "footer": {
+    "slogan": "Powered by SlideSpeaker AI • Where presentations become your masterpiece",
+    "queueUnavailable": "System status: Unavailable",
+    "queueOk": "System status: OK",
+    "queueTooltipUnavailable": "System status unavailable",
+    "queueTooltipOk": "System status OK",
+    "queueTooltipLatency": "System status OK • {latency}ms",
+    "theme": {
+      "classic": "Classic",
+      "flat": "Flat",
+      "material": "Material"
+    }
+  },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {page}"
+  },
+  "modal": {
+    "previewTitle": "Media Preview"
+  },
+  "alerts": {
+    "previewUnavailable": "Preview is only available for completed tasks."
+  }
+}

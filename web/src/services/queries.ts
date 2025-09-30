@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient, QueryClient } from '@tanstack/react-query';
-import { getTasks, getStats, searchTasks, getDownloads, getTranscriptMarkdown, getVttText, cancelRun, purgeTask, runFile, getTaskById } from './client';
+import { getTasks, getStats, searchTasks, getDownloads, getTranscriptMarkdown, getVttText, cancelRun, deleteTask, runFile, getTaskById } from './client';
 import type { Task } from '../types';
 
 export const queries = {
@@ -147,7 +147,8 @@ export const useCancelTaskMutation = () => {
   return useMutation({
     mutationFn: (taskId: string) => cancelRun(taskId),
     onSettled: async () => {
-      await qc.invalidateQueries({ queryKey: queries.tasks({ status: 'all', page: 1, limit: 10 }) as any, exact: false });
+      await qc.invalidateQueries({ queryKey: ['tasks'] as any, exact: false });
+      await qc.invalidateQueries({ queryKey: ['files'] as any, exact: false });
       await qc.invalidateQueries({ queryKey: queries.search('') as any, exact: false });
     },
   });
@@ -221,7 +222,7 @@ export const useRunFileTaskMutation = () => {
 export const usePurgeTaskMutation = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (taskId: string) => purgeTask(taskId),
+    mutationFn: (taskId: string) => deleteTask(taskId),
     onSettled: async () => {
       await qc.invalidateQueries({ queryKey: queries.tasks({ status: 'all', page: 1, limit: 10 }) as any, exact: false });
       await qc.invalidateQueries({ queryKey: queries.search('') as any, exact: false });

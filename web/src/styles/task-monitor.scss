@@ -753,6 +753,37 @@
   .id-chip { color: #334155; }
   .id-mono { font-family: 'SF Mono', Menlo, Consolas, monospace; font-weight: 600; }
   .step-progress { margin-top: 8px; }
+  .step-progress__meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .step-progress__status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    background: #e2e8f0;
+    color: #334155;
+  }
+  .step-progress__status--processing { background: #dbeafe; color: #1d4ed8; }
+  .step-progress__status--completed { background: #dcfce7; color: #15803d; }
+  .step-progress__status--pending { background: #cffafe; color: #0f766e; }
+  .step-progress__status--failed { background: #fee2e2; color: #b91c1c; }
+  .step-progress__status--cancelled { background: #ffe4d5; color: #c2410c; }
+  .step-progress__status--skipped { background: #e2e8f0; color: #475569; }
+  .step-progress__value {
+    font-size: 12px;
+    font-weight: 700;
+    color: #0f172a;
+  }
   .step-line { font-size: 12px; color: #334155; font-weight: 600; }
   .queued-note { font-size: 12px; color: #64748b; font-weight: 600; margin-bottom: 6px; }
   .steps-timeline { margin-top: 6px; padding-left: 0; list-style: none; display: grid; grid-template-columns: 1fr; gap: 4px; }

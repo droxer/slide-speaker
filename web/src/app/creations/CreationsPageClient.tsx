@@ -1,6 +1,7 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import {useLocale} from 'next-intl';
+import {useRouter} from '@/navigation';
 import App from '@/App';
 import type { HealthStatus } from '@/types/health';
 
@@ -10,6 +11,7 @@ export type CreationsPageClientProps = {
 
 export default function CreationsPageClient({ initialHealth = null }: CreationsPageClientProps) {
   const router = useRouter();
+  const locale = useLocale();
 
   return (
     <App
@@ -17,7 +19,7 @@ export default function CreationsPageClient({ initialHealth = null }: CreationsP
       initialHealth={initialHealth}
       onNavigate={(view) => {
         if (view === 'studio') {
-          router.push('/');
+          router.push('/', {locale});
         }
       }}
     />

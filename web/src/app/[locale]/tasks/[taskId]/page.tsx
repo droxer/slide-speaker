@@ -1,7 +1,7 @@
-import { notFound } from 'next/navigation';
-import type { Metadata } from 'next';
-import TaskPageClient from '@/app/tasks/TaskPageClient';
-import { loadTaskById, taskRevalidate } from '@/app/tasks/loadTaskById';
+import {notFound} from 'next/navigation';
+import type {Metadata} from 'next';
+import TaskPageClient from '../../../tasks/TaskPageClient';
+import {loadTaskById, taskRevalidate} from '../../../tasks/loadTaskById';
 
 export const revalidate = taskRevalidate;
 
@@ -11,7 +11,7 @@ type PageParams = {
   };
 };
 
-export async function generateMetadata({ params }: PageParams): Promise<Metadata> {
+export async function generateMetadata({params}: PageParams): Promise<Metadata> {
   const task = await loadTaskById(params.taskId);
   if (!task) {
     return {
@@ -28,8 +28,8 @@ export async function generateMetadata({ params }: PageParams): Promise<Metadata
   };
 }
 
-export default async function TaskDetailPage({ params }: PageParams) {
-  const { taskId } = params;
+export default async function TaskDetailPage({params}: PageParams) {
+  const {taskId} = params;
   const initialTask = await loadTaskById(taskId);
 
   if (!initialTask) {

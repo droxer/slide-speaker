@@ -1,9 +1,6 @@
-import StudioPageClient from './StudioPageClient';
-import { loadInitialHealth, healthRevalidate } from './loadInitialHealth';
+import {redirect} from 'next/navigation';
+import {defaultLocale} from '@/i18n/config';
 
-export const revalidate = healthRevalidate;
-
-export default async function StudioPage() {
-  const initialHealth = await loadInitialHealth();
-  return <StudioPageClient initialHealth={initialHealth} />;
+export default function RootRedirect() {
+  redirect(`/${defaultLocale}`);
 }

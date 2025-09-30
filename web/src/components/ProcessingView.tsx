@@ -1,4 +1,6 @@
 import React from 'react';
+import { useI18n } from '@/i18n/hooks';
+import { STEP_STATUS_ICONS, StepStatusVariant, normalizeStepStatus } from '@/utils/stepLabels';
 
 type ProcessingViewProps = {
   apiBaseUrl: string;
@@ -29,24 +31,46 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
   audioRef,
   formatStepNameWithLanguages,
 }) => {
+  const { t } = useI18n();
   const pd = processingDetails || {};
   const steps = (pd.steps || {}) as Record<string, any>;
   const taskType = String(pd.task_type || '').toLowerCase();
+  const clampedProgress = Number.isFinite(progress)
+    ? Math.max(0, Math.min(100, Math.round(progress)))
+    : 0;
 
   const hasVideoReady = Boolean(steps['compose_video']?.status === 'completed');
   const hasPodcastReady = Boolean(steps['compose_podcast']?.status === 'completed');
   const mode = hasVideoReady ? (processingPreviewMode || 'video') as 'video' | 'audio' : 'audio';
+  const shortFileId = fileId ? fileId.slice(0, 8) : '…';
+  const locatingLabel = t('processing.meta.locating', undefined, '(locating…)');
+  const describeStepStatus = (variant: StepStatusVariant) => {
+    switch (variant) {
+      case 'completed':
+        return t('task.status.completed');
+      case 'processing':
+        return t('task.status.processing');
+      case 'failed':
+        return t('task.status.failed');
+      case 'cancelled':
+        return t('task.status.cancelled');
+      case 'skipped':
+        return t('task.status.skipped', undefined, 'Skipped');
+      default:
+        return t('task.status.pending', undefined, 'Pending');
+    }
+  };
 
   return (
     <div className="processing-view">
       <div className="spinner"></div>
-      <h3>Crafting Your Masterpiece</h3>
+      <h3>{t('processing.title')}</h3>
 
-      <div className="processing-meta" role="group" aria-label="Task Meta">
+      <div className="processing-meta" role="group" aria-label={t('processing.meta.aria', undefined, 'Task details')}>
         <div className="meta-card file" title={fileName || fileId || ''}>
           <div className="meta-title">
             <span className="meta-icon">📄</span>
-            <span className="meta-text">{fileName || 'Untitled'}</span>
+            <span className="meta-text">{fileName || t('processing.file.untitled', undefined, 'Untitled')}</span>
           </div>
           <div className="meta-badge">
             {String(fileName || '').toLowerCase().endsWith('.pdf')
@@ -59,60 +83,94 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
             <span className="meta-icon">🆔</span>
           </div>
           <div className="meta-actions">
-            <code className={`meta-code ${taskId ? 'clickable' : ''}`}>{taskId || '(locating…)'}
+            <code className={`meta-code ${taskId ? 'clickable' : ''}`}>{taskId || locatingLabel}
             </code>
             {!taskId && (
-              <span className="meta-hint">from file {fileId?.slice(0, 8) || '…'}</span>
+              <span className="meta-hint">{t('processing.meta.locatingHint', { id: shortFileId }, `from file ${shortFileId}`)}</span>
             )}
           </div>
         </div>
       </div>
 
-      <div className="progress-container">
-        <div className="progress-bar">
-          <div className="progress-fill" style={{ width: `${progress}%` }} />
+      <div
+        className="progress-container"
+        role="group"
+        aria-label={t('processing.progressLabel', undefined, 'Overall progress')}
+      >
+        <div className="progress-header">
+          <span className="progress-label">
+            {t('processing.progressLabel', undefined, 'Overall progress')}
+          </span>
+          <span className="progress-value">
+            {clampedProgress}
+            <span className="progress-value__suffix">%</span>
+          </span>
         </div>
+        <div
+          className="progress-bar"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={clampedProgress}
+        >
+          <div className="progress-fill" style={{ width: `${clampedProgress}%` }} />
+        </div>
+        <p className="progress-status" aria-live="polite">
+          {t('processing.progressStatus', undefined, 'We are bringing your presentation to life…')}
+        </p>
       </div>
 
-      <button onClick={onStop} className="cancel-btn">STOP</button>
+      <button onClick={onStop} className="cancel-btn">{t('processing.stop')}</button>
 
       <div className="steps-container">
         <h4>
-          <span className="steps-title">🌟 Crafting Your Masterpiece</span>
+          <span className="steps-title">🌟 {t('processing.stepsHeading', undefined, 'Processing steps')}</span>
           <span className="output-badges">
             {(["video","both"].includes(taskType)) && (
-              <span className="output-pill video" title="Video generation enabled">🎬 Video</span>
+              <span className="output-pill video" title={t('processing.preview.videoEnabled', undefined, 'Video generation enabled')}>🎬 {t('task.list.videoLabel')}</span>
             )}
             {(["podcast","both"].includes(taskType)) && (
-              <span className="output-pill podcast" title="Podcast generation enabled">🎧 Podcast</span>
+              <span className="output-pill podcast" title={t('processing.preview.podcastEnabled', undefined, 'Podcast generation enabled')}>🎧 {t('task.list.podcastLabel')}</span>
             )}
           </span>
         </h4>
 
-        <div className="steps-grid">
+        <div className="steps-grid" role="list">
           {Object.keys(steps).map((stepName) => {
             const stepData = steps[stepName];
-            if (!stepData || stepData.status === 'skipped') return null;
+            if (!stepData) return null;
             const vl = String(pd.voice_language || 'english');
             const sl = String(pd.subtitle_language || vl);
+            const statusVariant = normalizeStepStatus(stepData.status);
             return (
-              <div key={stepName} className={`step ${stepData.status}`}>
-                <span className="step-icon">
-                  {stepData.status === 'completed' ? '✓'
-                    : (stepData.status === 'processing' || stepData.status === 'in_progress') ? '⏳'
-                    : stepData.status === 'failed' ? '✗' : '○'}
+              <div
+                key={stepName}
+                role="listitem"
+                className={`progress-step progress-step--${statusVariant}`}
+              >
+                <span className="progress-step__icon" aria-hidden>
+                  {STEP_STATUS_ICONS[statusVariant]}
                 </span>
-                <span className="step-name">{formatStepNameWithLanguages(stepName, vl, sl)}</span>
+                <div className="progress-step__body">
+                  <span className="progress-step__title">
+                    {formatStepNameWithLanguages(stepName, vl, sl)}
+                  </span>
+                  <span className="progress-step__meta">
+                    {describeStepStatus(statusVariant)}
+                  </span>
+                </div>
               </div>
             );
-          }).filter(Boolean)}
+          })}
         </div>
 
         {(hasVideoReady || hasPodcastReady) && (
           <div className="preview-block">
             {hasVideoReady && mode !== 'video' && (
               <div className="preview-toggle">
-                <button type="button" className="toggle-btn" onClick={() => setProcessingPreviewMode('video')}>▶️ Watch</button>
+                <button type="button" className="toggle-btn" onClick={() => setProcessingPreviewMode('video')}>
+                  {`▶️ ${t('task.preview.watch')}`}
+                </button>
               </div>
             )}
             {mode === 'video' && hasVideoReady && (
@@ -125,7 +183,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
                   crossOrigin="anonymous"
                   src={`${apiBaseUrl}/api/tasks/${taskId}/video`}
                   style={{ width: '100%', borderRadius: 8 }}
-                  aria-label={`Video preview for task ${taskId}`}
+                  aria-label={t('task.preview.videoAria', { taskId: taskId ?? '' }, `Video preview for task ${taskId}`)}
                 />
               </div>
             )}
@@ -137,7 +195,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
                   preload="auto"
                   src={`${apiBaseUrl}/api/tasks/${taskId}/${(() => { const p = ["podcast","both"].includes(taskType); return p ? 'podcast' : 'audio'; })()}`}
                   crossOrigin="anonymous"
-                  aria-label="Audio narration preview"
+                  aria-label={t('task.preview.audioAria')}
                 />
               </div>
             )}
@@ -146,7 +204,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
 
         {Array.isArray(pd.errors) && pd.errors.length > 0 && (
           <div className="error-section">
-            <h4>Errors Encountered</h4>
+            <h4>{t('processing.errorsHeading')}</h4>
             <div className="error-list">
               {pd.errors.map((error: any, index: number) => {
                 const vl = String(pd.voice_language || 'english');
@@ -166,4 +224,3 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
 };
 
 export default ProcessingView;
-

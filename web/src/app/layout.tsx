@@ -5,21 +5,17 @@ import '@/styles/app.scss';
 import '@/styles/ultra-flat-overrides.scss';
 import '@/styles/subtle-material-overrides.scss';
 import '@/styles/classic-overrides.scss';
-import { Providers } from './providers';
+import '@/styles/task-monitor.scss';
 
 export const metadata: Metadata = {
   title: 'SlideSpeaker',
   description: 'Transform presentations into rich multimedia experiences with SlideSpeaker.',
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   return (
-    <html lang="en">
-      <body>
-        <Providers>{children}</Providers>
-      </body>
+    <html lang="en" suppressHydrationWarning>
+      <body>{children}</body>
     </html>
   );
 }

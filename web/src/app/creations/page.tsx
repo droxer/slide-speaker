@@ -1,9 +1,6 @@
-import CreationsPageClient from './CreationsPageClient';
-import { loadInitialHealth, healthRevalidate } from '../loadInitialHealth';
+import {redirect} from 'next/navigation';
+import {defaultLocale} from '@/i18n/config';
 
-export const revalidate = healthRevalidate;
-
-export default async function CreationsPage() {
-  const initialHealth = await loadInitialHealth();
-  return <CreationsPageClient initialHealth={initialHealth} />;
+export default function CreationsRedirect() {
+  redirect(`/${defaultLocale}/creations`);
 }

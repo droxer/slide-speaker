@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getLanguageDisplayName } from '../utils/language';
+import { useI18n } from '@/i18n/hooks';
 
 type RunTaskPayload = {
   task_type: 'video' | 'podcast';
@@ -30,8 +31,17 @@ const LANGS = [
   'thai',
 ];
 
-const shortenFileName = (name?: string, max = 48): string => {
-  if (!name) return 'Selected file';
+const LANGUAGE_KEY_BY_CODE: Record<string, string> = {
+  english: 'language.english',
+  simplified_chinese: 'language.simplified',
+  traditional_chinese: 'language.traditional',
+  japanese: 'language.japanese',
+  korean: 'language.korean',
+  thai: 'language.thai',
+};
+
+const shortenFileName = (name?: string, fallback = 'Selected file', max = 48): string => {
+  if (!name) return fallback;
   const base = name.replace(/\.(pdf|pptx?|PPTX?|PDF)$/,'');
   if (base.length <= max) return base;
   const head = Math.max(12, Math.floor((max - 1) / 2));
@@ -40,6 +50,7 @@ const shortenFileName = (name?: string, max = 48): string => {
 };
 
 const RunTaskModal: React.FC<Props> = ({ open, isPdf, defaults, onClose, onSubmit, filename, submitting }) => {
+  const { t } = useI18n();
   const [taskType, setTaskType] = useState<'video'|'podcast'>(defaults.task_type as any || 'video');
   const [voiceLang, setVoiceLang] = useState<string>(defaults.voice_language || 'english');
   const [subLang, setSubLang] = useState<string | null>((defaults.subtitle_language as any) ?? null);
@@ -76,6 +87,16 @@ const RunTaskModal: React.FC<Props> = ({ open, isPdf, defaults, onClose, onSubmi
 
   if (!open) return null;
 
+  const fileDisplayName = shortenFileName(filename, t('runTask.noFileSelected', undefined, 'Selected file'));
+
+  const displayLanguage = (code: string) => {
+    const normalized = (code || '').toLowerCase();
+    const key = LANGUAGE_KEY_BY_CODE[normalized];
+    const fallback = getLanguageDisplayName(code);
+    if (key) return t(key, undefined, fallback);
+    return fallback || t('common.unknown', undefined, 'Unknown');
+  };
+
   const run = () => {
     // Upload view parity:
     // - PDF supports either video or podcast
@@ -99,10 +120,10 @@ const RunTaskModal: React.FC<Props> = ({ open, isPdf, defaults, onClose, onSubmi
         <div className="modal-header-bar" data-kind={taskType}>
           <div className="header-left">
             <span className="header-icon" aria-hidden>{taskType === 'podcast' ? '🎧' : '🎬'}</span>
-            <span>{taskType === 'podcast' ? 'Generate Podcast' : 'Generate Video'}</span>
+            <span>{taskType === 'podcast' ? t('actions.generatePodcast') : t('actions.generateVideo')}</span>
           </div>
           <div className="header-right">
-            <button type="button" className="modal-close-btn" aria-label="Close" title="Close" onClick={onClose}>
+            <button type="button" className="modal-close-btn" aria-label={t('actions.close')} title={t('actions.close')} onClick={onClose}>
               <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
@@ -114,63 +135,63 @@ const RunTaskModal: React.FC<Props> = ({ open, isPdf, defaults, onClose, onSubmi
           <div className="run-config">
             <div className="run-left">
               <div className="run-summary">
-                <div className="run-tag" data-kind={taskType}>{taskType === 'podcast' ? 'Podcast' : 'Video'} task</div>
+                <div className="run-tag" data-kind={taskType}>{`${taskType === 'podcast' ? t('task.list.podcastLabel') : t('task.list.videoLabel')} ${t('runTask.tagSuffix')}`}</div>
                 <dl className="summary-fields">
                   <div>
-                    <dt>Source</dt>
-                    <dd title={filename || ''}>{shortenFileName(filename)}</dd>
+                    <dt>{t('runTask.source')}</dt>
+                    <dd title={filename || ''}>{fileDisplayName}</dd>
                   </div>
                   <div>
-                    <dt>Output</dt>
-                    <dd>{taskType === 'podcast' ? 'Audio narrative' : 'Narrated video'}</dd>
+                    <dt>{t('runTask.output.label')}</dt>
+                    <dd>{taskType === 'podcast' ? t('runTask.output.podcast') : t('runTask.output.video')}</dd>
                   </div>
                 </dl>
-                <div className="hint">Adjust the generation options and press Generate when you are ready.</div>
+                <div className="hint">{t('runTask.adjustHint')}</div>
               </div>
             </div>
             <div className="run-right">
               <div className="config-grid">
                 <label className="cfg-field">
-                  <span className="cfg-label">Voice Language</span>
+                  <span className="cfg-label">{t('runTask.voiceLanguage')}</span>
                   <select className="video-option-select" value={voiceLang} onChange={(e)=>setVoiceLang(e.target.value)} disabled={submitting}>
-                    {LANGS.map(l => <option key={l} value={l}>{getLanguageDisplayName(l)}</option>)}
+                    {LANGS.map(l => <option key={l} value={l}>{displayLanguage(l)}</option>)}
                   </select>
                 </label>
 
                 {taskType !== 'podcast' && (
                   <label className="cfg-field">
-                    <span className="cfg-label">Subtitle Language</span>
+                    <span className="cfg-label">{t('runTask.subtitleLanguage')}</span>
                     <select className="video-option-select" value={subLang ?? ''} onChange={(e)=>setSubLang(e.target.value || null)} disabled={submitting}>
-                      <option value="">Same as voice</option>
-                      {LANGS.map(l => <option key={l} value={l}>{getLanguageDisplayName(l)}</option>)}
+                      <option value="">{t('runTask.sameAsVoice')}</option>
+                      {LANGS.map(l => <option key={l} value={l}>{displayLanguage(l)}</option>)}
                     </select>
                   </label>
                 )}
 
                 {isPdf && taskType === 'podcast' && (
                   <label className="cfg-field">
-                    <span className="cfg-label">Transcript Language</span>
+                    <span className="cfg-label">{t('runTask.transcriptLanguage')}</span>
                     <select className="video-option-select" value={transcriptLang ?? ''} onChange={(e)=>setTranscriptLang(e.target.value || null)} disabled={submitting}>
-                      <option value="">Same as voice</option>
-                      {LANGS.map(l => <option key={l} value={l}>{getLanguageDisplayName(l)}</option>)}
+                      <option value="">{t('runTask.sameAsVoice')}</option>
+                      {LANGS.map(l => <option key={l} value={l}>{displayLanguage(l)}</option>)}
                     </select>
                   </label>
                 )}
 
                 <label className="cfg-field">
-                  <span className="cfg-label">Video Resolution</span>
+                  <span className="cfg-label">{t('runTask.videoResolution')}</span>
                   <select className="video-option-select" value={resolution} onChange={(e)=>setResolution(e.target.value)} disabled={submitting}>
-                    <option value="sd">SD (640×480)</option>
-                    <option value="hd">HD (1280×720)</option>
-                    <option value="fullhd">Full HD (1920×1080)</option>
+                    <option value="sd">{t('runTask.resolution.sd')}</option>
+                    <option value="hd">{t('runTask.resolution.hd')}</option>
+                    <option value="fullhd">{t('runTask.resolution.fullhd')}</option>
                   </select>
                 </label>
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-                <button className="secondary-btn" onClick={onClose} disabled={submitting}>Cancel</button>
+                <button className="secondary-btn" onClick={onClose} disabled={submitting}>{t('actions.cancel')}</button>
                 <button className="primary-btn" onClick={run} disabled={submitting}>
-                  {submitting ? 'Generating…' : 'Generate'}
+                  {submitting ? t('actions.generating') : t('actions.generate')}
                 </button>
               </div>
             </div>

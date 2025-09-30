@@ -2,18 +2,20 @@ import React from "react";
 interface GoogleLoginButtonProps {
   onClick: () => void;
   disabled?: boolean;
+  label: string;
 }
 
 const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   onClick,
   disabled = false,
+  label,
 }) => {
   return (
     <button
       className="google-login-button"
       onClick={onClick}
       disabled={disabled}
-      aria-label="Sign in with Google"
+      aria-label={label}
     >
       <div className="google-icon-wrapper">
         <svg
@@ -41,7 +43,7 @@ const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
           />
         </svg>
       </div>
-      <span className="google-button-text">Sign in with Google</span>
+      <span className="google-button-text">{label}</span>
     </button>
   );
 };
