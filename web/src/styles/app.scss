@@ -27,6 +27,10 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  body.light-theme {
+    color-scheme: light;
+  }
   
   .App {
     min-height: 100vh;
@@ -475,7 +479,7 @@
       font-size: 0.8rem;
     }
   }
-  
+
   /* Main content */
   .main-content {
     flex: 1;
@@ -493,8 +497,8 @@
     color: #ffffff; /* default (Modern) on dark gradient bg */
   }
   
-  /* Classic theme: subtle glass footer (sticky retained) */
-  body:not(.ultra-flat) .app-footer {
+  /* Light theme footer glass effect */
+  body.light-theme .app-footer {
     background: rgba(255, 255, 255, 0.08);
     border-top-color: rgba(255, 255, 255, 0.2);
     backdrop-filter: saturate(160%) blur(12px);

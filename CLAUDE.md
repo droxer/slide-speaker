@@ -50,7 +50,7 @@ make check           # Lint + TS
   - Components: src/components/ (TaskMonitor, TaskCard, PreviewModal, UploadPanel, ProcessingView, AudioPlayer, VideoPlayer, PodcastPlayer, TranscriptList)
   - Services: src/services/client.ts (API calls), src/services/queries.ts (React Query hooks + prefetch)
   - Types: src/types/ (Task, TaskState)
-  - Styles: src/styles/ (index.scss, app.scss, task-monitor.scss, ultra-flat-overrides.scss, subtle-material-overrides.scss, classic-overrides.scss)
+  - Styles: src/styles/ (index.scss, app.scss, TaskMonitor.scss, dark-theme.scss)
 
 ## Core Concepts
 - task_type: What we are generating. Allowed: video | podcast | both. Drives whether video, podcast, or both artifacts are produced.
@@ -185,7 +185,7 @@ OSS_REGION=...
 ## Troubleshooting Notes
 - If you see duplicate type errors like “Identifier 'Cue' has already been declared”, ensure shared types live once at the component scope (use TranscriptList types) and remove duplicates.
 - If subtitles don’t render, verify VTT fetch via services/queries useVttQuery and that components receive vttUrl or parsed cues. Ensure unified styling via styles/.
-- If styles don’t apply, check that index.tsx imports `src/styles/index.scss` and App.tsx imports `src/styles/app.scss` plus theme overrides. Task monitor styles live in `src/styles/task-monitor.scss`.
+- If styles don’t apply, check that index.tsx imports `src/styles/index.scss` and App.tsx imports `src/styles/app.scss` and the dark theme overrides (`dark-theme.scss`). Task monitor styles live in `src/styles/TaskMonitor.scss`.
 - If too many /api/tasks calls occur, ensure React Query keys are consistent and refetchInterval only runs when active tasks are on the current page.
 
 ## Recent Backend/Frontend Alignments

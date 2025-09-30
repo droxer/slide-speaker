@@ -3,8 +3,8 @@ import GoogleLoginButton from './GoogleLoginButton';
 import dynamic from 'next/dynamic';
 import { useI18n } from '@/i18n/hooks';
 
-const LanguageSwitcher = dynamic(
-  () => import('./LanguageSwitcher').then((mod) => mod.default),
+const LanguageToggle = dynamic(
+  () => import('./LanguageToggle').then((mod) => mod.default),
   { ssr: false },
 );
 import { initiateGoogleLogin, getCurrentUser, logout } from '../services/auth';
@@ -66,7 +66,7 @@ const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
           <p>{t('header.subtitle')}</p>
         </div>
         <div className="header-right">
-          <LanguageSwitcher />
+          <LanguageToggle />
           <div
             className="view-toggle ai-toggle"
             role="tablist"

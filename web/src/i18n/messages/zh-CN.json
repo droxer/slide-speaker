@@ -276,9 +276,10 @@
     "queueTooltipOk": "系统状态正常",
     "queueTooltipLatency": "系统状态正常 • {latency}ms",
     "theme": {
-      "classic": "经典",
-      "flat": "扁平",
-      "material": "质感"
+      "toggleLabel": "主题切换",
+      "auto": "跟随系统",
+      "light": "浅色",
+      "dark": "深色"
     }
   },
   "pagination": {

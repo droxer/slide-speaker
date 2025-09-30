@@ -2,6 +2,7 @@
 
 import React from 'react';
 import TaskDetail from '@/components/TaskDetail';
+import Footer from '@/components/Footer';
 import { resolveApiBaseUrl } from '@/utils/apiBaseUrl';
 import { useTaskQuery, useDownloadsQuery, useCancelTaskMutation } from '@/services/queries';
 import { useQueryClient } from '@tanstack/react-query';
@@ -63,14 +64,17 @@ const TaskPageClient: React.FC<TaskPageClientProps> = ({ taskId, initialTask }) 
   };
 
   return (
-    <TaskDetail
-      task={task}
-      downloads={downloads}
-      apiBaseUrl={apiBaseUrl}
-      onCancel={handleCancel}
-      isCancelling={cancelMutation.isPending}
-      downloadsLoading={downloadsQuery.isLoading}
-    />
+    <>
+      <TaskDetail
+        task={task}
+        downloads={downloads}
+        apiBaseUrl={apiBaseUrl}
+        onCancel={handleCancel}
+        isCancelling={cancelMutation.isPending}
+        downloadsLoading={downloadsQuery.isLoading}
+      />
+      <Footer queueUnavailable={false} redisLatencyMs={null} />
+    </>
   );
 };
 

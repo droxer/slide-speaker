@@ -8,7 +8,7 @@ This guide helps contributors work productively across the FastAPI backend and t
 - Frontend: `web/` (Next.js + React + TypeScript). Main client surface: `web/src/App.tsx`; creation monitor: `web/src/components/TaskMonitor.tsx`.
 - App Router: locale-aware routes live under `web/src/app/[locale]/`. Shared client entry points sit in `web/src/app/*PageClient.tsx`. Use the non-locale directories only for server components that seed data before delegating to the client versions.
 - Internationalization: `web/src/i18n/` holds `config.ts`, message catalogs, and hooks. Navigation helpers live in `web/src/navigation.ts`. Middleware (`web/middleware.ts`) wires next-intl locale detection.
-- UI components: `web/src/components/` (match `.scss` files). `LanguageSwitcher` handles locale changes inside detail views. Download surfaces live in `DownloadLinks`.
+- UI components: `web/src/components/` (match `.scss` files). `LanguageToggle` handles locale changes inside detail views. Download surfaces live in `DownloadLinks`.
 - Docs: `docs/`; Top-level: `README.md`, `CLAUDE.md`, `QWEN.md`.
 
 ## Build, Test, and Development
@@ -24,7 +24,7 @@ This guide helps contributors work productively across the FastAPI backend and t
 ## Internationalization Workflow
 - Locales currently ship with `en`, `zh-CN`, `zh-TW`. Add new keys to every catalog in `web/src/i18n/messages/`.
 - Shared navigation helpers (`web/src/navigation.ts`) and middleware rely on `defaultLocale` from `config.ts`; update both when introducing locales.
-- Surface locale controls via `LanguageSwitcher` where users need to swap languages.
+- Surface locale controls via `LanguageToggle` where users need to swap languages.
 
 ## Testing Guidelines
 - API: No formal tests yet; run `make check`. If adding tests, place under `api/tests/` as `test_*.py`.

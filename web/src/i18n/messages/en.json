@@ -276,9 +276,10 @@
     "queueTooltipOk": "System status OK",
     "queueTooltipLatency": "System status OK • {latency}ms",
     "theme": {
-      "classic": "Classic",
-      "flat": "Flat",
-      "material": "Material"
+      "toggleLabel": "Theme toggle",
+      "auto": "Auto",
+      "light": "Light",
+      "dark": "Dark"
     }
   },
   "pagination": {

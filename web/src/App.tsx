@@ -19,9 +19,6 @@ import { useRouter } from '@/navigation';
 // API configuration – prefer same-origin when served over HTTPS to avoid mixed-content blocks
 const API_BASE_URL = resolveApiBaseUrl();
 
-// UI Theme key
-const THEME_STORAGE_KEY = "slidespeaker_ui_theme"; // 'flat' | 'classic' | 'material'
-
 // Define TypeScript interfaces
 interface StepDetails {
   status: string;
@@ -66,17 +63,6 @@ function App({ activeView = 'studio', onNavigate, initialHealth }: AppProps) {
   const router = useRouter();
   const { t, locale } = useI18n();
   const queryClient = useQueryClient();
-  // UI theme: 'classic' (Modern, default), 'flat', or 'material'
-  const [uiTheme, setUiTheme] = useState<"flat" | "classic" | "material">("classic");
-
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(THEME_STORAGE_KEY);
-      if (saved === "classic" || saved === "flat" || saved === "material") {
-        setUiTheme((current) => (current === saved ? current : saved));
-      }
-    } catch {}
-  }, []);
 
   // Handle Google OAuth callback
   useEffect(() => {
@@ -95,19 +81,6 @@ function App({ activeView = 'studio', onNavigate, initialHealth }: AppProps) {
       window.location.reload();
     }
   }, []);
-
-  // Apply/remove theme classes on body
-  useEffect(() => {
-    const isFlat = uiTheme === "flat";
-    const isMaterial = uiTheme === "material";
-    const isClassic = uiTheme === "classic";
-    document.body.classList.toggle("ultra-flat", isFlat);
-    document.body.classList.toggle("subtle-material", isMaterial);
-    document.body.classList.toggle("classic", isClassic);
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, uiTheme);
-    } catch {}
-  }, [uiTheme]);
 
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
@@ -852,8 +825,6 @@ function App({ activeView = 'studio', onNavigate, initialHealth }: AppProps) {
       <Footer
         queueUnavailable={queueUnavailable}
         redisLatencyMs={redisLatencyMs}
-        uiTheme={uiTheme}
-        setUiTheme={setUiTheme}
       />
     </div>
   );
