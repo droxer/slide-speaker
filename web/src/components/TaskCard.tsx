@@ -1,7 +1,7 @@
 import React from 'react';
 import { Link } from '@/navigation';
 import { STEP_STATUS_ICONS, getStepLabel, normalizeStepStatus, StepStatusVariant } from '@/utils/stepLabels';
-import { resolveLanguages, getLanguageDisplayName as displayName } from '@/utils/language';
+import { resolveLanguages, getLanguageDisplayName } from '@/utils/language';
 import type { Task, DownloadItem } from '@/types';
 import { useDownloadsQuery, useTranscriptQuery, hasCachedVtt, prefetchTaskPreview } from '@/services/queries';
 import { useI18n } from '@/i18n/hooks';
@@ -185,6 +185,11 @@ const TaskCard: React.FC<Props> = ({
           : '•';
   const statusContent = `${statusIcon} ${humanStatus(task.status)}`;
 
+  const languageLabel = (code: string) => {
+    const normalized = (code || '').toLowerCase();
+    return t(`language.display.${normalized}`, undefined, getLanguageDisplayName(code));
+  };
+
   return (
     <div className={`task-item ${getStatusColor(task.status)} ${isRemoving ? 'removing' : ''}`}>
       <div className="task-header">
@@ -243,11 +248,11 @@ const TaskCard: React.FC<Props> = ({
 
           {/* Meta chips */}
           <div className="meta-row">
-            <span className="chip">{t('task.list.voice', { language: displayName(voiceLang) }, `Voice: ${displayName(voiceLang)}`)}</span>
+            <span className="chip">{t('task.list.voice', { language: languageLabel(voiceLang) }, `Voice: ${languageLabel(voiceLang)}`)}</span>
             {isPodcastTask ? (
-              <span className="chip">{t('task.list.transcript', { language: displayName(transcriptLang) }, `Transcript: ${displayName(transcriptLang)}`)}</span>
+              <span className="chip">{t('task.list.transcript', { language: languageLabel(transcriptLang) }, `Transcript: ${languageLabel(transcriptLang)}`)}</span>
             ) : (
-              <span className="chip">{t('task.list.subtitles', { language: displayName(transcriptLang) }, `Subs: ${displayName(transcriptLang)}`)}</span>
+              <span className="chip">{t('task.list.subtitles', { language: languageLabel(transcriptLang) }, `Subs: ${languageLabel(transcriptLang)}`)}</span>
             )}
             <span className="chip">{getVideoResolutionDisplayName(videoRes)}</span>
           </div>

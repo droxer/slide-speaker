@@ -17,6 +17,14 @@
     "japanese": "日语",
     "korean": "韩语",
     "thai": "泰语",
+    "display": {
+      "english": "英语",
+      "simplified_chinese": "简体中文",
+      "traditional_chinese": "繁体中文",
+      "japanese": "日语",
+      "korean": "韩语",
+      "thai": "泰语"
+    },
     "switcher": {
       "label": "界面语言",
       "tooltip": "切换语言"
@@ -116,8 +124,8 @@
     "tagSuffix": "任务",
     "source": "来源",
     "output": {
-      "video": "配音视频",
-      "podcast": "音频讲解",
+      "video": "视频",
+      "podcast": "播客",
       "label": "输出"
     },
     "voiceLanguage": "配音语言",

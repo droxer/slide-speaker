@@ -22,14 +22,6 @@ const shortId = (id?: string) => {
   return `${id.slice(0, 6)}…${id.slice(-4)}`;
 };
 
-const LANGUAGE_KEYS: Record<string, string> = {
-  english: 'language.english',
-  simplified_chinese: 'language.simplified',
-  traditional_chinese: 'language.traditional',
-  japanese: 'language.japanese',
-  korean: 'language.korean',
-  thai: 'language.thai',
-};
 
 const RESOLUTION_KEYS: Record<string, string> = {
   sd: 'runTask.resolution.sd',
@@ -69,9 +61,8 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
 
   const getLanguageName = useCallback((code: string) => {
     const normalized = (code || '').toLowerCase();
-    const key = LANGUAGE_KEYS[normalized];
-    if (key) return t(key, undefined, getLanguageDisplayName(normalized));
-    return getLanguageDisplayName(code) || t('common.unknown', undefined, 'Unknown');
+    const fallback = getLanguageDisplayName(code);
+    return t(`language.display.${normalized}`, undefined, fallback || t('common.unknown', undefined, 'Unknown'));
   }, [t]);
 
   const getResolutionName = useCallback((value: string) => {
@@ -466,7 +457,7 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
             return (
               <div className="modal-preview-stack">
                 <div className="modal-video-wrapper">
-                  <VideoPlayer src={videoUrl} trackUrl={vtt} trackLang={subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : subtitleLanguage === 'traditional_chinese' ? 'zh-Hant' : subtitleLanguage === 'japanese' ? 'ja' : subtitleLanguage === 'korean' ? 'ko' : subtitleLanguage === 'thai' ? 'th' : 'en'} trackLabel={getLanguageName(subtitleLanguage)} className="video-player" onReady={() => {}} onError={() => {}} />
+                  <VideoPlayer src={videoUrl} trackUrl={vtt} trackLang={subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : subtitleLanguage === 'traditional_chinese' ? 'zh-Hant' : subtitleLanguage === 'japanese' ? 'ja' : subtitleLanguage === 'korean' ? 'ko' : subtitleLanguage === 'thai' ? 'th' : 'en'} trackLabel={getLanguageDisplayName(subtitleLanguage, t)} className="video-player" onReady={() => {}} onError={() => {}} />
                 </div>
               </div>
             );

@@ -17,6 +17,14 @@
     "japanese": "Japanese",
     "korean": "Korean",
     "thai": "Thai",
+    "display": {
+      "english": "English",
+      "simplified_chinese": "Simplified Chinese",
+      "traditional_chinese": "Traditional Chinese",
+      "japanese": "Japanese",
+      "korean": "Korean",
+      "thai": "Thai"
+    },
     "switcher": {
       "label": "Interface language",
       "tooltip": "Switch language"
@@ -116,8 +124,8 @@
     "tagSuffix": "task",
     "source": "Source",
     "output": {
-      "video": "Narrated video",
-      "podcast": "Audio narrative",
+      "video": "Video",
+      "podcast": "Podcast",
       "label": "Output"
     },
     "voiceLanguage": "Voice language",

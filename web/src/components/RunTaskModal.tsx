@@ -31,15 +31,6 @@ const LANGS = [
   'thai',
 ];
 
-const LANGUAGE_KEY_BY_CODE: Record<string, string> = {
-  english: 'language.english',
-  simplified_chinese: 'language.simplified',
-  traditional_chinese: 'language.traditional',
-  japanese: 'language.japanese',
-  korean: 'language.korean',
-  thai: 'language.thai',
-};
-
 const shortenFileName = (name?: string, fallback = 'Selected file', max = 48): string => {
   if (!name) return fallback;
   const base = name.replace(/\.(pdf|pptx?|PPTX?|PDF)$/,'');
@@ -91,10 +82,8 @@ const RunTaskModal: React.FC<Props> = ({ open, isPdf, defaults, onClose, onSubmi
 
   const displayLanguage = (code: string) => {
     const normalized = (code || '').toLowerCase();
-    const key = LANGUAGE_KEY_BY_CODE[normalized];
     const fallback = getLanguageDisplayName(code);
-    if (key) return t(key, undefined, fallback);
-    return fallback || t('common.unknown', undefined, 'Unknown');
+    return t(`language.display.${normalized}`, undefined, fallback || t('common.unknown', undefined, 'Unknown'));
   };
 
   const run = () => {

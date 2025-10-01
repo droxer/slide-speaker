@@ -333,13 +333,16 @@ body.dark-theme .toggle-chip:hover {
 
 body.dark-theme .app-footer {
   background: rgba(15, 23, 42, 0.9) !important;
-  border-top: 1px solid var(--dark-border) !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.3) !important;
   color: var(--dark-text) !important;
 }
 
 body.dark-theme .footer-note,
 body.dark-theme .footer-content,
-body.dark-theme .footer-right,
+body.dark-theme .footer-right {
+  color: var(--dark-text-muted) !important;
+}
+
 body.dark-theme .health-indicator {
   background: rgba(30, 41, 59, 0.85) !important;
   border: 1px solid var(--dark-border) !important;
@@ -360,7 +363,7 @@ body.dark-theme .video-modal {
 
 body.dark-theme .app-footer {
   background: rgba(15, 23, 42, 0.92) !important;
-  border-top: 1px solid var(--dark-border) !important;
+  border-top: 1px solid rgba(148, 163, 184, 0.3) !important;
   color: var(--dark-text) !important;
 }
 

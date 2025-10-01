@@ -1,6 +1,17 @@
 export type LanguageCode = string;
 
-export const getLanguageDisplayName = (languageCode: LanguageCode): string => {
+export const getLanguageDisplayName = (
+  languageCode: LanguageCode,
+  translate?: (key: string, vars?: Record<string, string | number>, fallback?: string) => string,
+): string => {
+  const normalized = (languageCode || '').toLowerCase();
+  if (translate) {
+    const key = `language.display.${normalized}`;
+    const translated = translate(key, undefined, '');
+    if (translated) {
+      return translated;
+    }
+  }
   const languageNames: Record<string, string> = {
     english: 'English',
     simplified_chinese: '简体中文',
@@ -9,7 +20,7 @@ export const getLanguageDisplayName = (languageCode: LanguageCode): string => {
     korean: '한국어',
     thai: 'ไทย',
   };
-  return languageNames[(languageCode || '').toLowerCase()] || languageCode || 'Unknown';
+  return languageNames[normalized] || languageCode || 'Unknown';
 };
 
 export const resolveLanguages = (task: any) => {
@@ -22,4 +33,3 @@ export const resolveLanguages = (task: any) => {
     : subtitle;
   return { voiceLanguage: voice, subtitleLanguage: subtitle, transcriptLanguage: transcript };
 };
-

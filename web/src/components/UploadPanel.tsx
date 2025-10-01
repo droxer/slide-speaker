@@ -32,15 +32,6 @@ const LANGS = [
   'thai',
 ];
 
-const LANGUAGE_KEY_BY_CODE: Record<string, string> = {
-  english: 'language.english',
-  simplified_chinese: 'language.simplified',
-  traditional_chinese: 'language.traditional',
-  japanese: 'language.japanese',
-  korean: 'language.korean',
-  thai: 'language.thai',
-};
-
 const UploadPanel: React.FC<UploadPanelProps> = ({
   uploadMode,
   setUploadMode,
@@ -68,10 +59,8 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
 
   const displayLanguage = (code: string) => {
     const normalized = (code || '').toLowerCase();
-    const key = LANGUAGE_KEY_BY_CODE[normalized];
     const fallback = getLanguageDisplayName(code);
-    if (key) return t(key, undefined, fallback);
-    return fallback || t('common.unknown', undefined, 'Unknown');
+    return t(`language.display.${normalized}`, undefined, fallback || t('common.unknown', undefined, 'Unknown'));
   };
 
   const fileLabel = useMemo(() => {
@@ -175,7 +164,7 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
             </div>
             <select id="voice-language-select" value={voiceLanguage} onChange={(e) => setVoiceLanguage(e.target.value)} className="video-option-select">
               {LANGS.map((code) => (
-                <option key={code} value={code}>{displayLanguage(code)}</option>
+                <option key={code} value={code}>{getLanguageDisplayName(code, t)}</option>
               ))}
             </select>
           </div>
@@ -200,7 +189,7 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
               className="video-option-select"
             >
               {LANGS.map((code) => (
-                <option key={code} value={code}>{displayLanguage(code)}</option>
+                <option key={code} value={code}>{getLanguageDisplayName(code, t)}</option>
               ))}
             </select>
           </div>

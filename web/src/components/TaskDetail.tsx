@@ -101,6 +101,10 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
 }) => {
   const { t, locale } = useI18n();
   const { voiceLanguage, subtitleLanguage, transcriptLanguage } = resolveLanguages(task);
+  const languageLabel = React.useCallback((code: string) => {
+    const normalized = (code || '').toLowerCase();
+    return t(`language.display.${normalized}`, undefined, getLanguageDisplayName(code));
+  }, [t]);
   const canCancel = typeof onCancel === 'function' && (task.status === 'processing' || task.status === 'queued');
   const captionLang = transcriptLanguage ?? subtitleLanguage;
 
@@ -260,7 +264,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
                 src={videoUrl}
                 trackUrl={subtitleUrl}
                 trackLang={captionLang || 'en'}
-                trackLabel={`${getLanguageDisplayName(captionLang)} ${t('task.detail.subtitles', undefined, 'Subtitles')}`}
+                trackLabel={`${languageLabel(captionLang || 'english')} ${t('task.detail.subtitles', undefined, 'Subtitles')}`}
                 autoPlay={false}
               />
             )}
@@ -281,11 +285,11 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
             <div className="task-detail-card__fact-group">
               <div className="task-detail-card__fact">
                 <span className="task-detail-card__fact-label">{t('task.detail.voice')}</span>
-                <span className="task-detail-card__fact-value">{getLanguageDisplayName(voiceLanguage)}</span>
+                <span className="task-detail-card__fact-value">{getLanguageDisplayName(voiceLanguage, t)}</span>
               </div>
               <div className="task-detail-card__fact">
                 <span className="task-detail-card__fact-label">{taskType === 'podcast' ? t('task.detail.transcript') : t('task.detail.subtitlesFormats')}</span>
-                <span className="task-detail-card__fact-value">{getLanguageDisplayName(transcriptLanguage ?? subtitleLanguage)}</span>
+                <span className="task-detail-card__fact-value">{getLanguageDisplayName(transcriptLanguage ?? subtitleLanguage, t)}</span>
               </div>
             </div>
             <div className="task-detail-card__fact-group subtle-meta">
