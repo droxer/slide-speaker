@@ -16,6 +16,8 @@ SlideSpeaker is under active development. Expect rapid iteration, breaking chang
 - Podcast-ready audio exports for sharing beyond video platforms
 - Subtitle outputs in VTT/SRT formats aligned to the narration
 - Task-based API that coordinates the full processing pipeline end-to-end
+- Responsive light, dark, and auto themes with per-user preferences
+- Global language switcher with localized UI labels and stored preferences
 
 ## 🚀 Quick Start
 
