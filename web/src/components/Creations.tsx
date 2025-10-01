@@ -1,8 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { cancelRun as apiCancelRun, purgeTask as apiPurgeTask, getHealth } from '../services/client';
+import { cancelRun as apiCancelRun, deleteTask as apiDeleteTask, purgeTask as apiPurgeTask, getHealth } from '../services/client';
 import { getCachedDownloads, useFilesQuery, useRunFileTaskMutation, useSearchTasksQuery, useTranscriptQuery } from '../services/queries';
-import '../styles/task-monitor.scss';
 import TaskCard from './TaskCard';
 import PreviewModal from './PreviewModal';
 import RunTaskModal from './RunTaskModal';
@@ -11,31 +10,23 @@ import AudioPlayer from './AudioPlayer';
 import PodcastPlayer from './PodcastPlayer';
 import { getGlobalRunDefaults, saveGlobalRunDefaults } from '../utils/defaults';
 import type { Task } from '../types';
+import { useI18n } from '@/i18n/hooks';
+import { getLanguageDisplayName } from '../utils/language';
 
 interface CreationsProps { apiBaseUrl: string }
 
 const isPdf = (ext?: string) => (ext || '').toLowerCase() === '.pdf';
-const langName = (code: string) => ({
-  english: 'English',
-  simplified_chinese: '简体中文',
-  traditional_chinese: '繁體中文',
-  japanese: '日本語',
-  korean: '한국어',
-  thai: 'ไทย',
-} as any)[(code || '').toLowerCase()] || code || 'Unknown';
-const resName = (r: string) => (r === 'sd' ? 'SD (640×480)' : r === 'hd' ? 'HD (1280×720)' : r === 'fullhd' ? 'Full HD (1920×1080)' : r || 'Unknown');
-const shortBaseName = (name?: string, max = 42): string => {
-  if (!name) return 'Unknown file';
-  const base = name.replace(/\.(pdf|pptx?|PPTX?|PDF)$/,'');
-  if (base.length <= max) return base;
-  const head = Math.max(12, Math.floor((max - 1) / 2));
-  const tail = max - head - 1;
-  return base.slice(0, head) + '…' + base.slice(-tail);
-};
 const shortId = (id?: string) => {
   if (!id) return '';
   if (id.length <= 12) return id;
   return `${id.slice(0, 6)}…${id.slice(-4)}`;
+};
+
+
+const RESOLUTION_KEYS: Record<string, string> = {
+  sd: 'runTask.resolution.sd',
+  hd: 'runTask.resolution.hd',
+  fullhd: 'runTask.resolution.fullhd',
 };
 
 const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
@@ -44,6 +35,7 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
   const [status, setStatus] = useState('all');
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
+  const { t } = useI18n();
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Task | null>(null);
   const [mode, setMode] = useState<'video'|'audio'>('video');
@@ -53,9 +45,32 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
   const [runDefaults, setRunDefaults] = useState<any>({});
   const [runSubmitting, setRunSubmitting] = useState(false);
   const queryClient = useQueryClient();
+  const [hiddenTasks, setHiddenTasks] = useState<Set<string>>(new Set());
 
   useEffect(() => { const t = setTimeout(() => setDebounced(search.trim()), 350); return () => clearTimeout(t); }, [search]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2600); return () => clearTimeout(t); }, [toast]);
+
+  const formatFileName = useCallback((name?: string, max = 42): string => {
+    if (!name) return t('common.unknownFile', undefined, 'Unknown file');
+    const base = name.replace(/\.(pdf|pptx?|PPTX?|PDF)$/,'');
+    if (base.length <= max) return base;
+    const head = Math.max(12, Math.floor((max - 1) / 2));
+    const tail = max - head - 1;
+    return base.slice(0, head) + '…' + base.slice(-tail);
+  }, [t]);
+
+  const getLanguageName = useCallback((code: string) => {
+    const normalized = (code || '').toLowerCase();
+    const fallback = getLanguageDisplayName(code);
+    return t(`language.display.${normalized}`, undefined, fallback || t('common.unknown', undefined, 'Unknown'));
+  }, [t]);
+
+  const getResolutionName = useCallback((value: string) => {
+    const normalized = (value || '').toLowerCase();
+    const key = RESOLUTION_KEYS[normalized];
+    if (key) return t(key, undefined, value);
+    return t('common.unknown', undefined, 'Unknown');
+  }, [t]);
 
   const filesQuery = useFilesQuery(
     { page, limit: 10, includeTasks: true, q: debounced || undefined },
@@ -78,7 +93,19 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
   const dbLatency = health?.db?.latency_ms as number | undefined;
   const redisError = health?.redis?.error as string | undefined;
   const dbError = health?.db?.error as string | undefined;
-  const overallLabel = overall === 'ok' ? 'All systems nominal' : overall === 'degraded' ? 'Partial availability' : overall === 'down' ? 'Systems offline' : 'Status unknown';
+  const overallLabel = overall === 'ok'
+    ? t('creations.health.overall.okLabel')
+    : overall === 'degraded'
+      ? t('creations.health.overall.degradedLabel')
+      : overall === 'down'
+        ? t('creations.health.overall.downLabel')
+        : t('creations.health.overall.unknownLabel');
+  const queueTooltip = redisOk
+    ? t('creations.health.queueLatency', { latency: typeof redisLatency === 'number' ? redisLatency : 'n/a' }, `Queue latency: ${redisLatency ?? 'n/a'} ms`)
+    : (redisError || t('creations.health.queueUnavailable'));
+  const dbTooltip = dbOk
+    ? t('creations.health.databaseLatency', { latency: typeof dbLatency === 'number' ? dbLatency : 'n/a' }, `Database latency: ${dbLatency ?? 'n/a'} ms`)
+    : (dbError || t('creations.health.databaseUnavailable'));
 
   // Selected preview transcript (podcast listen)
   const selectedIsPodcast = useMemo(() => {
@@ -107,33 +134,90 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
   }, [searching, searchQuery.data]);
 
   const counts = useMemo(() => {
+    const filterHidden = (tasks: Task[]) => tasks.filter((t) => !hiddenTasks.has(t.task_id));
     if (searching) {
-      const filesCount = searchGroups.filter((g) => (status === 'all' ? g.tasks : g.tasks.filter((t) => t.status === status)).length > 0).length;
-      const creationsCount = searchGroups.reduce((n, g) => n + (status === 'all' ? g.tasks.length : g.tasks.filter((t) => t.status === status).length), 0);
-      const runningCount = searchGroups.reduce((n, g) => n + g.tasks.filter((t) => t.status === 'processing').length, 0);
+      const filesCount = searchGroups.filter((g) => {
+        const visible = filterHidden(g.tasks);
+        const vis = status === 'all' ? visible : visible.filter((t) => t.status === status);
+        return vis.length > 0;
+      }).length;
+      const creationsCount = searchGroups.reduce((n, g) => {
+        const visible = filterHidden(g.tasks);
+        const vis = status === 'all' ? visible : visible.filter((t) => t.status === status);
+        return n + vis.length;
+      }, 0);
+      const runningCount = searchGroups.reduce((n, g) => n + filterHidden(g.tasks).filter((t) => t.status === 'processing').length, 0);
       return { filesCount, creationsCount, runningCount };
     }
     const files = ((filesQuery.data as any)?.files || []) as Array<{ tasks?: Task[] }>;
     let filesCount = 0, creationsCount = 0, runningCount = 0;
     for (const f of files) {
-      const tasks = (f.tasks || []) as Task[];
+      const tasks = filterHidden((f.tasks || []) as Task[]);
       const vis = status === 'all' ? tasks : tasks.filter((t) => t.status === status);
       if (vis.length > 0) filesCount++;
       creationsCount += vis.length;
       runningCount += tasks.filter((t) => t.status === 'processing').length;
     }
     return { filesCount, creationsCount, runningCount };
-  }, [searching, searchGroups, filesQuery.data, status]);
+  }, [searching, searchGroups, filesQuery.data, status, hiddenTasks]);
 
   const toggleFile = (k: string) => setExpandedFiles((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
   const toggleTask = (id: string) => setExpandedTasks((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const runFileTask = useRunFileTaskMutation();
 
-  const onCancel = async (taskId: string) => { try { await apiCancelRun(taskId); } catch { alert('Failed to cancel task'); } };
+  const onCancel = async (taskId: string) => {
+    try { await apiCancelRun(taskId); }
+    catch { alert(t('creations.toast.cancelFailed', undefined, 'Failed to cancel task')); }
+  };
   const onDelete = async (taskId: string) => {
-    if (!window.confirm('This will permanently remove the task and its state. Continue?')) return;
-    try { await apiPurgeTask(taskId); } catch { alert('Failed to delete task'); }
+    if (!window.confirm(t('creations.confirm.delete', undefined, 'This will permanently remove the task and its state. Continue?'))) return;
+    try {
+      await apiDeleteTask(taskId);
+    } catch (error: any) {
+      const message = error?.response?.data?.error || error?.message || '';
+      if (typeof message === 'string' && message.toLowerCase().includes('cannot be cancelled')) {
+        await apiPurgeTask(taskId);
+      } else {
+        throw error;
+      }
+    }
+    try {
+      setHiddenTasks((prev) => {
+        const next = new Set(prev);
+        next.add(taskId);
+        return next;
+      });
+      if (selected?.task_id === taskId) {
+        setSelected(null);
+      }
+      // Optimistically remove the task from any cached lists
+      queryClient.setQueriesData({ predicate: ({ queryKey }) => Array.isArray(queryKey) && queryKey[0] === 'files' }, (old: any) => {
+        if (!old || !Array.isArray(old.files)) return old;
+        const files = old.files
+          .map((file: any) => ({
+            ...file,
+            tasks: Array.isArray(file.tasks)
+              ? file.tasks.filter((t: any) => t?.task_id !== taskId)
+              : file.tasks,
+          }))
+          .filter((file: any) => Array.isArray(file.tasks) ? file.tasks.length > 0 : true);
+        return { ...old, files };
+      });
+      queryClient.setQueriesData({ predicate: ({ queryKey }) => Array.isArray(queryKey) && queryKey[0] === 'tasks' }, (old: any) => {
+        if (!Array.isArray(old)) return old;
+        return old.filter((t: any) => t?.task_id !== taskId);
+      });
+      queryClient.setQueriesData({ predicate: ({ queryKey }) => Array.isArray(queryKey) && queryKey[0] === 'tasksSearch' }, (old: any) => {
+        if (!old || !Array.isArray(old.tasks)) return old;
+        return { ...old, tasks: old.tasks.filter((t: any) => t?.task_id !== taskId) };
+      });
+      await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      await queryClient.invalidateQueries({ queryKey: ['files'] });
+    } catch (error) {
+      console.error('Failed to delete task from creations', error);
+      alert(t('creations.toast.deleteFailed', undefined, 'Failed to delete task'));
+    }
   };
 
   const deriveOutputs = (task: Task) => {
@@ -147,7 +231,7 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
   };
 
   const openPreview = (task: Task, m?: 'video'|'audio') => {
-    if (task.status !== 'completed') { alert('Preview is only available for completed tasks.'); return; }
+    if (task.status !== 'completed') { alert(t('alerts.previewUnavailable')); return; }
     setSelected(task);
     if (m) setMode(m); else {
       const outs = deriveOutputs(task); setMode(outs.video ? 'video' : 'audio');
@@ -168,12 +252,13 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
 
   const renderGroups = () => {
     if (searching) {
-      if (!searchGroups.length) return <div className="no-tasks">No tasks found</div>;
+      if (!searchGroups.length) return <div className="no-tasks">{t('creations.empty', undefined, 'No tasks found')}</div>;
       return (
         <div className="file-groups">
           {searchGroups.map((g, idx) => {
             const key = g.file_id || g.filename || `search-${idx}`;
-            const vis = (status === 'all' ? g.tasks : g.tasks.filter((t) => t.status === status));
+            const visible = g.tasks.filter((t) => !hiddenTasks.has(t.task_id));
+            const vis = status === 'all' ? visible : visible.filter((t) => t.status === status);
             if (!vis.length) return null;
             return (
               <section key={key} className={`file-group ${expandedFiles.has(key) ? 'open' : ''}`}>
@@ -184,25 +269,28 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
                     aria-expanded={expandedFiles.has(key)}
                     onClick={() => toggleFile(key)}
                   >
-                    <div className="file-title" title={g.filename || 'Unknown file'}>
-                      <span className="file-title-text">{shortBaseName(g.filename, 48)}</span>
+                    <div className="file-title" title={g.filename || t('common.unknownFile', undefined, 'Unknown file')}>
+                      <span className="file-title-text">{formatFileName(g.filename, 48)}</span>
                     </div>
                     <div className="file-meta">
-                      <span className="file-id-chip" title={g.file_id || ''}>{g.file_id ? `ID ${shortId(g.file_id)}` : 'Untracked file'}</span>
-                      <span className="task-count">{vis.length} {vis.length === 1 ? 'creation' : 'creations'}</span>
+                      <span className="file-id-chip" title={g.file_id || ''}>{g.file_id ? t('creations.file.idChip', { id: shortId(g.file_id) }, `ID ${shortId(g.file_id)}`) : t('common.untrackedFile', undefined, 'Untracked file')}</span>
+                      <span className="task-count">{vis.length === 1
+                        ? t('creations.file.count.one', { count: vis.length }, '1 creation')
+                        : t('creations.file.count.other', { count: vis.length }, `${vis.length} creations`)}
+                      </span>
                     </div>
                     <span className="chev" aria-hidden>▾</span>
                   </button>
                   {!!g.file_id && (
                     <div className="file-group-actions" onClick={(e) => e.stopPropagation()}>
-                      <button className="mini-btn" title="Generate Video" onClick={() => onRun(g.file_id!, g.filename, g.file_ext, 'video')}>
+                      <button className="mini-btn" title={t('actions.generateVideo')} onClick={() => onRun(g.file_id!, g.filename, g.file_ext, 'video')}>
                         <span aria-hidden>🎬</span>
-                        <span>Generate Video</span>
+                        <span>{t('actions.generateVideo')}</span>
                       </button>
                       {isPdf(g.file_ext) && (
-                        <button className="mini-btn" title="Generate Podcast" onClick={() => onRun(g.file_id!, g.filename, g.file_ext, 'podcast')}>
+                        <button className="mini-btn" title={t('actions.generatePodcast')} onClick={() => onRun(g.file_id!, g.filename, g.file_ext, 'podcast')}>
                           <span aria-hidden>🎧</span>
-                          <span>Generate Podcast</span>
+                          <span>{t('actions.generatePodcast')}</span>
                         </button>
                       )}
                     </div>
@@ -222,8 +310,8 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
                         onCancel={onCancel}
                         onDelete={onDelete}
                         deriveTaskOutputs={deriveOutputs}
-                        getLanguageDisplayName={langName}
-                        getVideoResolutionDisplayName={resName}
+                        getLanguageDisplayName={getLanguageName}
+                        getVideoResolutionDisplayName={getResolutionName}
                       />
                     ))}
                   </div>
@@ -235,13 +323,13 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
       );
     }
     const files = ((filesQuery.data as any)?.files || []) as Array<{ file_id?: string; filename?: string; file_ext?: string; tasks?: Task[] }>;
-    if (!files.length) return <div className="no-tasks">No tasks found</div>;
+    if (!files.length) return <div className="no-tasks">{t('creations.empty', undefined, 'No tasks found')}</div>;
     return (
       <div className="file-groups">
         {files.map((f, idx) => {
           const key = f.file_id || f.filename || `file-${idx}`;
-          const tasks = (f.tasks || []) as Task[];
-          const vis = (status === 'all' ? tasks : tasks.filter((t) => t.status === status));
+          const tasks = ((f.tasks || []) as Task[]).filter((t) => !hiddenTasks.has(t.task_id));
+          const vis = status === 'all' ? tasks : tasks.filter((t) => t.status === status);
           if (!vis.length) return null;
           return (
               <section key={key} className={`file-group ${expandedFiles.has(key) ? 'open' : ''}`}>
@@ -252,25 +340,28 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
                   aria-expanded={expandedFiles.has(key)}
                   onClick={() => toggleFile(key)}
                 >
-                  <div className="file-title" title={f.filename || 'Unknown file'}>
-                    <span className="file-title-text">{shortBaseName(f.filename, 48)}</span>
+                  <div className="file-title" title={f.filename || t('common.unknownFile', undefined, 'Unknown file')}>
+                    <span className="file-title-text">{formatFileName(f.filename, 48)}</span>
                   </div>
                   <div className="file-meta">
-                    <span className="file-id-chip" title={f.file_id || ''}>{f.file_id ? `ID ${shortId(f.file_id)}` : 'Untracked file'}</span>
-                    <span className="task-count">{vis.length} {vis.length === 1 ? 'creation' : 'creations'}</span>
+                    <span className="file-id-chip" title={f.file_id || ''}>{f.file_id ? t('creations.file.idChip', { id: shortId(f.file_id) }, `ID ${shortId(f.file_id)}`) : t('common.untrackedFile', undefined, 'Untracked file')}</span>
+                    <span className="task-count">{vis.length === 1
+                      ? t('creations.file.count.one', { count: vis.length }, '1 creation')
+                      : t('creations.file.count.other', { count: vis.length }, `${vis.length} creations`)}
+                    </span>
                   </div>
                   <span className="chev" aria-hidden>▾</span>
                 </button>
                 {!!f.file_id && (
                   <div className="file-group-actions" onClick={(e) => e.stopPropagation()}>
-                    <button className="mini-btn" title="Generate Video" onClick={() => onRun(f.file_id!, f.filename, f.file_ext, 'video')}>
+                    <button className="mini-btn" title={t('actions.generateVideo')} onClick={() => onRun(f.file_id!, f.filename, f.file_ext, 'video')}>
                       <span aria-hidden>🎬</span>
-                      <span>Generate Video</span>
+                      <span>{t('actions.generateVideo')}</span>
                     </button>
                     {isPdf(f.file_ext) && (
-                      <button className="mini-btn" title="Generate Podcast" onClick={() => onRun(f.file_id!, f.filename, f.file_ext, 'podcast')}>
+                      <button className="mini-btn" title={t('actions.generatePodcast')} onClick={() => onRun(f.file_id!, f.filename, f.file_ext, 'podcast')}>
                         <span aria-hidden>🎧</span>
-                        <span>Generate Podcast</span>
+                        <span>{t('actions.generatePodcast')}</span>
                       </button>
                     )}
                   </div>
@@ -290,8 +381,8 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
                       onCancel={onCancel}
                       onDelete={onDelete}
                       deriveTaskOutputs={deriveOutputs}
-                      getLanguageDisplayName={langName}
-                      getVideoResolutionDisplayName={resName}
+                      getLanguageDisplayName={getLanguageName}
+                      getVideoResolutionDisplayName={getResolutionName}
                     />
                   ))}
                 </div>
@@ -307,50 +398,31 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
     <div className="task-monitor">
       {toast && <div className={`toast ${toast.type}`} role="status" aria-live="polite">{toast.message}</div>}
       <div className="monitor-header">
-        <h2 className="ai-title">Creations</h2>
-        <div className="monitor-counts" aria-live="polite">{counts.filesCount} files · {counts.creationsCount} creations · {counts.runningCount} running</div>
+        <h2 className="ai-title">{t('creations.title', undefined, 'Creations')}</h2>
+        <div className="monitor-counts" aria-live="polite">{t('creations.summary', { files: counts.filesCount, creations: counts.creationsCount, running: counts.runningCount }, `${counts.filesCount} files · ${counts.creationsCount} creations · ${counts.runningCount} running`)}</div>
         <div className="monitor-controls">
           <form onSubmit={(e)=>{e.preventDefault(); setDebounced(search.trim());}} className="search-form">
-            <input type="text" placeholder="Search tasks..." value={search} onChange={(e)=>setSearch(e.target.value)} className="search-input" />
-            <button type="submit" className="search-button">Search</button>
+            <input type="text" placeholder={t('search.placeholder')} value={search} onChange={(e)=>setSearch(e.target.value)} className="search-input" />
+            <button type="submit" className="search-button">{t('search.submit')}</button>
           </form>
           <select value={status} onChange={(e)=>setStatus(e.target.value)} className="status-filter">
-            <option value="all">All Status</option>
-            <option value="queued">Queued</option>
-            <option value="processing">Processing</option>
-            <option value="completed">Completed</option>
-            <option value="failed">Failed</option>
-            <option value="cancelled">Cancelled</option>
+            <option value="all">{t('filters.status.all')}</option>
+            <option value="queued">{t('task.status.queued')}</option>
+            <option value="processing">{t('task.status.processing')}</option>
+            <option value="completed">{t('task.status.completed')}</option>
+            <option value="failed">{t('task.status.failed')}</option>
+            <option value="cancelled">{t('task.status.cancelled')}</option>
           </select>
         </div>
       </div>
-      {/* Health indicator */}
-      <div className="health-indicator" role="status" aria-live="polite">
-        <span className={`hi-dot ${overall === 'ok' ? 'ok' : overall === 'degraded' ? 'warn' : 'down'}`} aria-hidden></span>
-        <span className="hi-label">Status</span>
-        <span className={`hi-chip overall ${overall}`} title={overallLabel}>{overall === 'ok' ? 'OK' : overall === 'degraded' ? 'Degraded' : overall === 'down' ? 'Down' : 'Unknown'}</span>
-        <span
-          className={`hi-chip ${redisOk ? 'ok' : 'down'}`}
-          title={redisOk ? `Queue latency: ${redisLatency ?? 'n/a'} ms` : (redisError || 'Queue unavailable')}
-        >
-          Queue
-        </span>
-        <span
-          className={`hi-chip ${dbOk ? 'ok' : 'down'}`}
-          title={dbOk ? `Database latency: ${dbLatency ?? 'n/a'} ms` : (dbError || 'Database unavailable')}
-        >
-          Database
-        </span>
-      </div>
-
       <div className="task-list">
         {renderGroups()}
       </div>
 
       <div className="pagination">
-        <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="page-button">Previous</button>
-        <span className="page-info">Page {page}</span>
-        <button onClick={() => setPage(page + 1)} disabled={searching ? ((((searchQuery.data as any)?.tasks) || []).length < 10) : !((filesQuery.data as any)?.has_more)} className="page-button">Next</button>
+        <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1} className="page-button">{t('pagination.previous')}</button>
+        <span className="page-info">{t('pagination.page', { page }, `Page ${page}`)}</span>
+        <button onClick={() => setPage(page + 1)} disabled={searching ? ((((searchQuery.data as any)?.tasks) || []).length < 10) : !((filesQuery.data as any)?.has_more)} className="page-button">{t('pagination.next')}</button>
       </div>
 
       {/* Selected preview helpers */}
@@ -364,9 +436,9 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
         onClose={closePreview}
         header={selected ? (
           <div className="modal-header-bar" data-mode={mode}>
-            <div className="header-left" aria-label="Media Preview"><span className="header-icon" aria-hidden>{mode === 'video' ? '🎬' : '🎧'}</span><span>Media Preview</span></div>
+            <div className="header-left" aria-label={t('modal.previewTitle')}><span className="header-icon" aria-hidden>{mode === 'video' ? '🎬' : '🎧'}</span><span>{t('modal.previewTitle')}</span></div>
             <div className="header-right">
-              <button type="button" className="modal-close-btn" aria-label="Close" title="Close" onClick={closePreview}>
+              <button type="button" className="modal-close-btn" aria-label={t('actions.close')} title={t('actions.close')} onClick={closePreview}>
                 <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
               </button>
             </div>
@@ -385,7 +457,7 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
             return (
               <div className="modal-preview-stack">
                 <div className="modal-video-wrapper">
-                  <VideoPlayer src={videoUrl} trackUrl={vtt} trackLang={subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : subtitleLanguage === 'traditional_chinese' ? 'zh-Hant' : subtitleLanguage === 'japanese' ? 'ja' : subtitleLanguage === 'korean' ? 'ko' : subtitleLanguage === 'thai' ? 'th' : 'en'} trackLabel={langName(subtitleLanguage)} className="video-player" onReady={() => {}} onError={() => {}} />
+                  <VideoPlayer src={videoUrl} trackUrl={vtt} trackLang={subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : subtitleLanguage === 'traditional_chinese' ? 'zh-Hant' : subtitleLanguage === 'japanese' ? 'ja' : subtitleLanguage === 'korean' ? 'ko' : subtitleLanguage === 'thai' ? 'th' : 'en'} trackLabel={getLanguageDisplayName(subtitleLanguage, t)} className="video-player" onReady={() => {}} onError={() => {}} />
                 </div>
               </div>
             );
@@ -412,7 +484,12 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
           saveGlobalRunDefaults({ voice_language: payload.voice_language, subtitle_language: payload.subtitle_language ?? null, transcript_language: payload.transcript_language ?? null, video_resolution: payload.video_resolution || 'hd' });
           runFileTask.mutate(
             { fileId: runFile.file_id, payload },
-            { onSuccess: (res: any) => { setRunOpen(false); setToast({ type: 'success', message: `Task created: ${res?.task_id || ''}` }); }, onError: () => setToast({ type: 'error', message: 'Failed to create task' }), onSettled: () => setRunSubmitting(false) }
+            { onSuccess: (res: any) => {
+                setRunOpen(false);
+                setToast({ type: 'success', message: t('creations.toast.taskCreated', { id: res?.task_id || '' }, `Task created: ${res?.task_id || ''}`) });
+              },
+              onError: () => setToast({ type: 'error', message: t('creations.toast.createFailed', undefined, 'Failed to create task') }),
+              onSettled: () => setRunSubmitting(false) }
           );
         }}
       />

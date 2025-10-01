@@ -1,15 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import GoogleLoginButton from './GoogleLoginButton';
+import dynamic from 'next/dynamic';
+import { useI18n } from '@/i18n/hooks';
+
+const LanguageToggle = dynamic(
+  () => import('./LanguageToggle').then((mod) => mod.default),
+  { ssr: false },
+);
 import { initiateGoogleLogin, getCurrentUser, logout } from '../services/auth';
 
+export type AppView = 'studio' | 'creations';
+
 type HeaderProps = {
-  showTaskMonitor: boolean;
-  setShowTaskMonitor: (show: boolean) => void;
+  activeView: AppView;
+  onNavigate: (view: AppView) => void;
 };
 
-const Header: React.FC<HeaderProps> = ({ showTaskMonitor, setShowTaskMonitor }) => {
+const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
   const [user, setUser] = useState<any>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const { t } = useI18n();
 
   // Check for existing session on component mount
   useEffect(() => {
@@ -42,52 +52,53 @@ const Header: React.FC<HeaderProps> = ({ showTaskMonitor, setShowTaskMonitor }) 
         <div className="header-left">
           {user ? (
             <div className="user-info">
-              <span>Welcome, {user.name}</span>
+              <span>{t('header.welcome', { name: user.name }, `Welcome, ${user.name}`)}</span>
               <button onClick={handleLogout} className="logout-btn">
-                Logout
+                {t('header.logout')}
               </button>
             </div>
           ) : (
-            <GoogleLoginButton onClick={handleLogin} />
+            <GoogleLoginButton onClick={handleLogin} label={t('header.login')} />
           )}
         </div>
         <div className="header-center">
           <h1>SlideSpeaker AI</h1>
-          <p>Transform slides into AI-powered videos</p>
+          <p>{t('header.subtitle')}</p>
         </div>
         <div className="header-right">
+          <LanguageToggle />
           <div
             className="view-toggle ai-toggle"
             role="tablist"
             aria-label="View Toggle"
           >
             <button
-              onClick={() => setShowTaskMonitor(false)}
-              className={`toggle-btn ${!showTaskMonitor ? "active" : ""}`}
-              title="Studio"
+              onClick={() => onNavigate('studio')}
+              className={`toggle-btn ${activeView === 'studio' ? "active" : ""}`}
+              title={t('header.view.studio')}
               role="tab"
-              aria-selected={!showTaskMonitor}
+              aria-selected={activeView === 'studio'}
               aria-controls="studio-panel"
               id="studio-tab"
             >
               <span className="toggle-icon" aria-hidden="true">
                 ▶
               </span>
-              <span className="toggle-text">Studio</span>
+              <span className="toggle-text">{t('header.view.studio')}</span>
             </button>
             <button
-              onClick={() => setShowTaskMonitor(true)}
-              className={`toggle-btn ${showTaskMonitor ? "active" : ""}`}
-              title="Creations"
+              onClick={() => onNavigate('creations')}
+              className={`toggle-btn ${activeView === 'creations' ? "active" : ""}`}
+              title={t('header.view.creations')}
               role="tab"
-              aria-selected={showTaskMonitor}
+              aria-selected={activeView === 'creations'}
               aria-controls="monitor-panel"
               id="monitor-tab"
             >
               <span className="toggle-icon" aria-hidden="true">
                 🎬
               </span>
-              <span className="toggle-text">Creations</span>
+              <span className="toggle-text">{t('header.view.creations')}</span>
             </button>
           </div>
         </div>

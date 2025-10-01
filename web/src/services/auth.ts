@@ -1,5 +1,7 @@
 // Authentication service for Google OAuth
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "";
+import { resolveApiBaseUrl } from "@/utils/apiBaseUrl";
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 export interface User {
   id: string;

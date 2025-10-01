@@ -7,11 +7,14 @@ task queue submission.
 """
 
 import base64
+import binascii
 import hashlib
+import json
 from pathlib import Path
+from typing import Any
 
 import aiofiles
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, UploadFile
 from loguru import logger
 
 from slidespeaker.configs.config import config
@@ -23,18 +26,196 @@ router = APIRouter(prefix="/api", tags=["upload"])
 UPLOAD_DIR = config.uploads_dir
 
 
+def _coerce_bool(value: Any, default: bool) -> bool:
+    """Best-effort conversion of form/query values into booleans."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int | float):
+        return bool(value)
+    value_str = str(value).strip().lower()
+    if value_str in {"true", "1", "yes", "on"}:
+        return True
+    if value_str in {"false", "0", "no", "off"}:
+        return False
+    return default
+
+
+def _coerce_optional_str(value: Any) -> str | None:
+    if value is None:
+        return None
+    value_str = str(value).strip()
+    return value_str or None
+
+
+async def _parse_upload_payload(request: Request) -> dict[str, Any]:
+    content_type = (request.headers.get("content-type") or "").lower()
+
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        upload = form.get("file")
+
+        file_bytes: bytes | None = None
+        filename: str | None = None
+
+        if isinstance(upload, UploadFile):
+            file_bytes = await upload.read()
+            filename = upload.filename or None
+            await upload.close()
+        else:
+            # Support older clients that still send base64 strings ("file" or "file_data")
+            raw_file = form.get("file_data") or form.get("file")
+            if raw_file is None:
+                raise HTTPException(
+                    status_code=400, detail="File field 'file' is required"
+                )
+
+            logger.debug(
+                "Legacy upload payload detected - type=%s preview=%s",
+                type(raw_file).__name__,
+                str(raw_file)[:128],
+            )
+
+            if isinstance(raw_file, bytes | bytearray):
+                file_bytes = bytes(raw_file)
+            else:
+                raw_str = str(raw_file).strip()
+                comma_idx = raw_str.find(",")
+                candidate = raw_str[comma_idx + 1 :] if comma_idx != -1 else raw_str
+                candidate = candidate.strip().replace("%2B", "+").replace(" ", "+")
+
+                decoded_bytes: bytes | None = None
+                if candidate:
+                    try:
+                        decoded_bytes = base64.b64decode(candidate, validate=True)
+                    except (ValueError, binascii.Error):
+                        try:
+                            decoded_bytes = base64.b64decode(candidate)
+                        except Exception:
+                            decoded_bytes = None
+
+                if decoded_bytes is None:
+                    try:
+                        parsed = json.loads(candidate)
+                    except Exception:
+                        parsed = None
+
+                    if (
+                        isinstance(parsed, dict)
+                        and parsed.get("type") == "Buffer"
+                        and isinstance(parsed.get("data"), list)
+                    ):
+                        try:
+                            decoded_bytes = bytes(int(v) & 0xFF for v in parsed["data"])
+                        except Exception:
+                            decoded_bytes = None
+                    elif isinstance(parsed, list):
+                        try:
+                            decoded_bytes = bytes(int(v) & 0xFF for v in parsed)
+                        except Exception:
+                            decoded_bytes = None
+
+                if decoded_bytes is None:
+                    # Handle simple comma/space separated integer payloads
+                    parts = [p.strip() for p in candidate.split(",") if p.strip()]
+                    if parts:
+                        try:
+                            decoded_bytes = bytes(int(p) & 0xFF for p in parts)
+                        except Exception:
+                            decoded_bytes = None
+
+                if decoded_bytes is None:
+                    raise HTTPException(status_code=400, detail="Invalid file payload")
+
+                file_bytes = decoded_bytes
+
+            filename = (
+                _coerce_optional_str(form.get("filename"))
+                or _coerce_optional_str(form.get("original_filename"))
+                or _coerce_optional_str(form.get("name"))
+            )
+
+        if not filename:
+            raise HTTPException(
+                status_code=400, detail="Uploaded file is missing a filename"
+            )
+        if not file_bytes:
+            raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+        payload = {
+            "filename": filename,
+            "file_bytes": file_bytes,
+            "voice_language": _coerce_optional_str(form.get("voice_language"))
+            or "english",
+            "subtitle_language": _coerce_optional_str(form.get("subtitle_language")),
+            "transcript_language": _coerce_optional_str(
+                form.get("transcript_language")
+            ),
+            "video_resolution": _coerce_optional_str(form.get("video_resolution"))
+            or "hd",
+            "generate_avatar": _coerce_bool(form.get("generate_avatar"), True),
+            "generate_subtitles": _coerce_bool(form.get("generate_subtitles"), True),
+            "generate_podcast": _coerce_bool(form.get("generate_podcast"), False),
+            "generate_video": _coerce_bool(form.get("generate_video"), True),
+            "task_type": _coerce_optional_str(form.get("task_type")),
+            "source_type": _coerce_optional_str(form.get("source_type")),
+        }
+        return payload
+
+    try:
+        body = await request.json()
+    except Exception as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=400, detail="Invalid JSON payload") from exc
+
+    filename = _coerce_optional_str(body.get("filename"))
+    file_data = body.get("file_data")
+
+    if not filename or not file_data:
+        raise HTTPException(
+            status_code=400, detail="Filename and file data are required"
+        )
+
+    try:
+        data_str = str(file_data).strip()
+        comma_idx = data_str.find(",")
+        candidate = data_str[comma_idx + 1 :] if comma_idx != -1 else data_str
+        candidate = candidate.strip().replace("%2B", "+").replace(" ", "+")
+        try:
+            file_bytes = base64.b64decode(candidate, validate=True)
+        except (ValueError, binascii.Error):
+            file_bytes = base64.b64decode(candidate)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail="Invalid base64 file data") from exc
+
+    return {
+        "filename": filename,
+        "file_bytes": file_bytes,
+        "voice_language": _coerce_optional_str(body.get("voice_language")) or "english",
+        "subtitle_language": _coerce_optional_str(body.get("subtitle_language")),
+        "transcript_language": _coerce_optional_str(body.get("transcript_language")),
+        "video_resolution": _coerce_optional_str(body.get("video_resolution")) or "hd",
+        "generate_avatar": _coerce_bool(body.get("generate_avatar"), True),
+        "generate_subtitles": _coerce_bool(body.get("generate_subtitles"), True),
+        "generate_podcast": _coerce_bool(body.get("generate_podcast"), False),
+        "generate_video": _coerce_bool(body.get("generate_video"), True),
+        "task_type": _coerce_optional_str(body.get("task_type")),
+        "source_type": _coerce_optional_str(body.get("source_type")),
+    }
+
+
 @router.post("/upload")
 async def upload_file(request: Request) -> dict[str, str | None]:
     """Upload a presentation file and start processing."""
     try:
-        # Parse JSON data from request body
-        body = await request.json()
-        filename = body.get("filename")
-        file_data = body.get("file_data")
+        payload = await _parse_upload_payload(request)
+        filename = payload["filename"]
+        file_bytes = payload["file_bytes"]
+
         # Normalize incoming languages to internal keys
-        raw_voice_language = body.get("voice_language", "english")
-        raw_subtitle_language = body.get("subtitle_language")
-        raw_transcript_language = body.get("transcript_language")
+        raw_voice_language = payload.get("voice_language", "english")
+        raw_subtitle_language = payload.get("subtitle_language")
+        raw_transcript_language = payload.get("transcript_language")
         voice_language = locale_utils.normalize_language(raw_voice_language)
         subtitle_language = (
             locale_utils.normalize_language(raw_subtitle_language)
@@ -46,23 +227,15 @@ async def upload_file(request: Request) -> dict[str, str | None]:
             if raw_transcript_language is not None
             else None
         )
-        video_resolution = body.get("video_resolution", "hd")  # Default to HD
-        generate_avatar = body.get("generate_avatar", True)  # Default to True
-        generate_subtitles = True  # Always generate subtitles by default
-        generate_podcast = body.get("generate_podcast", False)
-        generate_video = body.get("generate_video", True)
-
-        if not filename or not file_data:
-            raise HTTPException(
-                status_code=400, detail="Filename and file data are required"
-            )
-
-        # Decode base64 file data
-        file_bytes = base64.b64decode(file_data)
+        video_resolution = payload.get("video_resolution", "hd")  # Default to HD
+        generate_avatar = payload.get("generate_avatar", True)  # Default to True
+        generate_subtitles = payload.get("generate_subtitles", True)
+        generate_podcast = payload.get("generate_podcast", False)
+        generate_video = payload.get("generate_video", True)
 
         file_ext = Path(filename).suffix.lower()
         # Determine source_type from request or by extension and validate
-        source_type = body.get("source_type")
+        source_type = payload.get("source_type")
         if not source_type:
             source_type = (
                 "pdf"
@@ -81,7 +254,7 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         if (
             file_ext == ".pdf"
             and generate_podcast
-            and body.get("generate_video") is not True
+            and payload.get("generate_video") is not True
         ):
             # If generate_video is not explicitly set to True, disable video generation
             # This covers cases where generate_video is False, None, or not present
@@ -144,7 +317,7 @@ async def upload_file(request: Request) -> dict[str, str | None]:
 
         # Normalize task_type and flags consistently
         # Prefer explicit task_type from request body when present; otherwise derive from flags
-        req_task_type = (body.get("task_type") or "").lower() or None
+        req_task_type = (payload.get("task_type") or "").lower() or None
         if req_task_type in ("video", "podcast", "both"):
             task_type = req_task_type
         else:
@@ -196,5 +369,5 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         }
 
     except Exception as e:
-        logger.error(f"Upload error: {e}")
+        logger.exception("Upload error")
         raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}") from e

@@ -47,10 +47,10 @@ make check           # Lint + TS
   - Storage: slidespeaker/storage/ (local, S3, OSS via unified interface)
 - web/: React + TypeScript UI
   - Entrypoints: src/index.tsx, src/App.tsx
-  - Components: src/components/ (TaskMonitor, TaskCard, PreviewModal, UploadPanel, ProcessingView, CompletedView, AudioPlayer, VideoPlayer, PodcastPlayer, TranscriptList)
+  - Components: src/components/ (TaskMonitor, TaskCard, PreviewModal, UploadPanel, ProcessingView, AudioPlayer, VideoPlayer, PodcastPlayer, TranscriptList)
   - Services: src/services/client.ts (API calls), src/services/queries.ts (React Query hooks + prefetch)
   - Types: src/types/ (Task, TaskState)
-  - Styles: src/styles/ (index.scss, app.scss, task-monitor.scss, ultra-flat-overrides.scss, subtle-material-overrides.scss, classic-overrides.scss)
+  - Styles: src/styles/ (index.scss, app.scss, TaskMonitor.scss, dark-theme.scss)
 
 ## Core Concepts
 - task_type: What we are generating. Allowed: video | podcast | both. Drives whether video, podcast, or both artifacts are produced.
@@ -83,7 +83,6 @@ make check           # Lint + TS
 - Views:
   - UploadPanel: upload box; “AUDIO LANGUAGE” and “Subtitles Language” labels; hide upload UI during upload/processing; Create button only when idle/ready.
   - ProcessingView: task meta in two equal‑width cards; correct badges; small preview where applicable.
-  - CompletedView: unified media preview (video/audio/podcast) using the components above. No upload box here.
   - TaskMonitor: task list + TaskCard per task. Preview modal closes on ESC and is sized larger for audio/podcast.
 - UX rules (see AGENTS.md for full spec):
   - Downloads order: Video, Audio, Transcript, VTT, SRT.
@@ -141,13 +140,13 @@ OSS_REGION=...
 - LLM: Use helpers in slidespeaker/llm (chat_completion, image_generate, tts_speech_stream); do not instantiate OpenAI clients directly.
 - Scope: Keep patches tight; do not alter project structure/Make targets unless asked.
 
-## Frontend UX Rules (Task Monitor & Completed)
+## Frontend UX Rules (Task Monitor & Redirect)
 - Downloads order: Video, Audio, Transcript, VTT, SRT.
 - “More” toggle at end of task details expands/collapses full download block (link‑style UI acceptable or native details/summary).
 - Task‑based URLs only; never emit file‑based URLs in new UI.
-- Subtitle styling/rendering unified between preview modal and completed views.
+- Subtitle styling/rendering unified between preview modal and task detail tabs.
 - Remove file ID chip; keep header “Task: {task_id}”; task‑id label is focusable and copyable (Enter).
-- Completed headline: “Your Masterpiece is Ready!”.
+- Post-completion flow: show the redirect spinner copy (`completed.redirecting`) and push to `/[locale]/tasks/{id}`.
 - Default font: Google Open Sans across the app.
 - Status pills (Completed/Processing/Queued/Failed/Cancelled) follow theme colors with hover/focus.
 - Processing Task Meta: two equal‑width cards; file icon/name don’t overlap; file‑type badge vertically centered.
@@ -186,7 +185,7 @@ OSS_REGION=...
 ## Troubleshooting Notes
 - If you see duplicate type errors like “Identifier 'Cue' has already been declared”, ensure shared types live once at the component scope (use TranscriptList types) and remove duplicates.
 - If subtitles don’t render, verify VTT fetch via services/queries useVttQuery and that components receive vttUrl or parsed cues. Ensure unified styling via styles/.
-- If styles don’t apply, check that index.tsx imports `src/styles/index.scss` and App.tsx imports `src/styles/app.scss` plus theme overrides. Task monitor styles live in `src/styles/task-monitor.scss`.
+- If styles don’t apply, check that index.tsx imports `src/styles/index.scss` and App.tsx imports `src/styles/app.scss` and the dark theme overrides (`dark-theme.scss`). Task monitor styles live in `src/styles/TaskMonitor.scss`.
 - If too many /api/tasks calls occur, ensure React Query keys are consistent and refetchInterval only runs when active tasks are on the current page.
 
 ## Recent Backend/Frontend Alignments

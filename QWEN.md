@@ -174,7 +174,6 @@ The frontend is built with React and follows a component-based architecture:
    - TaskMonitor: Main dashboard for task monitoring
    - UploadPanel: File upload interface
    - ProcessingView: Real-time processing visualization
-   - CompletedView: Final results display
    - Reusable media players (VideoPlayer, AudioPlayer, PodcastPlayer)
 
 2. **Services** (`src/services/`)

@@ -1,48 +1,23 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
-import { upload as apiUpload, cancelRun as apiCancel, getHealth as apiHealth, getTaskProgress as apiGetProgress, getTranscriptMarkdown as apiGetTranscript, headTaskVideo as apiHeadVideo, getVttText as apiGetVttText } from "./services/client";
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import "./styles/app.scss";
-import "./styles/ultra-flat-overrides.scss";
-import "./styles/subtle-material-overrides.scss";
-import "./styles/classic-overrides.scss";
-import Creations from "./components/Creations";
-import ProcessingView from "./components/ProcessingView";
-import CompletedView from "./components/CompletedView";
-import UploadPanel from "./components/UploadPanel";
-import Header from "./components/Header";
-import Footer from "./components/Footer";
-import ErrorView from "./components/ErrorView";
-import UploadingView from "./components/UploadingView";
-import { getStepLabel } from './utils/stepLabels';
-import { useUI } from './context/UIContext';
-// Players are used within components (CompletedView/Creations) not here
+'use client';
 
-// Constants for local storage keys
-const LOCAL_STORAGE_KEYS = {
-  TASK_STATE: "slidespeaker_task_state",
-  FILE_ID: "slidespeaker_file_id",
-  TASK_ID: "slidespeaker_task_id",
-  STATUS: "slidespeaker_status",
-  PROCESSING_DETAILS: "slidespeaker_processing_details",
-  LATEST_TASK_TIMESTAMP: "slidespeaker_latest_task_timestamp",
-  FILE_TYPE: "slidespeaker_file_type", // Add file type tracking for PDF vs PPT handling
-};
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { upload as apiUpload, cancelRun as apiCancel, getHealth as apiHealth, getTaskProgress as apiGetProgress } from "@/services/client";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Creations from "@/components/Creations";
+import ProcessingView from "@/components/ProcessingView";
+import UploadPanel from "@/components/UploadPanel";
+import Header, { AppView } from "@/components/Header";
+import Footer from "@/components/Footer";
+import ErrorView from "@/components/ErrorView";
+import UploadingView from "@/components/UploadingView";
+import { getStepLabel } from '@/utils/stepLabels';
+import { resolveApiBaseUrl } from '@/utils/apiBaseUrl';
+import type { HealthStatus } from '@/types/health';
+import { useI18n } from '@/i18n/hooks';
+import { useRouter } from '@/navigation';
 
 // API configuration – prefer same-origin when served over HTTPS to avoid mixed-content blocks
-const API_BASE_URL = (() => {
-  const env = process.env.REACT_APP_API_BASE_URL;
-  if (env !== undefined) return env;
-  const { protocol, hostname } = window.location;
-  if (protocol === "https:") {
-    // Use same-origin '/api' paths; rely on reverse proxy in production
-    return "";
-  }
-  // Local dev over HTTP
-  return `${protocol}//${hostname}:8000`;
-})();
-
-// UI Theme key
-const THEME_STORAGE_KEY = "slidespeaker_ui_theme"; // 'flat' | 'classic' | 'material'
+const API_BASE_URL = resolveApiBaseUrl();
 
 // Define TypeScript interfaces
 interface StepDetails {
@@ -78,132 +53,16 @@ type AppStatus =
   | "error"
   | "cancelled";
 
-// Local storage utility functions
-const localStorageUtils = {
-  saveTaskState: (state: {
-    fileId: string | null;
-    taskId: string | null;
-    status: AppStatus;
-    processingDetails: ProcessingDetails | null;
-    voiceLanguage: string;
-    subtitleLanguage: string;
-    transcriptLanguage: string;
-    generateAvatar: boolean;
-    generateSubtitles: boolean;
-    fileName: string | null; // Add fileName to track file type
-  }) => {
-    try {
-      const stateToSave = {
-        ...state,
-        timestamp: new Date().toISOString(),
-      };
-      localStorage.setItem(
-        LOCAL_STORAGE_KEYS.TASK_STATE,
-        JSON.stringify(stateToSave),
-      );
-      localStorage.setItem(
-        LOCAL_STORAGE_KEYS.LATEST_TASK_TIMESTAMP,
-        new Date().toISOString(),
-      );
-      // Save file type information
-      if (state.fileName) {
-        const fileType = state.fileName.toLowerCase().split(".").pop() || "";
-        localStorage.setItem(LOCAL_STORAGE_KEYS.FILE_TYPE, fileType);
-      }
-    } catch (error) {
-      console.warn("Failed to save task state to local storage:", error);
-    }
-  },
-
-  loadTaskState: () => {
-    try {
-      const savedState = localStorage.getItem(LOCAL_STORAGE_KEYS.TASK_STATE);
-      if (savedState) {
-        const parsed = JSON.parse(savedState);
-        // Validate the timestamp to ensure it's recent (within 24 hours)
-        const timestamp = new Date(parsed.timestamp);
-        const now = new Date();
-        const hoursDiff =
-          (now.getTime() - timestamp.getTime()) / (1000 * 60 * 60);
-
-        if (hoursDiff < 24) {
-          // Load file type information
-          const fileType = localStorage.getItem(LOCAL_STORAGE_KEYS.FILE_TYPE);
-          return {
-            ...parsed,
-            fileType,
-          };
-        } else {
-          // Clean up old data
-          localStorageUtils.clearTaskState();
-          return null;
-        }
-      }
-      return null;
-    } catch (error) {
-      console.warn("Failed to load task state from local storage:", error);
-      return null;
-    }
-  },
-
-  clearTaskState: () => {
-    try {
-      Object.values(LOCAL_STORAGE_KEYS).forEach((key) => {
-        localStorage.removeItem(key);
-      });
-    } catch (error) {
-      console.warn("Failed to clear task state from local storage:", error);
-    }
-  },
-
-  saveFileId: (fileId: string) => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEYS.FILE_ID, fileId);
-    } catch (error) {
-      console.warn("Failed to save file ID to local storage:", error);
-    }
-  },
-
-  loadFileId: (): string | null => {
-    try {
-      return localStorage.getItem(LOCAL_STORAGE_KEYS.FILE_ID);
-    } catch (error) {
-      console.warn("Failed to load file ID from local storage:", error);
-      return null;
-    }
-  },
-
-  saveTaskId: (taskId: string) => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEYS.TASK_ID, taskId);
-    } catch (error) {
-      console.warn("Failed to save task ID to local storage:", error);
-    }
-  },
-
-  loadTaskId: (): string | null => {
-    try {
-      return localStorage.getItem(LOCAL_STORAGE_KEYS.TASK_ID);
-    } catch (error) {
-      console.warn("Failed to load task ID from local storage:", error);
-      return null;
-    }
-  },
+type AppProps = {
+  activeView?: AppView;
+  onNavigate?: (view: AppView) => void;
+  initialHealth?: HealthStatus | null;
 };
 
-function App() {
+function App({ activeView = 'studio', onNavigate, initialHealth }: AppProps) {
+  const router = useRouter();
+  const { t, locale } = useI18n();
   const queryClient = useQueryClient();
-  // UI theme: 'classic' (Modern, default), 'flat', or 'material'
-  const [uiTheme, setUiTheme] = useState<"flat" | "classic" | "material">(
-    () => {
-      try {
-        const saved = localStorage.getItem(THEME_STORAGE_KEY);
-        if (saved === "classic" || saved === "flat" || saved === "material")
-          return saved as "flat" | "classic" | "material";
-      } catch {}
-      return "classic";
-    },
-  );
 
   // Handle Google OAuth callback
   useEffect(() => {
@@ -223,21 +82,7 @@ function App() {
     }
   }, []);
 
-  // Apply/remove theme classes on body
-  useEffect(() => {
-    const isFlat = uiTheme === "flat";
-    const isMaterial = uiTheme === "material";
-    const isClassic = uiTheme === "classic";
-    document.body.classList.toggle("ultra-flat", isFlat);
-    document.body.classList.toggle("subtle-material", isMaterial);
-    document.body.classList.toggle("classic", isClassic);
-    try {
-      localStorage.setItem(THEME_STORAGE_KEY, uiTheme);
-    } catch {}
-  }, [uiTheme]);
-
   const [file, setFile] = useState<File | null>(null);
-  const [, setFileType] = useState<string | null>(null); // Track file type for PDF vs PPT handling (setter only) // eslint-disable-line @typescript-eslint/no-unused-vars
   const [uploading, setUploading] = useState<boolean>(false);
   const [fileId, setFileId] = useState<string | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
@@ -253,14 +98,143 @@ function App() {
   const [videoResolution, setVideoResolution] = useState<string>("hd"); // hd as default
   const [generateAvatar, setGenerateAvatar] = useState<boolean>(false);
   const [generateSubtitles, setGenerateSubtitles] = useState<boolean>(true);
-  const [isResumingTask, setIsResumingTask] = useState<boolean>(false);
-  const { showTaskMonitor, setShowTaskMonitor } = useUI();
+  const showTaskMonitor = activeView === 'creations';
+  const handleViewChange = (view: AppView) => {
+    if (view !== activeView) {
+      onNavigate?.(view);
+    }
+  };
   const [uploadMode, setUploadMode] = useState<"slides" | "pdf">("slides");
   const [pdfOutputMode, setPdfOutputMode] = useState<"video" | "podcast">(
     "video",
   );
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const uploadProgressTimerRef = useRef<number | null>(null);
+  const processingSubtitleCleanupRef = useRef<(() => void) | null>(null);
+  const completionRedirectRef = useRef<boolean>(false);
+  const getLanguageDisplayName = useCallback((languageCode: string): string => {
+    const languageKeyMap: Record<string, string> = {
+      english: 'language.english',
+      simplified_chinese: 'language.simplified',
+      traditional_chinese: 'language.traditional',
+      japanese: 'language.japanese',
+      korean: 'language.korean',
+      thai: 'language.thai',
+    };
+
+    const normalized = (languageCode || '').toLowerCase();
+    const key = languageKeyMap[normalized];
+    if (key) {
+      return t(key, undefined, languageCode);
+    }
+    return t('language.unknown', { code: languageCode }, languageCode);
+  }, [t]);
+  const formatFileSize = useCallback((size?: number | null) => {
+    if (typeof size !== 'number' || !Number.isFinite(size) || size <= 0) {
+      return null;
+    }
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let value = size;
+    let index = 0;
+    while (value >= 1024 && index < units.length - 1) {
+      value /= 1024;
+      index += 1;
+    }
+    const maximumFractionDigits = value >= 100 || index === 0 ? 0 : value < 10 ? 1 : 0;
+    const formatter = new Intl.NumberFormat(locale, { maximumFractionDigits });
+    return `${formatter.format(value)} ${units[index]}`;
+  }, [locale]);
+  const uploadingOutputs = useMemo(() => {
+    const outputs: { key: string; label: string; icon: string }[] = [];
+    const hasVideo = uploadMode === 'slides' || (uploadMode === 'pdf' && pdfOutputMode === 'video');
+    if (hasVideo) {
+      outputs.push({ key: 'video', label: t('task.list.videoLabel'), icon: '🎬' });
+      outputs.push({ key: 'audio', label: t('task.list.audioLabel'), icon: '🎧' });
+    }
+    if (uploadMode === 'pdf' && pdfOutputMode === 'podcast') {
+      outputs.push({ key: 'podcast', label: t('task.list.podcastLabel'), icon: '🎙️' });
+    }
+    if (generateSubtitles) {
+      outputs.push({ key: 'subtitles', label: t('task.detail.subtitles'), icon: '💬' });
+    }
+    return outputs;
+  }, [uploadMode, pdfOutputMode, generateSubtitles, t]);
+  const uploadingSummaryItems = useMemo(() => {
+    const items: { key: string; label: string; value: string }[] = [];
+    const modeValue = uploadMode === 'slides'
+      ? t('upload.mode.slides', undefined, 'Slides')
+      : t('upload.mode.pdf', undefined, 'PDF');
+    items.push({
+      key: 'mode',
+      label: t('uploading.modeLabel', undefined, 'Mode'),
+      value: modeValue,
+    });
+    if (uploadMode === 'pdf') {
+      const outputLabelKey = pdfOutputMode === 'video' ? 'runTask.output.video' : 'runTask.output.podcast';
+      const defaultOutput = pdfOutputMode === 'video' ? 'Narrated video' : 'Audio narrative';
+      items.push({
+        key: 'pdf-output',
+        label: t('runTask.output.label', undefined, 'Output'),
+        value: t(outputLabelKey, undefined, defaultOutput),
+      });
+    }
+    if (file && Number.isFinite(file.size)) {
+      const sizeLabel = formatFileSize(file.size);
+      if (sizeLabel) {
+        items.push({
+          key: 'file-size',
+          label: t('uploading.fileSizeLabel', undefined, 'File size'),
+          value: sizeLabel,
+        });
+      }
+    }
+    const voiceValue = voiceLanguage ? getLanguageDisplayName(voiceLanguage) : null;
+    if (voiceValue) {
+      items.push({
+        key: 'voice',
+        label: t('task.detail.voice'),
+        value: voiceValue,
+      });
+    }
+    const subtitlesValue = generateSubtitles
+      ? getLanguageDisplayName(subtitleLanguage)
+      : t('common.disabled', undefined, 'Disabled');
+    items.push({
+      key: 'subtitles',
+      label: t('task.detail.subtitles'),
+      value: subtitlesValue,
+    });
+    if (transcriptLanguage) {
+      items.push({
+        key: 'transcript',
+        label: t('task.detail.transcript'),
+        value: getLanguageDisplayName(transcriptLanguage),
+      });
+    }
+    const hasVideo = uploadMode === 'slides' || (uploadMode === 'pdf' && pdfOutputMode === 'video');
+    if (hasVideo) {
+      const resolutionKey = `runTask.resolution.${videoResolution}` as const;
+      items.push({
+        key: 'resolution',
+        label: t('runTask.videoResolution', undefined, 'Video resolution'),
+        value: t(resolutionKey, undefined, videoResolution.toUpperCase()),
+      });
+    }
+    return items;
+  }, [
+    uploadMode,
+    pdfOutputMode,
+    file,
+    formatFileSize,
+    t,
+    voiceLanguage,
+    subtitleLanguage,
+    transcriptLanguage,
+    generateSubtitles,
+    getLanguageDisplayName,
+    videoResolution,
+  ]);
   // Video loading state handled inside components
   // Keep transcriptLanguage in sync with voiceLanguage for PDF+Podcast unless user changed it
   useEffect(() => {
@@ -276,46 +250,26 @@ function App() {
     }
   }, [uploadMode, pdfOutputMode]);
   // Global health (footer indicator) via React Query
-  const healthQuery = useQuery({
+  const initialHealthData = initialHealth ?? null;
+
+  const healthQuery = useQuery<HealthStatus | null>({
     queryKey: ['health'],
     queryFn: apiHealth,
-    refetchInterval: 300000, // Check every 5 minutes instead of every 15 seconds
+    refetchInterval: 300_000,
     refetchOnWindowFocus: false,
+    staleTime: 300_000,
+    initialData: initialHealthData ?? undefined,
   });
-  const queueUnavailable = !((healthQuery.data as any)?.redis?.ok === true || (healthQuery.data as any)?.redis_ok === true);
+  const healthData = healthQuery.data ?? null;
+  const queueUnavailable = !(healthData?.redis?.ok === true);
   const redisLatencyMs = (() => {
-    const d: any = healthQuery.data;
-    const latRaw = (d?.redis && d.redis.latency_ms) ?? d?.redis_latency_ms;
-    return typeof latRaw === 'number' ? Math.round(latRaw) : null;
+    const latency = healthData?.redis?.latency_ms;
+    return typeof latency === 'number' ? Math.round(latency) : null;
   })();
   // Audio transcript UI is handled by reusable components
-  // Completed banner visibility (dismissible)
-  const [showCompletedBanner, setShowCompletedBanner] = useState<boolean>(
-    () => {
-      try {
-        return localStorage.getItem("ss_show_completed_banner") !== "0";
-      } catch {
-        return true;
-      }
-    },
-  );
-  const COMPLETED_MEDIA_KEY = "slidespeaker_completed_media";
-  const [completedMedia, setCompletedMedia] = useState<"video" | "audio">(
-    () => {
-      try {
-        const stored = localStorage.getItem(COMPLETED_MEDIA_KEY);
-        if (stored === "video" || stored === "audio")
-          return stored as "video" | "audio";
-      } catch {}
-      return "video";
-    },
-  );
   const [processingPreviewMode, setProcessingPreviewMode] = useState<
     "video" | "audio"
   >("video");
-  // Completed view: pin user choice to prevent auto-forcing
-  const completedMediaPinnedRef = useRef<boolean>(false);
-  // Completed view: subtitles handled by VideoPlayer/AudioPlayer components
 
   // Studio policy: upload form is shown only when idle
 
@@ -335,7 +289,6 @@ function App() {
       }
       if (ext && (isPdf || isSlide)) {
         setFile(selectedFile);
-        setFileType(ext);
       } else {
         alert("Please select a PDF or PowerPoint file");
       }
@@ -352,59 +305,84 @@ function App() {
     },
   });
 
+  const clearUploadProgressTimer = useCallback(() => {
+    if (uploadProgressTimerRef.current !== null) {
+      window.clearInterval(uploadProgressTimerRef.current);
+      uploadProgressTimerRef.current = null;
+    }
+  }, []);
+
   const handleUpload = async () => {
     if (!file) return;
 
     setUploading(true);
     setStatus("uploading");
+    setProgress(0);
+    clearUploadProgressTimer();
+    uploadProgressTimerRef.current = window.setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 90) {
+          return prev;
+        }
+        return prev + 5;
+      });
+    }, 200);
 
     try {
-      // Read file as array buffer for base64 encoding using FileReader for better performance
+      const taskType = uploadMode === 'pdf'
+        ? (pdfOutputMode === 'video' ? 'video' : 'podcast')
+        : 'video';
+      const sourceType = uploadMode === 'pdf' ? 'pdf' : 'slides';
+
       const base64File = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => {
           const result = reader.result as string;
-          // Remove the data URL prefix (e.g., "data:application/pdf;base64,")
-          const base64Data = result.split(",")[1];
+          const base64Data = result.includes(',') ? result.split(',')[1] : result;
           resolve(base64Data);
         };
         reader.onerror = reject;
         reader.readAsDataURL(file);
       });
 
-      // Send as JSON
-      const response = await uploadMutation.mutateAsync({
-          filename: file.name,
-          file_data: base64File,
-          voice_language: voiceLanguage,
-          subtitle_language: subtitleLanguage,
-          transcript_language:
-            uploadMode === 'pdf' && pdfOutputMode === 'podcast'
-              ? transcriptLanguage
-              : undefined,
-          video_resolution: videoResolution,
-          generate_avatar: generateAvatar,
-          generate_subtitles: generateSubtitles,
-          ...(uploadMode === "pdf"
-            ? {
-                task_type: pdfOutputMode === "video" ? "video" : "podcast",
-                source_type: "pdf",
-              }
-            : {
-                task_type: "video",
-                source_type: "slides",
-              }),
-        });
+      const payload: Record<string, unknown> = {
+        filename: file.name,
+        file_data: base64File,
+        voice_language: voiceLanguage,
+        video_resolution: videoResolution,
+        generate_avatar: generateAvatar,
+        generate_subtitles: generateSubtitles,
+        task_type: taskType,
+        source_type: sourceType,
+        generate_video: taskType !== 'podcast',
+        generate_podcast: taskType !== 'video',
+      };
+
+      if (subtitleLanguage) {
+        payload.subtitle_language = subtitleLanguage;
+      }
+
+      if (taskType === 'podcast' && transcriptLanguage) {
+        payload.transcript_language = transcriptLanguage;
+      }
+
+      const response = await uploadMutation.mutateAsync(payload);
 
       setFileId(response.file_id);
       setTaskId(response.task_id);
+      clearUploadProgressTimer();
+      setProgress(100);
+      await new Promise((resolve) => setTimeout(resolve, 150));
       setStatus("processing");
+      setUploading(false);
       setProgress(0);
     } catch (error) {
       console.error("Upload error:", error);
       alert("Upload failed. Please try again.");
       setUploading(false);
       setStatus("idle");
+      clearUploadProgressTimer();
+      setProgress(0);
     }
   };
 
@@ -425,10 +403,9 @@ function App() {
       const response = await cancelMutation.mutateAsync(taskId);
       console.log("Stop processing response:", response);
 
-      // Instead of immediately setting to idle, let the polling detect the cancelled state
-      // This ensures frontend and backend stay in sync
-      setStatus("processing"); // Keep showing processing until backend confirms cancelled
-      alert("Processing is being stopped... Please wait a moment.");
+      clearUploadProgressTimer();
+      resetForm();
+      alert("Processing has been stopped.");
     } catch (error) {
       console.error("Stop processing error:", error);
       alert(
@@ -439,7 +416,6 @@ function App() {
 
   const resetForm = () => {
     setFile(null);
-    setFileType(null);
     setFileId(null);
     setTaskId(null);
     setStatus("idle");
@@ -453,268 +429,17 @@ function App() {
       videoRef.current.src = "";
     }
 
-    // Clear local storage
-    localStorageUtils.clearTaskState();
   };
-
-  // Load saved task state on component mount
-  useEffect(() => {
-    const loadSavedState = async () => {
-      const savedState = localStorageUtils.loadTaskState();
-      if (savedState) {
-        setIsResumingTask(true);
-
-        // Restore the saved state
-        setFileId(savedState.fileId);
-        setTaskId(savedState.taskId);
-        setStatus(savedState.status);
-        setProgress(savedState.processingDetails?.progress || 0);
-        setProcessingDetails(savedState.processingDetails);
-        setVoiceLanguage(savedState.voiceLanguage);
-        setSubtitleLanguage(savedState.subtitleLanguage);
-        setTranscriptLanguage(savedState.transcriptLanguage || savedState.subtitleLanguage || 'english');
-        setGenerateAvatar(savedState.generateAvatar);
-        setGenerateSubtitles(savedState.generateSubtitles);
-        setFileType(savedState.fileType || null);
-
-        console.log("Resuming task from local storage:", {
-          fileId: savedState.fileId,
-          taskId: savedState.taskId,
-          status: savedState.status,
-          fileType: savedState.fileType,
-        });
-
-        setIsResumingTask(false);
-      }
-    };
-
-    loadSavedState();
-  }, []);
 
   // Processing transcript preview fetch removed to avoid duplicate/early transcript view
 
   // Transcript/VTT handling moved to reusable players
-
-  // Detect actual video availability via HEAD for Completed view using React Query
-  const [hasVideoAsset, setHasVideoAsset] = useState<boolean>(false);
-  const videoHeadQuery = useQuery({
-    queryKey: ['videoHead', taskId],
-    queryFn: () => apiHeadVideo(taskId as string),
-    enabled: status === 'completed' && Boolean(taskId),
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
-  });
-  useEffect(() => {
-    if (status !== 'completed') { setHasVideoAsset(false); return; }
-    if (videoHeadQuery.isSuccess) setHasVideoAsset(Boolean(videoHeadQuery.data));
-  }, [status, videoHeadQuery.isSuccess, videoHeadQuery.data]);
-
   // Stable task type for dependency-light effects
   const taskType = useMemo(() => {
     return ((((processingDetails as any)?.task_type) || '').toLowerCase());
   }, [processingDetails]);
 
-  // Fetch conversation transcript (Query) for Completed podcast
-  const completedTranscriptQuery = useQuery({
-    queryKey: ['transcript', taskId],
-    queryFn: () => apiGetTranscript(taskId as string),
-    enabled: status === 'completed' && Boolean(taskId) && (["podcast","both"].includes(taskType)),
-    staleTime: 5 * 60_000,
-  });
-  const [completedTranscriptMd, setCompletedTranscriptMd] = useState<string | null>(null);
-  useEffect(() => {
-    if (completedTranscriptQuery.isSuccess) setCompletedTranscriptMd(String(completedTranscriptQuery.data || ''));
-    else if (status !== 'completed') setCompletedTranscriptMd(null);
-  }, [completedTranscriptQuery.isSuccess, completedTranscriptQuery.data, status]);
-
-  // Ensure video subtitles display by default in Completed view
-  useEffect(() => {
-    if (status !== "completed") return;
-    const v = videoRef.current;
-    if (!v) return;
-    try {
-      const tracks = v.textTracks;
-      if (tracks && tracks.length > 0) {
-        tracks[0].mode = "showing";
-      }
-    } catch {}
-  }, [status, taskId, videoRef]);
-
   // Stable subtitle language code for completed view
-  const subtitleLanguageCode = useMemo(() => {
-    const explicit = (processingDetails as any)?.subtitle_language;
-    return explicit || subtitleLanguage || voiceLanguage || 'english';
-  }, [processingDetails, subtitleLanguage, voiceLanguage]);
-
-  const subtitleLocale = useMemo(() => {
-    const lang = (subtitleLanguageCode || '').toLowerCase();
-    if (lang === 'simplified_chinese') return 'zh-Hans';
-    if (lang === 'traditional_chinese') return 'zh-Hant';
-    if (lang === 'japanese') return 'ja';
-    if (lang === 'korean') return 'ko';
-    if (lang === 'thai') return 'th';
-    return 'en';
-  }, [subtitleLanguageCode]);
-
-  const vttUrl = useMemo(() => `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(subtitleLanguageCode)}`,
-    [taskId, subtitleLanguageCode]);
-
-  // Prefetch VTT for Completed video (optional warm cache)
-  useQuery({
-    queryKey: ['vtt', taskId, subtitleLanguageCode],
-    queryFn: () => apiGetVttText(taskId as string, subtitleLanguageCode),
-    enabled: status === 'completed' && Boolean(taskId) && (["video","both"].includes(taskType)),
-    staleTime: 5 * 60_000,
-  });
-
-  // Persist completed media selection
-  useEffect(() => {
-    try {
-      localStorage.setItem(COMPLETED_MEDIA_KEY, completedMedia);
-    } catch {}
-  }, [completedMedia]);
-
-  // If only podcast is generated (no video), force audio tab in Completed view (unless user pinned)
-  useEffect(() => {
-    if (status !== "completed") return;
-    if (completedMediaPinnedRef.current) return;
-    const genVideo = ["video", "both"].includes(taskType);
-    if (!genVideo && completedMedia !== "audio") {
-      setCompletedMedia("audio");
-    }
-  }, [status, taskType, completedMedia]);
-
-  // Default to Video on Completed view when video exists (unless user pinned)
-  useEffect(() => {
-    if (status !== 'completed') return;
-    if (completedMediaPinnedRef.current) return;
-    const genVideo = ["video", "both"].includes(taskType) || hasVideoAsset;
-    if (genVideo && completedMedia !== 'video') {
-      setCompletedMedia('video');
-    }
-  }, [status, taskId, taskType, completedMedia, hasVideoAsset]);
-
-  // Video loading overlay handled inside VideoPlayer component
-
-  // Also hide banner when video starts playing
-  useEffect(() => {
-    if (status !== "completed") return;
-    const v = videoRef.current;
-    if (!v) return;
-    const onPlay = () => {
-      if (showCompletedBanner) {
-        setShowCompletedBanner(false);
-        try {
-          localStorage.setItem("ss_show_completed_banner", "0");
-        } catch {}
-      }
-    };
-    v.addEventListener("play", onPlay);
-    return () => {
-      v.removeEventListener("play", onPlay);
-    };
-  }, [status, taskId, showCompletedBanner]);
-
-  // Prevent video and audio from playing simultaneously
-  useEffect(() => {
-    if (status !== "completed") return;
-
-    const video = videoRef.current;
-    const audio = audioRef.current;
-
-    if (!video || !audio) return;
-
-    const handleVideoPlay = () => {
-      if (!audio.paused) {
-        audio.pause();
-      }
-    };
-
-    const handleAudioPlay = () => {
-      if (!video.paused) {
-        video.pause();
-      }
-    };
-
-    video.addEventListener("play", handleVideoPlay);
-    audio.addEventListener("play", handleAudioPlay);
-
-    return () => {
-      video.removeEventListener("play", handleVideoPlay);
-      audio.removeEventListener("play", handleAudioPlay);
-    };
-  }, [status, taskId]);
-
-  // Prefetch media when task is completed (once per taskId). Skips subtitles to avoid duplicate VTT loads.
-  const prefetchDoneRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (status !== "completed" || !taskId) return;
-    if (prefetchDoneRef.current === taskId) return;
-    try {
-      const videoEnabled = ["video", "both"].includes(taskType) || hasVideoAsset;
-      const podcastEnabled = ["podcast", "both"].includes(taskType);
-
-      if (videoEnabled) {
-        const videoUrl = `${API_BASE_URL}/api/tasks/${taskId}/video`;
-        const hasVideoLink = Array.from(document.querySelectorAll('link[rel="prefetch"]')).some((el) => (el as HTMLLinkElement).href === videoUrl);
-        if (!hasVideoLink) {
-          const l = document.createElement('link');
-          l.rel = 'prefetch';
-          l.href = videoUrl;
-          l.as = 'video';
-          document.head.appendChild(l);
-        }
-      }
-      const audioUrl = `${API_BASE_URL}/api/tasks/${taskId}/${podcastEnabled ? 'podcast' : 'audio'}`;
-      const hasAudioLink = Array.from(document.querySelectorAll('link[rel="prefetch"]')).some((el) => (el as HTMLLinkElement).href === audioUrl);
-      if (!hasAudioLink) {
-        const l = document.createElement('link');
-        l.rel = 'prefetch';
-        l.href = audioUrl;
-        l.as = 'audio';
-        document.head.appendChild(l);
-      }
-
-      prefetchDoneRef.current = taskId;
-    } catch (e) {
-      console.warn('Prefetch links failed:', e);
-    }
-  }, [status, taskId, hasVideoAsset, taskType]);
-
-  // Transcript/VTT sync is now encapsulated in components
-
-  // No-op: final audio is served via a single endpoint
-
-  // Save task state to local storage whenever relevant state changes
-  useEffect(() => {
-    if (status !== "idle" && !isResumingTask) {
-      localStorageUtils.saveTaskState({
-        fileId,
-        taskId,
-        status,
-        processingDetails,
-        voiceLanguage,
-        subtitleLanguage,
-        transcriptLanguage,
-        generateAvatar,
-        generateSubtitles,
-        fileName: file?.name || null,
-      });
-    }
-  }, [
-    fileId,
-    taskId,
-    status,
-    processingDetails,
-    voiceLanguage,
-    subtitleLanguage,
-    generateAvatar,
-    generateSubtitles,
-    transcriptLanguage,
-    isResumingTask,
-    file,
-  ]);
-
   // Poll for status updates when processing via React Query
   const progressQuery = useQuery({
     queryKey: ['progress', taskId],
@@ -725,21 +450,51 @@ function App() {
   });
   useEffect(() => {
     const resp = progressQuery.data as any;
-    if (!resp || !resp.data) return;
-    const data = resp.data;
-    setProcessingDetails(resp as ProcessingDetails);
+    if (!resp) return;
+
+    const data = resp?.data ?? resp;
+    if (!data) return;
+
+    setProcessingDetails(data as ProcessingDetails);
+
+    const rawProgress = typeof data.progress === 'number' ? data.progress : 0;
+    const normalizedProgress = Number.isFinite(rawProgress)
+      ? (rawProgress > 1 ? Math.min(100, rawProgress) : Math.min(100, Math.round(rawProgress * 100)))
+      : 0;
+
     if (data.status === 'completed') {
-      setStatus('completed'); setUploading(false); setProgress(100);
+      setStatus('completed');
+      setUploading(false);
+      setProgress(100);
     } else if (data.status === 'processing' || data.status === 'uploaded') {
-      setStatus('processing'); setProgress(data.progress);
+      setStatus('processing');
+      setUploading(false);
+      setProgress(normalizedProgress);
     } else if (data.status === 'cancelled') {
-      setUploading(false); setTaskId(null); setFileId(null); setFile(null); setProcessingDetails(null); setProgress(0); localStorageUtils.clearTaskState(); setStatus('idle');
+      setUploading(false);
+      setTaskId(null);
+      setFileId(null);
+      setFile(null);
+      setProcessingDetails(null);
+      setProgress(0);
+      setStatus('idle');
     } else if (data.status === 'failed') {
-      setStatus('error'); setUploading(false); setTaskId(null); localStorageUtils.clearTaskState();
+      setStatus('error');
+      setUploading(false);
+      setTaskId(null);
     } else {
-      setStatus('error'); setUploading(false); setTaskId(null); localStorageUtils.clearTaskState();
+      setStatus('error');
+      setUploading(false);
+      setTaskId(null);
     }
   }, [progressQuery.data]);
+
+  useEffect(() => {
+    if (status === 'completed' && taskId && !completionRedirectRef.current) {
+      completionRedirectRef.current = true;
+      router.push(`/tasks/${taskId}`, { locale });
+    }
+  }, [status, taskId, router, locale]);
 
   // Ensure taskId is populated in completed view (fallback via stats search)
   useEffect(() => {
@@ -795,155 +550,163 @@ function App() {
     hydrateTaskIdWhileProcessing();
   }, [status, fileId, taskId]);
 
-  // Add subtitle tracks when video is loaded
   useEffect(() => {
-    if (
-      status === "completed" &&
-      generateSubtitles &&
-      taskId &&
-      videoRef.current
-    ) {
-      const addSubtitles = () => {
-        if (videoRef.current) {
-          // Remove existing tracks
-          const existingTracks = videoRef.current.querySelectorAll("track");
-          existingTracks.forEach((track) => track.remove());
+    const previousCleanup = processingSubtitleCleanupRef.current;
+    if (previousCleanup) {
+      previousCleanup();
+      processingSubtitleCleanupRef.current = null;
+    }
 
-          // Ensure video has loaded metadata before adding track
-          if (videoRef.current.readyState === 0) {
-            console.log("Video not ready, waiting for metadata...");
-            return;
-          }
+    const video = videoRef.current;
+    if (!generateSubtitles || !taskId || !video || status !== 'processing') {
+      return;
+    }
 
-          // Skip dynamic track injection in Completed view; a static <track> is rendered there
-          if (status === 'completed') {
-            return;
-          }
+    const resolveSrclang = (lang: string) => {
+      switch (lang) {
+        case 'simplified_chinese':
+          return 'zh-Hans';
+        case 'traditional_chinese':
+          return 'zh-Hant';
+        case 'japanese':
+          return 'ja';
+        case 'korean':
+          return 'ko';
+        case 'thai':
+          return 'th';
+        default:
+          return 'en';
+      }
+    };
 
-          // Add VTT subtitle track if subtitles are enabled (used during processing)
-          const track = document.createElement("track");
-          track.kind = "subtitles";
-          // Always use absolute URL with explicit language to avoid mismatches
-          track.src = `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(subtitleLanguage)}`;
-          track.setAttribute(
-            "srclang",
-            subtitleLanguage === "simplified_chinese"
-              ? "zh-Hans"
-              : subtitleLanguage === "traditional_chinese"
-                ? "zh-Hant"
-                : subtitleLanguage === "japanese"
-                  ? "ja"
-                  : subtitleLanguage === "korean"
-                    ? "ko"
-                    : subtitleLanguage === "thai"
-                      ? "th"
-                      : "en",
-          );
-          track.label = getLanguageDisplayName(subtitleLanguage);
-          track.default = true;
+    let activeTrack: HTMLTrackElement | null = null;
+    let loadHandler: ((event: Event) => void) | null = null;
+    let errorHandler: ((event: Event) => void) | null = null;
+    let retryTimeout: ReturnType<typeof globalThis.setTimeout> | null = null;
 
-          track.addEventListener("load", () => {
-            console.log("Subtitle track loaded successfully");
-            if (videoRef.current && videoRef.current.textTracks.length > 0) {
-              const textTrack = videoRef.current.textTracks[0];
-              textTrack.mode = "showing";
-              console.log("Subtitles are now showing");
-            }
-          });
+    const detachActiveTrack = () => {
+      if (activeTrack) {
+        if (loadHandler) activeTrack.removeEventListener('load', loadHandler);
+        if (errorHandler) activeTrack.removeEventListener('error', errorHandler);
+        if (activeTrack.parentNode === video) {
+          video.removeChild(activeTrack);
+        }
+      }
+      activeTrack = null;
+      loadHandler = null;
+      errorHandler = null;
+    };
 
-          track.addEventListener("error", (e) => {
-            console.error("Subtitle track loading error:", e);
-            // Fallback: try without explicit language (server infers from state)
-            const fallbackUrl = `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt`;
-            console.log("Trying fallback URL:", fallbackUrl);
-            track.src = fallbackUrl;
-          });
+    const attachTrack = (useFallbackSrc = false) => {
+      detachActiveTrack();
+      if (retryTimeout) {
+        globalThis.clearTimeout(retryTimeout);
+        retryTimeout = null;
+      }
 
-          videoRef.current.appendChild(track);
+      const track = document.createElement('track');
+      track.kind = 'subtitles';
+      track.dataset.processingTrack = 'true';
+      track.src = useFallbackSrc
+        ? `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt`
+        : `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(subtitleLanguage)}`;
+      track.setAttribute('srclang', resolveSrclang(subtitleLanguage));
+      track.label = getLanguageDisplayName(subtitleLanguage);
+      track.default = true;
 
-          // Force reload if track fails
-          setTimeout(() => {
-            if (videoRef.current && videoRef.current.textTracks.length === 0) {
-              console.log("Retrying subtitle loading...");
-              const retryTrack = document.createElement("track");
-              retryTrack.kind = "subtitles";
-              retryTrack.src = `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(subtitleLanguage)}`;
-              retryTrack.setAttribute(
-                "srclang",
-                subtitleLanguage === "simplified_chinese"
-                  ? "zh-Hans"
-                  : subtitleLanguage === "traditional_chinese"
-                    ? "zh-Hant"
-                    : subtitleLanguage === "japanese"
-                      ? "ja"
-                      : subtitleLanguage === "korean"
-                        ? "ko"
-                        : subtitleLanguage === "thai"
-                          ? "th"
-                          : "en",
-              );
-              retryTrack.label = "Subtitles";
-              retryTrack.default = true;
-              videoRef.current.appendChild(retryTrack);
-            }
-          }, 1000);
+      loadHandler = () => {
+        if (!video || video.textTracks.length === 0) return;
+        const textTrack = video.textTracks[0];
+        textTrack.mode = 'showing';
+      };
+
+      errorHandler = (event: Event) => {
+        console.error('Subtitle track loading error:', event);
+        if (!useFallbackSrc) {
+          attachTrack(true);
         }
       };
 
-      // Wait for video to be fully loaded
-      const handleLoadedMetadata = () => {
-        console.log("Video metadata loaded, adding subtitles...");
-        addSubtitles();
-      };
+      track.addEventListener('load', loadHandler);
+      track.addEventListener('error', errorHandler);
+      video.appendChild(track);
+      activeTrack = track;
 
-      if (videoRef.current.readyState >= 1) {
-        // Metadata already loaded
-        addSubtitles();
-      } else {
-        // Wait for metadata to load
-        videoRef.current.addEventListener(
-          "loadedmetadata",
-          handleLoadedMetadata,
-          { once: true },
-        );
-        videoRef.current.addEventListener("loadeddata", addSubtitles, {
-          once: true,
-        });
+      if (!useFallbackSrc) {
+        retryTimeout = globalThis.setTimeout(() => {
+          if (video && video.textTracks.length === 0) {
+            attachTrack(true);
+          }
+        }, 1200);
       }
+    };
+
+    const ensureTrack = () => {
+      if (!video || video.readyState === 0) {
+        return;
+      }
+      attachTrack(false);
+    };
+
+    if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
+      ensureTrack();
     }
-  }, [status, generateSubtitles, subtitleLanguage, taskId]);
 
-  const formatStepName = (step: string): string => getStepLabel(step);
+    const onLoadedMetadata = () => {
+      ensureTrack();
+    };
 
-  const formatStepNameWithLanguages = (
+    const onLoadedData = () => {
+      ensureTrack();
+    };
+
+    if (video.readyState < HTMLMediaElement.HAVE_METADATA) {
+      video.addEventListener('loadedmetadata', onLoadedMetadata, { once: true });
+      video.addEventListener('loadeddata', onLoadedData, { once: true });
+    }
+
+    const cleanup = () => {
+      if (retryTimeout) {
+        globalThis.clearTimeout(retryTimeout);
+      }
+      detachActiveTrack();
+      video.removeEventListener('loadedmetadata', onLoadedMetadata);
+      video.removeEventListener('loadeddata', onLoadedData);
+    };
+
+    processingSubtitleCleanupRef.current = cleanup;
+
+    return () => {
+      cleanup();
+      processingSubtitleCleanupRef.current = null;
+    };
+  }, [status, generateSubtitles, subtitleLanguage, taskId, getLanguageDisplayName]);
+
+  useEffect(() => {
+    return () => {
+      clearUploadProgressTimer();
+    };
+  }, [clearUploadProgressTimer]);
+
+  const formatStepName = useCallback((step: string): string => getStepLabel(step, t), [t]);
+
+  const formatStepNameWithLanguages = useCallback((
     step: string,
     voiceLang: string,
     subtitleLang?: string,
   ): string => {
-    const vl = (voiceLang || "english").toLowerCase();
+    const vl = (voiceLang || 'english').toLowerCase();
     const sl = (subtitleLang || vl).toLowerCase();
     const same = vl === sl;
     if (
       same &&
-      (step === "translate_voice_transcripts" ||
-        step === "translate_subtitle_transcripts")
+      (step === 'translate_voice_transcripts' ||
+        step === 'translate_subtitle_transcripts')
     ) {
-      return "Translating Transcripts";
+      return t('processing.step.translatingTranscripts', undefined, 'Translating Transcripts');
     }
     return formatStepName(step);
-  };
-
-  const getLanguageDisplayName = (languageCode: string): string => {
-    const languageNames: Record<string, string> = {
-      english: "English",
-      simplified_chinese: "简体中文",
-      traditional_chinese: "繁體中文",
-      japanese: "日本語",
-      korean: "한국어",
-      thai: "ไทย",
-    };
-    return languageNames[languageCode] || languageCode;
-  };
+  }, [formatStepName, t]);
 
   // Removed unused getProcessingStatusMessage; ProcessingView shows progress and step names directly
 
@@ -955,20 +718,18 @@ function App() {
     if (ext === "pdf") {
       return (
         <div className="file-type-hint pdf">
-          <span className="file-type-badge pdf">PDF</span>
+          <span className="file-type-badge pdf">{t('upload.file.pdfBadge', undefined, 'PDF')}</span>
           <div className="file-type-description">
-            AI will analyze and convert your PDF into engaging video chapters
-            with AI narration and subtitles.
+            {t('upload.file.pdfDescription', undefined, 'AI will analyze and convert your PDF into engaging video chapters with narration and subtitles.')}
           </div>
         </div>
       );
     } else if (ext === "pptx" || ext === "ppt") {
       return (
         <div className="file-type-hint ppt">
-          <span className="file-type-badge ppt">PPT</span>
+          <span className="file-type-badge ppt">{t('upload.file.pptBadge', undefined, 'PPT')}</span>
           <div className="file-type-description">
-            AI will convert your slides into a video with AI narration and
-            optional avatar presenter.
+            {t('upload.file.pptDescription', undefined, 'AI will convert your slides into a narrated video.')}
           </div>
         </div>
       );
@@ -976,9 +737,9 @@ function App() {
 
     return (
       <div className="file-type-hint">
-        <span className="file-type-badge">Supported File</span>
+        <span className="file-type-badge">{t('upload.file.supportedBadge', undefined, 'Supported File')}</span>
         <div className="file-type-description">
-          Supports PDF, PPTX, and PPT files
+          {t('upload.file.supportedDescription', undefined, 'Supports PDF, PPTX, and PPT files')}
         </div>
       </div>
     );
@@ -986,7 +747,7 @@ function App() {
 
   return (
     <div className="App">
-      <Header showTaskMonitor={showTaskMonitor} setShowTaskMonitor={setShowTaskMonitor} />
+      <Header activeView={activeView} onNavigate={handleViewChange} />
 
       <main className="main-content">
         {showTaskMonitor ? (
@@ -996,17 +757,13 @@ function App() {
         ) : (
           <div id="studio-panel" role="tabpanel" aria-labelledby="studio-tab">
             <div className="card-container">
-              <div
-                className={`content-card ${status === "completed" ? "wide" : ""}`}
-              >
-                {/* Upload box visible only in idle */}
+              <div className={`content-card ${status === "completed" ? "wide" : ""}`}>
                 {status === 'idle' && (
                   <UploadPanel
                     uploadMode={uploadMode}
                     setUploadMode={setUploadMode}
                     pdfOutputMode={pdfOutputMode}
                     setPdfOutputMode={setPdfOutputMode}
-                    isResumingTask={isResumingTask}
                     file={file}
                     onFileChange={handleFileChange}
                     voiceLanguage={voiceLanguage}
@@ -1024,13 +781,14 @@ function App() {
                   />
                 )}
 
-
-
-                                
-
-                {/* Below: Non-idle status panels remain visible below the upload box */}
                 {status === "uploading" && (
-                  <UploadingView progress={progress} />
+                  <UploadingView
+                    progress={progress}
+                    fileName={file?.name || null}
+                    fileSize={file?.size ?? null}
+                    summaryItems={uploadingSummaryItems}
+                    outputs={uploadingOutputs}
+                  />
                 )}
 
                 {status === "processing" && processingDetails && (
@@ -1050,30 +808,14 @@ function App() {
                   />
                 )}
 
-                {status === "completed" && processingDetails && taskId && (
-                  <CompletedView
-                    apiBaseUrl={API_BASE_URL}
-                    taskId={taskId}
-                    processingDetails={processingDetails}
-                    hasVideoAsset={hasVideoAsset}
-                    completedTranscriptMd={completedTranscriptMd}
-                    subtitleLanguageCode={subtitleLanguageCode}
-                    subtitleLocale={subtitleLocale}
-                    vttUrl={vttUrl}
-                    completedMedia={completedMedia}
-                    setCompletedMedia={setCompletedMedia}
-                    completedMediaPinnedRef={completedMediaPinnedRef}
-                    showCompletedBanner={showCompletedBanner}
-                    setShowCompletedBanner={setShowCompletedBanner}
-                    onResetForm={resetForm}
-                  />
+                {status === "completed" && taskId && !completionRedirectRef.current && (
+                  <div className="processing-view redirecting-view" role="status" aria-live="polite">
+                    <div className="spinner" aria-hidden></div>
+                    <h3>{t('completed.redirecting', undefined, 'Opening task details…')}</h3>
+                  </div>
                 )}
 
-                
-
-                {status === "error" && (
-                  <ErrorView onResetForm={resetForm} />
-                )}
+                {status === "error" && <ErrorView onResetForm={resetForm} />}
               </div>
             </div>
           </div>
@@ -1083,8 +825,6 @@ function App() {
       <Footer
         queueUnavailable={queueUnavailable}
         redisLatencyMs={redisLatencyMs}
-        uiTheme={uiTheme}
-        setUiTheme={setUiTheme}
       />
     </div>
   );

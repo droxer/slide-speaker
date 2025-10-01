@@ -29,8 +29,8 @@ describe('AuthService', () => {
 
   describe('initiateGoogleLogin', () => {
     it('should redirect to Google OAuth endpoint', () => {
-      // Set REACT_APP_API_BASE_URL environment variable
-      process.env.REACT_APP_API_BASE_URL = 'http://localhost:8000';
+      // Set NEXT_PUBLIC_API_BASE_URL environment variable
+      process.env.NEXT_PUBLIC_API_BASE_URL = 'http://localhost:8000';
       
       // Call the function
       initiateGoogleLogin();
@@ -39,9 +39,9 @@ describe('AuthService', () => {
       expect(window.location.href).toBe('http://localhost:8000/api/auth/login');
     });
 
-    it('should use empty string when REACT_APP_API_BASE_URL is not set', () => {
-      // Unset REACT_APP_API_BASE_URL environment variable
-      delete process.env.REACT_APP_API_BASE_URL;
+    it('should use empty string when NEXT_PUBLIC_API_BASE_URL is not set', () => {
+      // Unset NEXT_PUBLIC_API_BASE_URL environment variable
+      delete process.env.NEXT_PUBLIC_API_BASE_URL;
       
       // Call the function
       initiateGoogleLogin();

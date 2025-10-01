@@ -10,9 +10,9 @@ help:
 	@echo "SlideSpeaker Web - Makefile Commands"
 	@echo "================================"
 	@echo "make install     - Install dependencies (uses pnpm if available, falls back to npm)"
-	@echo "make dev         - Start development server"
+	@echo "make dev         - Start Next.js development server"
 	@echo "make build       - Build production version"
-	@echo "make start       - Start production server (serve build)"
+	@echo "make start       - Start production server"
 	@echo "make lint        - Run ESLint code linting"
 	@echo "make lint-fix     - Run ESLint with auto-fix"
 	@echo "make typecheck    - Run TypeScript type checking"
@@ -34,9 +34,9 @@ install:
 .PHONY: dev
 dev:
 	@if command -v pnpm >/dev/null 2>&1; then \
-		pnpm start; \
+		pnpm dev; \
 	else \
-		npm start; \
+		npm run dev; \
 	fi
 
 # Build production version
@@ -51,8 +51,11 @@ build:
 # Start production server
 .PHONY: start
 start:
-	npm install -g serve
-	serve -s build
+	@if command -v pnpm >/dev/null 2>&1; then \
+		pnpm start; \
+	else \
+		npm run start; \
+	fi
 
 # Linting
 .PHONY: lint

@@ -1,5 +1,7 @@
 import React from 'react';
-import PodcastTranscript from './PodcastTranscript';
+import { useMemo } from 'react';
+import AudioPlayer from '@/components/AudioPlayer';
+import { buildCuesFromMarkdown } from '@/utils/transcript';
 
 type PodcastPlayerProps = {
   src: string;
@@ -8,23 +10,12 @@ type PodcastPlayerProps = {
 };
 
 const PodcastPlayer: React.FC<PodcastPlayerProps> = ({ src, transcriptMarkdown, className }) => {
-  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+  const cues = useMemo(() => {
+    if (!transcriptMarkdown) return undefined;
+    return buildCuesFromMarkdown(transcriptMarkdown);
+  }, [transcriptMarkdown]);
   return (
-    <div className={className} style={{ width: '100%' }}>
-      <audio
-        ref={audioRef}
-        controls
-        preload="auto"
-        src={src}
-        crossOrigin="anonymous"
-        style={{ width: '100%', maxWidth: '100%', display: 'block' }}
-      />
-      {transcriptMarkdown && (
-        <div className="audio-transcript" style={{ marginTop: 8 }}>
-          <PodcastTranscript audioRef={audioRef} markdown={transcriptMarkdown} />
-        </div>
-      )}
-    </div>
+    <AudioPlayer src={src} initialCues={cues} showTranscript className={className} />
   );
 };
 

@@ -1,9 +1,12 @@
 import React from 'react';
-import { getStepLabel } from '../utils/stepLabels';
-import { resolveLanguages, getLanguageDisplayName as displayName } from '../utils/language';
-import type { Task, DownloadItem } from '../types';
-import { useDownloadsQuery, useTranscriptQuery, hasCachedVtt, prefetchTaskPreview } from '../services/queries';
+import { Link } from '@/navigation';
+import { STEP_STATUS_ICONS, getStepLabel, normalizeStepStatus, StepStatusVariant } from '@/utils/stepLabels';
+import { resolveLanguages, getLanguageDisplayName } from '@/utils/language';
+import type { Task, DownloadItem } from '@/types';
+import { useDownloadsQuery, useTranscriptQuery, hasCachedVtt, prefetchTaskPreview } from '@/services/queries';
+import { useI18n } from '@/i18n/hooks';
 import { useQueryClient } from '@tanstack/react-query';
+import DownloadLinks, { DownloadLinkItem } from '@/components/DownloadLinks';
 
 type Outputs = { video: boolean; podcast: boolean };
 
@@ -40,14 +43,19 @@ const getStatusColor = (status: string) => {
   }
 };
 
-const formatStepNameWithLanguages = (step: string, voiceLang: string, subtitleLang?: string): string => {
+const formatStepNameWithLanguages = (
+  step: string,
+  voiceLang: string,
+  subtitleLang: string | undefined,
+  t: (key: string, vars?: Record<string, string | number>, fallback?: string) => string,
+): string => {
   const vl = (voiceLang || 'english').toLowerCase();
   const sl = (subtitleLang || vl).toLowerCase();
   const same = vl === sl;
   if (same && (step === 'translate_voice_transcripts' || step === 'translate_subtitle_transcripts')) {
-    return 'Translating Transcripts';
+    return t('processing.step.translatingTranscripts', undefined, 'Translating Transcripts');
   }
-  return getStepLabel(step);
+  return getStepLabel(step, t);
 };
 
 const TaskCard: React.FC<Props> = ({
@@ -63,16 +71,96 @@ const TaskCard: React.FC<Props> = ({
   getLanguageDisplayName,
   getVideoResolutionDisplayName,
 }) => {
+  const { t } = useI18n();
   const { voiceLanguage: voiceLang, transcriptLanguage } = resolveLanguages(task);
   const videoRes = task.kwargs?.video_resolution || task.state?.video_resolution || 'hd';
   const { video: isVideoTask, podcast: isPodcastTask } = deriveTaskOutputs(task);
   const transcriptLang = transcriptLanguage;
+  const filename = task.kwargs?.filename || task.state?.filename || 'Unknown file';
   // Prefer cache-driven downloads when the card is expanded
   const queryClient = useQueryClient();
   const { data: dlData } = useDownloadsQuery(task.task_id, isExpanded);
   const dlItems: DownloadItem[] | undefined = dlData?.items;
   const transcriptQuery = useTranscriptQuery(task.task_id, isExpanded);
   const hasVtt = !isPodcastTask && hasCachedVtt(queryClient, task.task_id, transcriptLang);
+  const progressPercent = Number.isFinite(task.completion_percentage)
+    ? Math.max(0, Math.min(100, Math.round(task.completion_percentage ?? 0)))
+    : null;
+  const describeStepStatus = React.useCallback((variant: StepStatusVariant) => {
+    switch (variant) {
+      case 'completed':
+        return t('task.status.completed');
+      case 'processing':
+        return t('task.status.processing');
+      case 'failed':
+        return t('task.status.failed');
+      case 'cancelled':
+        return t('task.status.cancelled');
+      case 'skipped':
+        return t('task.status.skipped', undefined, 'Skipped');
+      default:
+        return t('task.status.pending', undefined, 'Pending');
+    }
+  }, [t]);
+  const overallStatusVariant = normalizeStepStatus(task.status);
+  const overallStatusLabel = describeStepStatus(overallStatusVariant);
+
+  const downloadLinks = React.useMemo(() => {
+    const links: DownloadLinkItem[] = [];
+    const hasVideoLink = isVideoTask || (dlItems?.some((d) => d.type === 'video') ?? false);
+    const hasPodcastLink = dlItems?.some((d) => d.type === 'podcast') ?? isPodcastTask;
+
+    if (hasVideoLink) {
+      links.push({
+        key: `video-${task.task_id}`,
+        label: t('task.list.videoLabel'),
+        url: `${apiBaseUrl}/api/tasks/${task.task_id}/video`,
+        copyMessage: t('notifications.videoCopied'),
+      });
+    }
+
+    links.push({
+      key: `audio-${task.task_id}`,
+      label: hasPodcastLink ? t('task.list.podcastLabel') : t('task.list.audioLabel'),
+      url: `${apiBaseUrl}/api/tasks/${task.task_id}/${hasPodcastLink ? 'podcast' : 'audio'}`,
+      copyMessage: hasPodcastLink ? t('notifications.podcastCopied') : t('notifications.audioCopied'),
+    });
+
+    if (transcriptQuery.isSuccess) {
+      links.push({
+        key: `transcript-${task.task_id}`,
+        label: t('task.list.transcriptLabel'),
+        url: `${apiBaseUrl}/api/tasks/${task.task_id}/transcripts/markdown`,
+        copyMessage: t('notifications.transcriptCopied'),
+      });
+    }
+
+    if (!isPodcastTask && hasVtt) {
+      links.push({
+        key: `vtt-${task.task_id}`,
+        label: t('task.list.vttLabel'),
+        url: `${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/vtt`,
+        copyMessage: t('notifications.vttCopied'),
+      });
+      links.push({
+        key: `srt-${task.task_id}`,
+        label: t('task.list.srtLabel'),
+        url: `${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/srt`,
+        copyMessage: t('notifications.srtCopied'),
+      });
+    }
+
+    return links;
+  }, [
+    apiBaseUrl,
+    dlItems,
+    hasVtt,
+    isPodcastTask,
+    isVideoTask,
+    t,
+    task.task_id,
+    transcriptQuery.isSuccess,
+  ]);
 
   // Prefetch preview assets when expanded to improve responsiveness
   React.useEffect(() => {
@@ -84,53 +172,63 @@ const TaskCard: React.FC<Props> = ({
     })();
   }, [isExpanded, isPodcastTask, queryClient, task.task_id, transcriptLang]);
 
-  const statusLabel = (
-    task.status === 'completed' ? 'Completed' :
-    task.status === 'processing' ? 'Processing' :
-    task.status === 'queued' ? 'Queued' :
-    task.status === 'failed' ? 'Failed' :
-    task.status === 'cancelled' ? 'Cancelled' : String(task.status)
-  );
-  const statusContent = (
-    task.status === 'processing' ? '⏳ Processing' :
-    task.status === 'queued' ? '⏸️ Queued' :
-    task.status === 'failed' ? '❌ Failed' :
-    task.status === 'cancelled' ? '🚫 Cancelled' : String(task.status)
-  );
+  const humanStatus = (status: string) => t(`task.status.${status}`, undefined, status);
+  const statusLabel = humanStatus(task.status);
+  const statusIcon = task.status === 'processing'
+    ? '⏳'
+    : task.status === 'queued'
+      ? '⏸️'
+      : task.status === 'failed'
+        ? '❌'
+        : task.status === 'cancelled'
+          ? '🚫'
+          : '•';
+  const statusContent = `${statusIcon} ${humanStatus(task.status)}`;
+
+  const languageLabel = (code: string) => {
+    const normalized = (code || '').toLowerCase();
+    return t(`language.display.${normalized}`, undefined, getLanguageDisplayName(code));
+  };
 
   return (
     <div className={`task-item ${getStatusColor(task.status)} ${isRemoving ? 'removing' : ''}`}>
       <div className="task-header">
-        <div
-          className="task-id"
-          tabIndex={0}
-          role="button"
-          aria-label={`Task ID: ${task.task_id} (press Enter to copy)`}
-          title={task.task_id}
-          onClick={() => {
-            try { navigator.clipboard.writeText(task.task_id); alert('Task ID copied!'); } catch {}
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              try { navigator.clipboard.writeText(task.task_id); alert('Task ID copied!'); } catch {}
-            }
-          }}
-        >
+        <div className="task-id">
           {/* Output badges inline before task id (one line) */}
           {(isVideoTask || (dlItems?.some((d) => d.type === 'video') ?? false)) && (
-            <span className="output-inline"><span className="output-dot video" aria-hidden></span>Video</span>
+            <span className="output-inline"><span className="output-dot video" aria-hidden></span>{t('task.list.videoLabel')}</span>
           )}
           {(isPodcastTask || (dlItems?.some((d) => d.type === 'podcast') ?? false)) && (
-            <span className="output-inline"><span className="output-dot podcast" aria-hidden></span>Podcast</span>
+            <span className="output-inline"><span className="output-dot podcast" aria-hidden></span>{t('task.list.podcastLabel')}</span>
           )}
-          <span className="task-id-text">Task: {task.task_id}</span>
+          <Link
+            href={`/tasks/${task.task_id}`}
+            className="task-id-link"
+            title={t('task.list.openTaskTitle', { id: task.task_id }, `Open task ${task.task_id}`)}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {t('task.list.idPrefix', { id: task.task_id }, `Task: ${task.task_id}`)}
+          </Link>
+          <button
+            type="button"
+            className="copy-task-id"
+            aria-label={t('task.list.copyId')}
+            title={t('task.list.copyId')}
+            onClick={() => {
+              try {
+                navigator.clipboard.writeText(task.task_id);
+              } catch {}
+            }}
+          >
+            {t('actions.copy')}
+          </button>
         </div>
         {task.status !== 'completed' && task.status !== 'queued' && (
           <div
             className={`task-status ${getStatusColor(task.status)}`}
             tabIndex={0}
-            aria-label={`Status: ${statusLabel}`}
+            aria-label={t('task.list.statusAria', { status: statusLabel }, `Status: ${statusLabel}`)}
           >
             {statusContent}
           </div>
@@ -141,17 +239,20 @@ const TaskCard: React.FC<Props> = ({
         <>
           {/* Queued note (lightweight, no pill) */}
           {task.status === 'queued' && (
-            <div className="queued-note" role="status" aria-live="polite">Queued • Waiting to start</div>
+            <div className="queued-note" role="status" aria-live="polite">{t('task.list.queuedMessage')}</div>
           )}
-          {/* Filename omitted (shown on file group header) */}
+          <div className="task-filename" title={filename}>
+            <span className="task-filename__icon" aria-hidden>📄</span>
+            <span className="task-filename__text">{filename}</span>
+          </div>
 
           {/* Meta chips */}
           <div className="meta-row">
-            <span className="chip">Voice: {displayName(voiceLang)}</span>
+            <span className="chip">{t('task.list.voice', { language: languageLabel(voiceLang) }, `Voice: ${languageLabel(voiceLang)}`)}</span>
             {isPodcastTask ? (
-              <span className="chip">Transcript: {displayName(transcriptLang)}</span>
+              <span className="chip">{t('task.list.transcript', { language: languageLabel(transcriptLang) }, `Transcript: ${languageLabel(transcriptLang)}`)}</span>
             ) : (
-              <span className="chip">Subs: {displayName(transcriptLang)}</span>
+              <span className="chip">{t('task.list.subtitles', { language: languageLabel(transcriptLang) }, `Subs: ${languageLabel(transcriptLang)}`)}</span>
             )}
             <span className="chip">{getVideoResolutionDisplayName(videoRes)}</span>
           </div>
@@ -159,12 +260,26 @@ const TaskCard: React.FC<Props> = ({
           {/* Progress shown only while processing */}
           {task.status === 'processing' && task.state && (
             <div className="step-progress">
-              <div className="step-line" role="status" aria-live="polite">
-                {formatStepNameWithLanguages(task.state.current_step, voiceLang, transcriptLang)}
+              <div className="step-progress__meta">
+                <span className={`step-progress__status step-progress__status--${overallStatusVariant}`}>
+                  {overallStatusLabel}
+                </span>
+                {progressPercent !== null && (
+                  <span className="step-progress__value">{progressPercent}%</span>
+                )}
               </div>
-              {typeof task.completion_percentage === 'number' && (
-                <div className="progress-rail" aria-valuemin={0} aria-valuemax={100} aria-valuenow={task.completion_percentage} role="progressbar">
-                  <div className="progress-fill" style={{ width: `${Math.max(0, Math.min(100, task.completion_percentage))}%` }} />
+              <div className="step-line" role="status" aria-live="polite">
+                {formatStepNameWithLanguages(task.state.current_step, voiceLang, transcriptLang, t)}
+              </div>
+              {progressPercent !== null && (
+                <div
+                  className="progress-rail"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={progressPercent}
+                  role="progressbar"
+                >
+                  <div className="progress-fill" style={{ width: `${progressPercent}%` }} />
                 </div>
               )}
             </div>
@@ -172,22 +287,27 @@ const TaskCard: React.FC<Props> = ({
 
           {/* Exact steps timeline (shown while processing) */}
           {task.status === 'processing' && (task.state as any)?.steps && (
-            <ul className="steps-timeline" aria-label="Processing steps">
+            <ul className="progress-steps" aria-label={t('processing.stepsHeading', undefined, 'Processing steps')}>
               {Object.entries((task.state as any).steps).map(([name, info]: any) => {
-                const s = (info?.status || 'pending').toLowerCase();
-                const icon = s === 'completed' ? '✓' : s === 'processing' ? '⏳' : s === 'failed' ? '❌' : s === 'cancelled' ? '⛔' : s === 'skipped' ? '⤼' : '•';
+                const variant = normalizeStepStatus(info?.status);
                 return (
-                  <li key={name} className={`step-item s-${s}`}><span className="step-icon" aria-hidden>{icon}</span><span className="step-name">{getStepLabel(name)}</span></li>
+                  <li key={name} className={`progress-step progress-step--${variant}`}>
+                    <span className="progress-step__icon" aria-hidden>{STEP_STATUS_ICONS[variant]}</span>
+                    <div className="progress-step__body">
+                      <span className="progress-step__title">{getStepLabel(name, t)}</span>
+                      <span className="progress-step__meta">{describeStepStatus(variant)}</span>
+                    </div>
+                  </li>
                 );
               })}
             </ul>
           )}
 
           {/* Timestamps */}
-          <div className="timestamps-row">
-            <span className="timestamp">Created: {new Date(task.created_at).toLocaleString()}</span>
+         <div className="timestamps-row">
+            <span className="timestamp">{t('task.list.createdStamp', { timestamp: new Date(task.created_at).toLocaleString() }, `Created: ${new Date(task.created_at).toLocaleString()}`)}</span>
             {task.status === 'completed' && (
-              <span className="timestamp">Completed: {new Date(task.updated_at).toLocaleString()}</span>
+              <span className="timestamp">{t('task.list.completedStamp', { timestamp: new Date(task.updated_at).toLocaleString() }, `Completed: ${new Date(task.updated_at).toLocaleString()}`)}</span>
             )}
           </div>
 
@@ -202,59 +322,37 @@ const TaskCard: React.FC<Props> = ({
               <span className="toggle-text">
                 {(() => {
                   const count = Array.isArray(dlItems) ? dlItems.length : undefined;
-                  return `Downloads${!isExpanded && count ? ` (${count})` : ''}`;
+                  const base = t('task.list.downloads');
+                  return `${base}${!isExpanded && count ? ` (${count})` : ''}`;
                 })()}
               </span>
               <span className="chev" aria-hidden>▾</span>
             </summary>
-            <div className="resource-links" id={`downloads-${task.task_id}`}>
-                {(dlItems?.some((d) => d.type === 'video') ?? isVideoTask) && (
-                  <div className="url-copy-row">
-                    <span className="resource-label-inline">Video</span>
-                    <input type="text" value={`${apiBaseUrl}/api/tasks/${task.task_id}/video`} readOnly className="url-input-enhanced" />
-                    <button onClick={() => { navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/video`); alert('Video URL copied!'); }} className="copy-btn-enhanced">Copy</button>
-                  </div>
-                )}
-
-                <div className="url-copy-row">
-                  <span className="resource-label-inline">{(dlItems?.some((d) => d.type === 'podcast') ?? isPodcastTask) ? 'Podcast' : 'Audio'}</span>
-                  <input type="text" value={`${apiBaseUrl}/api/tasks/${task.task_id}/${(dlItems?.some((d) => d.type === 'podcast') ?? isPodcastTask) ? 'podcast' : 'audio'}`} readOnly className="url-input-enhanced" />
-                  <button onClick={() => { const isPod = (dlItems?.some((d) => d.type === 'podcast') ?? isPodcastTask); navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/${isPod ? 'podcast' : 'audio'}`); alert(`${isPod ? 'Podcast' : 'Audio'} URL copied!`); }} className="copy-btn-enhanced">Copy</button>
-                </div>
-
-                {transcriptQuery.isSuccess && (
-                  <div className="url-copy-row">
-                    <span className="resource-label-inline">Transcript</span>
-                    <input type="text" value={`${apiBaseUrl}/api/tasks/${task.task_id}/transcripts/markdown`} readOnly className="url-input-enhanced" />
-                    <button onClick={() => { navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/transcripts/markdown`); alert('Transcript URL copied!'); }} className="copy-btn-enhanced">Copy</button>
-                  </div>
-                )}
-
-                {!isPodcastTask && hasVtt && (
-                  <>
-                    <div className="url-copy-row">
-                      <span className="resource-label-inline">VTT</span>
-                      <input type="text" value={`${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/vtt`} readOnly className="url-input-enhanced" />
-                      <button onClick={() => { navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/vtt`); alert('VTT URL copied!'); }} className="copy-btn-enhanced">Copy</button>
-                    </div>
-                    <div className="url-copy-row">
-                      <span className="resource-label-inline">SRT</span>
-                      <input type="text" value={`${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/srt`} readOnly className="url-input-enhanced" />
-                      <button onClick={() => { navigator.clipboard.writeText(`${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/srt`); alert('SRT URL copied!'); }} className="copy-btn-enhanced">Copy</button>
-                    </div>
-                  </>
-                )}
-            </div>
+            <DownloadLinks links={downloadLinks} id={`downloads-${task.task_id}`} />
           </details>
         </>
       </div>
 
       <div className="task-actions">
         {task.status === 'completed' && isVideoTask && (
-          <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPreview(task, 'video'); }} className="preview-button" title="Open preview" type="button">▶️ Watch</button>
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPreview(task, 'video'); }}
+            className="preview-button"
+            title={t('actions.openPreview')}
+            type="button"
+          >
+            {`▶️ ${t('task.preview.watch')}`}
+          </button>
         )}
         {task.status === 'completed' && (isPodcastTask || isVideoTask) && (
-          <button onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPreview(task, 'audio'); }} className="preview-button" title="Open preview" type="button">🎧 Listen</button>
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPreview(task, 'audio'); }}
+            className="preview-button"
+            title={t('actions.openPreview')}
+            type="button"
+          >
+            {`🎧 ${t('task.preview.listen')}`}
+          </button>
         )}
         {(task.status === 'queued' || task.status === 'processing') && (
           <button onClick={() => onCancel(task.task_id)} className="cancel-button">Cancel</button>

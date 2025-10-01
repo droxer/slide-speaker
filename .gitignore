@@ -35,6 +35,7 @@ api/build/
 api/dist/
 web/build/
 web/dist/
+web/.next/
 
 # Upload and output directories
 api/uploads/
@@ -81,6 +82,9 @@ package-lock.json
 yarn.lock
 pnpm-lock.yaml
 uv.lock
+
+# TypeScript build info
+tsconfig.tsbuildinfo
 
 # Virtual environments
 api/venv/

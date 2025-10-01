@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient, QueryClient } from '@tanstack/react-query';
-import { getTasks, getStats, searchTasks, getDownloads, getTranscriptMarkdown, getVttText, cancelRun, purgeTask, runFile } from './client';
+import { getTasks, getStats, searchTasks, getDownloads, getTranscriptMarkdown, getVttText, cancelRun, deleteTask, runFile, getTaskById } from './client';
 import type { Task } from '../types';
 
 export const queries = {
@@ -9,6 +9,7 @@ export const queries = {
   downloads: (taskId: string) => ['downloads', taskId] as const,
   transcript: (taskId: string) => ['transcript', taskId] as const,
   vtt: (taskId: string, language?: string) => (language ? (['vtt', taskId, language] as const) : (['vtt', taskId] as const)),
+  task: (taskId: string) => ['task', taskId] as const,
 };
 
 export const useTasksQuery = (
@@ -79,6 +80,26 @@ export const useTranscriptQuery = (taskId: string | null, enabled = true) => {
   return useQuery({ queryKey: queries.transcript(id), queryFn: () => getTranscriptMarkdown(id), enabled: Boolean(taskId) && enabled });
 };
 
+export const useTaskQuery = (taskId: string, initialData?: Task | null) => {
+  return useQuery<Task | null>({
+    queryKey: queries.task(taskId),
+    queryFn: async () => {
+      if (!taskId) return null;
+      try {
+        return await getTaskById(taskId);
+      } catch (error: any) {
+        if (error?.response?.status === 404) {
+          return null;
+        }
+        throw error;
+      }
+    },
+    enabled: Boolean(taskId),
+    staleTime: 30_000,
+    initialData: initialData ?? undefined,
+  });
+};
+
 // Cache selectors (helpers)
 export const getCachedDownloads = (qc: QueryClient, taskId: string) => {
   return qc.getQueryData(queries.downloads(taskId)) as { items?: Array<{ type: string; url: string; download_url?: string }>} | undefined;
@@ -126,7 +147,8 @@ export const useCancelTaskMutation = () => {
   return useMutation({
     mutationFn: (taskId: string) => cancelRun(taskId),
     onSettled: async () => {
-      await qc.invalidateQueries({ queryKey: queries.tasks({ status: 'all', page: 1, limit: 10 }) as any, exact: false });
+      await qc.invalidateQueries({ queryKey: ['tasks'] as any, exact: false });
+      await qc.invalidateQueries({ queryKey: ['files'] as any, exact: false });
       await qc.invalidateQueries({ queryKey: queries.search('') as any, exact: false });
     },
   });
@@ -200,7 +222,7 @@ export const useRunFileTaskMutation = () => {
 export const usePurgeTaskMutation = () => {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (taskId: string) => purgeTask(taskId),
+    mutationFn: (taskId: string) => deleteTask(taskId),
     onSettled: async () => {
       await qc.invalidateQueries({ queryKey: queries.tasks({ status: 'all', page: 1, limit: 10 }) as any, exact: false });
       await qc.invalidateQueries({ queryKey: queries.search('') as any, exact: false });

@@ -24,6 +24,13 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const [cues, setCues] = useState<Cue[]>(initialCues || []);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
+  // Refresh cues if transcript props arrive after mount (e.g., fetched markdown)
+  useEffect(() => {
+    if (Array.isArray(initialCues)) {
+      setCues(initialCues);
+    }
+  }, [initialCues]);
+
   // Fetch and parse VTT when vttUrl provided
   useEffect(() => {
     if (!vttUrl) return;

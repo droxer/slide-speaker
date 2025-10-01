@@ -1,0 +1,304 @@
+{
+  "header": {
+    "title": "幻燈演說 AI",
+    "subtitle": "將幻燈片轉化為 AI 驅動的影片",
+    "login": "使用 Google 登入",
+    "logout": "登出",
+    "welcome": "歡迎，{name}",
+    "view": {
+      "studio": "創作室",
+      "creations": "作品庫"
+    }
+  },
+  "language": {
+    "english": "English",
+    "simplified": "简体中文",
+    "traditional": "繁體中文",
+    "japanese": "日語",
+    "korean": "韓語",
+    "thai": "泰語",
+    "display": {
+      "english": "英語",
+      "simplified_chinese": "簡體中文",
+      "traditional_chinese": "繁體中文",
+      "japanese": "日語",
+      "korean": "韓語",
+      "thai": "泰語"
+    },
+    "switcher": {
+      "label": "介面語言",
+      "tooltip": "切換語言"
+    },
+    "unknown": "{code}"
+  },
+  "common": {
+    "unknown": "未知",
+    "unknownFile": "未知檔案",
+    "untrackedFile": "未關聯檔案",
+    "disabled": "已停用"
+  },
+  "task": {
+    "detail": {
+      "breadcrumb": {
+        "task": "任務"
+      },
+      "videoPreview": "影片預覽",
+      "audioPreview": "音訊預覽",
+      "podcastPreview": "播客預覽",
+      "previewTabs": "預覽切換",
+      "cancel": "取消任務",
+      "cancelling": "正在取消…",
+      "currentProgress": "目前進度",
+      "steps": "處理步驟",
+      "downloads": "可下載項目",
+      "loadingDownloads": "正在載入可下載項目…",
+      "noDownloads": "目前沒有可下載項目。",
+      "created": "建立時間",
+      "updated": "更新時間",
+      "voice": "配音語言",
+      "subtitles": "字幕語言",
+      "subtitlesFormats": "VTT / SRT",
+      "transcript": "逐字稿語言",
+      "metadataAria": "任務資訊"
+    },
+    "status": {
+      "completed": "已完成",
+      "processing": "處理中",
+      "queued": "排程中",
+      "failed": "失敗",
+      "cancelled": "已取消",
+      "pending": "待處理",
+      "skipped": "已跳過"
+    },
+    "list": {
+      "copyId": "複製任務 ID",
+      "voice": "配音：{language}",
+      "transcript": "逐字稿：{language}",
+      "subtitles": "字幕：{language}",
+      "downloads": "下載",
+      "videoLabel": "影片",
+      "podcastLabel": "播客",
+      "audioLabel": "音訊",
+      "transcriptLabel": "逐字稿",
+      "vttLabel": "VTT 字幕",
+      "srtLabel": "SRT 字幕",
+      "idPrefix": "任務：{id}",
+      "openTaskTitle": "開啟任務 {id}",
+      "queuedMessage": "排程中 • 等待開始",
+      "createdStamp": "建立時間：{timestamp}",
+      "completedStamp": "完成時間：{timestamp}",
+      "statusAria": "狀態：{status}"
+    },
+    "preview": {
+      "watch": "觀看",
+      "listen": "收聽",
+      "videoAria": "任務 {taskId} 的影片預覽",
+      "audioAria": "音訊講解預覽"
+    }
+  },
+  "actions": {
+    "copy": "複製",
+    "openPreview": "打開預覽",
+    "generateVideo": "產生影片",
+    "generatePodcast": "產生播客",
+    "generate": "產生",
+    "generating": "正在產生…",
+    "cancel": "取消",
+    "close": "關閉"
+  },
+  "notifications": {
+    "videoCopied": "影片連結已複製！",
+    "audioCopied": "音訊連結已複製！",
+    "podcastCopied": "播客連結已複製！",
+    "transcriptCopied": "逐字稿連結已複製！",
+    "vttCopied": "VTT 連結已複製！",
+    "srtCopied": "SRT 連結已複製！"
+  },
+  "filters": {
+    "status": {
+      "all": "全部狀態"
+    }
+  },
+  "runTask": {
+    "adjustHint": "調整產生選項後按下「產生」。",
+    "tagSuffix": "任務",
+    "source": "來源",
+    "output": {
+      "video": "影片",
+      "podcast": "播客",
+      "label": "輸出"
+    },
+    "voiceLanguage": "配音語言",
+    "subtitleLanguage": "字幕語言",
+    "transcriptLanguage": "逐字稿語言",
+    "videoResolution": "影片解析度",
+    "sameAsVoice": "與配音相同",
+    "resolution": {
+      "sd": "標清 (640×480)",
+      "hd": "高清 (1280×720)",
+      "fullhd": "全高清 (1920×1080)"
+    },
+    "noFileSelected": "所選檔案"
+  },
+  "creations": {
+    "health": {
+      "overall": {
+        "okLabel": "系統正常",
+        "degradedLabel": "部份可用",
+        "downLabel": "系統離線",
+        "unknownLabel": "狀態未知",
+        "ok": "正常",
+        "degraded": "降級",
+        "down": "離線",
+        "unknown": "未知"
+      },
+      "status": "系統狀態",
+      "queue": "佇列",
+      "database": "資料庫",
+      "queueLatency": "佇列延遲：{latency} 毫秒",
+      "databaseLatency": "資料庫延遲：{latency} 毫秒",
+      "queueUnavailable": "佇列無法使用",
+      "databaseUnavailable": "資料庫無法使用"
+    },
+    "title": "作品庫",
+    "summary": "{files} 個檔案 · {creations} 個作品 · {running} 個進行中",
+    "empty": "目前沒有任務",
+    "file": {
+      "idChip": "ID {id}",
+      "count": {
+        "one": "{count} 個作品",
+        "other": "{count} 個作品"
+      }
+    },
+    "toast": {
+      "taskCreated": "任務已建立：{id}",
+      "createFailed": "建立任務失敗",
+      "cancelFailed": "取消任務失敗",
+      "deleteFailed": "刪除任務失敗"
+    },
+    "confirm": {
+      "delete": "此動作會永久刪除任務與其狀態，確定要繼續嗎？"
+    }
+  },
+  "search": {
+    "placeholder": "搜尋任務...",
+    "submit": "搜尋"
+  },
+  "completed": {
+    "redirecting": "正在開啟任務詳情…"
+  },
+  "processing": {
+    "title": "正在為您打造作品",
+    "stop": "停止",
+    "errorsHeading": "發生錯誤",
+    "meta": {
+      "aria": "任務詳情",
+      "locating": "（定位中…）",
+      "locatingHint": "來源檔案 {id}"
+    },
+    "file": {
+      "untitled": "未命名"
+    },
+    "stepsHeading": "處理步驟",
+    "metadataAria": "任務資訊",
+    "progressLabel": "整體進度",
+    "progressStatus": "正在為您的簡報注入活力…",
+    "steps": {
+      "extract_slides": "擷取投影片",
+      "analyze_slide_images": "分析內容",
+      "generate_transcripts": "產生逐字稿",
+      "revise_transcripts": "潤飾逐字稿",
+      "translate_voice_transcripts": "翻譯配音稿",
+      "translate_subtitle_transcripts": "翻譯字幕稿",
+      "generate_subtitle_transcripts": "產生字幕稿",
+      "generate_audio": "產生音訊",
+      "generate_avatar_videos": "建立虛擬角色",
+      "convert_slides_to_images": "轉換投影片",
+      "generate_subtitles": "產生字幕",
+      "compose_video": "合成影片",
+      "segment_pdf_content": "分段內容",
+      "revise_pdf_transcripts": "潤飾稿件",
+      "generate_pdf_chapter_images": "產生章節畫面",
+      "generate_pdf_audio": "產生音訊",
+      "generate_pdf_subtitles": "產生字幕",
+      "generate_podcast_script": "產生播客腳本",
+      "translate_podcast_script": "翻譯播客腳本",
+      "generate_podcast_audio": "產生播客音訊",
+      "compose_podcast": "合成播客",
+      "unknown": "初始化"
+    },
+    "step": {
+      "translatingTranscripts": "正在翻譯稿件"
+    },
+    "preview": {
+      "videoEnabled": "已啟用影片產生",
+      "podcastEnabled": "已啟用播客產生"
+    }
+  },
+  "uploading": {
+    "title": "正在上傳簡報",
+    "status": "正在為 AI 轉換準備內容…",
+    "progress": "已上傳 {progress}%",
+    "progressLabel": "上傳進度",
+    "summaryLabel": "上傳摘要",
+    "modeLabel": "模式",
+    "fileSizeLabel": "檔案大小",
+    "outputsLabel": "輸出內容"
+  },
+  "upload": {
+    "modeToggle": {
+      "aria": "模式選擇"
+    },
+    "mode": {
+      "slides": "投影片",
+      "pdf": "PDF",
+      "slidesHeading": "投影片模式：",
+      "slidesDescription": "逐頁處理投影片，產生逐字稿、音訊、字幕並合成最終影片。",
+      "pdfHeading": "PDF 模式：",
+      "pdfDescription": "將文件分段，可產生影片（音訊+字幕）或雙人播客（MP3）。"
+    },
+    "pdfOutput": {
+      "aria": "PDF 輸出"
+    },
+    "file": {
+      "choosePdf": "選擇 PDF 檔案",
+      "chooseSlides": "選擇 PPTX/PPT 檔案",
+      "hintPdf": "PDF 將被轉換為影片或播客",
+      "hintSlides": "投影片將被轉換為配音影片",
+      "pdfBadge": "PDF",
+      "pdfDescription": "AI 會分析 PDF，生成帶旁白和字幕的精彩章節影片。",
+      "pptBadge": "PPT",
+      "pptDescription": "AI 會將投影片轉換為帶配音的影片。",
+      "supportedBadge": "支援的檔案",
+      "supportedDescription": "支援 PDF、PPTX 與 PPT 檔案"
+    },
+    "notice": "AI 生成內容可能不夠精準，請務必檢查。",
+    "createPodcast": "建立播客",
+    "createVideo": "建立影片"
+  },
+  "footer": {
+    "slogan": "SlideSpeaker AI 讓簡報煥然一新",
+    "queueUnavailable": "系統狀態：無法使用",
+    "queueOk": "系統狀態：正常",
+    "queueTooltipUnavailable": "系統狀態無法使用",
+    "queueTooltipOk": "系統狀態正常",
+    "queueTooltipLatency": "系統狀態正常 • {latency}ms",
+    "theme": {
+      "toggleLabel": "主題切換",
+      "auto": "自動",
+      "light": "淺色",
+      "dark": "深色"
+    }
+  },
+  "pagination": {
+    "previous": "上一頁",
+    "next": "下一頁",
+    "page": "第 {page} 頁"
+  },
+  "modal": {
+    "previewTitle": "媒體預覽"
+  },
+  "alerts": {
+    "previewUnavailable": "僅支援已完成的任務預覽。"
+  }
+}
