@@ -7,9 +7,9 @@ from typing import Annotated, cast
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
+from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.locales import locale_utils
 from slidespeaker.repository.user import get_user_by_id, update_user_profile
-from slidespeaker.utils.auth import require_authenticated_user
 
 router = APIRouter(
     prefix="/api/users",

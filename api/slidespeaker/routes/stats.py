@@ -11,12 +11,12 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
 
+from slidespeaker.auth import extract_user_id, require_authenticated_user
 from slidespeaker.core.progress_utils import compute_step_percentage
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 from slidespeaker.repository.task import delete_task as db_delete_task
 from slidespeaker.repository.task import list_tasks as db_list_tasks
-from slidespeaker.utils.auth import extract_user_id, require_authenticated_user
 
 
 def _filter_sensitive_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:

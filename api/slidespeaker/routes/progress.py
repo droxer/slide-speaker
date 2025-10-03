@@ -9,9 +9,9 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
+from slidespeaker.auth import extract_user_id, require_authenticated_user
 from slidespeaker.core.progress_utils import compute_step_percentage
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.utils.auth import extract_user_id, require_authenticated_user
 
 router = APIRouter(
     prefix="/api",

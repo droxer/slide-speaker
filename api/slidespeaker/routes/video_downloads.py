@@ -11,9 +11,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 
+from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.storage import StorageProvider
-from slidespeaker.utils.auth import require_authenticated_user
 
 from .download_utils import file_id_from_task, proxy_cloud_media
 
@@ -22,6 +22,30 @@ router = APIRouter(
     tags=["video_downloads"],
     dependencies=[Depends(require_authenticated_user)],
 )
+
+
+def _build_headers(
+    request: Request,
+    *,
+    content_type: str,
+    content_length: int | None = None,
+    disposition: str | None = None,
+    cache_control: str = "public, max-age=3600",
+) -> dict[str, str]:
+    origin = request.headers.get("origin") or request.headers.get("Origin")
+    headers: dict[str, str] = {
+        "Content-Type": content_type,
+        "Accept-Ranges": "bytes",
+        "Cache-Control": cache_control,
+    }
+    if content_length is not None:
+        headers["Content-Length"] = str(content_length)
+    if disposition:
+        headers["Content-Disposition"] = disposition
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return headers
 
 
 @router.get("/tasks/{task_id}/video")
@@ -93,15 +117,13 @@ async def get_video_by_task(task_id: str, request: Request) -> Any:
                         remaining -= len(data)
                         yield data
 
-            headers = {
-                "Content-Type": media_type,
-                "Content-Range": f"bytes {start}-{end}/{file_size}",
-                "Accept-Ranges": "bytes",
-                "Content-Length": str(length),
-                "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "public, max-age=3600",
-                "Content-Disposition": f"inline; filename=presentation_{task_id}.mp4",
-            }
+            headers = _build_headers(
+                request,
+                content_type=media_type,
+                content_length=length,
+                disposition=f"inline; filename=presentation_{task_id}.mp4",
+            )
+            headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
             return StreamingResponse(
                 iter_file(str(actual_file_path), start, length),
                 status_code=206,
@@ -113,33 +135,33 @@ async def get_video_by_task(task_id: str, request: Request) -> Any:
                 str(actual_file_path),
                 media_type=media_type,
                 filename=f"presentation_{task_id}.mp4",
-                headers={
-                    "Access-Control-Allow-Origin": "*",
-                    "Cache-Control": "public, max-age=3600",
-                    "Accept-Ranges": "bytes",
-                    "Content-Disposition": f"inline; filename=presentation_{task_id}.mp4",
-                },
+                headers=_build_headers(
+                    request,
+                    content_type=media_type,
+                    disposition=f"inline; filename=presentation_{task_id}.mp4",
+                ),
             )
 
     # Cloud storage
     if config.proxy_cloud_media:
         # Proxy through API for CORS-safe range streaming
-        return await proxy_cloud_media(object_key, media_type, range_header)
+        origin = request.headers.get("origin") or request.headers.get("Origin")
+        return await proxy_cloud_media(
+            object_key, media_type, range_header, origin=origin
+        )
 
     # Redirect to signed URL (no response overrides to keep range-friendly)
     url = sp.get_file_url(object_key, expires_in=300)
-    return Response(
-        status_code=307,
-        headers={
-            "Location": url,
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Access-Control-Allow-Origin": "*",
-        },
-    )
+    headers = {"Location": url, "Cache-Control": "no-cache, no-store, must-revalidate"}
+    origin = request.headers.get("origin") or request.headers.get("Origin")
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return Response(status_code=307, headers=headers)
 
 
 @router.get("/tasks/{task_id}/video/download")
-async def download_video_by_task(task_id: str) -> Any:
+async def download_video_by_task(task_id: str, request: Request) -> Any:
     """Provide a download-focused endpoint for video with attachment disposition."""
     sp: StorageProvider = get_storage_provider()
     # Prefer task-id-based filename when present
@@ -161,10 +183,11 @@ async def download_video_by_task(task_id: str) -> Any:
             str(actual_file_path),
             media_type="video/mp4",
             filename=f"presentation_{task_id}.mp4",
-            headers={
-                "Content-Disposition": f"attachment; filename=presentation_{task_id}.mp4",
-                "Access-Control-Allow-Origin": "*",
-            },
+            headers=_build_headers(
+                request,
+                content_type="video/mp4",
+                disposition=f"attachment; filename=presentation_{task_id}.mp4",
+            ),
         )
 
     # Cloud: redirect to presigned URL with attachment disposition
@@ -174,14 +197,12 @@ async def download_video_by_task(task_id: str) -> Any:
         content_disposition=f"attachment; filename=presentation_{task_id}.mp4",
         content_type="video/mp4",
     )
-    return Response(
-        status_code=307,
-        headers={
-            "Location": url,
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Access-Control-Allow-Origin": "*",
-        },
-    )
+    headers = {"Location": url, "Cache-Control": "no-cache, no-store, must-revalidate"}
+    origin = request.headers.get("origin") or request.headers.get("Origin")
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return Response(status_code=307, headers=headers)
 
 
 @router.options("/tasks/{task_id}/video")
@@ -197,7 +218,7 @@ async def options_video_by_task(task_id: str) -> Response:
 
 
 @router.head("/tasks/{task_id}/video")
-async def head_video_by_task(task_id: str) -> Response:
+async def head_video_by_task(task_id: str, request: Request) -> Response:
     """HEAD endpoint to check if the generated video exists (task-based)."""
     sp: StorageProvider = get_storage_provider()
     # Determine existence using task-id-based or file-id-based key
@@ -214,13 +235,13 @@ async def head_video_by_task(task_id: str) -> Response:
         except Exception:
             exists = False
 
-    headers = {
-        "Content-Type": "video/mp4",
-        "Accept-Ranges": "bytes",
-        "Content-Disposition": f"inline; filename=presentation_{task_id}.mp4",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-        "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
-        "Cache-Control": "public, max-age=3600",
-    }
+    headers = _build_headers(
+        request,
+        content_type="video/mp4",
+        disposition=f"inline; filename=presentation_{task_id}.mp4",
+    )
+    headers["Access-Control-Allow-Methods"] = "GET, HEAD, OPTIONS"
+    headers["Access-Control-Allow-Headers"] = (
+        "Range, Accept, Accept-Encoding, Accept-Language, Content-Type"
+    )
     return Response(status_code=200 if exists else 404, headers=headers)

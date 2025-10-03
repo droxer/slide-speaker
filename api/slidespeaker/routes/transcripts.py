@@ -10,9 +10,9 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 
+from slidespeaker.auth import require_authenticated_user
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.transcript.markdown import transcripts_to_markdown
-from slidespeaker.utils.auth import require_authenticated_user
 
 router = APIRouter(
     prefix="/api",

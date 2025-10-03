@@ -12,9 +12,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 
+from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.storage import StorageProvider
-from slidespeaker.utils.auth import require_authenticated_user
 
 from .download_utils import (
     file_id_from_task,
@@ -29,6 +29,30 @@ router = APIRouter(
     tags=["audio_downloads"],
     dependencies=[Depends(require_authenticated_user)],
 )
+
+
+def _build_headers(
+    request: Request,
+    *,
+    content_type: str,
+    content_length: int | None = None,
+    disposition: str | None = None,
+    cache_control: str = "no-cache, no-store, must-revalidate",
+) -> dict[str, str]:
+    origin = request.headers.get("origin") or request.headers.get("Origin")
+    headers: dict[str, str] = {
+        "Content-Type": content_type,
+        "Accept-Ranges": "bytes",
+        "Cache-Control": cache_control,
+    }
+    if content_length is not None:
+        headers["Content-Length"] = str(content_length)
+    if disposition:
+        headers["Content-Disposition"] = disposition
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return headers
 
 
 async def get_final_audio(file_id: str, request: Request) -> Any:
@@ -54,14 +78,12 @@ async def get_final_audio(file_id: str, request: Request) -> Any:
                         str(actual),
                         media_type="audio/mpeg",
                         filename=f"presentation_{file_id}.mp3",
-                        headers={
-                            "Content-Type": "audio/mpeg",
-                            "Content-Length": str(file_size),
-                            "Accept-Ranges": "bytes",
-                            "Access-Control-Allow-Origin": "*",
-                            "Cache-Control": "no-cache, no-store, must-revalidate",
-                            "Content-Disposition": f"inline; filename=presentation_{file_id}.mp3",
-                        },
+                        headers=_build_headers(
+                            request,
+                            content_type="audio/mpeg",
+                            content_length=file_size,
+                            disposition=f"inline; filename=presentation_{file_id}.mp3",
+                        ),
                     )
             except Exception:
                 pass
@@ -69,7 +91,15 @@ async def get_final_audio(file_id: str, request: Request) -> Any:
             # Cloud: try proxying the object key without relying on HEAD permissions
             try:
                 if config.proxy_cloud_media:
-                    return await proxy_cloud_media(key, "audio/mpeg", None)
+                    origin = request.headers.get("origin") or request.headers.get(
+                        "Origin"
+                    )
+                    return await proxy_cloud_media(
+                        key,
+                        "audio/mpeg",
+                        None,
+                        origin=origin,
+                    )
                 # If proxy disabled, attempt redirect
                 url = sp.get_file_url(
                     key,
@@ -77,16 +107,13 @@ async def get_final_audio(file_id: str, request: Request) -> Any:
                     content_disposition=f"inline; filename=presentation_{file_id}.mp3",
                     content_type="audio/mpeg",
                 )
-                return Response(
-                    status_code=307,
-                    headers={
-                        "Location": url,
-                        "Content-Type": "audio/mpeg",
-                        "Accept-Ranges": "bytes",
-                        "Cache-Control": "no-cache, no-store, must-revalidate",
-                        "Access-Control-Allow-Origin": "*",
-                    },
+                headers = _build_headers(
+                    request,
+                    content_type="audio/mpeg",
+                    cache_control="no-cache, no-store, must-revalidate",
                 )
+                headers["Location"] = url
+                return Response(status_code=307, headers=headers)
             except HTTPException as e:
                 # Continue to next key on 404/403; re-raise others
                 if e.status_code not in (403, 404):
@@ -102,14 +129,12 @@ async def get_final_audio(file_id: str, request: Request) -> Any:
             return StreamingResponse(
                 stream_concatenated_files(audio_files),
                 media_type="audio/mpeg",
-                headers={
-                    # Serve inline so <audio> can play concatenated bytes
-                    "Content-Type": "audio/mpeg",
-                    "Accept-Ranges": "bytes",
-                    "Content-Disposition": f"inline; filename=presentation_{file_id}.mp3",
-                    "Access-Control-Allow-Origin": "*",
-                    "Cache-Control": "no-cache",
-                },
+                headers=_build_headers(
+                    request,
+                    content_type="audio/mpeg",
+                    disposition=f"inline; filename=presentation_{file_id}.mp3",
+                    cache_control="no-cache",
+                ),
             )
 
     # 3) Fallback: last generated track (serve inline)
@@ -124,14 +149,12 @@ async def get_final_audio(file_id: str, request: Request) -> Any:
             actual_file_path,
             media_type="audio/mpeg",
             filename=f"presentation_{file_id}.mp3",
-            headers={
-                "Content-Type": "audio/mpeg",
-                "Content-Length": str(file_size),
-                "Accept-Ranges": "bytes",
-                "Access-Control-Allow-Origin": "*",
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Content-Disposition": f"inline; filename=presentation_{file_id}.mp3",
-            },
+            headers=_build_headers(
+                request,
+                content_type="audio/mpeg",
+                content_length=file_size,
+                disposition=f"inline; filename=presentation_{file_id}.mp3",
+            ),
         )
     except Exception as e:
         raise HTTPException(status_code=404, detail="Final audio not found") from e
@@ -227,17 +250,20 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
                                         remaining -= len(data)
                                         yield data
 
+                            headers = _build_headers(
+                                request,
+                                content_type="audio/mpeg",
+                                content_length=length,
+                                cache_control="no-cache, no-store, must-revalidate",
+                            )
+                            headers["Content-Range"] = (
+                                f"bytes {start}-{end}/{file_size}"
+                            )
+
                             return StreamingResponse(
                                 iter_file(),
                                 status_code=206,  # Partial Content
-                                headers={
-                                    "Content-Type": "audio/mpeg",
-                                    "Content-Length": str(length),
-                                    "Content-Range": f"bytes {start}-{end}/{file_size}",
-                                    "Accept-Ranges": "bytes",
-                                    "Access-Control-Allow-Origin": "*",
-                                    "Cache-Control": "no-cache, no-store, must-revalidate",
-                                },
+                                headers=headers,
                             )
                         except Exception:
                             # Malformed range header, fall back to full file
@@ -248,14 +274,12 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
                         str(actual),
                         media_type="audio/mpeg",
                         filename=f"presentation_{task_id}.mp3",
-                        headers={
-                            "Content-Type": "audio/mpeg",
-                            "Content-Length": str(file_size),
-                            "Accept-Ranges": "bytes",
-                            "Access-Control-Allow-Origin": "*",
-                            "Cache-Control": "no-cache, no-store, must-revalidate",
-                            "Content-Disposition": f"inline; filename=presentation_{task_id}.mp3",
-                        },
+                        headers=_build_headers(
+                            request,
+                            content_type="audio/mpeg",
+                            content_length=file_size,
+                            disposition=f"inline; filename=presentation_{task_id}.mp3",
+                        ),
                     )
             except Exception:
                 pass
@@ -263,7 +287,15 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
             # Cloud: try proxying the object key without relying on HEAD permissions
             try:
                 if config.proxy_cloud_media:
-                    return await proxy_cloud_media(task_key, "audio/mpeg", None)
+                    origin = request.headers.get("origin") or request.headers.get(
+                        "Origin"
+                    )
+                    return await proxy_cloud_media(
+                        task_key,
+                        "audio/mpeg",
+                        None,
+                        origin=origin,
+                    )
                 # If proxy disabled, attempt redirect
                 url = sp.get_file_url(
                     task_key,
@@ -271,16 +303,13 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
                     content_disposition=f"inline; filename=presentation_{task_id}.mp3",
                     content_type="audio/mpeg",
                 )
-                return Response(
-                    status_code=307,
-                    headers={
-                        "Location": url,
-                        "Content-Type": "audio/mpeg",
-                        "Accept-Ranges": "bytes",
-                        "Cache-Control": "no-cache, no-store, must-revalidate",
-                        "Access-Control-Allow-Origin": "*",
-                    },
+                headers = _build_headers(
+                    request,
+                    content_type="audio/mpeg",
+                    cache_control="no-cache, no-store, must-revalidate",
                 )
+                headers["Location"] = url
+                return Response(status_code=307, headers=headers)
             except HTTPException as e:
                 # Continue to fallback on 404/403; re-raise others
                 if e.status_code not in (403, 404):
@@ -302,7 +331,7 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
 
 
 @router.get("/tasks/{task_id}/audio/download")
-async def download_final_audio_by_task(task_id: str) -> Any:
+async def download_final_audio_by_task(task_id: str, request: Request) -> Any:
     """Download endpoint for the final MP3 with attachment disposition."""
     sp: StorageProvider = get_storage_provider()
     # Resolve best key (prefer task-id, then file-id variants)
@@ -322,10 +351,12 @@ async def download_final_audio_by_task(task_id: str) -> Any:
             str(actual),
             media_type="audio/mpeg",
             filename=f"presentation_{task_id}.mp3",
-            headers={
-                "Content-Disposition": f"attachment; filename=presentation_{task_id}.mp3",
-                "Access-Control-Allow-Origin": "*",
-            },
+            headers=_build_headers(
+                request,
+                content_type="audio/mpeg",
+                disposition=f"attachment; filename=presentation_{task_id}.mp3",
+                cache_control="public, max-age=3600",
+            ),
         )
 
     # Cloud: redirect with attachment disposition
@@ -335,13 +366,16 @@ async def download_final_audio_by_task(task_id: str) -> Any:
         content_disposition=f"attachment; filename=presentation_{task_id}.mp3",
         content_type="audio/mpeg",
     )
-    return Response(
-        status_code=307, headers={"Location": url, "Access-Control-Allow-Origin": "*"}
-    )
+    headers = {"Location": url}
+    origin = request.headers.get("origin") or request.headers.get("Origin")
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return Response(status_code=307, headers=headers)
 
 
 @router.get("/tasks/{task_id}/audio/{index}")
-async def get_audio_file_by_task(task_id: str, index: int) -> Any:
+async def get_audio_file_by_task(task_id: str, index: int, request: Request) -> Any:
     """Serve a single generated audio track by 1-based index (task-based)."""
     file_id = await file_id_from_task(task_id)
     audio_files = await get_audio_files_from_state(file_id)
@@ -354,11 +388,10 @@ async def get_audio_file_by_task(task_id: str, index: int) -> Any:
         actual_file_path,
         media_type="audio/mpeg",
         filename=f"{task_id}_track_{index}.mp3",
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-            "Access-Control-Allow-Headers": "*",
-            "Cache-Control": "public, max-age=3600",
-            "Content-Disposition": f"inline; filename={task_id}_track_{index}.mp3",
-        },
+        headers=_build_headers(
+            request,
+            content_type="audio/mpeg",
+            disposition=f"inline; filename={task_id}_track_{index}.mp3",
+            cache_control="public, max-age=3600",
+        ),
     )

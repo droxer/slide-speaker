@@ -9,8 +9,8 @@ service availability checking and configuration validation.
 
 from slidespeaker.configs.config import config
 
-from .elevenlabs_tts_service import ElevenLabsTTSService
-from .openai_tts_service import OpenAITTSService
+from .elevenlabs_tts import ElevenLabsTTSService
+from .openai_tts import OpenAITTSService
 from .tts_interface import TTSInterface
 
 

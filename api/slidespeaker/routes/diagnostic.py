@@ -9,8 +9,8 @@ import time
 
 from fastapi import APIRouter, Depends
 
+from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.config import config
-from slidespeaker.utils.auth import require_authenticated_user
 
 router = APIRouter(
     prefix="/api/diagnostic",

@@ -10,10 +10,10 @@ from datetime import datetime
 from typing import Any
 from uuid import uuid4
 
+from slidespeaker.auth.passwords import hash_password, verify_password
 from slidespeaker.configs.db import get_session
 from slidespeaker.configs.locales import locale_utils
 from slidespeaker.core.models import User
-from slidespeaker.utils.passwords import hash_password, verify_password
 
 
 def _row_to_dict(

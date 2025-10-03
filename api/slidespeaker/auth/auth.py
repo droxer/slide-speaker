@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+# jose does not provide type hints
+import base64
 import hashlib
 import hmac
 import json
@@ -9,8 +11,6 @@ import os
 from typing import Any, cast
 
 from fastapi import HTTPException, Request, status
-
-# jose does not provide type hints
 from jose import JWTError, jwe, jwt  # type: ignore[import-untyped]
 from loguru import logger
 
@@ -69,10 +69,31 @@ def _derive_encryption_key(secret: str | bytes, *, salt: str = "") -> bytes:
     return okm[:32]
 
 
+def _decode_header(token: str) -> dict[str, Any]:
+    try:
+        header = jwt.get_unverified_header(token)
+        if not isinstance(header, dict):
+            raise JWTError("Token header is not a JSON object") from None
+        return cast(dict[str, Any], header)
+    except JWTError:
+        parts = token.split(".")
+        if not parts:
+            raise
+        try:
+            padded = parts[0] + "=" * (-len(parts[0]) % 4)
+            raw = base64.urlsafe_b64decode(padded.encode("ascii"))
+            header = json.loads(raw.decode("utf-8"))
+        except Exception as exc:  # noqa: BLE001
+            raise JWTError("Unable to parse token header") from exc
+        if not isinstance(header, dict):
+            raise JWTError("Token header is not a JSON object") from None
+        return cast(dict[str, Any], header)
+
+
 def _decode_nextauth_jwt(token: str) -> dict[str, Any]:
     secret = _get_nextauth_secret()
     try:
-        header = jwt.get_unverified_header(token)
+        header = _decode_header(token)
     except JWTError as exc:
         preview = f"{token[:8]}..." if len(token) > 8 else token
         logger.warning(

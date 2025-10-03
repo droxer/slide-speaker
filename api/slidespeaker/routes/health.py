@@ -14,9 +14,9 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from sqlalchemy import text
 
+from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.db import get_session
 from slidespeaker.configs.redis_config import RedisConfig
-from slidespeaker.utils.auth import require_authenticated_user
 
 router = APIRouter(
     prefix="/api",

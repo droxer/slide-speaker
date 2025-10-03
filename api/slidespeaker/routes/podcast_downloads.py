@@ -10,9 +10,9 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
+from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.storage import StorageProvider
-from slidespeaker.utils.auth import require_authenticated_user
 
 from .download_utils import file_id_from_task, proxy_cloud_media
 

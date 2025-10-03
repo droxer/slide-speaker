@@ -7,7 +7,8 @@ Supports detailed slide images without text based on title/description/key point
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import requests
+import httpx
+from fastapi.concurrency import run_in_threadpool
 from loguru import logger
 
 from slidespeaker.configs.config import config
@@ -133,8 +134,8 @@ Requirements:
             logger.info(f"Generating slide image with prompt: {prompt[:100]}...")
 
             image_model = config.openai_image_model
-            urls = image_generate(
-                prompt=prompt, model=image_model, size="1792x1024", n=1
+            urls = await run_in_threadpool(
+                image_generate, prompt=prompt, model=image_model, size="1792x1024", n=1
             )
             if not urls:
                 raise ValueError("No image returned from OpenAI image API")
@@ -151,12 +152,16 @@ Requirements:
     async def _download_image(self, image_url: str, output_path: Path) -> None:
         """Download image from URL and save to output path."""
         try:
-            response = requests.get(image_url, timeout=30)
-            response.raise_for_status()
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.get(image_url)
+                response.raise_for_status()
 
-            with open(output_path, "wb") as f:
-                f.write(response.content)
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                output_path.write_bytes(response.content)
 
+        except httpx.HTTPError as e:
+            logger.error(f"Image download error: {e}")
+            raise
         except Exception as e:
             logger.error(f"Image download error: {e}")
             raise

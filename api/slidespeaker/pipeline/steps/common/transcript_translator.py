@@ -92,7 +92,7 @@ async def translate_transcripts_common(
                 file_id, state_key, "failed", {"error": msg}
             )
             return
-        translated_transcripts = translator.translate(
+        translated_transcripts = await translator.translate(
             source_transcripts, source_language, target_language
         )
 

@@ -2,6 +2,7 @@
 
 from typing import Any
 
+from fastapi.concurrency import run_in_threadpool
 from loguru import logger
 
 from slidespeaker.configs.config import config
@@ -65,7 +66,7 @@ class TranslationService:
         # Use OpenAI exclusively for translation in this module
         self.provider: str = "openai"
 
-    def translate(
+    async def translate(
         self,
         scripts: list[dict[str, Any]],
         source_language: str,
@@ -88,8 +89,8 @@ class TranslationService:
             text_blocks = [s.get("script", "").strip() for s in scripts]
             joined = "\n\n".join(text_blocks)
 
-            translated_content = chat_completion(
-                model=config.translation_model,
+            translated_content = await run_in_threadpool(
+                chat_completion,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {
@@ -99,6 +100,7 @@ class TranslationService:
 {joined}""",
                     },
                 ],
+                model=config.translation_model,
             )
             if not translated_content.strip():
                 return scripts

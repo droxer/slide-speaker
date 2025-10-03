@@ -7,6 +7,7 @@ It supports multiple voices and languages through the OpenAI TTS models.
 
 from pathlib import Path
 
+from fastapi.concurrency import run_in_threadpool
 from loguru import logger
 
 from slidespeaker.configs.config import config
@@ -64,15 +65,15 @@ class OpenAITTSService(TTSInterface):
                 f"TTS request: model={self.model}, voice={use_voice}, language={language}, "
                 f"text_len={len(text.strip())}"
             )
-            stream = tts_speech_stream(
-                model=self.model, voice=use_voice, input_text=text.strip()
+            stream = await run_in_threadpool(
+                tts_speech_stream,
+                model=self.model,
+                voice=use_voice,
+                input_text=text.strip(),
             )
 
-            # Ensure output directory exists
             output_path.parent.mkdir(parents=True, exist_ok=True)
-
-            # Write response content to file
-            with open(output_path, "wb") as f:
+            with output_path.open("wb") as f:
                 for chunk in stream:
                     f.write(chunk)
 

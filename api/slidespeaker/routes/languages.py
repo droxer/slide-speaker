@@ -7,8 +7,8 @@ and their locale information for the presentation processing system.
 
 from fastapi import APIRouter, Depends
 
+from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.locales import locale_utils
-from slidespeaker.utils.auth import require_authenticated_user
 
 router = APIRouter(
     prefix="/api",

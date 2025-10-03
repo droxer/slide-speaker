@@ -13,14 +13,14 @@ import json
 from pathlib import Path
 from typing import Annotated, Any
 
-import aiofiles
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from loguru import logger
 
+from slidespeaker.auth import extract_user_id, require_authenticated_user
 from slidespeaker.configs.config import config
 from slidespeaker.configs.locales import locale_utils
 from slidespeaker.core.task_queue import task_queue
-from slidespeaker.utils.auth import extract_user_id, require_authenticated_user
 
 router = APIRouter(
     prefix="/api",
@@ -54,6 +54,25 @@ def _coerce_optional_str(value: Any) -> str | None:
     return value_str or None
 
 
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MiB safety limit
+
+
+async def _read_upload_file(upload: UploadFile) -> bytes:
+    remainder = MAX_UPLOAD_BYTES
+    chunks: list[bytes] = []
+    while True:
+        data = await upload.read(min(1024 * 1024, remainder))
+        if not data:
+            break
+        remainder -= len(data)
+        if remainder < 0:
+            raise HTTPException(
+                status_code=413, detail="Uploaded file exceeds size limit"
+            )
+        chunks.append(data)
+    return b"".join(chunks)
+
+
 async def _parse_upload_payload(request: Request) -> dict[str, Any]:
     content_type = (request.headers.get("content-type") or "").lower()
 
@@ -65,7 +84,16 @@ async def _parse_upload_payload(request: Request) -> dict[str, Any]:
         filename: str | None = None
 
         if isinstance(upload, UploadFile):
-            file_bytes = await upload.read()
+            content_length = request.headers.get("content-length")
+            if content_length is not None:
+                try:
+                    if int(content_length) > MAX_UPLOAD_BYTES:
+                        raise HTTPException(
+                            status_code=413, detail="Uploaded file exceeds size limit"
+                        )
+                except ValueError:
+                    pass
+            file_bytes = await _read_upload_file(upload)
             filename = upload.filename or None
             await upload.close()
         else:
@@ -193,6 +221,9 @@ async def _parse_upload_payload(request: Request) -> dict[str, Any]:
     except Exception as exc:
         raise HTTPException(status_code=400, detail="Invalid base64 file data") from exc
 
+    if len(file_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Uploaded file exceeds size limit")
+
     return {
         "filename": filename,
         "file_bytes": file_bytes,
@@ -302,8 +333,7 @@ async def upload_file(
         file_path = UPLOAD_DIR / f"{file_id}{file_ext}"
 
         # Write file to disk
-        async with aiofiles.open(file_path, "wb") as out_file:
-            await out_file.write(file_bytes)
+        await run_in_threadpool(file_path.write_bytes, file_bytes)
 
         # Persist original to storage for future reruns
         try:

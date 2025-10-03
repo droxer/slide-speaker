@@ -1,7 +1,5 @@
-"""
-Translation package for SlideSpeaker.
-"""
+"""Translation package for SlideSpeaker."""
 
-from .service import TranslationService
+from .openai_translator import TranslationService
 
 __all__ = ["TranslationService"]

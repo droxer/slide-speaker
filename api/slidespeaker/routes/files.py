@@ -10,10 +10,10 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 
+from slidespeaker.auth import extract_user_id, require_authenticated_user
 from slidespeaker.configs.config import config
 from slidespeaker.configs.locales import locale_utils
 from slidespeaker.core.task_queue import task_queue
-from slidespeaker.utils.auth import extract_user_id, require_authenticated_user
 
 router = APIRouter(
     prefix="/api",

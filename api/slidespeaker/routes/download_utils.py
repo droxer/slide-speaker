@@ -6,10 +6,12 @@ to avoid code duplication and improve maintainability.
 """
 
 from collections.abc import AsyncIterator, Iterator
+from contextlib import AsyncExitStack
 
 import httpx
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
+from starlette.background import BackgroundTask
 
 from slidespeaker.configs.config import get_storage_provider
 from slidespeaker.storage import StorageProvider
@@ -100,7 +102,11 @@ def final_audio_object_keys(file_id: str) -> list[str]:
 
 
 async def proxy_cloud_media(
-    object_key: str, media_type: str, range_header: str | None
+    object_key: str,
+    media_type: str,
+    range_header: str | None,
+    *,
+    origin: str | None = None,
 ) -> StreamingResponse:
     """Proxy a cloud object through the API using signed-URL streaming first.
 
@@ -110,45 +116,89 @@ async def proxy_cloud_media(
     sp: StorageProvider = get_storage_provider()
 
     # Prefer: presigned URL streaming with Range support
+    stack = AsyncExitStack()
     try:
         url = sp.get_file_url(object_key, expires_in=300)
         headers: dict[str, str] = {}
         if range_header:
             headers["Range"] = range_header
 
-        async with httpx.AsyncClient(timeout=None, follow_redirects=True) as client:  # noqa: SIM117 - nested context requires client reference
-            async with client.stream("GET", url, headers=headers) as resp:
-                status = resp.status_code
-                if status >= 400:
-                    if status in {400, 403, 404, 416}:
-                        raise HTTPException(status_code=status, detail=resp.text)
-                    resp.raise_for_status()
+        client = await stack.enter_async_context(
+            httpx.AsyncClient(timeout=None, follow_redirects=True)
+        )
+        resp = await stack.enter_async_context(
+            client.stream("GET", url, headers=headers)
+        )
 
-                content_length = resp.headers.get("Content-Length")
-                content_range = resp.headers.get("Content-Range")
+        status = resp.status_code
+        if status >= 400:
+            if status in {400, 403, 404, 416}:
+                raw_detail = await resp.aread()
+                detail = raw_detail.decode("utf-8", errors="replace")
+                raise HTTPException(status_code=status, detail=detail)
+            resp.raise_for_status()
 
-                async def iter_stream(
-                    chunk_size: int = 1024 * 256,
-                ) -> AsyncIterator[bytes]:
-                    async for chunk in resp.aiter_bytes(chunk_size):
-                        yield chunk
+        async def iter_stream(
+            chunk_size: int = 1024 * 256,
+        ) -> AsyncIterator[bytes]:
+            async for chunk in resp.aiter_raw(chunk_size):
+                yield chunk
 
-                out_headers = {
-                    "Content-Type": media_type,
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
-                    "Access-Control-Allow-Origin": "*",
-                    "Accept-Ranges": "bytes",
-                }
-                if content_length:
-                    out_headers["Content-Length"] = content_length
-                if content_range:
-                    out_headers["Content-Range"] = content_range
+        content_length = resp.headers.get("Content-Length")
+        content_range = resp.headers.get("Content-Range")
 
-                return StreamingResponse(
-                    iter_stream(),
-                    status_code=status,
-                    headers=out_headers,
-                )
+        out_headers: dict[str, str] = {
+            "Content-Type": media_type,
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Accept-Ranges": "bytes",
+        }
+        if "Content-Encoding" in resp.headers:
+            out_headers["Content-Encoding"] = resp.headers["Content-Encoding"]
+        if "Content-Disposition" in resp.headers:
+            out_headers["Content-Disposition"] = resp.headers["Content-Disposition"]
+        if "ETag" in resp.headers:
+            out_headers["ETag"] = resp.headers["ETag"]
+        if "Last-Modified" in resp.headers:
+            out_headers["Last-Modified"] = resp.headers["Last-Modified"]
+        if content_range:
+            out_headers["Content-Range"] = content_range
+        if not content_length and content_range:
+            try:
+                units, range_part = content_range.split(" ", 1)
+                if units.lower() == "bytes":
+                    span, total_part = range_part.split("/", 1)
+                    if "-" in span:
+                        start_s, end_s = span.split("-", 1)
+                        if start_s.strip() and end_s.strip():
+                            start = int(start_s)
+                            end = int(end_s)
+                            length = (end - start) + 1
+                            if length > 0:
+                                out_headers["Content-Length"] = str(length)
+                    elif span.strip():
+                        # e.g. "12345-" (open ended)
+                        start = int(span)
+                        if total_part.strip().isdigit():
+                            total = int(total_part)
+                            if total > start:
+                                out_headers["Content-Length"] = str(total - start)
+            except Exception:
+                pass
+        elif content_length:
+            out_headers["Content-Length"] = content_length
+        if origin:
+            out_headers["Access-Control-Allow-Origin"] = origin
+            out_headers["Access-Control-Allow-Credentials"] = "true"
+
+        cleanup_stack = stack.pop_all()
+        response = StreamingResponse(
+            iter_stream(),
+            status_code=status,
+            headers=out_headers,
+            media_type=media_type,
+            background=BackgroundTask(cleanup_stack.aclose),
+        )
+        return response
     except HTTPException as e:
         # Some providers return 4xx for transient or permissioned GETs
         if e.status_code not in (400, 403, 404, 416):
@@ -156,6 +206,8 @@ async def proxy_cloud_media(
         # Fall through to SDK download fallback
     except httpx.HTTPError:
         pass
+    finally:
+        await stack.aclose()
 
     # Fallback: download bytes via storage SDK
     try:
@@ -169,16 +221,20 @@ async def proxy_cloud_media(
                 yield blob[offset:nxt]
                 offset = nxt
 
+        headers = {
+            "Content-Type": media_type,
+            "Content-Length": str(total),
+            "Accept-Ranges": "bytes",
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+        }
+        if origin:
+            headers["Access-Control-Allow-Origin"] = origin
+            headers["Access-Control-Allow-Credentials"] = "true"
+
         return StreamingResponse(
             iter_mem(),
             status_code=200,
-            headers={
-                "Content-Type": media_type,
-                "Content-Length": str(total),
-                "Accept-Ranges": "bytes",
-                "Cache-Control": "no-cache, no-store, must-revalidate",
-                "Access-Control-Allow-Origin": "*",
-            },
+            headers=headers,
         )
     except Exception as e:
         raise HTTPException(status_code=404, detail="Media not found") from e

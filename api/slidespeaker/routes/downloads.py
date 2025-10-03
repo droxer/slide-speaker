@@ -9,9 +9,9 @@ from typing import Any
 
 from fastapi import APIRouter, Depends
 
+from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.config import get_storage_provider
 from slidespeaker.storage import StorageProvider
-from slidespeaker.utils.auth import require_authenticated_user
 
 from .download_utils import file_id_from_task, final_audio_object_keys
 
