@@ -2,8 +2,10 @@
 
 import {useLocale} from 'next-intl';
 import {useRouter} from '@/navigation';
-import App from '@/App';
-import type { HealthStatus } from '@/types/health';
+import AppShell from '@/components/AppShell';
+import Creations from '@/components/Creations';
+import {resolveApiBaseUrl} from '@/utils/apiBaseUrl';
+import type {HealthStatus} from '@/types/health';
 
 export type CreationsPageClientProps = {
   initialHealth?: HealthStatus | null;
@@ -12,9 +14,10 @@ export type CreationsPageClientProps = {
 export default function CreationsPageClient({ initialHealth = null }: CreationsPageClientProps) {
   const router = useRouter();
   const locale = useLocale();
+  const apiBaseUrl = resolveApiBaseUrl();
 
   return (
-    <App
+    <AppShell
       activeView="creations"
       initialHealth={initialHealth}
       onNavigate={(view) => {
@@ -22,6 +25,10 @@ export default function CreationsPageClient({ initialHealth = null }: CreationsP
           router.push('/', {locale});
         }
       }}
-    />
+    >
+      <div id="monitor-panel" role="tabpanel" aria-labelledby="monitor-tab">
+        <Creations apiBaseUrl={apiBaseUrl} />
+      </div>
+    </AppShell>
   );
 }

@@ -11,17 +11,22 @@ import binascii
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
-import aiofiles
-from fastapi import APIRouter, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from loguru import logger
 
+from slidespeaker.auth import extract_user_id, require_authenticated_user
 from slidespeaker.configs.config import config
 from slidespeaker.configs.locales import locale_utils
 from slidespeaker.core.task_queue import task_queue
 
-router = APIRouter(prefix="/api", tags=["upload"])
+router = APIRouter(
+    prefix="/api",
+    tags=["upload"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 UPLOAD_DIR = config.uploads_dir
 
@@ -49,6 +54,25 @@ def _coerce_optional_str(value: Any) -> str | None:
     return value_str or None
 
 
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MiB safety limit
+
+
+async def _read_upload_file(upload: UploadFile) -> bytes:
+    remainder = MAX_UPLOAD_BYTES
+    chunks: list[bytes] = []
+    while True:
+        data = await upload.read(min(1024 * 1024, remainder))
+        if not data:
+            break
+        remainder -= len(data)
+        if remainder < 0:
+            raise HTTPException(
+                status_code=413, detail="Uploaded file exceeds size limit"
+            )
+        chunks.append(data)
+    return b"".join(chunks)
+
+
 async def _parse_upload_payload(request: Request) -> dict[str, Any]:
     content_type = (request.headers.get("content-type") or "").lower()
 
@@ -60,7 +84,16 @@ async def _parse_upload_payload(request: Request) -> dict[str, Any]:
         filename: str | None = None
 
         if isinstance(upload, UploadFile):
-            file_bytes = await upload.read()
+            content_length = request.headers.get("content-length")
+            if content_length is not None:
+                try:
+                    if int(content_length) > MAX_UPLOAD_BYTES:
+                        raise HTTPException(
+                            status_code=413, detail="Uploaded file exceeds size limit"
+                        )
+                except ValueError:
+                    pass
+            file_bytes = await _read_upload_file(upload)
             filename = upload.filename or None
             await upload.close()
         else:
@@ -188,6 +221,9 @@ async def _parse_upload_payload(request: Request) -> dict[str, Any]:
     except Exception as exc:
         raise HTTPException(status_code=400, detail="Invalid base64 file data") from exc
 
+    if len(file_bytes) > MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Uploaded file exceeds size limit")
+
     return {
         "filename": filename,
         "file_bytes": file_bytes,
@@ -205,9 +241,15 @@ async def _parse_upload_payload(request: Request) -> dict[str, Any]:
 
 
 @router.post("/upload")
-async def upload_file(request: Request) -> dict[str, str | None]:
+async def upload_file(
+    request: Request,
+    current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
+) -> dict[str, str | None]:
     """Upload a presentation file and start processing."""
     try:
+        owner_id = extract_user_id(current_user)
+        if not owner_id:
+            raise HTTPException(status_code=403, detail="user session missing id")
         payload = await _parse_upload_payload(request)
         filename = payload["filename"]
         file_bytes = payload["file_bytes"]
@@ -291,8 +333,7 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         file_path = UPLOAD_DIR / f"{file_id}{file_ext}"
 
         # Write file to disk
-        async with aiofiles.open(file_path, "wb") as out_file:
-            await out_file.write(file_bytes)
+        await run_in_threadpool(file_path.write_bytes, file_bytes)
 
         # Persist original to storage for future reruns
         try:
@@ -343,6 +384,7 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         # Submit task to Redis task queue (state management is handled internally)
         task_id = await task_queue.submit_task(
             task_type,
+            owner_id=owner_id,
             file_id=file_id,
             file_path=str(file_path),
             file_ext=file_ext,
@@ -368,6 +410,8 @@ async def upload_file(request: Request) -> dict[str, str | None]:
             "message": "File uploaded successfully, processing started in background",
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Upload error")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}") from e
+        raise HTTPException(status_code=500, detail="Upload failed") from e

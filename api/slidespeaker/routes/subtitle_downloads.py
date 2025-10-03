@@ -7,16 +7,43 @@ subtitle files in both SRT and VTT formats.
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
+from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.configs.locales import locale_utils
 from slidespeaker.storage import StorageProvider
 
 from .download_utils import file_id_from_task
 
-router = APIRouter(prefix="/api", tags=["subtitle_downloads"])
+router = APIRouter(
+    prefix="/api",
+    tags=["subtitle_downloads"],
+    dependencies=[Depends(require_authenticated_user)],
+)
+
+
+def _build_headers(
+    request: Request,
+    *,
+    content_type: str,
+    disposition: str | None = None,
+    cache_control: str = "public, max-age=3600",
+) -> dict[str, str]:
+    origin = request.headers.get("origin") or request.headers.get("Origin")
+    headers: dict[str, str] = {
+        "Content-Type": content_type,
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
+        "Cache-Control": cache_control,
+    }
+    if disposition:
+        headers["Content-Disposition"] = disposition
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return headers
 
 
 async def _get_subtitle_language(
@@ -62,7 +89,7 @@ async def _get_subtitle_language(
 
 @router.get("/tasks/{task_id}/subtitles/srt")
 async def get_srt_subtitles_by_task(
-    task_id: str, language: str | None = None
+    task_id: str, request: Request, language: str | None = None
 ) -> Response:
     """Serve SRT subtitle file for a task."""
     sp: StorageProvider = get_storage_provider()
@@ -79,13 +106,11 @@ async def get_srt_subtitles_by_task(
         return Response(
             content=subtitle_content,
             media_type="text/plain",
-            headers={
-                "Content-Disposition": f"attachment; filename=presentation_{task_id}_{locale_code}.srt",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-                "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
-                "Cache-Control": "public, max-age=3600",
-            },
+            headers=_build_headers(
+                request,
+                content_type="text/plain",
+                disposition=f"attachment; filename=presentation_{task_id}_{locale_code}.srt",
+            ),
         )
 
     # Fallback: local state paths if upload missing
@@ -110,16 +135,18 @@ async def get_srt_subtitles_by_task(
                 candidate,
                 media_type="text/plain",
                 filename=f"presentation_{task_id}_{locale_code}.srt",
-                headers={
-                    "Content-Disposition": f"inline; filename=presentation_{task_id}_{locale_code}.srt"
-                },
+                headers=_build_headers(
+                    request,
+                    content_type="text/plain",
+                    disposition=f"inline; filename=presentation_{task_id}_{locale_code}.srt",
+                ),
             )
     raise HTTPException(status_code=404, detail="SRT subtitles not found")
 
 
 @router.get("/tasks/{task_id}/subtitles/srt/download")
 async def download_srt_subtitles_by_task(
-    task_id: str, language: str | None = None
+    task_id: str, request: Request, language: str | None = None
 ) -> Any:
     """Download SRT with attachment disposition (task-based)."""
     file_id = await file_id_from_task(task_id)
@@ -141,10 +168,11 @@ async def download_srt_subtitles_by_task(
             str(actual),
             media_type="text/plain",
             filename=f"presentation_{task_id}_{locale_code}.srt",
-            headers={
-                "Content-Disposition": f"attachment; filename=presentation_{task_id}_{locale_code}.srt",
-                "Access-Control-Allow-Origin": "*",
-            },
+            headers=_build_headers(
+                request,
+                content_type="text/plain",
+                disposition=f"attachment; filename=presentation_{task_id}_{locale_code}.srt",
+            ),
         )
 
     url = sp.get_file_url(
@@ -153,14 +181,17 @@ async def download_srt_subtitles_by_task(
         content_disposition=f"attachment; filename=presentation_{task_id}_{locale_code}.srt",
         content_type="text/plain",
     )
-    return Response(
-        status_code=307, headers={"Location": url, "Access-Control-Allow-Origin": "*"}
-    )
+    headers = {"Location": url}
+    origin = request.headers.get("origin") or request.headers.get("Origin")
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return Response(status_code=307, headers=headers)
 
 
 @router.get("/tasks/{task_id}/subtitles/vtt")
 async def get_vtt_subtitles_by_task(
-    task_id: str, language: str | None = None
+    task_id: str, request: Request, language: str | None = None
 ) -> Response:
     """Serve VTT subtitle file for a task."""
     sp: StorageProvider = get_storage_provider()
@@ -177,13 +208,11 @@ async def get_vtt_subtitles_by_task(
         return Response(
             content=subtitle_content,
             media_type="text/vtt",
-            headers={
-                "Content-Disposition": f"inline; filename=presentation_{task_id}_{locale_code}.vtt",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-                "Access-Control-Allow-Headers": "Range, Accept, Accept-Encoding, Accept-Language, Content-Type",
-                "Cache-Control": "public, max-age=3600",
-            },
+            headers=_build_headers(
+                request,
+                content_type="text/vtt",
+                disposition=f"inline; filename=presentation_{task_id}_{locale_code}.vtt",
+            ),
         )
 
     # Fallback: local state paths if upload missing
@@ -208,9 +237,11 @@ async def get_vtt_subtitles_by_task(
                 candidate,
                 media_type="text/vtt",
                 filename=f"presentation_{task_id}_{locale_code}.vtt",
-                headers={
-                    "Content-Disposition": f"inline; filename=presentation_{task_id}_{locale_code}.vtt"
-                },
+                headers=_build_headers(
+                    request,
+                    content_type="text/vtt",
+                    disposition=f"inline; filename=presentation_{task_id}_{locale_code}.vtt",
+                ),
             )
     raise HTTPException(status_code=404, detail="VTT subtitles not found")
 

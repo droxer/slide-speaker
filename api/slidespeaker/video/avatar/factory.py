@@ -4,7 +4,7 @@ Avatar Service Factory (video package)
 
 from slidespeaker.configs.config import config
 
-from .heygen_service import HeyGenAvatarService
+from .heygen import HeyGenAvatarService
 from .interface import AvatarInterface
 
 

@@ -1,15 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import GoogleLoginButton from './GoogleLoginButton';
-import dynamic from 'next/dynamic';
-import { useI18n } from '@/i18n/hooks';
+import {useSession, signIn, signOut} from 'next-auth/react';
+import {useRouter} from 'next/navigation';
+import {useI18n} from '@/i18n/hooks';
 
-const LanguageToggle = dynamic(
-  () => import('./LanguageToggle').then((mod) => mod.default),
-  { ssr: false },
-);
-import { initiateGoogleLogin, getCurrentUser, logout } from '../services/auth';
-
-export type AppView = 'studio' | 'creations';
+export type AppView = 'studio' | 'creations' | 'profile';
 
 type HeaderProps = {
   activeView: AppView;
@@ -17,48 +12,127 @@ type HeaderProps = {
 };
 
 const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
-  const [user, setUser] = useState<any>(null);
-  const [sessionToken, setSessionToken] = useState<string | null>(null);
-  const { t } = useI18n();
+  const { data: session, status } = useSession();
+  const { t, locale } = useI18n();
+  const router = useRouter();
 
-  // Check for existing session on component mount
-  useEffect(() => {
-    const token = localStorage.getItem('slidespeaker_session_token');
-    if (token) {
-      setSessionToken(token);
-      // Fetch user data
-      getCurrentUser(token).then(setUser).catch(console.error);
+  const currentLocale = useMemo(() => {
+    if (typeof locale === 'string' && locale.trim().length > 0) {
+      return locale.trim();
     }
-  }, []);
+    return 'en';
+  }, [locale]);
 
-  const handleLogin = () => {
-    initiateGoogleLogin();
+  const user = session?.user;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
+  const primaryName = useMemo(() => {
+    const name = typeof user?.name === 'string' ? user.name.trim() : '';
+    if (name.length > 0) {
+      return name;
+    }
+    const email = typeof user?.email === 'string' ? user.email.trim() : '';
+    if (email.length > 0) {
+      return email;
+    }
+    return t('header.defaultName', undefined, 'there');
+  }, [user?.name, user?.email, t]);
+
+  const initials = useMemo(() => {
+    const source = (user?.name || user?.email || '').trim();
+    if (!source) return '🙂';
+    const parts = source.split(/\s+/).filter(Boolean);
+    if (parts.length === 0 && user?.email) {
+      return user.email.slice(0, 2).toUpperCase();
+    }
+    if (parts.length === 1) {
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }, [user?.name, user?.email]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMenuOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleEscape);
+    return () => {
+      window.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleEscape);
+    };
+  }, [menuOpen]);
+
+  const handleCredentialsLogin = () => {
+    router.push('/login');
   };
 
-  const handleLogout = async () => {
-    if (sessionToken) {
-      await logout(sessionToken);
-      localStorage.removeItem('slidespeaker_session_token');
-      setSessionToken(null);
-      setUser(null);
-      // Reload the page to show the logged out view
-      window.location.reload();
-    }
+  const navigateToProfile = () => {
+    setMenuOpen(false);
+    router.push(`/${currentLocale}/profile`);
   };
 
   return (
     <header className="app-header">
       <div className="header-content">
         <div className="header-left">
-          {user ? (
-            <div className="user-info">
-              <span>{t('header.welcome', { name: user.name }, `Welcome, ${user.name}`)}</span>
-              <button onClick={handleLogout} className="logout-btn">
-                {t('header.logout')}
+          {status === 'loading' ? (
+            <div className="user-chip user-chip--loading" aria-live="polite">
+              <div className="user-chip__avatar" aria-hidden="true">🙂</div>
+              <div className="user-chip__text">
+                <span className="user-chip__name">{t('header.welcomeShort', {name: '…'}, 'Hi, …')}</span>
+              </div>
+            </div>
+          ) : user ? (
+            <div className="user-chip" ref={menuRef}>
+              <button
+                type="button"
+                className="user-menu-trigger"
+                onClick={() => setMenuOpen((prev) => !prev)}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+              >
+                <span className="user-chip__avatar" aria-hidden="true">{initials}</span>
+                <span className="user-chip__text">
+                  <span className="user-chip__name">{primaryName}</span>
+                  {user.email && <span className="user-chip__email">{user.email}</span>}
+                </span>
+                <span className="user-menu-icon" aria-hidden="true">▾</span>
               </button>
+              {menuOpen && (
+                <div className="user-menu" role="menu">
+                  <button type="button" role="menuitem" onClick={navigateToProfile}>
+                    {t('header.profile', undefined, 'Profile')}
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void signOut({callbackUrl: `/${currentLocale}`});
+                    }}
+                  >
+                    {t('header.menu.logout', undefined, 'Sign out')}
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
-            <GoogleLoginButton onClick={handleLogin} label={t('header.login')} />
+            <div className="auth-buttons">
+              <GoogleLoginButton onClick={() => signIn('google')} label={t('header.login')} />
+              <button type="button" className="credentials-login-button" onClick={handleCredentialsLogin}>
+                {t('auth.usePassword', undefined, 'Use email & password')}
+              </button>
+            </div>
           )}
         </div>
         <div className="header-center">
@@ -66,13 +140,13 @@ const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
           <p>{t('header.subtitle')}</p>
         </div>
         <div className="header-right">
-          <LanguageToggle />
           <div
             className="view-toggle ai-toggle"
             role="tablist"
             aria-label="View Toggle"
           >
             <button
+              type="button"
               onClick={() => onNavigate('studio')}
               className={`toggle-btn ${activeView === 'studio' ? "active" : ""}`}
               title={t('header.view.studio')}
@@ -87,6 +161,7 @@ const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
               <span className="toggle-text">{t('header.view.studio')}</span>
             </button>
             <button
+              type="button"
               onClick={() => onNavigate('creations')}
               className={`toggle-btn ${activeView === 'creations' ? "active" : ""}`}
               title={t('header.view.creations')}

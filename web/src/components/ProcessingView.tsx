@@ -120,7 +120,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
         </p>
       </div>
 
-      <button onClick={onStop} className="cancel-btn">{t('processing.stop')}</button>
+      <button type="button" onClick={onStop} className="cancel-btn">{t('processing.stop')}</button>
 
       <div className="steps-container">
         <h4>

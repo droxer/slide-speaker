@@ -6,20 +6,17 @@ including listing tasks, filtering, searching, and retrieving task statistics.
 """
 
 from contextlib import suppress
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from loguru import logger
 
+from slidespeaker.auth import extract_user_id, require_authenticated_user
 from slidespeaker.core.progress_utils import compute_step_percentage
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
-from slidespeaker.repository.task import (
-    delete_task as db_delete_task,
-)
-from slidespeaker.repository.task import (
-    list_tasks as db_list_tasks,
-)
+from slidespeaker.repository.task import delete_task as db_delete_task
+from slidespeaker.repository.task import list_tasks as db_list_tasks
 
 
 def _filter_sensitive_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -30,11 +27,16 @@ def _filter_sensitive_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
     return filtered
 
 
-router = APIRouter(prefix="/api", tags=["stats"])
+router = APIRouter(
+    prefix="/api",
+    tags=["stats"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 
 @router.get("/tasks")
 async def get_tasks(
+    *,
     status: str | None = Query(None, description="Filter by task status"),
     limit: int = Query(
         50, ge=1, le=1000, description="Maximum number of tasks to return"
@@ -44,10 +46,23 @@ async def get_tasks(
         "created_at", description="Sort field (created_at, updated_at, status)"
     ),
     sort_order: str = Query("desc", description="Sort order (asc, desc)"),
+    current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
 ) -> dict[str, Any]:
     """DB-backed task list. Uses repository; no Redis scanning."""
 
-    db_res = await db_list_tasks(limit=limit, offset=offset, status=status)
+    owner_id = extract_user_id(current_user)
+    if not owner_id:
+        return {
+            "tasks": [],
+            "total": 0,
+            "limit": limit,
+            "offset": offset,
+            "has_more": False,
+        }
+
+    db_res = await db_list_tasks(
+        limit=limit, offset=offset, status=status, owner_id=owner_id
+    )
     return {
         "tasks": db_res["tasks"],
         "total": db_res["total"],
@@ -111,15 +126,23 @@ async def set_task_type(
 
 @router.get("/tasks/search")
 async def search_tasks(
+    *,
     query: str = Query(
         ...,
         description="Search query for task_id, file_id, status, task_type, or kwargs",
     ),
     limit: int = Query(20, ge=1, le=100, description="Maximum number of results"),
+    current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
 ) -> dict[str, Any]:
     """DB-backed search across basic fields. No Redis usage."""
 
-    all_tasks_result = await db_list_tasks(limit=10000, offset=0, status=None)
+    owner_id = extract_user_id(current_user)
+    if not owner_id:
+        return {"tasks": [], "query": query, "total_found": 0}
+
+    all_tasks_result = await db_list_tasks(
+        limit=10000, offset=0, status=None, owner_id=owner_id
+    )
     all_tasks = all_tasks_result["tasks"]
 
     q = query.lower()
@@ -146,25 +169,63 @@ async def search_tasks(
 
 
 @router.get("/tasks/statistics")
-async def get_task_statistics() -> dict[str, Any]:
+async def get_task_statistics(
+    current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
+) -> dict[str, Any]:
     """Get comprehensive statistics about all tasks (DB only)."""
     from slidespeaker.repository.task import get_statistics as db_get_statistics
 
-    return await db_get_statistics()
+    owner_id = extract_user_id(current_user)
+    if not owner_id:
+        return {
+            "total_tasks": 0,
+            "status_breakdown": {},
+            "language_stats": {},
+            "recent_activity": {"last_24h": 0, "last_7d": 0, "last_30d": 0},
+            "processing_stats": {
+                "avg_processing_time_minutes": None,
+                "success_rate": 0.0,
+                "failed_rate": 0.0,
+            },
+        }
+
+    return await db_get_statistics(owner_id=owner_id)
 
 
 @router.get("/tasks/{task_id}")
-async def get_task_details(task_id: str) -> dict[str, Any]:
+async def get_task_details(
+    task_id: str,
+    current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
+) -> dict[str, Any]:
     """Get detailed information about a specific task."""
+
+    owner_id = extract_user_id(current_user)
+    if not owner_id:
+        raise HTTPException(status_code=403, detail="user session missing id")
 
     # Try to get from task queue first
     task = await task_queue.get_task(task_id)
+
+    from slidespeaker.repository.task import get_task as db_get_task
+
+    row = await db_get_task(task_id)
+    if not row or row.get("owner_id") != owner_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    if task:
+        task_owner = task.get("owner_id")
+        if task_owner and task_owner != owner_id:
+            raise HTTPException(status_code=404, detail="Task not found")
+        task.setdefault("owner_id", owner_id)
 
     if not task and task_id.startswith("state_"):
         # Check if it's a state-only task (format: state_{file_id})
         file_id = task_id.replace("state_", "")
         state = await state_manager.get_state(file_id)
         if state:
+            st_owner = state.get("owner_id")
+            if isinstance(st_owner, str) and st_owner and st_owner != owner_id:
+                raise HTTPException(status_code=404, detail="Task not found")
             task = {
                 "task_id": task_id,
                 "file_id": file_id,
@@ -186,30 +247,30 @@ async def get_task_details(task_id: str) -> dict[str, Any]:
 
     if not task:
         # DB fallback: reconstruct from DB + state
-        from slidespeaker.repository.task import get_task as db_get_task
+        file_id = str(row.get("file_id")) if row.get("file_id") is not None else ""
+        st = await state_manager.get_state(file_id) if file_id else None
+        if st:
+            st_owner = st.get("owner_id")
+            if isinstance(st_owner, str) and st_owner and st_owner != owner_id:
+                raise HTTPException(status_code=404, detail="Task not found")
+        # Filter sensitive information from kwargs
+        filtered_kwargs = _filter_sensitive_kwargs(row.get("kwargs") or {})
 
-        row = await db_get_task(task_id)
-        if row:
-            file_id = str(row.get("file_id")) if row.get("file_id") is not None else ""
-            st = await state_manager.get_state(file_id) if file_id else None
-            # Filter sensitive information from kwargs
-            filtered_kwargs = _filter_sensitive_kwargs(row.get("kwargs") or {})
-
-            return {
-                "task_id": row.get("task_id"),
-                "file_id": file_id,
-                "task_type": row.get("task_type"),
-                "status": row.get("status"),
-                "created_at": row.get("created_at"),
-                "updated_at": row.get("updated_at"),
-                "kwargs": filtered_kwargs,
-                "source_type": (st or {}).get("source_type")
-                or (st or {}).get("source")
-                or (filtered_kwargs.get("source_type")),
-                "state": st,
-                "completion_percentage": compute_step_percentage(st) if st else 0,
-            }
-        return {"error": "Task not found", "task_id": task_id}
+        return {
+            "task_id": row.get("task_id"),
+            "file_id": file_id,
+            "task_type": row.get("task_type"),
+            "status": row.get("status"),
+            "created_at": row.get("created_at"),
+            "updated_at": row.get("updated_at"),
+            "kwargs": filtered_kwargs,
+            "source_type": (st or {}).get("source_type")
+            or (st or {}).get("source")
+            or (filtered_kwargs.get("source_type")),
+            "state": st,
+            "completion_percentage": compute_step_percentage(st) if st else 0,
+            "owner_id": owner_id,
+        }
 
     # Enrich with detailed state information
     file_id = task.get("kwargs", {}).get("file_id", "unknown")
@@ -227,13 +288,35 @@ async def get_task_details(task_id: str) -> dict[str, Any]:
 
 
 @router.delete("/tasks/{task_id}")
-async def cancel_task(task_id: str) -> dict[str, Any]:
+async def cancel_task(
+    task_id: str,
+    current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
+) -> dict[str, Any]:
     """Cancel a specific task if it's still running."""
+
+    owner_id = extract_user_id(current_user)
+    if not owner_id:
+        raise HTTPException(status_code=403, detail="user session missing id")
+
+    from slidespeaker.repository.task import get_task as db_get_task
+
+    row = await db_get_task(task_id)
+    if not row or row.get("owner_id") != owner_id:
+        return {
+            "error": "Task not found",
+            "task_id": task_id,
+        }
 
     # Get task details
     task = await task_queue.get_task(task_id)
 
     if not task:
+        return {
+            "error": "Task not found",
+            "task_id": task_id,
+        }
+
+    if task.get("owner_id") and task.get("owner_id") != owner_id:
         return {
             "error": "Task not found",
             "task_id": task_id,

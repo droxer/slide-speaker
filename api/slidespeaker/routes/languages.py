@@ -5,11 +5,16 @@ This module provides API endpoints for retrieving supported languages
 and their locale information for the presentation processing system.
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.locales import locale_utils
 
-router = APIRouter(prefix="/api", tags=["languages"])
+router = APIRouter(
+    prefix="/api",
+    tags=["languages"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 
 @router.get("/languages")

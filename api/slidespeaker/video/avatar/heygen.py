@@ -6,7 +6,7 @@ import asyncio
 from pathlib import Path
 from typing import Any
 
-import requests
+import httpx
 from loguru import logger
 
 from slidespeaker.configs.config import config
@@ -64,7 +64,10 @@ class HeyGenAvatarService(AvatarInterface):
         self, script: str, avatar_id: str, voice_id: str
     ) -> str:
         url = f"{self.api_url}/video/generate"
-        headers = {"X-Api-Key": self.api_key, "Content-Type": "application/json"}
+        headers = {
+            "X-Api-Key": self.api_key or "",
+            "Content-Type": "application/json",
+        }
 
         payload = {
             "video_inputs": [
@@ -87,28 +90,32 @@ class HeyGenAvatarService(AvatarInterface):
         }
 
         try:
-            response = requests.post(url, headers=headers, json=payload)
-            response.raise_for_status()
-            data = response.json()
+            async with httpx.AsyncClient(timeout=30) as client:
+                response = await client.post(url, headers=headers, json=payload)
+                response.raise_for_status()
+                data = response.json()
             return str(data["data"]["task_id"])
+        except httpx.HTTPStatusError as e:
+            logger.error(f"HeyGen task creation failed: {e}")
+            logger.error(f"Response status: {e.response.status_code}")
+            logger.error(f"Response text: {e.response.text[:500]}")
+            raise
         except Exception as e:
             logger.error(f"HeyGen task creation failed: {e}")
-            if hasattr(e, "response") and e.response is not None:
-                logger.error(f"Response status: {e.response.status_code}")
-                logger.error(f"Response text: {e.response.text[:500]}")
             raise
 
     async def _wait_for_task_completion(
         self, task_id: str, max_retries: int = 30
     ) -> str:
         url = f"{self.api_url}/video/task/{task_id}"
-        headers = {"X-Api-Key": self.api_key}
+        headers = {"X-Api-Key": self.api_key or ""}
 
         for _attempt in range(max_retries):
             try:
-                response = requests.get(url, headers=headers)
-                response.raise_for_status()
-                data = response.json()
+                async with httpx.AsyncClient(timeout=30) as client:
+                    response = await client.get(url, headers=headers)
+                    response.raise_for_status()
+                    data = response.json()
                 status = str(data["data"]["status"])
 
                 if status == "completed":
@@ -127,12 +134,18 @@ class HeyGenAvatarService(AvatarInterface):
 
     async def _download_video(self, video_url: str, output_path: Path) -> None:
         try:
-            response = requests.get(video_url, stream=True)
-            response.raise_for_status()
-            with open(output_path, "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
+            async with (
+                httpx.AsyncClient(timeout=30) as client,
+                client.stream("GET", video_url) as response,
+            ):
+                response.raise_for_status()
+                with output_path.open("wb") as f:
+                    async for chunk in response.aiter_bytes(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+        except httpx.HTTPError as e:
+            logger.error(f"Error downloading HeyGen video: {e}")
+            raise
         except Exception as e:
             logger.error(f"Error downloading HeyGen video: {e}")
             raise

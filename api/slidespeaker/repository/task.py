@@ -69,12 +69,13 @@ async def insert_task(task: dict[str, Any]) -> None:
             sub_lang = k.get("subtitle_language")
 
         row = TaskRow(
-            task_id=task.get("task_id"),
+            id=task.get("id") or task.get("task_id"),
             file_id=k.get("file_id", "unknown"),
             task_type=task_type,
             status=task.get("status", "queued"),
             kwargs=task.get("kwargs"),
             error=task.get("error"),
+            owner_id=task.get("owner_id"),
             voice_language=k.get("voice_language"),
             subtitle_language=sub_lang,
             source_type=source_type,
@@ -94,17 +95,19 @@ async def get_task(task_id: str) -> dict[str, Any] | None:
 
     async with get_session() as s:
         row = (
-            await s.execute(select(TaskRow).where(TaskRow.task_id == task_id))
+            await s.execute(select(TaskRow).where(TaskRow.id == task_id))
         ).scalar_one_or_none()
         if not row:
             return None
         return {
-            "task_id": row.task_id,
+            "id": row.id,
+            "task_id": row.id,
             "file_id": row.file_id,
             "task_type": row.task_type,
             "status": row.status,
             "kwargs": _filter_sensitive_kwargs(row.kwargs or {}),
             "error": row.error,
+            "owner_id": row.owner_id,
             "voice_language": row.voice_language,
             "subtitle_language": row.subtitle_language,
             "created_at": row.created_at.isoformat() if row.created_at else None,
@@ -135,6 +138,7 @@ async def update_task(task_id: str, **fields: Any) -> None:
         "file_id",
         "created_at",
         "updated_at",
+        "owner_id",
     }
     vals: dict[str, Any] = {k: v for k, v in fields.items() if k in allowed}
     if "updated_at" not in vals:
@@ -142,9 +146,7 @@ async def update_task(task_id: str, **fields: Any) -> None:
     if not vals:
         return
     async with get_session() as s:
-        await s.execute(
-            sa_update(TaskRow).where(TaskRow.task_id == task_id).values(**vals)
-        )
+        await s.execute(sa_update(TaskRow).where(TaskRow.id == task_id).values(**vals))
         await s.commit()
 
 
@@ -153,12 +155,15 @@ async def delete_task(task_id: str) -> None:
     from sqlalchemy import delete as sa_delete
 
     async with get_session() as s:
-        await s.execute(sa_delete(TaskRow).where(TaskRow.task_id == task_id))
+        await s.execute(sa_delete(TaskRow).where(TaskRow.id == task_id))
         await s.commit()
 
 
 async def list_tasks(
-    limit: int, offset: int, status: str | None = None
+    limit: int,
+    offset: int,
+    status: str | None = None,
+    owner_id: str | None = None,
 ) -> dict[str, Any]:
     from sqlalchemy import func, select
 
@@ -166,6 +171,8 @@ async def list_tasks(
         q = select(TaskRow)
         if status:
             q = q.where(TaskRow.status == status)
+        if owner_id:
+            q = q.where(TaskRow.owner_id == owner_id)
         total = (
             await s.execute(select(func.count()).select_from(q.subquery()))
         ).scalar_one()
@@ -180,13 +187,15 @@ async def list_tasks(
         )
         tasks = [
             {
-                "task_id": r.task_id,
+                "task_id": r.id,
+                "id": r.id,
                 "file_id": r.file_id,
                 "task_type": r.task_type,
                 "status": r.status,
                 "created_at": r.created_at.isoformat(),
                 "updated_at": r.updated_at.isoformat(),
                 "kwargs": _filter_sensitive_kwargs(r.kwargs or {}),
+                "owner_id": r.owner_id,
                 # Surface language hints for UI if needed in the future
                 "voice_language": r.voice_language,
                 "subtitle_language": r.subtitle_language,
@@ -197,70 +206,72 @@ async def list_tasks(
         return {"tasks": tasks, "total": int(total or 0)}
 
 
-async def get_statistics() -> dict[str, Any]:
+async def get_statistics(owner_id: str | None = None) -> dict[str, Any]:
     """Compute aggregate statistics from the DB."""
     from sqlalchemy import func, select, text
 
     async with get_session() as s:
+        base_query = select(TaskRow)
+        if owner_id:
+            base_query = base_query.where(TaskRow.owner_id == owner_id)
+
         # Total
         total = (
-            await s.execute(select(func.count()).select_from(TaskRow))
+            await s.execute(select(func.count()).select_from(base_query.subquery()))
         ).scalar_one()
 
         # Status breakdown
-        rows = (
-            await s.execute(
-                select(TaskRow.status, func.count()).group_by(TaskRow.status)
-            )
-        ).all()
+        status_stmt = select(TaskRow.status, func.count())
+        if owner_id:
+            status_stmt = status_stmt.where(TaskRow.owner_id == owner_id)
+        rows = (await s.execute(status_stmt.group_by(TaskRow.status))).all()
         status_breakdown = {str(st): int(cnt) for st, cnt in rows}
 
         # Recent activity by created_at
-        last_24h = (
-            await s.execute(
-                select(func.count())
-                .select_from(TaskRow)
-                .where(
-                    TaskRow.created_at
-                    >= text("(CURRENT_TIMESTAMP - INTERVAL '24 hours')")
-                )
+        stmt_24 = (
+            select(func.count())
+            .select_from(TaskRow)
+            .where(
+                TaskRow.created_at >= text("(CURRENT_TIMESTAMP - INTERVAL '24 hours')")
             )
-        ).scalar_one()
-        last_7d = (
-            await s.execute(
-                select(func.count())
-                .select_from(TaskRow)
-                .where(
-                    TaskRow.created_at
-                    >= text("(CURRENT_TIMESTAMP - INTERVAL '7 days')")
-                )
+        )
+        stmt_7 = (
+            select(func.count())
+            .select_from(TaskRow)
+            .where(
+                TaskRow.created_at >= text("(CURRENT_TIMESTAMP - INTERVAL '7 days')")
             )
-        ).scalar_one()
-        last_30d = (
-            await s.execute(
-                select(func.count())
-                .select_from(TaskRow)
-                .where(
-                    TaskRow.created_at
-                    >= text("(CURRENT_TIMESTAMP - INTERVAL '30 days')")
-                )
+        )
+        stmt_30 = (
+            select(func.count())
+            .select_from(TaskRow)
+            .where(
+                TaskRow.created_at >= text("(CURRENT_TIMESTAMP - INTERVAL '30 days')")
             )
-        ).scalar_one()
+        )
+        if owner_id:
+            stmt_24 = stmt_24.where(TaskRow.owner_id == owner_id)
+            stmt_7 = stmt_7.where(TaskRow.owner_id == owner_id)
+            stmt_30 = stmt_30.where(TaskRow.owner_id == owner_id)
+        last_24h = int((await s.execute(stmt_24)).scalar_one() or 0)
+        last_7d = int((await s.execute(stmt_7)).scalar_one() or 0)
+        last_30d = int((await s.execute(stmt_30)).scalar_one() or 0)
 
         # Language stats from stored columns (if populated)
+        voice_stmt = select(TaskRow.voice_language, func.count()).where(
+            TaskRow.voice_language.is_not(None)
+        )
+        subtitle_stmt = select(TaskRow.subtitle_language, func.count()).where(
+            TaskRow.subtitle_language.is_not(None)
+        )
+        if owner_id:
+            voice_stmt = voice_stmt.where(TaskRow.owner_id == owner_id)
+            subtitle_stmt = subtitle_stmt.where(TaskRow.owner_id == owner_id)
         voice_rows = (
-            await s.execute(
-                select(TaskRow.voice_language, func.count())
-                .where(TaskRow.voice_language.is_not(None))
-                .group_by(TaskRow.voice_language)
-            )
+            await s.execute(voice_stmt.group_by(TaskRow.voice_language))
         ).all()
         subtitle_rows = (
-            await s.execute(
-                select(TaskRow.subtitle_language, func.count())
-                .where(TaskRow.subtitle_language.is_not(None))
-                .group_by(TaskRow.subtitle_language)
-            )
+            await s.execute(subtitle_stmt.group_by(TaskRow.subtitle_language))
         ).all()
         language_stats: dict[str, int] = {}
         for lang, cnt in voice_rows:
@@ -271,15 +282,12 @@ async def get_statistics() -> dict[str, Any]:
 
         # Processing stats
         # Average processing time for completed = avg(updated_at - created_at) minutes
-        avg_proc = (
-            await s.execute(
-                select(
-                    func.avg(
-                        func.extract("epoch", TaskRow.updated_at - TaskRow.created_at)
-                    )
-                ).where(TaskRow.status == "completed")
-            )
-        ).scalar()
+        avg_stmt = select(
+            func.avg(func.extract("epoch", TaskRow.updated_at - TaskRow.created_at))
+        ).where(TaskRow.status == "completed")
+        if owner_id:
+            avg_stmt = avg_stmt.where(TaskRow.owner_id == owner_id)
+        avg_proc = (await s.execute(avg_stmt)).scalar()
         avg_minutes = round(float(avg_proc) / 60.0, 2) if avg_proc else None
 
         completed = status_breakdown.get("completed", 0)

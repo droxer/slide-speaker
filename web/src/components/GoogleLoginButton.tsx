@@ -3,16 +3,19 @@ interface GoogleLoginButtonProps {
   onClick: () => void;
   disabled?: boolean;
   label: string;
+  className?: string;
 }
 
 const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
   onClick,
   disabled = false,
   label,
+  className,
 }) => {
   return (
     <button
-      className="google-login-button"
+      type="button"
+      className={`google-login-button${className ? ` ${className}` : ''}`}
       onClick={onClick}
       disabled={disabled}
       aria-label={label}

@@ -2289,6 +2289,69 @@
   .modal-preview-stack .podcast-transcript-pane::-webkit-scrollbar-thumb:hover {
     background: #64748b;
   }
+
+  body.dark-theme .video-preview-modal {
+    background: rgba(15, 23, 42, 0.82);
+  }
+  body.dark-theme .video-preview-modal[data-mode='audio'] {
+    background: rgba(30, 41, 59, 0.88);
+    backdrop-filter: blur(2px);
+  }
+  body.dark-theme .video-preview-content {
+    background: #0f172a;
+    border: 1px solid rgba(71, 85, 105, 0.55);
+    box-shadow: 0 24px 68px rgba(2, 6, 23, 0.72);
+    color: #e2e8f0;
+  }
+  body.dark-theme .modal-header-bar .header-left {
+    color: #f8fafc;
+  }
+  body.dark-theme .modal-close-btn {
+    color: #cbd5f5;
+  }
+  body.dark-theme .modal-close-btn:hover {
+    background: rgba(148, 163, 184, 0.18);
+    color: #f8fafc;
+  }
+  body.dark-theme .modal-preview-stack .modal-video-wrapper {
+    background: #020617;
+    border: 1px solid rgba(71, 85, 105, 0.6);
+  }
+  body.dark-theme .modal-preview-stack .modal-audio-wrapper {
+    background: #111827;
+    border: 1px solid rgba(71, 85, 105, 0.65);
+    box-shadow: 0 12px 32px rgba(2, 6, 23, 0.55);
+  }
+  body.dark-theme .modal-preview-stack .modal-audio-wrapper audio {
+    background: #0f172a;
+    border: 1px solid rgba(51, 65, 85, 0.9);
+    color: #f8fafc;
+  }
+  body.dark-theme .podcast-title {
+    color: #f8fafc;
+  }
+  body.dark-theme .podcast-title .podcast-subtitle {
+    color: #94a3b8;
+  }
+  body.dark-theme .podcast-meta .output-pill.podcast {
+    background: rgba(14, 165, 233, 0.12);
+    border: 1px solid rgba(125, 211, 252, 0.24);
+    color: #7dd3fc;
+  }
+  body.dark-theme .modal-preview-stack .podcast-transcript-pane {
+    background: #0f172a;
+    border: 1px solid rgba(63, 78, 104, 0.6);
+    color: #e2e8f0;
+  }
+  body.dark-theme .modal-preview-stack .podcast-transcript-pane::-webkit-scrollbar-track {
+    background: rgba(51, 65, 85, 0.35);
+  }
+  body.dark-theme .modal-preview-stack .podcast-transcript-pane::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.45);
+  }
+  body.dark-theme .modal-preview-stack .podcast-transcript-pane::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.7);
+  }
   
   /* Podcast Transcript Styles */
   .podcast-transcript {

@@ -7,7 +7,7 @@ It supports multiple voices and high-quality speech synthesis through the Eleven
 
 from pathlib import Path
 
-import requests
+import httpx
 from loguru import logger
 
 from slidespeaker.configs.config import config
@@ -60,20 +60,21 @@ class ElevenLabsTTSService(TTSInterface):
         }
 
         try:
-            # Ensure output directory exists
-            output_path.parent.mkdir(parents=True, exist_ok=True)
+            async with (
+                httpx.AsyncClient(timeout=30) as client,
+                client.stream("POST", url, headers=headers, json=data) as response,
+            ):
+                response.raise_for_status()
 
-            response = requests.post(url, headers=headers, json=data, stream=True)
-            response.raise_for_status()
-
-            with open(output_path, "wb") as f:
-                for chunk in response.iter_content(chunk_size=1024):
-                    if chunk:
-                        f.write(chunk)
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                with output_path.open("wb") as f:
+                    async for chunk in response.aiter_bytes(chunk_size=1024):
+                        if chunk:
+                            f.write(chunk)
 
             logger.info(f"Generated ElevenLabs TTS: {output_path}")
 
-        except requests.exceptions.RequestException as e:
+        except httpx.HTTPError as e:
             logger.error(f"ElevenLabs TTS API error: {e}")
             raise
         except Exception as e:

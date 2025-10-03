@@ -159,7 +159,7 @@ export const useFilesQuery = (
   opts?: {
     refetchInterval?: number | false | ((q: any) => number | false);
     staleTime?: number;
-  }
+  },
 ) => {
   return useQuery({
     queryKey: ['files', filters] as const,
@@ -172,10 +172,10 @@ export const useFilesQuery = (
       
       const res = await getTasks(Object.fromEntries(params));
       const allTasks = (res.tasks || []).filter((t: any) => typeof t?.task_id === 'string' && !t.task_id.startsWith('state_'));
-      
+
       // Group tasks by file_id to create a file-based structure
       const filesMap = new Map<string, { file_id: string; filename?: string; file_ext?: string; tasks?: Task[] }>();
-      
+
       for (const task of allTasks) {
         const fileId = task.file_id || task.kwargs?.file_id;
         const key = fileId || `unknown:${task.kwargs?.filename || 'Unknown'}`;

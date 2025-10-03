@@ -78,7 +78,7 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
         const files = (q?.state?.data as any)?.files || [];
         const hasActive = files.some((f: any) => (f.tasks || []).some((t: Task) => t.status === 'processing' || t.status === 'queued'));
         return hasActive ? 15000 : false;
-      }, staleTime: 10000 }
+      }, staleTime: 10000 },
   );
   const searchQuery = useSearchTasksQuery(debounced);
   const searching = debounced.length > 0;

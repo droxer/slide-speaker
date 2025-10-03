@@ -178,8 +178,8 @@ const RunTaskModal: React.FC<Props> = ({ open, isPdf, defaults, onClose, onSubmi
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 16 }}>
-                <button className="secondary-btn" onClick={onClose} disabled={submitting}>{t('actions.cancel')}</button>
-                <button className="primary-btn" onClick={run} disabled={submitting}>
+                <button type="button" className="secondary-btn" onClick={onClose} disabled={submitting}>{t('actions.cancel')}</button>
+                <button type="button" className="primary-btn" onClick={run} disabled={submitting}>
                   {submitting ? t('actions.generating') : t('actions.generate')}
                 </button>
               </div>

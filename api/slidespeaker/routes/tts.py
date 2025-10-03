@@ -2,13 +2,18 @@
 TTS and LLM routes for listing provider catalogs.
 """
 
-import requests
-from fastapi import APIRouter, HTTPException
+import httpx
+from fastapi import APIRouter, Depends, HTTPException
 
 from slidespeaker.audio.tts_factory import TTSFactory
+from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.config import config
 
-router = APIRouter(prefix="/api", tags=["tts"])
+router = APIRouter(
+    prefix="/api",
+    tags=["tts"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 
 @router.get("/tts/voices")
@@ -47,13 +52,13 @@ async def tts_catalog(provider: str | None = None) -> dict[str, object]:
             api_key = config.elevenlabs_api_key
             if not api_key:
                 raise RuntimeError("ELEVENLABS_API_KEY not configured")
-            resp = requests.get(
-                "https://api.elevenlabs.io/v1/voices",
-                headers={"xi-api-key": api_key},
-                timeout=30,
-            )
-            resp.raise_for_status()
-            data = resp.json()
+            async with httpx.AsyncClient(timeout=30) as client:
+                resp = await client.get(
+                    "https://api.elevenlabs.io/v1/voices",
+                    headers={"xi-api-key": api_key},
+                )
+                resp.raise_for_status()
+                data = resp.json()
             voices = []
             for v in data.get("voices") or []:
                 voices.append(
@@ -81,7 +86,7 @@ async def tts_catalog(provider: str | None = None) -> dict[str, object]:
             return catalog
         else:
             raise RuntimeError(f"Unknown provider: {p}")
-    except Exception as e:
+    except httpx.HTTPError as e:
         raise HTTPException(status_code=500, detail=f"Catalog error: {e}") from e
 
 
@@ -92,7 +97,7 @@ async def llm_models() -> dict[str, object]:
     Qwen support is removed for transcript generation/review and TTS; this
     endpoint reflects OpenAI for script models.
     """
-    from slidespeaker.translation.service import LANGUAGE_CODES
+    from slidespeaker.translation.openai_translator import LANGUAGE_CODES
 
     return {
         "script": {

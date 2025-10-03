@@ -4,10 +4,18 @@
     "subtitle": "Transform slides into AI-powered videos",
     "login": "Sign in with Google",
     "logout": "Logout",
+    "profile": "Profile",
+    "defaultName": "there",
     "welcome": "Welcome, {name}",
+    "welcomeShort": "Hi, {name}",
     "view": {
       "studio": "Studio",
       "creations": "Creations"
+    },
+    "menu": {
+      "studio": "Studio",
+      "creations": "Creations",
+      "logout": "Sign out"
     }
   },
   "language": {
@@ -23,7 +31,15 @@
       "traditional_chinese": "Traditional Chinese",
       "japanese": "Japanese",
       "korean": "Korean",
-      "thai": "Thai"
+      "thai": "Thai",
+      "spanish": "Spanish",
+      "french": "French",
+      "german": "German",
+      "italian": "Italian",
+      "portuguese": "Portuguese",
+      "russian": "Russian",
+      "arabic": "Arabic",
+      "hindi": "Hindi"
     },
     "switcher": {
       "label": "Interface language",
@@ -36,6 +52,17 @@
     "unknownFile": "Unknown file",
     "untrackedFile": "Untracked file",
     "disabled": "Disabled"
+  },
+  "profile": {
+    "title": "Profile",
+    "subtitle": "Manage your display name and language preference.",
+    "nameLabel": "Display name",
+    "namePlaceholder": "How should we address you?",
+    "languageLabel": "Preferred language",
+    "saveButton": "Save changes",
+    "saving": "Saving…",
+    "saveSuccess": "Profile updated",
+    "saveError": "Could not update profile. Please try again."
   },
   "task": {
     "detail": {
@@ -105,6 +132,28 @@
     "generating": "Generating…",
     "cancel": "Cancel",
     "close": "Close"
+  },
+  "auth": {
+    "loginTitle": "Sign in",
+    "registerTitle": "Create account",
+    "emailLabel": "Email",
+    "passwordLabel": "Password",
+    "loading": "Please wait…",
+    "loginAction": "Sign in",
+    "registerAction": "Create account",
+    "separator": "or",
+    "loginWithGoogle": "Sign in with Google",
+    "switchToRegister": "Don't have an account? Create one",
+    "switchToLogin": "Already have an account? Sign in",
+    "usePassword": "Use email & password",
+    "messages": {
+      "registerSuccess": "Account created. You can sign in now."
+    },
+    "errors": {
+      "invalidCredentials": "Invalid email or password.",
+      "registerFailed": "Registration failed",
+      "generic": "Something went wrong."
+    }
   },
   "notifications": {
     "videoCopied": "Video URL copied!",

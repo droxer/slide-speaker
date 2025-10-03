@@ -31,7 +31,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       autoPlay={autoPlay}
       playsInline
       preload="auto"
-      crossOrigin="anonymous"
+      crossOrigin="use-credentials"
       onCanPlay={onReady}
       onError={onError}
     >
@@ -44,4 +44,3 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
 };
 
 export default VideoPlayer;
-
