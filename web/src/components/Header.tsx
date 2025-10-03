@@ -118,7 +118,7 @@ const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
                     role="menuitem"
                     onClick={() => {
                       setMenuOpen(false);
-                      void signOut({callbackUrl: '/'});
+                      void signOut({callbackUrl: `/${currentLocale}`});
                     }}
                   >
                     {t('header.menu.logout', undefined, 'Sign out')}
@@ -129,7 +129,7 @@ const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
           ) : (
             <div className="auth-buttons">
               <GoogleLoginButton onClick={() => signIn('google')} label={t('header.login')} />
-              <button className="credentials-login-button" onClick={handleCredentialsLogin}>
+              <button type="button" className="credentials-login-button" onClick={handleCredentialsLogin}>
                 {t('auth.usePassword', undefined, 'Use email & password')}
               </button>
             </div>
@@ -146,6 +146,7 @@ const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
             aria-label="View Toggle"
           >
             <button
+              type="button"
               onClick={() => onNavigate('studio')}
               className={`toggle-btn ${activeView === 'studio' ? "active" : ""}`}
               title={t('header.view.studio')}
@@ -160,6 +161,7 @@ const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
               <span className="toggle-text">{t('header.view.studio')}</span>
             </button>
             <button
+              type="button"
               onClick={() => onNavigate('creations')}
               className={`toggle-btn ${activeView === 'creations' ? "active" : ""}`}
               title={t('header.view.creations')}

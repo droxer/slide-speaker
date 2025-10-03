@@ -1,9 +1,9 @@
 import type {NextAuthOptions} from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import CredentialsProvider from 'next-auth/providers/credentials';
+import {resolveServerApiBaseUrl} from '@/utils/serverApiBaseUrl';
 
-const API_BASE_URL =
-  process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000';
+const API_BASE_URL = resolveServerApiBaseUrl();
 
 const AUTH_BASE_URL = `${API_BASE_URL.replace(/\/$/, '')}/api/auth`;
 

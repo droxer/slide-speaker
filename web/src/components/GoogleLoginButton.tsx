@@ -14,6 +14,7 @@ const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
 }) => {
   return (
     <button
+      type="button"
       className={`google-login-button${className ? ` ${className}` : ''}`}
       onClick={onClick}
       disabled={disabled}

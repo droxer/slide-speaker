@@ -268,7 +268,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
             )}
             {previewTab === 'audio' && availableTabs.includes('audio') && (
               <AudioPlayer
-                className="task-detail-card__audio"
+                className="task-detail-card__video task-detail-card__audio"
                 src={audioPreviewUrl}
                 vttUrl={!hasPodcastAsset ? subtitleUrl : undefined}
                 initialCues={fallbackCues}

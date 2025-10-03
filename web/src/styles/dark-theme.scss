@@ -94,6 +94,10 @@ body.dark-theme .view-toggle .toggle-btn:hover:not(.active) {
   color: var(--dark-text) !important;
 }
 
+body.dark-theme .run-task-modal {
+  background: rgba(15, 23, 42, 0.72) !important;
+}
+
 body.dark-theme .content-card,
 body.dark-theme .card-container,
 body.dark-theme .statistics-summary,
@@ -122,9 +126,15 @@ body.dark-theme .file-toggle,
 body.dark-theme .mode-toggle,
 body.dark-theme .theme-toggle {
   background: var(--dark-surface-alt) !important;
-  border: 1px solid var(--dark-border) !important;
-  box-shadow: 0 14px 45px rgba(2, 6, 23, 0.55) !important;
+  border: 1px solid rgba(71, 85, 105, 0.32) !important;
+  box-shadow: 0 10px 28px rgba(2, 6, 23, 0.32) !important;
   color: var(--dark-text) !important;
+}
+
+body.dark-theme .file-group,
+body.dark-theme .file-group-header {
+  border-color: rgba(71, 85, 105, 0.28) !important;
+  box-shadow: 0 8px 22px rgba(2, 6, 23, 0.28) !important;
 }
 
 body.dark-theme .file-toggle {
@@ -147,6 +157,22 @@ body.dark-theme .task-count {
   border: 1px solid rgba(99, 102, 241, 0.4) !important;
 }
 
+body.dark-theme .file-group,
+body.dark-theme .file-group-header {
+  border-color: rgba(148, 163, 184, 0.22) !important;
+  box-shadow: 0 12px 36px rgba(2, 6, 23, 0.42) !important;
+}
+
+body.dark-theme .file-meta {
+  color: var(--dark-text-muted) !important;
+}
+
+body.dark-theme .file-id-chip {
+  background: rgba(148, 163, 184, 0.18) !important;
+  border: 1px solid rgba(148, 163, 184, 0.42) !important;
+  color: var(--dark-text) !important;
+}
+
 body.dark-theme .subtitle,
 body.dark-theme .secondary-text,
 body.dark-theme .file-toggle .file-meta,
@@ -160,6 +186,17 @@ body.dark-theme .meta-label,
 body.dark-theme .progress-label,
 body.dark-theme .preview-description {
   color: var(--dark-text-muted) !important;
+}
+
+body.dark-theme .file-group-actions .mini-btn {
+  background: rgba(51, 65, 85, 0.58) !important;
+  border: 1px solid rgba(148, 163, 184, 0.26) !important;
+  color: #e2e8f0 !important;
+}
+
+body.dark-theme .file-group-actions .mini-btn:hover {
+  background: rgba(99, 102, 241, 0.28) !important;
+  border-color: rgba(99, 102, 241, 0.36) !important;
 }
 
 body.dark-theme .content-card h1,
@@ -197,6 +234,53 @@ body.dark-theme .user-menu {
   background: rgba(15, 23, 42, 0.94) !important;
   border: 1px solid rgba(99, 102, 241, 0.28) !important;
   box-shadow: 0 20px 48px -20px rgba(2, 6, 23, 0.85) !important;
+}
+
+body.dark-theme .run-task-content .run-summary .summary-fields div,
+body.dark-theme .run-task-content .cfg-label {
+  color: var(--dark-text) !important;
+}
+
+body.dark-theme .run-task-content .run-summary .summary-fields dt,
+body.dark-theme .run-task-content .run-summary .hint {
+  color: var(--dark-text-muted) !important;
+}
+
+body.dark-theme .run-task-content .run-summary .run-tag {
+  background: rgba(99, 102, 241, 0.18) !important;
+  border: 1px solid rgba(99, 102, 241, 0.32) !important;
+  color: #e0e7ff !important;
+}
+
+body.dark-theme .run-task-content .run-summary .run-tag[data-kind='podcast'] {
+  background: rgba(236, 72, 153, 0.2) !important;
+  border-color: rgba(236, 72, 153, 0.32) !important;
+  color: #fbcfe8 !important;
+}
+
+body.dark-theme .run-task-content select,
+body.dark-theme .run-task-content input,
+body.dark-theme .run-task-content .video-option-select {
+  background: var(--dark-surface) !important;
+  border: 1px solid rgba(71, 85, 105, 0.32) !important;
+  color: var(--dark-text) !important;
+}
+
+body.dark-theme .run-task-content .secondary-btn {
+  background: transparent !important;
+  color: var(--dark-text) !important;
+  border: 1px solid rgba(148, 163, 184, 0.28) !important;
+}
+
+body.dark-theme .run-task-content .secondary-btn:hover {
+  background: rgba(30, 41, 59, 0.42) !important;
+}
+
+body.dark-theme .run-task-content .primary-btn {
+  background: linear-gradient(135deg, #6366f1, #4338ca) !important;
+  border: none !important;
+  color: #f8fafc !important;
+  box-shadow: 0 8px 22px rgba(79, 70, 229, 0.24) !important;
 }
 
 body.dark-theme .user-menu button {
@@ -818,6 +902,86 @@ body.dark-theme .audio-transcript {
   background: rgba(15, 23, 42, 0.8) !important;
   border-color: var(--dark-border) !important;
   color: var(--dark-text) !important;
+}
+
+body.dark-theme .audio-transcript {
+  box-shadow: inset 0 0 0 1px rgba(71, 85, 105, 0.35);
+}
+
+body.dark-theme .audio-transcript-row {
+  color: var(--dark-text);
+  border-radius: 8px;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+body.dark-theme .audio-transcript-row:hover {
+  background: rgba(71, 85, 105, 0.42);
+}
+
+body.dark-theme .audio-transcript-row.active {
+  background: rgba(99, 102, 241, 0.32);
+  border: 1px solid rgba(129, 140, 248, 0.6);
+  box-shadow: 0 0 0 1px rgba(79, 70, 229, 0.3);
+}
+
+body.dark-theme .audio-transcript-ts {
+  background: rgba(30, 41, 59, 0.92);
+  color: rgba(226, 232, 240, 0.92);
+  border: 1px solid rgba(71, 85, 105, 0.65);
+}
+
+body.dark-theme .audio-transcript-row.active .audio-transcript-ts {
+  background: rgba(99, 102, 241, 0.7);
+  color: #e0e7ff;
+  border-color: rgba(99, 102, 241, 0.85);
+}
+
+body.dark-theme .audio-transcript::-webkit-scrollbar {
+  width: 8px;
+}
+
+body.dark-theme .audio-transcript::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.6);
+}
+
+body.dark-theme .audio-transcript::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.55);
+  border-radius: 4px;
+}
+
+body.dark-theme .audio-transcript::-webkit-scrollbar-thumb:hover {
+  background: rgba(191, 219, 254, 0.75);
+}
+
+body.dark-theme .audio-player__native {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.92) 100%);
+  border: 1px solid rgba(71, 85, 105, 0.65);
+  box-shadow: 0 12px 30px rgba(2, 6, 23, 0.6);
+}
+
+body.dark-theme .audio-player__native:focus-visible {
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.45);
+}
+
+body.dark-theme .task-detail-card__audio {
+  background: rgba(15, 23, 42, 0.98);
+  border: 1px solid rgba(71, 85, 105, 0.55);
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.6);
+}
+
+body.dark-theme .task-detail-card__audio .audio-player__native {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.9) 0%, rgba(30, 41, 59, 0.92) 100%);
+  border-bottom: 1px solid rgba(71, 85, 105, 0.7);
+  border-radius: 1rem 1rem 0 0;
+}
+
+body.dark-theme .task-detail-card__audio .audio-transcript {
+  background: rgba(15, 23, 42, 0.9);
+  border-top: 1px solid rgba(71, 85, 105, 0.6);
+  color: var(--dark-text);
+  border-radius: 0 0 1rem 1rem;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 body.dark-theme .audio-transcript-pane .cue,

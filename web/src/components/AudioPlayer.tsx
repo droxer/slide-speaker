@@ -104,17 +104,20 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
     a.currentTime = target;
   };
 
+  const rootClasses = ['audio-player'];
+  if (className) rootClasses.push(className);
+
   return (
-    <div className={className} style={{ width: '100%' }}>
+    <div className={rootClasses.join(' ')}>
       <audio
         ref={audioRef}
         controls
         preload="auto"
         src={src}
-        crossOrigin="anonymous"
+        crossOrigin="use-credentials"
         onCanPlay={onReady}
         onError={onError}
-        style={{ width: '100%', maxWidth: '100%', display: 'block' }}
+        className="audio-player__native"
       />
       {showTranscript && cues.length > 0 && (
         <TranscriptList cues={cues} activeIdx={activeIdx} onSeek={handleSeek} />

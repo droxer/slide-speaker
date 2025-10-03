@@ -2693,6 +2693,34 @@
     margin-top: 0.5rem;
   }
   
+  /* Shared audio player shell */
+  .audio-player {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .audio-player__native {
+    width: 100%;
+    max-width: 100%;
+    display: block;
+    border-radius: 12px;
+    background: #ffffff;
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    outline: none;
+  }
+
+  .audio-player__native::-webkit-media-controls-panel {
+    background: var(--media-controls-bg-audio);
+    border-radius: 12px;
+  }
+
+  .audio-player__native:focus-visible {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35);
+  }
+
   /* Inline audio player styling */
   .audio-player-inline {
     display: flex;
@@ -2701,23 +2729,8 @@
     margin: 0.75rem 0 0.5rem 0;
   }
   
-  .audio-player-inline audio {
-    width: 100%;
-    max-width: 100%;
-    border-radius: 12px;
-    background: #ffffff;
-    border: 1px solid rgba(226, 232, 240, 0.9);
+  .audio-player-inline .audio-player__native {
     box-shadow: 0 3px 12px rgba(0, 0, 0, 0.04);
-    outline: none;
-  }
-  
-  .audio-player-inline audio::-webkit-media-controls-panel {
-    background: var(--media-controls-bg-audio);
-    border-radius: 12px;
-  }
-  
-  .audio-player-inline audio:focus-visible {
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35);
   }
   
   @media (max-width: 768px) {
@@ -3552,12 +3565,12 @@
   }
   
   /* Ensure audio players and transcripts fill available width in Completed/Modal views */
-  .audio-player-inline audio,
-  .audio-player-inline .audio-transcript {
-    width: 100%;
-    max-width: 100%;
-    display: block;
-  }
+.audio-player-inline .audio-player__native,
+.audio-player-inline .audio-transcript {
+  width: 100%;
+  max-width: 100%;
+  display: block;
+}
   
 .task-detail-card__facts {
   display: grid;

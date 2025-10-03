@@ -1,8 +1,8 @@
 import axios from 'axios';
-import { resolveApiBaseUrl } from '@/utils/apiBaseUrl';
-import type { HealthStatus } from '@/types/health';
-import type { Task, DownloadsResponse } from '@/types';
-import type { ProfileResponse } from '@/types/user';
+import {resolveApiBaseUrl} from '@/utils/apiBaseUrl';
+import type {HealthStatus} from '@/types/health';
+import type {Task, DownloadsResponse} from '@/types';
+import type {ProfileResponse} from '@/types/user';
 
 const API_BASE_URL = resolveApiBaseUrl();
 
@@ -11,14 +11,22 @@ export const api = axios.create({
   withCredentials: true,
 });
 
-export type TaskRow = any;
+export type TaskRow = Task;
 
-export const getTasks = async (params?: Record<string, string | number>) => {
+export interface TaskListResponse {
+  tasks: TaskRow[];
+  total: number;
+  limit: number;
+  offset: number;
+  has_more: boolean;
+}
+
+export const getTasks = async (params?: Record<string, string | number>): Promise<TaskListResponse> => {
   const qs = params
     ? '?' + new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()
     : '';
   const res = await api.get(`/api/tasks${qs}`);
-  return res.data as { tasks: TaskRow[]; total: number; limit: number; offset: number; has_more: boolean };
+  return res.data as TaskListResponse;
 };
 
 export const searchTasks = async (query: string, limit = 20) => {
@@ -38,7 +46,7 @@ export const getTranscriptMarkdown = async (taskId: string) => {
 
 export const getStats = async () => {
   const res = await api.get(`/api/tasks/statistics`);
-  return res.data as any;
+  return res.data as Record<string, unknown>;
 };
 
 export const getTaskById = async (taskId: string): Promise<Task> => {

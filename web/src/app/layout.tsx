@@ -1,5 +1,7 @@
-import type { Metadata } from 'next';
-import type { ReactNode } from 'react';
+import type {Metadata} from 'next';
+import type {ReactNode} from 'react';
+import {cookies, headers} from 'next/headers';
+import {defaultLocale, locales, type Locale} from '@/i18n/config';
 import './globals.scss';
 import '@/styles/app.scss';
 import '@/styles/dark-theme.scss';
@@ -20,15 +22,34 @@ const themeInitScript = `(() => {
   }
 })();`;
 
+const deriveLocale = (): Locale => {
+  const cookieLocale = cookies().get('NEXT_LOCALE')?.value;
+  if (cookieLocale && (locales as ReadonlyArray<string>).includes(cookieLocale)) {
+    return cookieLocale as Locale;
+  }
+
+  const requestPath = headers().get('next-url');
+  if (requestPath) {
+    const [, maybeLocale] = requestPath.split('/');
+    if (maybeLocale && (locales as ReadonlyArray<string>).includes(maybeLocale)) {
+      return maybeLocale as Locale;
+    }
+  }
+
+  return defaultLocale;
+};
+
 export const metadata: Metadata = {
   title: 'SlideSpeaker',
   description: 'Transform presentations into rich multimedia experiences with SlideSpeaker.',
 };
 
-export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+export default function RootLayout({children}: Readonly<{children: ReactNode}>) {
+  const locale = deriveLocale();
+
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body>
+    <html lang={locale} suppressHydrationWarning>
+      <body suppressHydrationWarning>
         <script dangerouslySetInnerHTML={{__html: themeInitScript}} />
         {children}
       </body>
