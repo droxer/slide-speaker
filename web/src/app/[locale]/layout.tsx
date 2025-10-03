@@ -3,6 +3,7 @@ import {unstable_setRequestLocale, getMessages} from 'next-intl/server';
 import {NextIntlClientProvider} from 'next-intl';
 import type {ReactNode} from 'react';
 import {Providers} from '../providers';
+import {LocaleClientSetup} from './LocaleClientSetup';
 import {locales, type Locale} from '@/i18n/config';
 
 export function generateStaticParams() {
@@ -24,12 +25,11 @@ export default async function LocaleLayout({
   const messages = await getMessages();
 
   return (
-    <html lang={locale} suppressHydrationWarning>
-      <body>
-        <NextIntlClientProvider locale={locale} messages={messages}>
-          <Providers>{children}</Providers>
-        </NextIntlClientProvider>
-      </body>
-    </html>
+    <NextIntlClientProvider locale={locale} messages={messages}>
+      <Providers>
+        <LocaleClientSetup locale={locale} />
+        {children}
+      </Providers>
+    </NextIntlClientProvider>
   );
 }

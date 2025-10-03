@@ -8,12 +8,17 @@ the revised transcript list if the pre-rendered Markdown is not present.
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.transcript.markdown import transcripts_to_markdown
+from slidespeaker.utils.auth import require_authenticated_user
 
-router = APIRouter(prefix="/api", tags=["transcripts"])
+router = APIRouter(
+    prefix="/api",
+    tags=["transcripts"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 
 @router.get("/tasks/{task_id}/transcripts/markdown")

@@ -1,3 +1,4 @@
+import {cookies} from 'next/headers';
 import resolveServerApiBaseUrl from '@/utils/serverApiBaseUrl';
 import type { Task } from '@/types';
 
@@ -10,9 +11,20 @@ export async function loadTaskById(taskId: string): Promise<Task | null> {
 
   try {
     const baseUrl = resolveServerApiBaseUrl();
+    const cookieHeader = cookies()
+      .getAll()
+      .map(({name, value}) => `${name}=${value}`)
+      .join('; ');
+
+    const headers: Record<string, string> = {Accept: 'application/json'};
+    if (cookieHeader) {
+      headers.Cookie = cookieHeader;
+    }
+
     const response = await fetch(`${baseUrl}/api/task/${encodeURIComponent(taskId)}`, {
-      headers: { Accept: 'application/json' },
-      next: { revalidate: TASK_REVALIDATE_SECONDS },
+      headers,
+      credentials: 'include',
+      next: {revalidate: TASK_REVALIDATE_SECONDS},
     });
 
     if (response.status === 404) {

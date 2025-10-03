@@ -1,12 +1,16 @@
-import {notFound} from 'next/navigation';
+import {notFound, redirect} from 'next/navigation';
+import {getServerSession} from 'next-auth';
 import type {Metadata} from 'next';
 import TaskPageClient from '../../../tasks/TaskPageClient';
 import {loadTaskById, taskRevalidate} from '../../../tasks/loadTaskById';
+import {loadInitialHealth} from '../../../loadInitialHealth';
+import {authOptions} from '@/auth/options';
 
 export const revalidate = taskRevalidate;
 
 type PageParams = {
   params: {
+    locale: string;
     taskId: string;
   };
 };
@@ -29,12 +33,27 @@ export async function generateMetadata({params}: PageParams): Promise<Metadata> 
 }
 
 export default async function TaskDetailPage({params}: PageParams) {
-  const {taskId} = params;
-  const initialTask = await loadTaskById(taskId);
+  const {locale, taskId} = params;
+
+  const session = await getServerSession(authOptions);
+  if (!session) {
+    redirect(`/login?redirectTo=/${locale}/tasks/${taskId}`);
+  }
+
+  const [initialTask, initialHealth] = await Promise.all([
+    loadTaskById(taskId),
+    loadInitialHealth(),
+  ]);
 
   if (!initialTask) {
     notFound();
   }
 
-  return <TaskPageClient taskId={taskId} initialTask={initialTask} />;
+  return (
+    <TaskPageClient
+      taskId={taskId}
+      initialTask={initialTask}
+      initialHealth={initialHealth}
+    />
+  );
 }

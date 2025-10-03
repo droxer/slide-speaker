@@ -15,12 +15,14 @@ export interface TaskState {
 }
 
 export interface Task {
+  id?: string;
   task_id: string;
   file_id: string;
   task_type: string;
   status: string;
   created_at: string;
   updated_at: string;
+  owner_id?: string | null;
   // Optional DB-surfaced language hints
   voice_language?: string;
   subtitle_language?: string;
@@ -49,3 +51,5 @@ export interface DownloadItem {
 export interface DownloadsResponse {
   items: DownloadItem[];
 }
+
+export type {UserProfile, ProfileResponse} from './user';

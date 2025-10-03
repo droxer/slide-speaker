@@ -4,10 +4,18 @@
     "subtitle": "将幻灯片转化为 AI 驱动的视频",
     "login": "使用 Google 登录",
     "logout": "退出登录",
+    "profile": "个人资料",
+    "defaultName": "朋友",
     "welcome": "欢迎，{name}",
+    "welcomeShort": "{name}，你好",
     "view": {
       "studio": "创作室",
       "creations": "作品库"
+    },
+    "menu": {
+      "studio": "创作室",
+      "creations": "作品库",
+      "logout": "退出登录"
     }
   },
   "language": {
@@ -23,7 +31,15 @@
       "traditional_chinese": "繁体中文",
       "japanese": "日语",
       "korean": "韩语",
-      "thai": "泰语"
+      "thai": "泰语",
+      "spanish": "西班牙语",
+      "french": "法语",
+      "german": "德语",
+      "italian": "意大利语",
+      "portuguese": "葡萄牙语",
+      "russian": "俄语",
+      "arabic": "阿拉伯语",
+      "hindi": "印地语"
     },
     "switcher": {
       "label": "界面语言",
@@ -36,6 +52,17 @@
     "unknownFile": "未知文件",
     "untrackedFile": "未关联文件",
     "disabled": "已停用"
+  },
+  "profile": {
+    "title": "个人资料",
+    "subtitle": "管理显示名称和偏好语言。",
+    "nameLabel": "显示名称",
+    "namePlaceholder": "我们应该如何称呼你？",
+    "languageLabel": "偏好语言",
+    "saveButton": "保存更改",
+    "saving": "正在保存…",
+    "saveSuccess": "资料已更新",
+    "saveError": "保存失败，请稍后再试。"
   },
   "task": {
     "detail": {
@@ -105,6 +132,28 @@
     "generating": "正在生成…",
     "cancel": "取消",
     "close": "关闭"
+  },
+  "auth": {
+    "loginTitle": "登录",
+    "registerTitle": "创建账户",
+    "emailLabel": "邮箱",
+    "passwordLabel": "密码",
+    "loading": "请稍候…",
+    "loginAction": "登录",
+    "registerAction": "创建账户",
+    "separator": "或",
+    "loginWithGoogle": "使用 Google 登录",
+    "switchToRegister": "还没有账户？立即创建",
+    "switchToLogin": "已有账户？立即登录",
+    "usePassword": "使用邮箱和密码",
+    "messages": {
+      "registerSuccess": "账户已创建，请登录。"
+    },
+    "errors": {
+      "invalidCredentials": "邮箱或密码错误。",
+      "registerFailed": "注册失败",
+      "generic": "发生错误，请稍后再试。"
+    }
   },
   "notifications": {
     "videoCopied": "视频链接已复制！",

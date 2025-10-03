@@ -7,11 +7,16 @@ runtime configuration. Intended for development/ops diagnostics.
 
 import time
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from slidespeaker.configs.config import config
+from slidespeaker.utils.auth import require_authenticated_user
 
-router = APIRouter(prefix="/api/diagnostic", tags=["diagnostic"])
+router = APIRouter(
+    prefix="/api/diagnostic",
+    tags=["diagnostic"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 
 _CONFIG_CACHE: dict[str, object] | None = None

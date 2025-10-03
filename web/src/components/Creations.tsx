@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useSession } from 'next-auth/react';
 import { cancelRun as apiCancelRun, deleteTask as apiDeleteTask, purgeTask as apiPurgeTask, getHealth } from '../services/client';
 import { getCachedDownloads, useFilesQuery, useRunFileTaskMutation, useSearchTasksQuery, useTranscriptQuery } from '../services/queries';
 import TaskCard from './TaskCard';
@@ -36,6 +37,8 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
   const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const { t } = useI18n();
+  const { data: session } = useSession();
+  const ownerId = typeof session?.user?.id === 'string' ? session.user.id : null;
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Task | null>(null);
   const [mode, setMode] = useState<'video'|'audio'>('video');
@@ -78,7 +81,8 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
         const files = (q?.state?.data as any)?.files || [];
         const hasActive = files.some((f: any) => (f.tasks || []).some((t: Task) => t.status === 'processing' || t.status === 'queued'));
         return hasActive ? 15000 : false;
-      }, staleTime: 10000 }
+      }, staleTime: 10000 },
+    ownerId,
   );
   const searchQuery = useSearchTasksQuery(debounced);
   const searching = debounced.length > 0;
@@ -119,7 +123,8 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
   // Build groups when searching (file_id -> tasks)
   const searchGroups = useMemo(() => {
     if (!searching) return [] as Array<{ file_id?: string; filename?: string; file_ext?: string; tasks: Task[] }>;
-    const items: Task[] = (((searchQuery.data as any)?.tasks) || []) as Task[];
+    const baseItems: Task[] = (((searchQuery.data as any)?.tasks) || []) as Task[];
+    const items: Task[] = ownerId ? baseItems.filter((task) => task?.owner_id === ownerId) : baseItems;
     const map = new Map<string, { file_id?: string; filename?: string; file_ext?: string; tasks: Task[]; newest: number }>();
     for (const t of items) {
       const fid = t.file_id || (t as any)?.kwargs?.file_id;
@@ -131,7 +136,7 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
     const groups = Array.from(map.values()).sort((a, b) => b.newest - a.newest);
     for (const g of groups) g.tasks.sort((a, b) => Date.parse(b.updated_at || b.created_at) - Date.parse(a.updated_at || a.created_at));
     return groups.map(({ newest, ...rest }) => rest);
-  }, [searching, searchQuery.data]);
+  }, [searching, searchQuery.data, ownerId]);
 
   const counts = useMemo(() => {
     const filterHidden = (tasks: Task[]) => tasks.filter((t) => !hiddenTasks.has(t.task_id));

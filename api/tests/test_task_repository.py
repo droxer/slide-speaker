@@ -62,7 +62,7 @@ class TestTaskRepository:
 
             # Mock query result
             mock_row = MagicMock()
-            mock_row.task_id = "test_task_id"
+            mock_row.id = "test_task_id"
             mock_row.file_id = "test_file_id"
             mock_row.task_type = "test_type"
             mock_row.status = "queued"

@@ -5,22 +5,28 @@ This endpoint allows creating new tasks for a previously uploaded file_id using
 the stored original in uploads/ or cloud storage.
 """
 
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from loguru import logger
 
 from slidespeaker.configs.config import config
 from slidespeaker.configs.locales import locale_utils
 from slidespeaker.core.task_queue import task_queue
+from slidespeaker.utils.auth import extract_user_id, require_authenticated_user
 
-router = APIRouter(prefix="/api", tags=["files"])
+router = APIRouter(
+    prefix="/api",
+    tags=["files"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 
 @router.post("/files/{file_id}/run")
 async def run_file(
     file_id: str,
     payload: dict[str, Any],
+    current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
 ) -> dict[str, Any]:
     """Create a new task for an existing file_id.
 
@@ -49,6 +55,19 @@ async def run_file(
         raise HTTPException(
             status_code=404, detail="Original file not found (unknown extension)"
         )
+
+    owner_id = extract_user_id(current_user)
+    if not owner_id:
+        raise HTTPException(status_code=403, detail="user session missing id")
+
+    if st and isinstance(st, dict):
+        existing_owner = st.get("owner_id")
+        if (
+            isinstance(existing_owner, str)
+            and existing_owner
+            and existing_owner != owner_id
+        ):
+            raise HTTPException(status_code=403, detail="forbidden")
 
     # Ensure local copy exists in uploads dir
     uploads_path = config.uploads_dir
@@ -93,6 +112,7 @@ async def run_file(
     try:
         new_task_id = await task_queue.submit_task(
             task_type,
+            owner_id=owner_id,
             file_id=file_id,
             file_path=str(file_path),
             file_ext=file_ext,

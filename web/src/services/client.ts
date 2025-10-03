@@ -2,11 +2,13 @@ import axios from 'axios';
 import { resolveApiBaseUrl } from '@/utils/apiBaseUrl';
 import type { HealthStatus } from '@/types/health';
 import type { Task, DownloadsResponse } from '@/types';
+import type { ProfileResponse } from '@/types/user';
 
 const API_BASE_URL = resolveApiBaseUrl();
 
 export const api = axios.create({
   baseURL: API_BASE_URL.length > 0 ? API_BASE_URL : undefined,
+  withCredentials: true,
 });
 
 export type TaskRow = any;
@@ -86,6 +88,18 @@ export const headTaskVideo = async (taskId: string) => {
 
 export const getTaskProgress = async <T = any>(taskId: string) => {
   const res = await api.get<T>(`/api/tasks/${taskId}/progress`);
+  return res.data;
+};
+
+export const getCurrentUserProfile = async (): Promise<ProfileResponse> => {
+  const res = await api.get<ProfileResponse>('/api/users/me');
+  return res.data;
+};
+
+export const updateCurrentUserProfile = async (
+  payload: {name?: string | null; preferred_language?: string | null},
+): Promise<ProfileResponse> => {
+  const res = await api.patch<ProfileResponse>('/api/users/me', payload);
   return res.data;
 };
 

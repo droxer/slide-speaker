@@ -7,16 +7,21 @@ subtitle files in both SRT and VTT formats.
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import FileResponse
 
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.configs.locales import locale_utils
 from slidespeaker.storage import StorageProvider
+from slidespeaker.utils.auth import require_authenticated_user
 
 from .download_utils import file_id_from_task
 
-router = APIRouter(prefix="/api", tags=["subtitle_downloads"])
+router = APIRouter(
+    prefix="/api",
+    tags=["subtitle_downloads"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 
 async def _get_subtitle_language(

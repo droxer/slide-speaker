@@ -203,6 +203,7 @@ class RedisStateManager:
         generate_podcast: bool = False,
         task_id: str | None = None,
         source_type: str | None = None,
+        owner_id: str | None = None,
     ) -> dict[str, Any]:
         """Create initial state for a file processing task"""
         # Initialize steps based on file type
@@ -257,6 +258,8 @@ class RedisStateManager:
         }
         if task_id:
             state["task_id"] = task_id
+        if owner_id:
+            state["owner_id"] = owner_id
         # If task-scoped, store task-first and bind mappings; otherwise store by file-id
         if task_id:
             try:

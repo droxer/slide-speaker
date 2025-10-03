@@ -11,17 +11,22 @@ import binascii
 import hashlib
 import json
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 import aiofiles
-from fastapi import APIRouter, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from loguru import logger
 
 from slidespeaker.configs.config import config
 from slidespeaker.configs.locales import locale_utils
 from slidespeaker.core.task_queue import task_queue
+from slidespeaker.utils.auth import extract_user_id, require_authenticated_user
 
-router = APIRouter(prefix="/api", tags=["upload"])
+router = APIRouter(
+    prefix="/api",
+    tags=["upload"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 UPLOAD_DIR = config.uploads_dir
 
@@ -205,9 +210,15 @@ async def _parse_upload_payload(request: Request) -> dict[str, Any]:
 
 
 @router.post("/upload")
-async def upload_file(request: Request) -> dict[str, str | None]:
+async def upload_file(
+    request: Request,
+    current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
+) -> dict[str, str | None]:
     """Upload a presentation file and start processing."""
     try:
+        owner_id = extract_user_id(current_user)
+        if not owner_id:
+            raise HTTPException(status_code=403, detail="user session missing id")
         payload = await _parse_upload_payload(request)
         filename = payload["filename"]
         file_bytes = payload["file_bytes"]
@@ -343,6 +354,7 @@ async def upload_file(request: Request) -> dict[str, str | None]:
         # Submit task to Redis task queue (state management is handled internally)
         task_id = await task_queue.submit_task(
             task_type,
+            owner_id=owner_id,
             file_id=file_id,
             file_path=str(file_path),
             file_ext=file_ext,
@@ -368,6 +380,8 @@ async def upload_file(request: Request) -> dict[str, str | None]:
             "message": "File uploaded successfully, processing started in background",
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Upload error")
-        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}") from e
+        raise HTTPException(status_code=500, detail="Upload failed") from e

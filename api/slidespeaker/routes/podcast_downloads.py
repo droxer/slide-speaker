@@ -7,15 +7,20 @@ podcast files with appropriate content types and headers.
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.storage import StorageProvider
+from slidespeaker.utils.auth import require_authenticated_user
 
 from .download_utils import file_id_from_task, proxy_cloud_media
 
-router = APIRouter(prefix="/api", tags=["podcast_downloads"])
+router = APIRouter(
+    prefix="/api",
+    tags=["podcast_downloads"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 
 @router.get("/tasks/{task_id}/podcast")

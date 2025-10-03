@@ -5,10 +5,9 @@ This module provides common functions used across different download route modul
 to avoid code duplication and improve maintainability.
 """
 
-import urllib.request
-from collections.abc import Iterator
-from urllib.error import HTTPError
+from collections.abc import AsyncIterator, Iterator
 
+import httpx
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 
@@ -113,75 +112,61 @@ async def proxy_cloud_media(
     # Prefer: presigned URL streaming with Range support
     try:
         url = sp.get_file_url(object_key, expires_in=300)
-        req = urllib.request.Request(url)
+        headers: dict[str, str] = {}
         if range_header:
-            req.add_header("Range", range_header)
-        resp = urllib.request.urlopen(req)  # nosec - controlled URL
+            headers["Range"] = range_header
 
-        status = resp.getcode() or 200
-        headers = resp.info()
-        content_length = headers.get("Content-Length")
-        content_range = headers.get("Content-Range")
+        async with httpx.AsyncClient(timeout=None, follow_redirects=True) as client:  # noqa: SIM117 - nested context requires client reference
+            async with client.stream("GET", url, headers=headers) as resp:
+                status = resp.status_code
+                if status >= 400:
+                    if status in {400, 403, 404, 416}:
+                        raise HTTPException(status_code=status, detail=resp.text)
+                    resp.raise_for_status()
 
-        def iter_stream(chunk_size: int = 1024 * 256) -> Iterator[bytes]:
-            while True:
-                chunk = resp.read(chunk_size)
-                if not chunk:
-                    break
-                yield chunk
+                content_length = resp.headers.get("Content-Length")
+                content_range = resp.headers.get("Content-Range")
 
-        out_headers = {
-            "Content-Type": media_type,
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-            "Access-Control-Allow-Origin": "*",
-            "Accept-Ranges": "bytes",
-        }
-        if content_length:
-            out_headers["Content-Length"] = content_length
-        if content_range:
-            out_headers["Content-Range"] = content_range
+                async def iter_stream(
+                    chunk_size: int = 1024 * 256,
+                ) -> AsyncIterator[bytes]:
+                    async for chunk in resp.aiter_bytes(chunk_size):
+                        yield chunk
 
-        return StreamingResponse(iter_stream(), status_code=status, headers=out_headers)
-    except HTTPError as e:
-        # Some providers return 400/403/404/416 for transient or permissioned HEAD/GET
-        # Try SDK download as a fallback to avoid bubbling 4xx to the client.
-        try:
-            blob: bytes = sp.download_bytes(object_key)
-            total = len(blob)
-
-            def iter_mem(chunk_size: int = 1024 * 256) -> Iterator[bytes]:
-                offset = 0
-                while offset < total:
-                    nxt = min(offset + chunk_size, total)
-                    yield blob[offset:nxt]
-                    offset = nxt
-
-            return StreamingResponse(
-                iter_mem(),
-                status_code=200,
-                headers={
+                out_headers = {
                     "Content-Type": media_type,
-                    "Content-Length": str(total),
-                    "Accept-Ranges": "bytes",
                     "Cache-Control": "no-cache, no-store, must-revalidate",
                     "Access-Control-Allow-Origin": "*",
-                },
-            )
-        except Exception:
-            raise HTTPException(status_code=e.code, detail=str(e)) from e
-    except Exception:
-        # Fallback: download all bytes and stream from memory (no Range)
+                    "Accept-Ranges": "bytes",
+                }
+                if content_length:
+                    out_headers["Content-Length"] = content_length
+                if content_range:
+                    out_headers["Content-Range"] = content_range
+
+                return StreamingResponse(
+                    iter_stream(),
+                    status_code=status,
+                    headers=out_headers,
+                )
+    except HTTPException as e:
+        # Some providers return 4xx for transient or permissioned GETs
+        if e.status_code not in (400, 403, 404, 416):
+            raise
+        # Fall through to SDK download fallback
+    except httpx.HTTPError:
         pass
 
+    # Fallback: download bytes via storage SDK
     try:
-        blob2: bytes = sp.download_bytes(object_key)
-        total = len(blob2)
+        blob: bytes = sp.download_bytes(object_key)
+        total = len(blob)
 
         def iter_mem(chunk_size: int = 1024 * 256) -> Iterator[bytes]:
             offset = 0
             while offset < total:
                 nxt = min(offset + chunk_size, total)
-                yield blob2[offset:nxt]
+                yield blob[offset:nxt]
                 offset = nxt
 
         return StreamingResponse(

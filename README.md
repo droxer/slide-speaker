@@ -18,6 +18,7 @@ SlideSpeaker is under active development. Expect rapid iteration, breaking chang
 - Task-based API that coordinates the full processing pipeline end-to-end
 - Responsive light, dark, and auto themes with per-user preferences
 - Global language switcher with localized UI labels and stored preferences
+- Hybrid authentication powered by NextAuth (Google OAuth + email/password) backed by FastAPI endpoints
 
 ## 🚀 Quick Start
 
@@ -29,6 +30,14 @@ cp .env.example .env         # Create config file
 # Edit .env to add your API keys
 make dev                     # Start development server (port 8000)
 ```
+
+#### User Management CLI
+```bash
+cd api
+python scripts/user_cli.py list
+python scripts/user_cli.py create --email you@example.com --password secret --name "You"
+```
+Use `--help` on any subcommand to see additional options (`show`, `set-password`, `delete`).
 
 ### Frontend (Web UI)
 ```bash
@@ -66,6 +75,16 @@ SlideSpeaker supports multiple storage backends:
 - **Local** - Default, stores files in `api/output/`
 - **AWS S3** - Configure `AWS_S3_BUCKET_NAME` and credentials
 - **Aliyun OSS** - Configure `OSS_BUCKET_NAME` and credentials
+
+### Authentication
+- **API (FastAPI)**
+  - Password hashing uses PBKDF2-HMAC-SHA256; no additional secrets required.
+- **Next.js (web/.env)**
+  - `NEXTAUTH_SECRET` – signing key for NextAuth JWT sessions
+  - `NEXTAUTH_URL` – base URL of the Next.js app (e.g. `http://localhost:3000`)
+  - `NEXT_PUBLIC_API_BASE_URL` – base URL of the FastAPI backend (defaults to `http://localhost:8000` for local dev)
+- **NextAuth providers**
+  - Optional Google OAuth: set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`
 
 ## 📚 Documentation
 

@@ -23,6 +23,36 @@ body.dark-theme .App {
   color: var(--dark-text);
 }
 
+body.dark-theme .profile-card {
+  background: var(--dark-surface) !important;
+  border: 1px solid var(--dark-border) !important;
+  color: var(--dark-text) !important;
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.6) !important;
+}
+
+body.dark-theme .profile-card header p {
+  color: var(--dark-text-muted) !important;
+}
+
+body.dark-theme .profile-form label {
+  color: var(--dark-text) !important;
+}
+
+body.dark-theme .profile-form input,
+body.dark-theme .profile-form select {
+  background: rgba(15, 23, 42, 0.82) !important;
+  border: 1px solid var(--dark-border) !important;
+  color: var(--dark-text) !important;
+}
+
+body.dark-theme .profile-feedback.success {
+  color: #34d399 !important;
+}
+
+body.dark-theme .profile-feedback.error {
+  color: #f87171 !important;
+}
+
 body.dark-theme .app-header {
   background: rgba(15, 23, 42, 0.9) !important;
   border-bottom: 1px solid var(--dark-border);
@@ -143,6 +173,39 @@ body.dark-theme h4,
 body.dark-theme h5,
 body.dark-theme h6 {
   color: var(--dark-text) !important;
+}
+
+body.dark-theme .user-menu-trigger {
+  background: rgba(51, 65, 85, 0.65) !important;
+  border: 1px solid rgba(148, 163, 184, 0.45) !important;
+  color: #f1f5f9 !important;
+}
+
+body.dark-theme .user-menu-trigger:hover,
+body.dark-theme .user-menu-trigger:focus-visible {
+  background: rgba(99, 102, 241, 0.28) !important;
+  border-color: rgba(129, 140, 248, 0.45) !important;
+  box-shadow: 0 14px 32px -18px rgba(15, 23, 42, 0.85) !important;
+}
+
+body.dark-theme .user-chip__avatar {
+  background: rgba(148, 163, 184, 0.35) !important;
+  color: #e2e8f0 !important;
+}
+
+body.dark-theme .user-menu {
+  background: rgba(15, 23, 42, 0.94) !important;
+  border: 1px solid rgba(99, 102, 241, 0.28) !important;
+  box-shadow: 0 20px 48px -20px rgba(2, 6, 23, 0.85) !important;
+}
+
+body.dark-theme .user-menu button {
+  color: #e2e8f0 !important;
+}
+
+body.dark-theme .user-menu button:hover,
+body.dark-theme .user-menu button:focus-visible {
+  background: rgba(99, 102, 241, 0.22) !important;
 }
 
 body.dark-theme .content-card p,

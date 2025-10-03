@@ -7,14 +7,19 @@ and subtitle files. It handles file serving with appropriate content types and h
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
 from slidespeaker.configs.config import get_storage_provider
 from slidespeaker.storage import StorageProvider
+from slidespeaker.utils.auth import require_authenticated_user
 
 from .download_utils import file_id_from_task, final_audio_object_keys
 
-router = APIRouter(prefix="/api", tags=["downloads"])
+router = APIRouter(
+    prefix="/api",
+    tags=["downloads"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 
 @router.get("/tasks/{task_id}/downloads")

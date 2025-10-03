@@ -2,8 +2,9 @@
 
 import {useLocale} from 'next-intl';
 import {useRouter} from '@/navigation';
-import App from '@/App';
-import type { HealthStatus } from '@/types/health';
+import AppShell from '@/components/AppShell';
+import StudioWorkspace from '@/components/StudioWorkspace';
+import type {HealthStatus} from '@/types/health';
 
 export type StudioPageClientProps = {
   initialHealth?: HealthStatus | null;
@@ -14,7 +15,7 @@ export default function StudioPageClient({ initialHealth = null }: StudioPageCli
   const locale = useLocale();
 
   return (
-    <App
+    <AppShell
       activeView="studio"
       initialHealth={initialHealth}
       onNavigate={(view) => {
@@ -22,6 +23,8 @@ export default function StudioPageClient({ initialHealth = null }: StudioPageCli
           router.push('/creations', {locale});
         }
       }}
-    />
+    >
+      <StudioWorkspace />
+    </AppShell>
   );
 }

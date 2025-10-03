@@ -11,13 +11,18 @@ import time
 from time import perf_counter
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from sqlalchemy import text
 
 from slidespeaker.configs.db import get_session
 from slidespeaker.configs.redis_config import RedisConfig
+from slidespeaker.utils.auth import require_authenticated_user
 
-router = APIRouter(prefix="/api", tags=["health"])
+router = APIRouter(
+    prefix="/api",
+    tags=["health"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 
 @router.get("/health")

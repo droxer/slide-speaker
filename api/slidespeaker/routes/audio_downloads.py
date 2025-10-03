@@ -9,11 +9,12 @@ import os
 from collections.abc import Iterator
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse, StreamingResponse
 
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.storage import StorageProvider
+from slidespeaker.utils.auth import require_authenticated_user
 
 from .download_utils import (
     file_id_from_task,
@@ -23,7 +24,11 @@ from .download_utils import (
     stream_concatenated_files,
 )
 
-router = APIRouter(prefix="/api", tags=["audio_downloads"])
+router = APIRouter(
+    prefix="/api",
+    tags=["audio_downloads"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 
 async def get_final_audio(file_id: str, request: Request) -> Any:

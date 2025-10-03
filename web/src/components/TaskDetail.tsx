@@ -5,7 +5,6 @@ import { Link } from '@/navigation';
 import VideoPlayer from '@/components/VideoPlayer';
 import AudioPlayer from '@/components/AudioPlayer';
 import DownloadLinks, { DownloadLinkItem } from '@/components/DownloadLinks';
-import LanguageToggle from '@/components/LanguageToggle';
 import type { Cue } from '@/components/TranscriptList';
 import { STEP_STATUS_ICONS, normalizeStepStatus, getStepLabel } from '@/utils/stepLabels';
 import { resolveLanguages, getLanguageDisplayName } from '@/utils/language';
@@ -165,7 +164,6 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
           </div>
 
           <div className="task-detail-card__actions">
-            <LanguageToggle />
             {canCancel && (
               <button
                 type="button"

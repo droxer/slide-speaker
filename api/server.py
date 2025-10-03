@@ -30,6 +30,7 @@ from slidespeaker.routes.tasks import router as tasks_router
 from slidespeaker.routes.transcripts import router as transcripts_router
 from slidespeaker.routes.tts import router as tts_router
 from slidespeaker.routes.upload import router as upload_router
+from slidespeaker.routes.users import router as users_router
 from slidespeaker.routes.video_downloads import router as video_downloads_router
 
 app = FastAPI(title="AI Slider API")
@@ -82,6 +83,7 @@ app.include_router(transcripts_router)
 app.include_router(tts_router)
 app.include_router(diagnostic_router)
 app.include_router(preview_router)
+app.include_router(users_router)
 
 
 @app.get("/")

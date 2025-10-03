@@ -3,12 +3,17 @@ TTS and LLM routes for listing provider catalogs.
 """
 
 import requests
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from slidespeaker.audio.tts_factory import TTSFactory
 from slidespeaker.configs.config import config
+from slidespeaker.utils.auth import require_authenticated_user
 
-router = APIRouter(prefix="/api", tags=["tts"])
+router = APIRouter(
+    prefix="/api",
+    tags=["tts"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 
 @router.get("/tts/voices")

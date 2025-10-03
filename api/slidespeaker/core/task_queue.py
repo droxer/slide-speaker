@@ -38,12 +38,15 @@ class RedisTaskQueue:
         """Generate Redis key for a task"""
         return f"{self.task_prefix}:{task_id}"
 
-    async def submit_task(self, task_type: str, **kwargs: Any) -> str:
+    async def submit_task(
+        self, task_type: str, *, owner_id: str | None = None, **kwargs: Any
+    ) -> str:
         """Submit a task to the Redis queue and return task ID"""
         task_id = str(uuid.uuid4())
         created_at = __import__("datetime").datetime.now().isoformat()
 
         task = {
+            "id": task_id,
             "task_id": task_id,
             "task_type": task_type,
             "status": "queued",
@@ -51,6 +54,7 @@ class RedisTaskQueue:
             "result": None,
             "error": None,
             "created_at": created_at,
+            "owner_id": owner_id,
         }
 
         # Store task in Redis
@@ -107,6 +111,7 @@ class RedisTaskQueue:
                         generate_podcast,
                         task_id=task_id,
                         source_type=source_type,
+                        owner_id=owner_id,
                     )
 
                     # Bind task_id <-> file_id (redundant when create_state passed task_id; kept for safety)

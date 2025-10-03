@@ -6,14 +6,19 @@ Keeps preview responsibilities separate from download endpoints.
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from slidespeaker.configs.config import get_storage_provider
 from slidespeaker.configs.redis_config import RedisConfig
 from slidespeaker.core.task_queue import task_queue
+from slidespeaker.utils.auth import require_authenticated_user
 from slidespeaker.video import VideoPreviewer
 
-router = APIRouter(prefix="/api", tags=["preview"])
+router = APIRouter(
+    prefix="/api",
+    tags=["preview"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 # Initialize video previewer
 video_previewer = VideoPreviewer()
