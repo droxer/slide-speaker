@@ -1,55 +1,103 @@
 'use client';
 
 import React from 'react';
+import {useMutation} from '@tanstack/react-query';
+import {useSession} from 'next-auth/react';
 import {useLocale, useTranslations} from 'next-intl';
 import {usePathname, useRouter} from '@/navigation';
-import {locales} from '@/i18n/config';
-
-type SupportedLocale = typeof locales[number];
-
-const supportedLocales = new Set<string>(locales);
-
-const isSupportedLocale = (code: string): code is SupportedLocale => supportedLocales.has(code);
+import {locales, type Locale} from '@/i18n/config';
+import {
+  LANGUAGE_TO_LOCALE,
+  coerceSupportedLanguage,
+  localeToPreferredLanguage,
+  type SupportedLanguage,
+} from '@/utils/localePreferences';
+import {updateCurrentUserProfile} from '@/services/client';
 
 const localeLabels: Record<string, string> = {
-  'en': 'language.english',
+  en: 'language.english',
   'zh-CN': 'language.simplified',
   'zh-TW': 'language.traditional',
 };
-
-const LOCALE_STORAGE_KEY = 'slidespeaker_locale';
 
 const LanguageToggle: React.FC = () => {
   const locale = useLocale();
   const t = useTranslations();
   const router = useRouter();
   const pathname = usePathname();
+  const {data: session, update: updateSession} = useSession();
+  const pendingLocaleRef = React.useRef<Locale | null>(null);
+  const lastAppliedPreferenceRef = React.useRef<Locale | null>(null);
 
   const normalizedLocale = React.useMemo(() => {
     const lower = locale.toLowerCase();
     return locales.find((code) => code.toLowerCase() === lower) ?? locale;
   }, [locale]);
 
-  React.useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      const stored = window.localStorage.getItem(LOCALE_STORAGE_KEY);
-      if (stored && isSupportedLocale(stored) && stored !== normalizedLocale) {
-        router.replace(pathname, { locale: stored });
-      }
-    } catch {
-      /* no-op */
+  const preferredLocale = React.useMemo<Locale | null>(() => {
+    const preference = coerceSupportedLanguage(session?.user?.preferred_language);
+    if (!preference) {
+      return null;
     }
-  }, [normalizedLocale, pathname, router]);
+    return LANGUAGE_TO_LOCALE[preference];
+  }, [session?.user?.preferred_language]);
+
+  const mutation = useMutation({
+    mutationFn: (preferredLanguage: SupportedLanguage) =>
+      updateCurrentUserProfile({preferred_language: preferredLanguage}),
+    onSuccess: (_, preferredLanguage) => {
+      pendingLocaleRef.current = null;
+      if (typeof updateSession === 'function') {
+        void updateSession({
+          ...(session ?? {}),
+          user: {
+            ...(session?.user ?? {}),
+            preferred_language: preferredLanguage,
+          },
+        } as any);
+      }
+    },
+    onError: () => {
+      pendingLocaleRef.current = null;
+    },
+  });
+
+  React.useEffect(() => {
+    if (!preferredLocale) {
+      lastAppliedPreferenceRef.current = null;
+      return;
+    }
+    if (
+      pendingLocaleRef.current &&
+      pendingLocaleRef.current !== preferredLocale
+    ) {
+      return;
+    }
+    if (preferredLocale === normalizedLocale) {
+      lastAppliedPreferenceRef.current = preferredLocale;
+      return;
+    }
+    if (lastAppliedPreferenceRef.current === preferredLocale) {
+      return;
+    }
+    lastAppliedPreferenceRef.current = preferredLocale;
+    // Only redirect if we're not already on the preferred locale
+    router.replace(pathname, {locale: preferredLocale});
+  }, [normalizedLocale, pathname, preferredLocale, router]);
 
   const handleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const nextLocale = event.target.value as SupportedLocale;
-    try {
-      window.localStorage.setItem(LOCALE_STORAGE_KEY, nextLocale);
-    } catch {
-      /* ignore */
+    const nextLocale = event.target.value as Locale;
+    if (nextLocale === normalizedLocale) {
+      return;
     }
+    pendingLocaleRef.current = nextLocale;
     router.replace(pathname, {locale: nextLocale});
+    if (session?.user) {
+      const nextLanguage = localeToPreferredLanguage(nextLocale);
+      mutation.mutate(nextLanguage);
+    } else {
+      pendingLocaleRef.current = null;
+    }
   };
 
   return (
