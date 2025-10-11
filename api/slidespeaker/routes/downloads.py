@@ -10,8 +10,6 @@ from typing import Any
 from fastapi import APIRouter, Depends
 
 from slidespeaker.auth import require_authenticated_user
-from slidespeaker.configs.config import get_storage_provider
-from slidespeaker.storage import StorageProvider
 
 from .download_utils import file_id_from_task, final_audio_object_keys
 
@@ -29,7 +27,8 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
     Includes video (inline and download), audio (inline and download),
     subtitles (available locales and formats), and transcript markdown.
     """
-    sp: StorageProvider = get_storage_provider()
+    from .shared_download_utils import check_file_exists
+
     file_id = await file_id_from_task(task_id)
     items: list[dict[str, Any]] = []
 
@@ -62,9 +61,9 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
 
     # Video - only for non-podcast tasks
     if task_type != "podcast" and (
-        sp.file_exists(f"{task_id}.mp4")
-        or sp.file_exists(f"{file_id}.mp4")
-        or sp.file_exists(f"{file_id}_final.mp4")
+        check_file_exists(f"{task_id}.mp4")
+        or check_file_exists(f"{file_id}.mp4")
+        or check_file_exists(f"{file_id}_final.mp4")
     ):
         items.append(
             {
@@ -77,7 +76,7 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
     # Final audio - only for non-podcast tasks (podcast tasks use separate podcast endpoint)
     if task_type != "podcast":
         audio_exists = any(
-            sp.file_exists(k)
+            check_file_exists(k)
             for k in ([f"{task_id}.mp3"] + final_audio_object_keys(file_id))
         )
         if audio_exists:
@@ -98,7 +97,7 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
             f"{task_id}_podcast.mp3",
             f"{file_id}_podcast.mp3",
         ]
-        podcast_exists = any(sp.file_exists(k) for k in podcast_keys)
+        podcast_exists = any(check_file_exists(k) for k in podcast_keys)
 
         if podcast_exists:
             items.append(
@@ -151,7 +150,7 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
     seen_locales: set[str] = set()
     for loc in preferred_locales:
         # Task-id-based keys only
-        if sp.file_exists(f"{task_id}_{loc}.vtt") or sp.file_exists(
+        if check_file_exists(f"{task_id}_{loc}.vtt") or check_file_exists(
             f"{task_id}_{loc}.srt"
         ):
             seen_locales.add(loc)

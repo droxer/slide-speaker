@@ -9,7 +9,8 @@ export const healthRevalidate = HEALTH_REVALIDATE_SECONDS;
 export async function loadInitialHealth(): Promise<HealthStatus | null> {
   try {
     const baseUrl = resolveServerApiBaseUrl();
-    const cookieHeader = cookies()
+    const cookieStore = await cookies();
+    const cookieHeader = cookieStore
       .getAll()
       .map(({name, value}) => `${name}=${value}`)
       .join('; ');

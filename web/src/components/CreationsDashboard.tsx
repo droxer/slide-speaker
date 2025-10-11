@@ -1,19 +1,18 @@
+'use client';
+
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { cancelRun as apiCancelRun, deleteTask as apiDeleteTask, purgeTask as apiPurgeTask, getHealth } from '../services/client';
-import { getCachedDownloads, useFilesQuery, useRunFileTaskMutation, useSearchTasksQuery, useTranscriptQuery } from '../services/queries';
+import { getCachedDownloads, useCancelTaskMutation, useFilesQuery, useRunFileTaskMutation, useSearchTasksQuery, useTaskQuery } from '../services/queries';
 import TaskCard from './TaskCard';
-import PreviewModal from './PreviewModal';
 import RunTaskModal from './RunTaskModal';
-import VideoPlayer from './VideoPlayer';
-import AudioPlayer from './AudioPlayer';
-import PodcastPlayer from './PodcastPlayer';
+import TaskProcessingModal from './TaskProcessingModal';
 import { getGlobalRunDefaults, saveGlobalRunDefaults } from '../utils/defaults';
 import type { Task } from '../types';
 import { useI18n } from '@/i18n/hooks';
 import { getLanguageDisplayName } from '../utils/language';
 
-interface CreationsProps { apiBaseUrl: string }
+interface CreationsDashboardProps { apiBaseUrl: string }
 
 const isPdf = (ext?: string) => (ext || '').toLowerCase() === '.pdf';
 const shortId = (id?: string) => {
@@ -29,7 +28,7 @@ const RESOLUTION_KEYS: Record<string, string> = {
   fullhd: 'runTask.resolution.fullhd',
 };
 
-const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
+const CreationsDashboard: React.FC<CreationsDashboardProps> = ({ apiBaseUrl }) => {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [status, setStatus] = useState('all');
@@ -37,13 +36,12 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
   const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const { t } = useI18n();
   const [page, setPage] = useState(1);
-  const [selected, setSelected] = useState<Task | null>(null);
-  const [mode, setMode] = useState<'video'|'audio'>('video');
   const [toast, setToast] = useState<{ type: 'success'|'error'; message: string }|null>(null);
   const [runOpen, setRunOpen] = useState(false);
   const [runFile, setRunFile] = useState<{ file_id: string; filename?: string; isPdf: boolean } | null>(null);
   const [runDefaults, setRunDefaults] = useState<any>({});
   const [runSubmitting, setRunSubmitting] = useState(false);
+  const [processingTask, setProcessingTask] = useState<Task | null>(null);
   const queryClient = useQueryClient();
   const [hiddenTasks, setHiddenTasks] = useState<Set<string>>(new Set());
 
@@ -107,15 +105,6 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
     ? t('creations.health.databaseLatency', { latency: typeof dbLatency === 'number' ? dbLatency : 'n/a' }, `Database latency: ${dbLatency ?? 'n/a'} ms`)
     : (dbError || t('creations.health.databaseUnavailable'));
 
-  // Selected preview transcript (podcast listen)
-  const selectedIsPodcast = useMemo(() => {
-    if (!selected) return false;
-    const tt = String(selected.task_type || (selected.state as any)?.task_type || '').toLowerCase();
-    return tt === 'podcast';
-  }, [selected]);
-  const transcriptQ = useTranscriptQuery(selected ? selected.task_id : null, !!selected && selectedIsPodcast && mode === 'audio');
-  const selectedTranscript = (transcriptQ.data as any) || '';
-
   // Build groups when searching (file_id -> tasks)
   const searchGroups = useMemo(() => {
     if (!searching) return [] as Array<{ file_id?: string; filename?: string; file_ext?: string; tasks: Task[] }>;
@@ -162,13 +151,28 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
   }, [searching, searchGroups, filesQuery.data, status, hiddenTasks]);
 
   const toggleFile = (k: string) => setExpandedFiles((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
-  const toggleTask = (id: string) => setExpandedTasks((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const runFileTask = useRunFileTaskMutation();
+  const cancelMutation = useCancelTaskMutation();
+  const processingTaskId = processingTask?.task_id ?? null;
+  const { data: processingTaskData } = useTaskQuery(processingTaskId || '', processingTask ?? null);
+  const processingModalTask = processingTaskData ?? processingTask;
 
   const onCancel = async (taskId: string) => {
-    try { await apiCancelRun(taskId); }
-    catch { alert(t('creations.toast.cancelFailed', undefined, 'Failed to cancel task')); }
+    try {
+      console.log('Cancelling task:', taskId);
+      const result = await cancelMutation.mutateAsync(taskId);
+      console.log('Cancel result:', result);
+      // Also invalidate the specific task query to ensure UI updates
+      await queryClient.invalidateQueries({ queryKey: ['task', taskId] });
+      // Also refetch the files query to ensure the task list updates
+      await queryClient.invalidateQueries({ queryKey: ['files'], exact: false });
+      console.log('Queries invalidated');
+    }
+    catch (error) {
+      console.error('Failed to cancel task:', error);
+      alert(t('creations.toast.cancelFailed', undefined, 'Failed to cancel task'));
+    }
   };
   const onDelete = async (taskId: string) => {
     if (!window.confirm(t('creations.confirm.delete', undefined, 'This will permanently remove the task and its state. Continue?'))) return;
@@ -188,9 +192,6 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
         next.add(taskId);
         return next;
       });
-      if (selected?.task_id === taskId) {
-        setSelected(null);
-      }
       // Optimistically remove the task from any cached lists
       queryClient.setQueriesData({ predicate: ({ queryKey }) => Array.isArray(queryKey) && queryKey[0] === 'files' }, (old: any) => {
         if (!old || !Array.isArray(old.files)) return old;
@@ -229,15 +230,6 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
     const items = dl?.items || [];
     return { video: items.some((i: any) => i?.type === 'video'), podcast: items.some((i: any) => i?.type === 'podcast') };
   };
-
-  const openPreview = (task: Task, m?: 'video'|'audio') => {
-    if (task.status !== 'completed') { alert(t('alerts.previewUnavailable')); return; }
-    setSelected(task);
-    if (m) setMode(m); else {
-      const outs = deriveOutputs(task); setMode(outs.video ? 'video' : 'audio');
-    }
-  };
-  const closePreview = () => setSelected(null);
 
   const onRun = (file_id: string, filename?: string, file_ext?: string, taskType: 'video'|'podcast' = 'video') => {
     setRunFile({ file_id, filename, isPdf: isPdf(file_ext) });
@@ -305,10 +297,9 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
                         apiBaseUrl={apiBaseUrl}
                         isRemoving={false}
                         isExpanded={expandedTasks.has(task.task_id)}
-                        onToggleDownloads={(t) => toggleTask(t.task_id)}
-                        onPreview={openPreview}
                         onCancel={onCancel}
                         onDelete={onDelete}
+                        onShowProcessingDetails={(t) => setProcessingTask(t)}
                         deriveTaskOutputs={deriveOutputs}
                         getLanguageDisplayName={getLanguageName}
                         getVideoResolutionDisplayName={getResolutionName}
@@ -370,20 +361,19 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
               {expandedFiles.has(key) && (
                 <div className="file-task-list">
                   {vis.map((task) => (
-                    <TaskCard
-                      key={task.task_id}
-                      task={task}
-                      apiBaseUrl={apiBaseUrl}
-                      isRemoving={false}
-                      isExpanded={expandedTasks.has(task.task_id)}
-                      onToggleDownloads={(t) => toggleTask(t.task_id)}
-                      onPreview={openPreview}
-                      onCancel={onCancel}
-                      onDelete={onDelete}
-                      deriveTaskOutputs={deriveOutputs}
-                      getLanguageDisplayName={getLanguageName}
-                      getVideoResolutionDisplayName={getResolutionName}
-                    />
+                      <TaskCard
+                        key={task.task_id}
+                        task={task}
+                        apiBaseUrl={apiBaseUrl}
+                        isRemoving={false}
+                        isExpanded={expandedTasks.has(task.task_id)}
+                        onCancel={onCancel}
+                        onDelete={onDelete}
+                        onShowProcessingDetails={(t) => setProcessingTask(t)}
+                        deriveTaskOutputs={deriveOutputs}
+                        getLanguageDisplayName={getLanguageName}
+                        getVideoResolutionDisplayName={getResolutionName}
+                      />
                   ))}
                 </div>
               )}
@@ -425,52 +415,6 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
         <button onClick={() => setPage(page + 1)} disabled={searching ? ((((searchQuery.data as any)?.tasks) || []).length < 10) : !((filesQuery.data as any)?.has_more)} className="page-button">{t('pagination.next')}</button>
       </div>
 
-      {/* Selected preview helpers */}
-      {(() => {
-        /* compute podcast flag at top-level to support hooks */
-        return null;
-      })()}
-      <PreviewModal
-        open={!!selected}
-        mode={mode}
-        onClose={closePreview}
-        header={selected ? (
-          <div className="modal-header-bar" data-mode={mode}>
-            <div className="header-left" aria-label={t('modal.previewTitle')}><span className="header-icon" aria-hidden>{mode === 'video' ? '🎬' : '🎧'}</span><span>{t('modal.previewTitle')}</span></div>
-            <div className="header-right">
-              <button type="button" className="modal-close-btn" aria-label={t('actions.close')} title={t('actions.close')} onClick={closePreview}>
-                <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-              </button>
-            </div>
-          </div>
-        ) : null}
-      >
-        {selected && (() => {
-          const voiceLanguage = selected.kwargs?.voice_language || selected.state?.voice_language || 'english';
-          const subtitleLanguage = selected.kwargs?.subtitle_language || selected.state?.subtitle_language || voiceLanguage;
-          const vtt = `${apiBaseUrl}/api/tasks/${selected.task_id}/subtitles/vtt?language=${encodeURIComponent(subtitleLanguage)}`;
-          const videoUrl = `${apiBaseUrl}/api/tasks/${selected.task_id}/video`;
-          const tt = (selected.task_type || (selected.state as any)?.task_type || '').toLowerCase();
-          const isPod = tt === 'podcast';
-          /* transcript loaded via top-level hook below */
-          if (mode === 'video') {
-            return (
-              <div className="modal-preview-stack">
-                <div className="modal-video-wrapper">
-                  <VideoPlayer src={videoUrl} trackUrl={vtt} trackLang={subtitleLanguage === 'simplified_chinese' ? 'zh-Hans' : subtitleLanguage === 'traditional_chinese' ? 'zh-Hant' : subtitleLanguage === 'japanese' ? 'ja' : subtitleLanguage === 'korean' ? 'ko' : subtitleLanguage === 'thai' ? 'th' : 'en'} trackLabel={getLanguageDisplayName(subtitleLanguage, t)} className="video-player" onReady={() => {}} onError={() => {}} />
-                </div>
-              </div>
-            );
-          }
-          const audioUrl = `${apiBaseUrl}/api/tasks/${selected.task_id}/${isPod ? 'podcast' : 'audio'}`;
-          return (
-            <div className="modal-preview-stack">
-              {isPod ? (<PodcastPlayer src={audioUrl} transcriptMarkdown={(selectedTranscript || '') as any} />) : (<AudioPlayer src={audioUrl} vttUrl={vtt} />)}
-            </div>
-          );
-        })()}
-      </PreviewModal>
-
       <RunTaskModal
         open={runOpen}
         isPdf={!!runFile?.isPdf}
@@ -493,8 +437,14 @@ const Creations: React.FC<CreationsProps> = ({ apiBaseUrl }) => {
           );
         }}
       />
+      <TaskProcessingModal
+        open={Boolean(processingTask)}
+        task={processingModalTask ?? null}
+        onClose={() => setProcessingTask(null)}
+        onCancel={onCancel}
+      />
     </div>
   );
 };
 
-export default Creations;
+export default CreationsDashboard;

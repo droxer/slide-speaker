@@ -51,7 +51,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
           if (m) {
             const start = (Number(m[1])*3600 + Number(m[2])*60 + Number(m[3]) + Number(m[4])/1000);
             const end = (Number(m[5])*3600 + Number(m[6])*60 + Number(m[7]) + Number(m[8])/1000);
-            let textLines: string[] = [];
+        const textLines: string[] = [];
             while (i < lines.length && lines[i].trim() && !timeRe.test(lines[i])) {
               textLines.push(lines[i].trim());
               i++;

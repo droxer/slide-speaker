@@ -1,5 +1,7 @@
-@import './GoogleLoginButton.scss';
-@import './task-detail.scss';
+@use './GoogleLoginButton.scss' as *;
+@use './task-detail.scss' as *;
+@use './TaskProcessingSteps.scss' as *;
+@use './TaskProcessingModal.scss' as *;
 
 /* Brand color tokens (override in themes as needed) */
 :root {

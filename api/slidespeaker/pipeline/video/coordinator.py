@@ -15,6 +15,12 @@ from loguru import logger
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 
+from ..helpers import (
+    check_and_handle_cancellation,
+    fetch_step_state,
+    set_step_status_processing,
+)
+
 # PDF steps (video)
 from ..steps.video.pdf import (
     compose_video_step as pdf_compose_video_step,
@@ -71,6 +77,14 @@ from ..steps.video.slides import (
 # ------------------------- PDF Coordinator (from_pdf) -------------------------
 
 
+class PipelineStepFailedError(RuntimeError):
+    """Raised when a pipeline step transitions to a failed status without bubbling an exception."""
+
+
+class PipelineCancelledError(RuntimeError):
+    """Raised when a pipeline step reports a cancelled status."""
+
+
 def _pdf_step_name(
     step: str, voice_language: str | None, subtitle_language: str | None
 ) -> str:
@@ -109,6 +123,37 @@ def _pdf_steps(
             steps.append("generate_pdf_subtitles")
         steps.append("compose_video")
     return steps
+
+
+async def _finalize_step_status(
+    file_id: str,
+    state_key: str,
+    task_id: str | None = None,
+) -> None:
+    """Ensure a step finished cleanly, flagging failures for upstream handling."""
+    step_state = await state_manager.get_step_status(file_id, state_key)
+    status = (step_state or {}).get("status")
+
+    if status == "failed":
+        detail = ""
+        data = (step_state or {}).get("data")
+        if isinstance(data, dict) and data.get("error"):
+            detail = f": {data['error']}"
+        raise PipelineStepFailedError(
+            f"Step '{state_key}' failed for file {file_id}{detail}"
+        )
+
+    if status == "cancelled":
+        raise PipelineCancelledError(f"Step '{state_key}' cancelled for file {file_id}")
+
+    if status in {"completed", "skipped"}:
+        return
+
+    # If the step neither completed nor reported failure, mark it as completed now.
+    if task_id:
+        await state_manager.update_step_status_by_task(task_id, state_key, "completed")
+    else:
+        await state_manager.update_step_status(file_id, state_key, "completed")
 
 
 async def from_pdf(
@@ -152,25 +197,20 @@ async def from_pdf(
         voice_language, subtitle_language, generate_subtitles, generate_video
     )
 
+    current_state_key = ""
     try:
         for step_name in steps_order:
-            if task_id and await task_queue.is_task_cancelled(task_id):
-                logger.info(f"Task {task_id} was cancelled during step {step_name}")
-                await state_manager.mark_cancelled(file_id, cancelled_step=step_name)
+            current_state_key = step_name
+            if await check_and_handle_cancellation(file_id, current_state_key, task_id):
                 return
 
-            st = await state_manager.get_step_status(file_id, step_name)
+            st = await fetch_step_state(file_id, step_name)
             if st and st.get("status") == "completed":
                 logger.info(f"Skipping already completed step: {step_name}")
                 continue
 
             # Mark processing (unified status)
-            if task_id:
-                await state_manager.update_step_status_by_task(
-                    task_id, step_name, "processing"
-                )
-            else:
-                await state_manager.update_step_status(file_id, step_name, "processing")
+            await set_step_status_processing(file_id, current_state_key, task_id)
             logger.info(
                 "=== Task %s - Executing: %s ===",
                 task_id,
@@ -202,23 +242,21 @@ async def from_pdf(
             elif step_name == "compose_video":
                 await pdf_compose_video_step(file_id)
 
-            # Mark completed
-            if task_id:
-                await state_manager.update_step_status_by_task(
-                    task_id, step_name, "completed", data=None
-                )
-            else:
-                await state_manager.update_step_status(
-                    file_id, step_name, "completed", data=None
-                )
+            try:
+                await _finalize_step_status(file_id, current_state_key, task_id)
+            except PipelineCancelledError as cancelled_exc:
+                logger.info(str(cancelled_exc))
+                return
 
         if generate_video:
             await state_manager.mark_completed(file_id)
             logger.info(f"All PDF video processing steps completed for file {file_id}")
     except Exception as e:
-        logger.error(f"PDF video processing failed at step {step_name}: {e}")
-        await state_manager.update_step_status(file_id, step_name, "failed")
-        await state_manager.add_error(file_id, str(e), step_name)
+        failing_key = current_state_key or (steps_order[0] if steps_order else "")
+        logger.error(f"PDF video processing failed at step {failing_key}: {e}")
+        if failing_key:
+            await state_manager.update_step_status(file_id, failing_key, "failed")
+            await state_manager.add_error(file_id, str(e), failing_key)
         await state_manager.mark_failed(file_id)
         raise
 
@@ -241,6 +279,16 @@ def _slide_step_name(step: str) -> str:
         "translate_subtitle_transcripts": "Translating subtitle transcripts",
     }
     return base.get(step, step)
+
+
+def _slide_state_key(step: str) -> str:
+    """Map human-readable step names to their underlying state keys."""
+    mapping = {
+        "convert_slides": "convert_slides_to_images",
+        "analyze_slides": "analyze_slide_images",
+        "generate_avatar": "generate_avatar_videos",
+    }
+    return mapping.get(step, step)
 
 
 def _slide_steps(
@@ -302,24 +350,19 @@ async def from_slide(
         subtitle_language=subtitle_language,
     )
 
+    current_state_key = ""
     try:
         for step_name in steps_order:
-            if task_id and await task_queue.is_task_cancelled(task_id):
-                logger.info(f"Task {task_id} was cancelled during step {step_name}")
-                await state_manager.mark_cancelled(file_id, cancelled_step=step_name)
+            current_state_key = _slide_state_key(step_name)
+            if await check_and_handle_cancellation(file_id, current_state_key, task_id):
                 return
 
-            st = await state_manager.get_step_status(file_id, step_name)
+            st = await fetch_step_state(file_id, current_state_key)
             if st and st.get("status") == "completed":
                 logger.info(f"Skipping already completed step: {step_name}")
                 continue
 
-            if task_id:
-                await state_manager.update_step_status_by_task(
-                    task_id, step_name, "processing"
-                )
-            else:
-                await state_manager.update_step_status(file_id, step_name, "processing")
+            await set_step_status_processing(file_id, current_state_key, task_id)
             logger.info(
                 f"=== Task {task_id} - Executing: {_slide_step_name(step_name)} ==="
             )
@@ -357,20 +400,21 @@ async def from_slide(
             elif step_name == "compose_video":
                 await slide_compose_video_step(file_id, file_path)
 
-            if task_id:
-                await state_manager.update_step_status_by_task(
-                    task_id, step_name, "completed", data=None
-                )
-            else:
-                await state_manager.update_step_status(
-                    file_id, step_name, "completed", data=None
-                )
+            try:
+                await _finalize_step_status(file_id, current_state_key, task_id)
+            except PipelineCancelledError as cancelled_exc:
+                logger.info(str(cancelled_exc))
+                return
 
         await state_manager.mark_completed(file_id)
         logger.info(f"All slides video processing steps completed for file {file_id}")
     except Exception as e:
-        logger.error(f"Slides video processing failed at step {step_name}: {e}")
-        await state_manager.update_step_status(file_id, step_name, "failed")
-        await state_manager.add_error(file_id, str(e), step_name)
+        failing_key = current_state_key or (
+            _slide_state_key(steps_order[0]) if steps_order else ""
+        )
+        logger.error(f"Slides video processing failed at step {failing_key}: {e}")
+        if failing_key:
+            await state_manager.update_step_status(file_id, failing_key, "failed")
+            await state_manager.add_error(file_id, str(e), failing_key)
         await state_manager.mark_failed(file_id)
         raise

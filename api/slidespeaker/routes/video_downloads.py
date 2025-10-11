@@ -5,7 +5,6 @@ This module provides API endpoints for downloading and streaming generated
 presentation videos with appropriate content types and headers.
 """
 
-from collections.abc import Iterator
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -16,36 +15,13 @@ from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.storage import StorageProvider
 
 from .download_utils import file_id_from_task, proxy_cloud_media
+from .shared_download_utils import build_headers, check_file_exists, iter_file
 
 router = APIRouter(
     prefix="/api",
     tags=["video_downloads"],
     dependencies=[Depends(require_authenticated_user)],
 )
-
-
-def _build_headers(
-    request: Request,
-    *,
-    content_type: str,
-    content_length: int | None = None,
-    disposition: str | None = None,
-    cache_control: str = "public, max-age=3600",
-) -> dict[str, str]:
-    origin = request.headers.get("origin") or request.headers.get("Origin")
-    headers: dict[str, str] = {
-        "Content-Type": content_type,
-        "Accept-Ranges": "bytes",
-        "Cache-Control": cache_control,
-    }
-    if content_length is not None:
-        headers["Content-Length"] = str(content_length)
-    if disposition:
-        headers["Content-Disposition"] = disposition
-    if origin:
-        headers["Access-Control-Allow-Origin"] = origin
-        headers["Access-Control-Allow-Credentials"] = "true"
-    return headers
 
 
 @router.get("/tasks/{task_id}/video")
@@ -61,15 +37,15 @@ async def get_video_by_task(task_id: str, request: Request) -> Any:
 
     # Resolve the object key to serve
     object_key: str | None = None
-    if sp.file_exists(f"{task_id}.mp4"):
+    if check_file_exists(f"{task_id}.mp4"):
         object_key = f"{task_id}.mp4"
     else:
         file_id = await file_id_from_task(task_id)
         preferred_key = f"{file_id}.mp4"
         legacy_key = f"{file_id}_final.mp4"
-        if sp.file_exists(preferred_key):
+        if check_file_exists(preferred_key):
             object_key = preferred_key
-        elif sp.file_exists(legacy_key):
+        elif check_file_exists(legacy_key):
             object_key = legacy_key
 
     if not object_key:
@@ -104,20 +80,7 @@ async def get_video_by_task(task_id: str, request: Request) -> Any:
                 end = file_size - 1
                 length = file_size
 
-            def iter_file(
-                path: str, offset: int, length: int, chunk: int = 1024 * 256
-            ) -> Iterator[bytes]:
-                with open(path, "rb") as f:
-                    f.seek(offset)
-                    remaining = length
-                    while remaining > 0:
-                        data = f.read(min(chunk, remaining))
-                        if not data:
-                            break
-                        remaining -= len(data)
-                        yield data
-
-            headers = _build_headers(
+            headers = build_headers(
                 request,
                 content_type=media_type,
                 content_length=length,
@@ -135,7 +98,7 @@ async def get_video_by_task(task_id: str, request: Request) -> Any:
                 str(actual_file_path),
                 media_type=media_type,
                 filename=f"presentation_{task_id}.mp4",
-                headers=_build_headers(
+                headers=build_headers(
                     request,
                     content_type=media_type,
                     disposition=f"inline; filename=presentation_{task_id}.mp4",
@@ -165,15 +128,15 @@ async def download_video_by_task(task_id: str, request: Request) -> Any:
     """Provide a download-focused endpoint for video with attachment disposition."""
     sp: StorageProvider = get_storage_provider()
     # Prefer task-id-based filename when present
-    object_key = f"{task_id}.mp4" if sp.file_exists(f"{task_id}.mp4") else None
+    object_key = f"{task_id}.mp4" if check_file_exists(f"{task_id}.mp4") else None
     if object_key is None:
         file_id = await file_id_from_task(task_id)
         # Fallback to file-id naming (new first, then legacy)
         preferred_key = f"{file_id}.mp4"
         legacy_key = f"{file_id}_final.mp4"
-        object_key = preferred_key if sp.file_exists(preferred_key) else legacy_key
+        object_key = preferred_key if check_file_exists(preferred_key) else legacy_key
 
-    if not sp.file_exists(object_key):
+    if not check_file_exists(object_key):
         raise HTTPException(status_code=404, detail="Video not found")
 
     # Local: serve file directly with attachment headers
@@ -183,7 +146,7 @@ async def download_video_by_task(task_id: str, request: Request) -> Any:
             str(actual_file_path),
             media_type="video/mp4",
             filename=f"presentation_{task_id}.mp4",
-            headers=_build_headers(
+            headers=build_headers(
                 request,
                 content_type="video/mp4",
                 disposition=f"attachment; filename=presentation_{task_id}.mp4",
@@ -220,22 +183,21 @@ async def options_video_by_task(task_id: str) -> Response:
 @router.head("/tasks/{task_id}/video")
 async def head_video_by_task(task_id: str, request: Request) -> Response:
     """HEAD endpoint to check if the generated video exists (task-based)."""
-    sp: StorageProvider = get_storage_provider()
     # Determine existence using task-id-based or file-id-based key
     exists = False
-    if sp.file_exists(f"{task_id}.mp4"):
+    if check_file_exists(f"{task_id}.mp4"):
         exists = True
     else:
         try:
             file_id = await file_id_from_task(task_id)
-            if sp.file_exists(f"{file_id}.mp4") or sp.file_exists(
+            if check_file_exists(f"{file_id}.mp4") or check_file_exists(
                 f"{file_id}_final.mp4"
             ):
                 exists = True
         except Exception:
             exists = False
 
-    headers = _build_headers(
+    headers = build_headers(
         request,
         content_type="video/mp4",
         disposition=f"inline; filename=presentation_{task_id}.mp4",

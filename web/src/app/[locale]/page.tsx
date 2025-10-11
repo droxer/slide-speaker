@@ -1,15 +1,18 @@
 import {redirect} from 'next/navigation';
 import {getServerSession} from 'next-auth';
 import StudioPageClient from '../StudioPageClient';
-import {loadInitialHealth, healthRevalidate} from '../loadInitialHealth';
+import {loadInitialHealth} from '../loadInitialHealth';
 import {authOptions} from '@/auth/options';
 
-export const revalidate = healthRevalidate;
+export const revalidate = 300;
 
-export default async function StudioPage({params}: {params: {locale: string}}) {
+type LocaleParams = { params: Promise<{ locale: string }> };
+
+export default async function StudioPage({params}: LocaleParams) {
+  const {locale} = await params;
   const session = await getServerSession(authOptions);
   if (!session) {
-    redirect(`/login?redirectTo=/${params.locale}`);
+    redirect(`/login?redirectTo=/${locale}`);
   }
 
   const initialHealth = await loadInitialHealth();

@@ -15,6 +15,7 @@ make lint              # Ruff lint
 make format            # Ruff format
 make typecheck         # mypy type check
 make check             # lint + typecheck
+make test              # Run pytest tests
 ```
 
 Optional uv variants:
@@ -22,6 +23,7 @@ Optional uv variants:
 uv sync                        # base deps
 uv sync --extra=dev            # + dev tools
 uv sync --extra=aws --extra=oss  # S3/OSS providers
+uv sync --extra=db             # Database dependencies
 ```
 
 ### Web (React)
@@ -38,19 +40,22 @@ make check           # Lint + TS
 ## Repository Structure
 - api/: FastAPI backend and workers
   - Entrypoints: server.py, master_worker.py, worker.py
-  - Core: slidespeaker/core/ (state + queue)
-  - Routes: slidespeaker/routes/ (upload, tasks, stats, downloads, transcripts)
+  - Core: slidespeaker/core/ (state + queue + monitoring + rate limiting)
+  - Routes: slidespeaker/routes/ (upload, tasks, stats, downloads, transcripts, metrics, auth)
   - Pipeline: slidespeaker/pipeline/ (PDF vs slides coordinators and steps)
   - Processing: slidespeaker/processing/ (audio/video/subtitles/images)
   - Services: slidespeaker/services/ (OpenAI, ElevenLabs, HeyGen, vision, TTS)
   - LLM: slidespeaker/llm/ (centralized OpenAI client + chat/image/tts helpers)
   - Storage: slidespeaker/storage/ (local, S3, OSS via unified interface)
+  - Schemas: slidespeaker/schemas/ (Pydantic models for request/response validation)
 - web/: React + TypeScript UI
   - Entrypoints: src/index.tsx, src/App.tsx
-  - Components: src/components/ (TaskMonitor, TaskCard, PreviewModal, UploadPanel, ProcessingView, AudioPlayer, VideoPlayer, PodcastPlayer, TranscriptList)
+  - Components: src/components/ (TaskMonitor, TaskCard, PreviewModal, UploadPanel, TaskProcessingSteps, AudioPlayer, VideoPlayer, PodcastPlayer, TranscriptList, ErrorBoundary, TaskProcessingStage, FileUploadingStage, UploadConfiguration)
   - Services: src/services/client.ts (API calls), src/services/queries.ts (React Query hooks + prefetch)
-  - Types: src/types/ (Task, TaskState)
+  - Types: src/types/ (Task, TaskState) and src/components/types.ts (component-specific types)
   - Styles: src/styles/ (index.scss, app.scss, TaskMonitor.scss, dark-theme.scss)
+  - Hooks: src/hooks/ (custom React hooks)
+  - Utils: src/utils/ (utility functions)
 
 ## Core Concepts
 - task_type: What we are generating. Allowed: video | podcast | both. Drives whether video, podcast, or both artifacts are produced.
@@ -68,10 +73,13 @@ make check           # Lint + TS
   - Persist transcript language via subtitle_language for podcast tasks.
   - Include translate_podcast_script step when transcript_language != english.
   - Audio generation uses voice_language; transcript language is subtitle_language. Dialogues are translated accordingly before TTS when needed.
-  - Remove any “Transition:” labels from dialogue when building/translating scripts and when rendering markdown.
+  - Remove any "Transition:" labels from dialogue when building/translating scripts and when rendering markdown.
   - Do not upload per‑segment MP3s to storage for PDF podcast; only upload the final composition.
 - Migration: migrations/versions/0004_add_source_type_to_tasks.py adds tasks.source_type and backfills from kwargs.file_ext. Use alembic/uv via Makefile.
 - Validation: run make check before pushing changes. Keep changes minimal and scoped; avoid unrelated fixes.
+- Rate limiting: All API endpoints are rate-limited using the slowapi library. Use the @limiter.limit decorator on routes that need specific rate limits.
+- Monitoring: All endpoints are automatically monitored for performance metrics. Use the @monitor_endpoint decorator for additional custom monitoring.
+- Schema validation: Use Pydantic models in slidespeaker/schemas/ for request/response validation. Prefer these over inline validation.
 
 ## Frontend Guidelines
 - All API calls go through src/services/client.ts. Prefer React Query hooks in src/services/queries.ts for cache‑first UX.
@@ -80,15 +88,21 @@ make check           # Lint + TS
   - VideoPlayer: video with optional <track> for subtitles; consistent styling.
   - PodcastPlayer: audio + markdown transcript rendering.
   - TranscriptList: shared cue/timestamp list with active highlight and auto‑scroll.
+- New components:
+  - ErrorBoundary: catches JavaScript errors in child components and displays fallback UI.
+  - TaskProcessingStage: wrapper component for the processing steps view state.
+  - FileUploadingStage: displays upload progress and file information.
+  - UploadConfiguration: form for configuring upload settings.
+  - ErrorStage: displays error information and reset options.
 - Views:
-  - UploadPanel: upload box; “AUDIO LANGUAGE” and “Subtitles Language” labels; hide upload UI during upload/processing; Create button only when idle/ready.
-  - ProcessingView: task meta in two equal‑width cards; correct badges; small preview where applicable.
+  - UploadPanel: upload box; "AUDIO LANGUAGE" and "Subtitles Language" labels; hide upload UI during upload/processing; Create button only when idle/ready.
+  - TaskProcessingSteps: task meta in two equal-width cards; correct badges; small preview where applicable.
   - TaskMonitor: task list + TaskCard per task. Preview modal closes on ESC and is sized larger for audio/podcast.
 - UX rules (see AGENTS.md for full spec):
   - Downloads order: Video, Audio, Transcript, VTT, SRT.
   - Use task‑based URLs only: /api/tasks/{task_id}/...
   - Subtitles styling and rendering must match between preview and completed views.
-  - Task card header: “Task: {task_id}”; task‑id label is focusable and click/Enter‑to‑copy.
+  - Task card header: "Task: {task_id}"; task‑id label is focusable and click/Enter‑to‑copy.
 
 ## Environment & Config
 Create api/.env (never commit secrets):
@@ -117,6 +131,8 @@ OSS_REGION=...
 2) Start Web: `cd web && make dev` → http://localhost:3000
 3) Run workers for background processing: `cd api && make master-worker`
 4) Validate: `make check` in both api/ and web/
+5) Run tests: `cd api && python -m pytest tests/` or `cd web && pnpm test`
+6) Check metrics: Visit http://localhost:8000/api/metrics/health to verify metrics service is running
 
 ## Do / Don’t
 - Do use services/client.ts and services/queries.ts; avoid direct fetch/axios in components.
@@ -152,7 +168,7 @@ OSS_REGION=...
 - Processing Task Meta: two equal‑width cards; file icon/name don’t overlap; file‑type badge vertically centered.
 
 ## Testing & Verification (mirror of AGENTS.md)
-- API: No formal tests; prioritize make check (Ruff + mypy). Place any new tests under api/tests/ as test_*.py.
+- API: Tests are now implemented using pytest. Run tests with `cd api && python -m pytest tests/`. Place any new tests under api/tests/ as test_*.py.
 - Web: If tests added, use Jest/RTL; keep tests near code (*.test.tsx|ts).
 - Manual checks:
   - Start API (make dev) and verify /docs loads.
@@ -161,11 +177,16 @@ OSS_REGION=...
     - /api/tasks/{task_id}/audio
     - /api/tasks/{task_id}/transcripts/markdown
     - /api/tasks/{task_id}/subtitles/vtt|srt
+  - Verify metrics endpoints are accessible:
+    - /api/metrics/health (public)
+    - /api/metrics/performance (authenticated)
 
 ## Security & Configuration (mirror of AGENTS.md)
 - Secrets: Require api/.env (OpenAI, ElevenLabs, HeyGen, Redis). Never commit secrets. See api/.env.example.
 - LLM config: OPENAI_API_KEY required; optional OPENAI_BASE_URL for compatible services; supports OPENAI_TIMEOUT/RETRIES/BACKOFF.
 - Storage: STORAGE_PROVIDER (local|s3|oss) + related keys. Local mounts /files for direct serving.
+- Authentication: JWT-based authentication for protected endpoints. Set JWT_SECRET_KEY in api/.env.
+- Rate limiting: Configure rate limiting parameters in api/.env (RATE_LIMIT_REQUESTS, RATE_LIMIT_DURATION).
 - Engines: Python ≥3.12 via uv; Node ≥20 for web.
 
 ## Useful Entry Points (mirror of AGENTS.md)
@@ -175,7 +196,19 @@ OSS_REGION=...
 - Downloads (video/subtitles): api/slidespeaker/routes/downloads.py
 - Transcripts (markdown): api/slidespeaker/routes/transcripts.py
 - Task stats/search: api/slidespeaker/routes/stats.py
+- Metrics endpoints: api/slidespeaker/routes/metrics.py
+- Upload handling: api/slidespeaker/routes/upload.py
 - Frontend monitor: web/src/components/TaskMonitor.tsx
+
+## New API Endpoints
+- Metrics:
+  - GET /api/metrics/health - Health check for metrics service
+  - GET /api/metrics/performance - Performance metrics (requires authentication)
+  - GET /api/metrics/prometheus - Export metrics in Prometheus format (requires authentication)
+- Authentication:
+  - POST /api/auth/login - User login
+  - POST /api/auth/logout - User logout
+  - GET /api/auth/me - Get current user info
 
 ## Known Gaps & Opportunities (mirror of AGENTS.md)
 - API tests are absent; adding a minimal pytest scaffold later could help.
@@ -197,3 +230,4 @@ OSS_REGION=...
 -- do NOT git commit
 -- do NOT check the node_modules and .venv
 - always use uv for python, pnpm for frontend
+- uv for all python related tasks

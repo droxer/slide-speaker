@@ -2,21 +2,22 @@ import {notFound, redirect} from 'next/navigation';
 import {getServerSession} from 'next-auth';
 import type {Metadata} from 'next';
 import TaskPageClient from '../../../tasks/TaskPageClient';
-import {loadTaskById, taskRevalidate} from '../../../tasks/loadTaskById';
+import {loadTaskById} from '../../../tasks/loadTaskById';
 import {loadInitialHealth} from '../../../loadInitialHealth';
 import {authOptions} from '@/auth/options';
 
-export const revalidate = taskRevalidate;
+export const revalidate = 30;
 
 type PageParams = {
-  params: {
+  params: Promise<{
     locale: string;
     taskId: string;
-  };
+  }>;
 };
 
 export async function generateMetadata({params}: PageParams): Promise<Metadata> {
-  const task = await loadTaskById(params.taskId);
+  const {taskId} = await params;
+  const task = await loadTaskById(taskId);
   if (!task) {
     return {
       title: 'Task Not Found • SlideSpeaker',
@@ -27,13 +28,13 @@ export async function generateMetadata({params}: PageParams): Promise<Metadata> 
   const taskType = String(task.task_type || 'task');
   const status = String(task.status || 'unknown');
   return {
-    title: `Task ${params.taskId} • ${status}`,
-    description: `View details for ${taskType} task ${params.taskId}.`,
+    title: `Task ${taskId} • ${status}`,
+    description: `View details for ${taskType} task ${taskId}.`,
   };
 }
 
 export default async function TaskDetailPage({params}: PageParams) {
-  const {locale, taskId} = params;
+  const {locale, taskId} = await params;
 
   const session = await getServerSession(authOptions);
   if (!session) {

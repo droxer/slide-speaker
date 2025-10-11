@@ -207,7 +207,7 @@ class RedisTaskQueue:
         return None
 
     async def cancel_task(self, task_id: str) -> bool:
-        """Cancel a task if it's still queued or processing"""
+        """Cancel a task if it's still queued or processing, or return True if already cancelled"""
         task = await self.get_task(task_id)
         if not task:
             logger.warning(f"Attempted to cancel non-existent task {task_id}")
@@ -218,9 +218,14 @@ class RedisTaskQueue:
             # Remove from queue - ignore return value
             removed_count = await self.redis_client.lrem(self.queue_key, 1, task_id)  # type: ignore
             task["status"] = "cancelled"
-            task["error"] = "Task was cancelled by user"
             task_key = self._get_task_key(task_id)
             await self.redis_client.set(task_key, json.dumps(task))
+            try:
+                await update_task(task_id, status="cancelled", error=None)
+            except Exception as db_err:
+                logger.warning(
+                    f"Failed to persist cancellation for {task_id}: {db_err}"
+                )
             logger.info(
                 f"Task {task_id} cancelled while queued (removed {removed_count} instances from queue)"
             )
@@ -232,9 +237,14 @@ class RedisTaskQueue:
             logger.info(
                 f"Task {task_id} marked for cancellation (currently processing)"
             )
-            task["error"] = "Task was cancelled by user"
             task_key = self._get_task_key(task_id)
             await self.redis_client.set(task_key, json.dumps(task))
+            try:
+                await update_task(task_id, status="cancelled", error=None)
+            except Exception as db_err:
+                logger.warning(
+                    f"Failed to persist cancellation for {task_id}: {db_err}"
+                )
 
             # Also store cancellation status in a separate key for immediate access
             cancellation_key = f"{self.task_prefix}:{task_id}:cancelled"
@@ -242,6 +252,10 @@ class RedisTaskQueue:
                 cancellation_key, 300, "true"
             )  # Expire after 5 minutes
             logger.info(f"Task {task_id} marked as cancelled during processing")
+            return True
+        elif current_status == "cancelled":
+            # Task is already cancelled, so we can return True to indicate successful cancel operation
+            logger.info(f"Task {task_id} was already cancelled, returning success")
             return True
         else:
             # Task is already completed or failed

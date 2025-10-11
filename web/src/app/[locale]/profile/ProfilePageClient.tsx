@@ -12,24 +12,12 @@ import {updateCurrentUserProfile} from '@/services/client';
 import type {UserProfile} from '@/types/user';
 import type {Locale} from '@/i18n/config';
 import type {HealthStatus} from '@/types/health';
-
-const SUPPORTED_LANGUAGES = ['english', 'simplified_chinese', 'traditional_chinese'] as const;
-type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
-
-const LANGUAGE_TO_LOCALE: Record<SupportedLanguage, Locale> = {
-  english: 'en',
-  simplified_chinese: 'zh-CN',
-  traditional_chinese: 'zh-TW',
-};
-
-const DEFAULT_LANGUAGE: SupportedLanguage = 'english';
-
-const normalizeLanguage = (value: string | null | undefined): SupportedLanguage => {
-  const normalized = (value ?? '').toLowerCase();
-  return SUPPORTED_LANGUAGES.includes(normalized as SupportedLanguage)
-    ? (normalized as SupportedLanguage)
-    : DEFAULT_LANGUAGE;
-};
+import {
+  LANGUAGE_TO_LOCALE,
+  SUPPORTED_LANGUAGES,
+  normalizeSupportedLanguage,
+  type SupportedLanguage,
+} from '@/utils/localePreferences';
 
 type ProfilePageClientProps = {
   profile: UserProfile;
@@ -42,7 +30,7 @@ export default function ProfilePageClient({profile, initialHealth = null}: Profi
   const locale = useLocale() as Locale;
   const {data: session, update: updateSession} = useSession();
   const initialName = profile.name ?? '';
-  const initialLanguage = normalizeLanguage(profile.preferred_language);
+  const initialLanguage = normalizeSupportedLanguage(profile.preferred_language);
 
   const [baseline, setBaseline] = React.useState({
     name: initialName,
@@ -55,7 +43,7 @@ export default function ProfilePageClient({profile, initialHealth = null}: Profi
 
   React.useEffect(() => {
     const nextName = profile.name ?? '';
-    const nextLanguage = normalizeLanguage(profile.preferred_language);
+    const nextLanguage = normalizeSupportedLanguage(profile.preferred_language);
     setName(nextName);
     setLanguage(nextLanguage);
     setBaseline({name: nextName, language: nextLanguage});
@@ -67,7 +55,7 @@ export default function ProfilePageClient({profile, initialHealth = null}: Profi
     onSuccess: (data) => {
       const updated = data.user;
       const updatedName = updated.name ?? '';
-      const updatedLanguage = normalizeLanguage(updated.preferred_language);
+      const updatedLanguage = normalizeSupportedLanguage(updated.preferred_language);
       setName(updatedName);
       setLanguage(updatedLanguage);
       setBaseline({name: updatedName, language: updatedLanguage});
@@ -151,7 +139,7 @@ export default function ProfilePageClient({profile, initialHealth = null}: Profi
             <select
               id="profile-language"
               value={language}
-              onChange={(event) => setLanguage(normalizeLanguage(event.target.value))}
+              onChange={(event) => setLanguage(normalizeSupportedLanguage(event.target.value))}
             >
               {languageOptions.map((option) => (
                 <option key={option.value} value={option.value}>

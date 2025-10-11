@@ -146,10 +146,16 @@ export const useCancelTaskMutation = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (taskId: string) => cancelRun(taskId),
-    onSettled: async () => {
+    onSettled: async (data, error, variables) => {
+      const taskId = variables;
+      // Invalidate specific task query
+      await qc.invalidateQueries({ queryKey: queries.task(taskId) });
+      // Invalidate general queries
       await qc.invalidateQueries({ queryKey: ['tasks'] as any, exact: false });
       await qc.invalidateQueries({ queryKey: ['files'] as any, exact: false });
       await qc.invalidateQueries({ queryKey: queries.search('') as any, exact: false });
+      // Invalidate progress query if it exists
+      await qc.invalidateQueries({ queryKey: ['progress', taskId] as any, exact: false });
     },
   });
 };

@@ -4,29 +4,12 @@ import {getToken} from 'next-auth/jwt';
 import createMiddleware from 'next-intl/middleware';
 import {locales, defaultLocale} from './src/i18n/config';
 import type {Locale} from './src/i18n/config';
+import {normalizePreferredLocale} from './src/utils/localePreferences';
 
 const intlMiddleware = createMiddleware({
   locales,
   defaultLocale,
 });
-
-const LANGUAGE_TO_LOCALE: Record<string, Locale> = {
-  english: 'en',
-  'en': 'en',
-  simplified_chinese: 'zh-CN',
-  'zh-cn': 'zh-CN',
-  traditional_chinese: 'zh-TW',
-  'zh-tw': 'zh-TW',
-};
-
-const normalizePreferredLocale = (value: unknown): Locale | null => {
-  if (typeof value !== 'string') {
-    return null;
-  }
-  const key = value.trim().toLowerCase();
-  const resolved = LANGUAGE_TO_LOCALE[key as keyof typeof LANGUAGE_TO_LOCALE];
-  return resolved ?? null;
-};
 
 const PUBLIC_PATHS = new Set<string>([
   '/login',
@@ -61,12 +44,16 @@ function isPublicPath(pathname: string): boolean {
 }
 
 export default async function middleware(request: NextRequest) {
-  const localeResponse = intlMiddleware(request);
-
   const pathname = request.nextUrl.pathname;
 
+  // Skip locale handling for auth API routes to prevent loops
+  if (pathname.startsWith('/api/auth')) {
+    return undefined; // Allow NextAuth to handle authentication routes
+  }
+
   if (isPublicPath(pathname)) {
-    return localeResponse;
+    // For public paths, only run intl middleware (no auth check needed)
+    return intlMiddleware(request);
   }
 
   const token = await getToken({req: request, secret: process.env.NEXTAUTH_SECRET});
@@ -86,16 +73,16 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (pathname.startsWith('/api')) {
-    return localeResponse;
-  }
-
+  // Check the user's preferred locale  
   const preferredLocale = normalizePreferredLocale((token as any)?.user?.preferred_language);
+  
   if (preferredLocale) {
     const segments = pathname.split('/').filter(Boolean);
     const [firstSegment] = segments;
     const hasLocalePrefix = isLocale(firstSegment ?? '');
 
+    // Only redirect if the current path has a locale prefix that differs from the preferred locale
+    // or if there's no locale prefix but the user has a preference
     if (!hasLocalePrefix || firstSegment !== preferredLocale) {
       const targetPathSegments = hasLocalePrefix ? segments.slice(1) : segments;
       const targetPath = targetPathSegments.length > 0 ? `/${targetPathSegments.join('/')}` : '';
@@ -106,7 +93,8 @@ export default async function middleware(request: NextRequest) {
     }
   }
 
-  return localeResponse;
+  // Run the internationalization middleware for other routes
+  return intlMiddleware(request);
 }
 
 export const config = {

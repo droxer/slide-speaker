@@ -152,11 +152,16 @@ async def update_task(task_id: str, **fields: Any) -> None:
 
 async def delete_task(task_id: str) -> None:
     """Delete a task row from DB by task_id (no-op if not found)."""
+    from loguru import logger
     from sqlalchemy import delete as sa_delete
 
+    logger.info(f"Repository: Attempting to delete task {task_id} from database")
     async with get_session() as s:
-        await s.execute(sa_delete(TaskRow).where(TaskRow.id == task_id))
+        result = await s.execute(sa_delete(TaskRow).where(TaskRow.id == task_id))
         await s.commit()
+        # Log the number of affected rows if available
+        rowcount = getattr(result, "rowcount", "unknown")
+        logger.info(f"Repository: Delete operation affected {rowcount} rows")
 
 
 async def list_tasks(

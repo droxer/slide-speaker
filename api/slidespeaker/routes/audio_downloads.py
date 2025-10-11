@@ -6,7 +6,6 @@ audio files with appropriate content types and headers.
 """
 
 import os
-from collections.abc import Iterator
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -23,36 +22,16 @@ from .download_utils import (
     proxy_cloud_media,
     stream_concatenated_files,
 )
+from .shared_download_utils import (
+    build_headers,
+    iter_file,
+)
 
 router = APIRouter(
     prefix="/api",
     tags=["audio_downloads"],
     dependencies=[Depends(require_authenticated_user)],
 )
-
-
-def _build_headers(
-    request: Request,
-    *,
-    content_type: str,
-    content_length: int | None = None,
-    disposition: str | None = None,
-    cache_control: str = "no-cache, no-store, must-revalidate",
-) -> dict[str, str]:
-    origin = request.headers.get("origin") or request.headers.get("Origin")
-    headers: dict[str, str] = {
-        "Content-Type": content_type,
-        "Accept-Ranges": "bytes",
-        "Cache-Control": cache_control,
-    }
-    if content_length is not None:
-        headers["Content-Length"] = str(content_length)
-    if disposition:
-        headers["Content-Disposition"] = disposition
-    if origin:
-        headers["Access-Control-Allow-Origin"] = origin
-        headers["Access-Control-Allow-Credentials"] = "true"
-    return headers
 
 
 async def get_final_audio(file_id: str, request: Request) -> Any:
@@ -78,7 +57,7 @@ async def get_final_audio(file_id: str, request: Request) -> Any:
                         str(actual),
                         media_type="audio/mpeg",
                         filename=f"presentation_{file_id}.mp3",
-                        headers=_build_headers(
+                        headers=build_headers(
                             request,
                             content_type="audio/mpeg",
                             content_length=file_size,
@@ -107,7 +86,7 @@ async def get_final_audio(file_id: str, request: Request) -> Any:
                     content_disposition=f"inline; filename=presentation_{file_id}.mp3",
                     content_type="audio/mpeg",
                 )
-                headers = _build_headers(
+                headers = build_headers(
                     request,
                     content_type="audio/mpeg",
                     cache_control="no-cache, no-store, must-revalidate",
@@ -129,7 +108,7 @@ async def get_final_audio(file_id: str, request: Request) -> Any:
             return StreamingResponse(
                 stream_concatenated_files(audio_files),
                 media_type="audio/mpeg",
-                headers=_build_headers(
+                headers=build_headers(
                     request,
                     content_type="audio/mpeg",
                     disposition=f"inline; filename=presentation_{file_id}.mp3",
@@ -149,7 +128,7 @@ async def get_final_audio(file_id: str, request: Request) -> Any:
             actual_file_path,
             media_type="audio/mpeg",
             filename=f"presentation_{file_id}.mp3",
-            headers=_build_headers(
+            headers=build_headers(
                 request,
                 content_type="audio/mpeg",
                 content_length=file_size,
@@ -202,12 +181,14 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
     Avoid pre-checks that can fail on cloud providers with restricted HEAD permissions.
     Try task-id first; on 404, fall back to file-id mapping.
     """
+    from .shared_download_utils import check_file_exists
+
     sp: StorageProvider = get_storage_provider()
     file_id = await file_id_from_task(task_id)
 
     # Check for audio files using the same logic as downloads endpoint
     # First check task-id based key
-    if sp.file_exists(f"{task_id}.mp3"):
+    if check_file_exists(f"{task_id}.mp3"):
         task_key = f"{task_id}.mp3"
         # Found task-id based audio file, use it directly
         if config.storage_provider == "local":
@@ -237,20 +218,7 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
                                 raise ValueError("Invalid range")
                             length = end - start + 1
 
-                            def iter_file(
-                                chunk_size: int = 1024 * 256,
-                            ) -> Iterator[bytes]:
-                                with open(str(actual), "rb") as f:
-                                    f.seek(start)
-                                    remaining = length
-                                    while remaining > 0:
-                                        data = f.read(min(chunk_size, remaining))
-                                        if not data:
-                                            break
-                                        remaining -= len(data)
-                                        yield data
-
-                            headers = _build_headers(
+                            headers = build_headers(
                                 request,
                                 content_type="audio/mpeg",
                                 content_length=length,
@@ -261,7 +229,7 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
                             )
 
                             return StreamingResponse(
-                                iter_file(),
+                                iter_file(str(actual), start, length),
                                 status_code=206,  # Partial Content
                                 headers=headers,
                             )
@@ -274,7 +242,7 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
                         str(actual),
                         media_type="audio/mpeg",
                         filename=f"presentation_{task_id}.mp3",
-                        headers=_build_headers(
+                        headers=build_headers(
                             request,
                             content_type="audio/mpeg",
                             content_length=file_size,
@@ -303,7 +271,7 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
                     content_disposition=f"inline; filename=presentation_{task_id}.mp3",
                     content_type="audio/mpeg",
                 )
-                headers = _build_headers(
+                headers = build_headers(
                     request,
                     content_type="audio/mpeg",
                     cache_control="no-cache, no-store, must-revalidate",
@@ -322,7 +290,7 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
         from .download_utils import final_audio_object_keys
 
         for key in final_audio_object_keys(file_id):
-            if sp.file_exists(key):
+            if check_file_exists(key):
                 # Found file-id based audio file, use the file-based logic
                 return await get_final_audio(file_id, request)
 
@@ -333,14 +301,16 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
 @router.get("/tasks/{task_id}/audio/download")
 async def download_final_audio_by_task(task_id: str, request: Request) -> Any:
     """Download endpoint for the final MP3 with attachment disposition."""
+    from .shared_download_utils import check_file_exists
+
     sp: StorageProvider = get_storage_provider()
     # Resolve best key (prefer task-id, then file-id variants)
-    if sp.file_exists(f"{task_id}.mp3"):
+    if check_file_exists(f"{task_id}.mp3"):
         object_key = f"{task_id}.mp3"
     else:
         file_id = await file_id_from_task(task_id)
         keys = final_audio_object_keys(file_id)
-        found = next((k for k in keys if sp.file_exists(k)), None)
+        found = next((k for k in keys if check_file_exists(k)), None)
         if not found:
             raise HTTPException(status_code=404, detail="Final audio not found")
         object_key = found
@@ -351,7 +321,7 @@ async def download_final_audio_by_task(task_id: str, request: Request) -> Any:
             str(actual),
             media_type="audio/mpeg",
             filename=f"presentation_{task_id}.mp3",
-            headers=_build_headers(
+            headers=build_headers(
                 request,
                 content_type="audio/mpeg",
                 disposition=f"attachment; filename=presentation_{task_id}.mp3",
@@ -388,7 +358,7 @@ async def get_audio_file_by_task(task_id: str, index: int, request: Request) -> 
         actual_file_path,
         media_type="audio/mpeg",
         filename=f"{task_id}_track_{index}.mp3",
-        headers=_build_headers(
+        headers=build_headers(
             request,
             content_type="audio/mpeg",
             disposition=f"inline; filename={task_id}_track_{index}.mp3",

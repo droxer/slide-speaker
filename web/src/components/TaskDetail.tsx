@@ -7,6 +7,7 @@ import AudioPlayer from '@/components/AudioPlayer';
 import DownloadLinks, { DownloadLinkItem } from '@/components/DownloadLinks';
 import type { Cue } from '@/components/TranscriptList';
 import { STEP_STATUS_ICONS, normalizeStepStatus, getStepLabel } from '@/utils/stepLabels';
+import { getTaskStatusClass, getTaskStatusIcon, getTaskStatusLabel } from '@/utils/taskStatus';
 import { resolveLanguages, getLanguageDisplayName } from '@/utils/language';
 import { buildCuesFromMarkdown } from '@/utils/transcript';
 import { useTranscriptQuery } from '@/services/queries';
@@ -24,30 +25,6 @@ const buildAssetUrl = (baseUrl: string, path: string) => {
   if (!baseUrl) return path;
   if (path.startsWith('http')) return path;
   return `${baseUrl}${path}`;
-};
-
-const statusLabel = (
-  status: string,
-  t: (key: string, vars?: Record<string, string | number>, fallback?: string) => string,
-) => {
-  switch (status) {
-    case 'completed':
-      return t('task.status.completed');
-    case 'processing':
-      return t('task.status.processing');
-    case 'queued':
-      return t('task.status.queued');
-    case 'failed':
-      return t('task.status.failed');
-    case 'cancelled':
-      return t('task.status.cancelled');
-    case 'pending':
-      return t('task.status.pending', undefined, 'Pending');
-    case 'skipped':
-      return t('task.status.skipped', undefined, 'Skipped');
-    default:
-      return t(`task.status.${status}`, undefined, status.length ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown');
-  }
 };
 
 const formatTaskType = (type?: string) => {
@@ -109,7 +86,12 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
 
   const taskType = String(task.task_type || '').toLowerCase();
   const filename = task.kwargs?.filename || task.state?.filename || 'Unknown file';
-  const displayTaskType = formatTaskType(task.task_type);
+  const taskTypeKey = (task.task_type ?? '').toString().toLowerCase();
+  const displayTaskType = t(
+    `task.detail.type.${taskTypeKey || 'unknown'}`,
+    undefined,
+    formatTaskType(task.task_type),
+  );
   const [previewTab, setPreviewTab] = useState<'video' | 'audio'>('video');
   const hasVideoAsset = downloads?.some((item) => item.type === 'video') ?? false;
   const hasPodcastAsset = downloads?.some((item) => item.type === 'podcast') ?? false;
@@ -154,9 +136,9 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
             <div className="task-detail-card__title-row">
               <h1>{filename}</h1>
               <span className="task-detail-card__type-pill">{displayTaskType}</span>
-              <span className={`task-detail-card__status task-detail-card__status--${task.status}`}>
-                {statusLabel(task.status, t)}
-              </span>
+              <div className={`task-status ${getTaskStatusClass(task.status)}`}>
+                {getTaskStatusIcon(task.status)} {getTaskStatusLabel(task.status, t)}
+              </div>
             </div>
             <p className="task-detail-card__meta">
               <span>Task ID: {task.task_id}</span>
@@ -189,7 +171,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
                     <span className="progress-step__icon" aria-hidden>{STEP_STATUS_ICONS[currentStepStatus]}</span>
                     <div className="progress-step__body">
                       <span className="progress-step__title">{getStepLabel(currentStepName, t)}</span>
-                      <span className="progress-step__meta">{statusLabel(currentStepStatus, t)}</span>
+                      <span className="progress-step__meta">{getTaskStatusLabel(currentStepStatus, t)}</span>
                     </div>
                   </div>
                 </div>
@@ -220,7 +202,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
                     <span className="progress-step__icon" aria-hidden>{STEP_STATUS_ICONS[stepStatus]}</span>
                     <div className="progress-step__body">
                       <span className="progress-step__title">{getStepLabel(name, t)}</span>
-                      <span className="progress-step__meta">{statusLabel(stepStatus, t)}</span>
+                      <span className="progress-step__meta">{getTaskStatusLabel(stepStatus, t)}</span>
                     </div>
                   </li>
                 );
@@ -305,7 +287,9 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
 
         <section className="task-detail-card__section">
           <h2>{t('task.detail.downloads')}</h2>
-          {downloadsLoading ? (
+          {task.status === 'cancelled' ? (
+            <p className="task-detail-card__empty">{t('task.detail.noDownloadsCancelled')}</p>
+          ) : downloadsLoading ? (
             <p className="task-detail-card__empty">{t('task.detail.loadingDownloads')}</p>
           ) : downloads && downloads.length > 0 ? (
             <DownloadLinks

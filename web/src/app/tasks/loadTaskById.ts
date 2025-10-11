@@ -11,7 +11,8 @@ export async function loadTaskById(taskId: string): Promise<Task | null> {
 
   try {
     const baseUrl = resolveServerApiBaseUrl();
-    const cookieHeader = cookies()
+    const cookieStore = await cookies();
+    const cookieHeader = cookieStore
       .getAll()
       .map(({name, value}) => `${name}=${value}`)
       .join('; ');
@@ -21,7 +22,7 @@ export async function loadTaskById(taskId: string): Promise<Task | null> {
       headers.Cookie = cookieHeader;
     }
 
-    const response = await fetch(`${baseUrl}/api/task/${encodeURIComponent(taskId)}`, {
+    const response = await fetch(`${baseUrl}/api/tasks/${encodeURIComponent(taskId)}`, {
       headers,
       credentials: 'include',
       next: {revalidate: TASK_REVALIDATE_SECONDS},
