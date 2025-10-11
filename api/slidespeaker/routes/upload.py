@@ -16,11 +16,18 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from loguru import logger
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from slidespeaker.auth import extract_user_id, require_authenticated_user
 from slidespeaker.configs.config import config
 from slidespeaker.configs.locales import locale_utils
+from slidespeaker.core.monitoring import monitor_endpoint
 from slidespeaker.core.task_queue import task_queue
+
+# Create a rate limiter for this router
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(
     prefix="/api",
@@ -29,6 +36,7 @@ router = APIRouter(
 )
 
 UPLOAD_DIR = config.uploads_dir
+UploadFileType = UploadFile | StarletteUploadFile
 
 
 def _coerce_bool(value: Any, default: bool) -> bool:
@@ -55,9 +63,10 @@ def _coerce_optional_str(value: Any) -> str | None:
 
 
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MiB safety limit
+AUDIO_EXTENSIONS = {".mp3", ".wav", ".m4a", ".aac", ".flac"}
 
 
-async def _read_upload_file(upload: UploadFile) -> bytes:
+async def _read_upload_file(upload: UploadFileType) -> bytes:
     remainder = MAX_UPLOAD_BYTES
     chunks: list[bytes] = []
     while True:
@@ -83,7 +92,7 @@ async def _parse_upload_payload(request: Request) -> dict[str, Any]:
         file_bytes: bytes | None = None
         filename: str | None = None
 
-        if isinstance(upload, UploadFile):
+        if isinstance(upload, UploadFileType):
             content_length = request.headers.get("content-length")
             if content_length is not None:
                 try:
@@ -241,6 +250,8 @@ async def _parse_upload_payload(request: Request) -> dict[str, Any]:
 
 
 @router.post("/upload")
+@limiter.limit("5/minute")  # Limit to 5 uploads per minute per IP
+@monitor_endpoint
 async def upload_file(
     request: Request,
     current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
@@ -278,17 +289,22 @@ async def upload_file(
         file_ext = Path(filename).suffix.lower()
         # Determine source_type from request or by extension and validate
         source_type = payload.get("source_type")
-        if not source_type:
+        if file_ext in AUDIO_EXTENSIONS:
+            source_type = "audio"
+        elif not source_type:
             source_type = (
                 "pdf"
                 if file_ext == ".pdf"
                 else ("slides" if file_ext in [".pptx", ".ppt"] else None)
             )
         # Validate provided/derived source_type strictly
-        if source_type not in ("pdf", "slides"):
+        if source_type not in ("pdf", "slides", "audio"):
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid source_type: {source_type}. Must be 'pdf' or 'slides'.",
+                detail=(
+                    f"Invalid source_type: {source_type}. "
+                    "Must be 'pdf', 'slides', or 'audio'."
+                ),
             )
         # For PDF files, if user selects podcast generation, default to podcast-only unless
         # they explicitly request video as well. This prevents accidental video generation
@@ -301,7 +317,15 @@ async def upload_file(
             # If generate_video is not explicitly set to True, disable video generation
             # This covers cases where generate_video is False, None, or not present
             generate_video = False
-        if file_ext not in [".pdf", ".pptx", ".ppt"]:
+        if source_type == "audio":
+            if not generate_podcast:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Audio uploads require podcast generation",
+                )
+            # Ensure we do not accidentally trigger video generation for audio-only uploads
+            generate_video = bool(payload.get("generate_video", False))
+        elif file_ext not in [".pdf", ".pptx", ".ppt"]:
             raise HTTPException(
                 status_code=400, detail="Only PDF and PowerPoint files are supported"
             )

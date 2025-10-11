@@ -13,10 +13,12 @@ import {
   getTaskProgress as apiGetProgress,
 } from '@/services/client';
 import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query';
-import ProcessingView from '@/components/ProcessingView';
-import UploadPanel from '@/components/UploadPanel';
-import ErrorView from '@/components/ErrorView';
-import UploadingView from '@/components/UploadingView';
+import {UploadConfiguration} from '@/components/UploadConfiguration';
+import {FileUploadingStage} from '@/components/FileUploadingStage';
+import {TaskProcessingStage} from '@/components/TaskProcessingStage';
+import {ErrorStage} from '@/components/ErrorStage';
+import { showErrorToast } from '@/utils/toast';
+import { validateFile, getFileType, formatFileSize as formatFileSizeUtil } from '@/utils/fileValidation';
 import {getStepLabel} from '@/utils/stepLabels';
 import {resolveApiBaseUrl} from '@/utils/apiBaseUrl';
 import {useI18n} from '@/i18n/hooks';
@@ -115,15 +117,16 @@ export function StudioWorkspace() {
     setUploading(false);
     setProgress(0);
     setProcessingDetails(null);
-    setVoiceLanguage('english');
-    setSubtitleLanguage('english');
-    setTranscriptLanguage('english');
+    // Keep the current language and mode settings when resetting
+    // setVoiceLanguage('english');
+    // setSubtitleLanguage('english');
+    // setTranscriptLanguage('english');
     setTranscriptLangTouched(false);
-    setVideoResolution('hd');
-    setGenerateAvatar(false);
-    setGenerateSubtitles(true);
-    setUploadMode('slides');
-    setPdfOutputMode('video');
+    // setVideoResolution('hd');
+    // setGenerateAvatar(false);
+    // setGenerateSubtitles(true);
+    // setUploadMode('slides');
+    // setPdfOutputMode('video');
     completionRedirectRef.current = false;
   }, []);
 
@@ -131,10 +134,8 @@ export function StudioWorkspace() {
     if (!size || size <= 0) {
       return t('common.unknown', undefined, 'Unknown');
     }
-    const units = ['B', 'KB', 'MB', 'GB'];
-    const exponent = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
-    const value = size / 1024 ** exponent;
-    return `${value.toFixed(1)} ${units[exponent]}`;
+    // Use the utility function for better formatting
+    return formatFileSizeUtil(size);
   }, [t]);
 
   const uploadingSummaryItems = useMemo(() => {
@@ -261,11 +262,11 @@ export function StudioWorkspace() {
     getLanguageDisplayName,
     pdfOutputMode,
     subtitleLanguage,
-    t,
     transcriptLanguage,
     uploadMode,
     videoResolution,
     voiceLanguage,
+    t,
   ]);
 
   useEffect(() => {
@@ -364,7 +365,7 @@ export function StudioWorkspace() {
       setProgress(0);
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Upload failed. Please try again.');
+      showErrorToast(t('upload.error.failed', undefined, 'Upload failed. Please try again.'));
       setUploading(false);
       setStatus('idle');
       clearUploadProgressTimer();
@@ -382,13 +383,18 @@ export function StudioWorkspace() {
     uploadMutation,
     videoResolution,
     voiceLanguage,
+    t,
   ]);
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => apiCancel(id),
-    onSettled: async () => {
+    onSettled: async (_data, _error, cancelledTaskId) => {
       try {
-        await queryClient.invalidateQueries({queryKey: ['progress']});
+        if (cancelledTaskId) {
+          await queryClient.invalidateQueries({queryKey: ['progress', cancelledTaskId]});
+        } else {
+          await queryClient.invalidateQueries({queryKey: ['progress']});
+        }
         await queryClient.invalidateQueries({queryKey: ['tasks']});
       } catch {}
     },
@@ -398,31 +404,33 @@ export function StudioWorkspace() {
     if (!taskId) return;
     try {
       await cancelMutation.mutateAsync(taskId);
+      setStatus('cancelled');
+      setUploading(false);
+      setProgress(0);
+      setProcessingDetails((prev) =>
+        prev ? {...prev, status: 'cancelled', progress: 0} : prev,
+      );
     } catch (error) {
       console.error('Failed to cancel task', error);
-      alert('Failed to cancel task. Please try again.');
+      showErrorToast(
+        t('task.error.cancelFailed', undefined, 'Failed to cancel task. Please try again.'),
+      );
     }
-  }, [cancelMutation, taskId]);
+  }, [cancelMutation, taskId, t]);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
-      const ext = selectedFile.name.toLowerCase().split('.').pop();
-      const isPdf = ext === 'pdf';
-      const isSlide = ext === 'pptx' || ext === 'ppt';
-      if (uploadMode === 'pdf' && !isPdf) {
-        alert('Please select a PDF file for PDF processing.');
+      // Validate file based on upload mode
+      const expectedFileType = uploadMode === 'pdf' ? 'pdf' : 'slides';
+      const validation = validateFile(selectedFile, expectedFileType);
+      
+      if (!validation.isValid) {
+        showErrorToast(validation.errorMessage || 'Invalid file selection.');
         return;
       }
-      if (uploadMode === 'slides' && !isSlide) {
-        alert('Please select a PPTX or PPT file for Slides processing.');
-        return;
-      }
-      if (ext && (isPdf || isSlide)) {
-        setFile(selectedFile);
-      } else {
-        alert('Please select a PDF or PowerPoint file');
-      }
+      
+      setFile(selectedFile);
     }
   }, [uploadMode]);
 
@@ -624,12 +632,8 @@ export function StudioWorkspace() {
       setProgress(normalizedProgress);
     } else if (data.status === 'cancelled') {
       setUploading(false);
-      setTaskId(null);
-      setFileId(null);
-      setFile(null);
-      setProcessingDetails(null);
       setProgress(0);
-      setStatus('idle');
+      setStatus('cancelled');
     } else if (data.status === 'failed') {
       setStatus('error');
       setUploading(false);
@@ -717,7 +721,7 @@ export function StudioWorkspace() {
       <div className="card-container">
         <div className={`content-card ${status === 'completed' ? 'wide' : ''}`}>
           {status === 'idle' && (
-            <UploadPanel
+            <UploadConfiguration
               uploadMode={uploadMode}
               setUploadMode={setUploadMode}
               pdfOutputMode={pdfOutputMode}
@@ -740,7 +744,7 @@ export function StudioWorkspace() {
           )}
 
           {status === 'uploading' && (
-            <UploadingView
+            <FileUploadingStage
               progress={progress}
               fileName={file?.name || null}
               fileSize={file?.size ?? null}
@@ -750,7 +754,7 @@ export function StudioWorkspace() {
           )}
 
           {status === 'processing' && processingDetails && (
-            <ProcessingView
+            <TaskProcessingStage
               apiBaseUrl={API_BASE_URL}
               taskId={taskId}
               fileId={fileId}
@@ -773,7 +777,18 @@ export function StudioWorkspace() {
             </div>
           )}
 
-          {status === 'error' && <ErrorView onResetForm={resetForm} />}
+          {status === 'cancelled' && (
+            <div className="processing-view cancelled-view" role="status" aria-live="polite">
+              <div className="status-icon cancelled" aria-hidden>🚫</div>
+              <h3>{t('task.status.cancelled', undefined, 'Task Cancelled')}</h3>
+              <p>{t('task.cancelled.description', undefined, 'The task has been successfully cancelled.')}</p>
+              <button onClick={resetForm} className="primary-btn">
+                {t('actions.createAnother', undefined, 'Create Another')}
+              </button>
+            </div>
+          )}
+
+          {status === 'error' && <ErrorStage onResetForm={resetForm} />}
         </div>
       </div>
     </div>

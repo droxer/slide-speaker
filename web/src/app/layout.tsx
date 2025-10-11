@@ -3,9 +3,6 @@ import type {ReactNode} from 'react';
 import {cookies, headers} from 'next/headers';
 import {defaultLocale, locales, type Locale} from '@/i18n/config';
 import './globals.scss';
-import '@/styles/app.scss';
-import '@/styles/dark-theme.scss';
-import '@/styles/TaskMonitor.scss';
 
 const themeInitScript = `(() => {
   try {
@@ -22,13 +19,15 @@ const themeInitScript = `(() => {
   }
 })();`;
 
-const deriveLocale = (): Locale => {
-  const cookieLocale = cookies().get('NEXT_LOCALE')?.value;
+const deriveLocale = async (): Promise<Locale> => {
+  const cookieStore = await cookies();
+  const cookieLocale = cookieStore.get('NEXT_LOCALE')?.value;
   if (cookieLocale && (locales as ReadonlyArray<string>).includes(cookieLocale)) {
     return cookieLocale as Locale;
   }
 
-  const requestPath = headers().get('next-url');
+  const headerStore = await headers();
+  const requestPath = headerStore.get('next-url');
   if (requestPath) {
     const [, maybeLocale] = requestPath.split('/');
     if (maybeLocale && (locales as ReadonlyArray<string>).includes(maybeLocale)) {
@@ -44,8 +43,8 @@ export const metadata: Metadata = {
   description: 'Transform presentations into rich multimedia experiences with SlideSpeaker.',
 };
 
-export default function RootLayout({children}: Readonly<{children: ReactNode}>) {
-  const locale = deriveLocale();
+export default async function RootLayout({children}: Readonly<{children: ReactNode}>) {
+  const locale = await deriveLocale();
 
   return (
     <html lang={locale} suppressHydrationWarning>

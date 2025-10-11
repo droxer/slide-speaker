@@ -6,6 +6,8 @@ import type {ReactNode} from 'react';
 import type {Session} from 'next-auth';
 import {queryClient} from '@/services/queryClient';
 import {ThemeProvider} from '@/theme/ThemeProvider';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
 type ProvidersProps = {
   children: ReactNode;
@@ -16,7 +18,10 @@ export function Providers({children, session}: ProvidersProps) {
   return (
     <SessionProvider session={session}>
       <ThemeProvider>
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        <QueryClientProvider client={queryClient}>
+          {children}
+          <ToastContainer />
+        </QueryClientProvider>
       </ThemeProvider>
     </SessionProvider>
   );

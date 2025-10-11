@@ -456,14 +456,25 @@ class VideoComposer:
         avatar_videos: list[Path],
         audio_files: list[Path],
     ) -> None:
-        """Validate video composition inputs"""
+        """Validate video composition inputs."""
         if not slide_images:
             raise ValueError("No slide images provided")
 
-        if len(slide_images) != len(avatar_videos) or len(slide_images) != len(
-            audio_files
-        ):
-            logger.warning("Mismatched counts; attempting best-effort composition")
+        if avatar_videos and len(slide_images) != len(avatar_videos):
+            logger.warning(
+                "Mismatched counts between slide images (%d) and avatar videos (%d); "
+                "attempting best-effort composition",
+                len(slide_images),
+                len(avatar_videos),
+            )
+
+        if len(slide_images) != len(audio_files):
+            logger.warning(
+                "Mismatched counts between slide images (%d) and audio files (%d); "
+                "attempting best-effort composition",
+                len(slide_images),
+                len(audio_files),
+            )
 
     def _create_composite_clips(
         self,

@@ -2,11 +2,12 @@ import {redirect} from 'next/navigation';
 import {defaultLocale} from '@/i18n/config';
 
 type RedirectLoginProps = {
-  searchParams?: {redirectTo?: string};
+  searchParams?: Promise<{redirectTo?: string}>;
 };
 
-export default function RedirectLogin({searchParams}: RedirectLoginProps) {
-  const redirectTo = typeof searchParams?.redirectTo === 'string' ? searchParams.redirectTo : undefined;
+export default async function RedirectLogin({searchParams}: RedirectLoginProps) {
+  const query = searchParams ? await searchParams : undefined;
+  const redirectTo = typeof query?.redirectTo === 'string' ? query.redirectTo : undefined;
   const params = new URLSearchParams();
   if (redirectTo) {
     params.set('redirectTo', redirectTo);

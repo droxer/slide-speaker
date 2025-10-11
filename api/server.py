@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from slidespeaker.configs.config import config
 from slidespeaker.configs.logging_config import setup_logging
+from slidespeaker.core.rate_limit import add_rate_limiting
 from slidespeaker.routes.audio_downloads import router as audio_downloads_router
 from slidespeaker.routes.auth import router as auth_router
 from slidespeaker.routes.diagnostic import router as diagnostic_router
@@ -21,6 +22,8 @@ from slidespeaker.routes.downloads import router as downloads_router
 from slidespeaker.routes.files import router as files_router
 from slidespeaker.routes.health import router as health_router
 from slidespeaker.routes.languages import router as languages_router
+from slidespeaker.routes.metrics import protected_router as metrics_protected_router
+from slidespeaker.routes.metrics import router as metrics_router
 from slidespeaker.routes.podcast_downloads import router as podcast_downloads_router
 from slidespeaker.routes.preview import router as preview_router
 from slidespeaker.routes.progress import router as progress_router
@@ -57,6 +60,9 @@ async def startup_event() -> None:
         app.mount("/files", StaticFiles(directory=config.output_dir), name="files")
 
 
+# Add rate limiting to the application
+add_rate_limiting(app)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:3000"],
@@ -65,7 +71,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include all route modules
+# Include all route modules with rate limiting applied
 app.include_router(auth_router)
 app.include_router(upload_router)
 app.include_router(files_router)
@@ -84,6 +90,8 @@ app.include_router(tts_router)
 app.include_router(diagnostic_router)
 app.include_router(preview_router)
 app.include_router(users_router)
+app.include_router(metrics_router)
+app.include_router(metrics_protected_router)  # Include protected metrics endpoints
 
 
 @app.get("/")

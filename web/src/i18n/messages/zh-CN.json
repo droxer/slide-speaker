@@ -69,6 +69,13 @@
       "breadcrumb": {
         "task": "任务"
       },
+      "type": {
+        "video": "视频",
+        "podcast": "播客",
+        "audio": "音频",
+        "both": "视频 + 播客",
+        "unknown": "任务"
+      },
       "videoPreview": "视频预览",
       "podcastPreview": "播客预览",
       "audioPreview": "音频预览",
@@ -80,6 +87,7 @@
       "downloads": "下载内容",
       "loadingDownloads": "正在加载下载内容…",
       "noDownloads": "暂无可用下载。",
+      "noDownloadsCancelled": "任务已取消，无法下载内容。",
       "created": "创建时间",
       "updated": "更新时间",
       "voice": "配音语言",
@@ -96,6 +104,9 @@
       "cancelled": "已取消",
       "pending": "待处理",
       "skipped": "已跳过"
+    },
+    "cancelled": {
+      "description": "任务已成功取消。"
     },
     "list": {
       "copyId": "复制任务 ID",
@@ -121,6 +132,9 @@
       "listen": "收听",
       "videoAria": "任务 {taskId} 的视频预览",
       "audioAria": "音频讲解预览"
+    },
+    "error": {
+      "cancelFailed": "取消任务失败"
     }
   },
   "actions": {
@@ -131,7 +145,8 @@
     "generate": "生成",
     "generating": "正在生成…",
     "cancel": "取消",
-    "close": "关闭"
+    "close": "关闭",
+    "createAnother": "创建另一个"
   },
   "auth": {
     "loginTitle": "登录",
@@ -169,7 +184,7 @@
     }
   },
   "runTask": {
-    "adjustHint": "调整生成选项后点击“生成”。",
+    "adjustHint": "调整生成选项后点击\"生成\"。",
     "tagSuffix": "任务",
     "source": "来源",
     "output": {
@@ -282,6 +297,11 @@
     "preview": {
       "videoEnabled": "已启用视频生成",
       "podcastEnabled": "已启用播客生成"
+    },
+    "modal": {
+      "title": "处理详情",
+      "close": "关闭处理详情",
+      "openDetails": "查看处理详情"
     }
   },
   "uploading": {
@@ -323,7 +343,12 @@
     },
     "notice": "AI 生成内容可能存在不准确，请仔细检查。",
     "createPodcast": "创建播客",
-    "createVideo": "创建视频"
+    "createVideo": "创建视频",
+    "summary": {
+      "file": "文件",
+      "size": "大小",
+      "output": "输出"
+    }
   },
   "footer": {
     "slogan": "SlideSpeaker AI 让演示焕然一新",

@@ -2,12 +2,12 @@ import base64
 from pathlib import Path
 
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 from slidespeaker.configs.config import config
 from slidespeaker.core.task_queue import task_queue
-from slidespeaker.routes.upload import router
+from slidespeaker.routes.upload import require_authenticated_user, router
 
 
 @pytest.fixture()
@@ -22,14 +22,24 @@ def client(tmp_path, monkeypatch):
     async def fake_submit_task(*args, **kwargs):
         return "task-123"
 
+    async def fake_auth(request: Request) -> dict[str, object]:
+        return {"sub": "test-user", "user": {"id": "test-user-id"}}
+
     monkeypatch.setattr(config, "_uploads_dir", Path(tmp_path))
     monkeypatch.setattr(config, "get_storage_provider", lambda: DummyStorage())
     monkeypatch.setattr(task_queue, "submit_task", fake_submit_task)
 
-    return TestClient(app)
+    app.dependency_overrides[require_authenticated_user] = fake_auth
+
+    client = TestClient(app)
+    try:
+        yield client
+    finally:
+        app.dependency_overrides.pop(require_authenticated_user, None)
+        client.close()
 
 
-def test_multipart_upload(client):
+def test_multipart_upload(client: TestClient):
     files = {
         "file": ("sample.pdf", b"dummy-data", "application/pdf"),
     }
@@ -44,14 +54,19 @@ def test_multipart_upload(client):
         "source_type": "pdf",
     }
 
-    response = client.post("/api/upload", data=data, files=files)
+    response = client.post(
+        "/api/upload",
+        data=data,
+        files=files,
+        headers={"Authorization": "Bearer fake-token"},
+    )
     assert response.status_code == 200
     payload = response.json()
     assert payload["task_id"] == "task-123"
     assert payload["file_id"]
 
 
-def test_json_upload_with_data_url(client):
+def test_json_upload_with_data_url(client: TestClient):
     file_bytes = b"dummy-ppt"
     encoded = base64.b64encode(file_bytes).decode("ascii")
     data_url = f"data:application/vnd.openxmlformats-officedocument.presentationml.presentation;base64,{encoded}"
@@ -64,6 +79,7 @@ def test_json_upload_with_data_url(client):
             "voice_language": "english",
             "video_resolution": "hd",
         },
+        headers={"Authorization": "Bearer fake-token"},
     )
     assert response.status_code == 200
     payload = response.json()
@@ -71,10 +87,11 @@ def test_json_upload_with_data_url(client):
     assert payload["file_id"]
 
 
-def test_json_upload_plain_base64(client):
+def test_json_upload_plain_base64(client: TestClient):
     file_bytes = b"dummy-podcast"
     encoded = base64.b64encode(file_bytes).decode("ascii")
 
+    # Make request with authentication header since we're mocking the auth function
     response = client.post(
         "/api/upload",
         json={
@@ -87,6 +104,7 @@ def test_json_upload_plain_base64(client):
             "task_type": "podcast",
             "source_type": "pdf",
         },
+        headers={"Authorization": "Bearer fake-token"},
     )
 
     assert response.status_code == 200

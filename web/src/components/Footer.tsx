@@ -10,11 +10,25 @@ type FooterProps = {
 const Footer: React.FC<FooterProps> = ({ queueUnavailable, redisLatencyMs }) => {
   const { t } = useI18n();
   const systemStatusLabel = queueUnavailable ? t('footer.queueUnavailable') : t('footer.queueOk');
-  const systemStatusTitle = queueUnavailable
-    ? t('footer.queueTooltipUnavailable')
-    : redisLatencyMs != null
-      ? t('footer.queueTooltipLatency', { latency: redisLatencyMs }, `System status OK • ${redisLatencyMs}ms`)
-      : t('footer.queueTooltipOk');
+  
+  // For hydration compatibility, we need to ensure the same initial title is rendered
+  // on both server and client - we'll use a stable value initially and update after mount
+  const [title, setTitle] = React.useState(() => 
+    queueUnavailable
+      ? t('footer.queueTooltipUnavailable')
+      : t('footer.queueTooltipOk')
+  );
+
+  // Update the title after the component mounts to reflect the actual latency
+  React.useEffect(() => {
+    const newTitle = queueUnavailable
+      ? t('footer.queueTooltipUnavailable')
+      : redisLatencyMs != null
+        ? t('footer.queueTooltipLatency', { latency: redisLatencyMs }, `System status OK • ${redisLatencyMs}ms`)
+        : t('footer.queueTooltipOk');
+    
+    setTitle(newTitle);
+  }, [queueUnavailable, redisLatencyMs, t]);
 
   return (
     <footer className="app-footer" role="contentinfo">
@@ -25,7 +39,7 @@ const Footer: React.FC<FooterProps> = ({ queueUnavailable, redisLatencyMs }) => 
             className="health-indicator"
             role="status"
             aria-live="polite"
-            title={systemStatusTitle}
+            title={title}
           >
             <span className={`dot ${queueUnavailable ? 'down' : 'ok'}`} aria-hidden />
             <span className="label">{systemStatusLabel}</span>

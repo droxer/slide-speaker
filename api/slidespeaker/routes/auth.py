@@ -1,15 +1,20 @@
 """Authentication routes providing registration and login for NextAuth."""
 
-from __future__ import annotations
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Body, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from slidespeaker.repository.user import (
     create_user_with_password,
     upsert_oauth_user,
     verify_user_credentials,
 )
+
+# Create a rate limiter for this router
+limiter = Limiter(key_func=get_remote_address)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -28,7 +33,11 @@ class OAuthPayload(BaseModel):
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
-async def register_user(payload: CredentialsPayload) -> dict[str, object]:
+@limiter.limit("5/minute")  # Limit to 5 registrations per minute per IP
+async def register_user(
+    request: Request,
+    payload: Annotated[CredentialsPayload, Body(...)],
+) -> dict[str, object]:
     try:
         user = await create_user_with_password(
             email=payload.email,
@@ -43,7 +52,11 @@ async def register_user(payload: CredentialsPayload) -> dict[str, object]:
 
 
 @router.post("/login")
-async def login_user(payload: CredentialsPayload) -> dict[str, object]:
+@limiter.limit("10/minute")  # Limit to 10 login attempts per minute per IP
+async def login_user(
+    request: Request,
+    payload: Annotated[CredentialsPayload, Body(...)],
+) -> dict[str, object]:
     user = await verify_user_credentials(email=payload.email, password=payload.password)
     if not user:
         raise HTTPException(
@@ -53,7 +66,11 @@ async def login_user(payload: CredentialsPayload) -> dict[str, object]:
 
 
 @router.post("/oauth/google")
-async def oauth_google(payload: OAuthPayload) -> dict[str, object]:
+@limiter.limit("10/minute")  # Limit to 10 OAuth attempts per minute per IP
+async def oauth_google(
+    request: Request,
+    payload: Annotated[OAuthPayload, Body(...)],
+) -> dict[str, object]:
     try:
         user = await upsert_oauth_user(payload.dict())
     except ValueError as exc:

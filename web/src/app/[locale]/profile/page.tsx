@@ -2,7 +2,7 @@ import {redirect} from 'next/navigation';
 import {getServerSession} from 'next-auth';
 import type {Metadata} from 'next';
 import ProfilePageClient from './ProfilePageClient';
-import {loadInitialHealth, healthRevalidate} from '../../loadInitialHealth';
+import {loadInitialHealth} from '../../loadInitialHealth';
 import {authOptions} from '@/auth/options';
 import {loadCurrentUser} from '@/app/profile/loadCurrentUser';
 import type {Locale} from '@/i18n/config';
@@ -25,22 +25,25 @@ export const metadata: Metadata = {
   title: 'Profile • SlideSpeaker',
 };
 
-export const revalidate = healthRevalidate;
+export const revalidate = 300;
 
-export default async function ProfilePage({params}: {params: {locale: string}}) {
+type ProfileParams = { params: Promise<{ locale: string }> };
+
+export default async function ProfilePage({params}: ProfileParams) {
+  const {locale} = await params;
   const session = await getServerSession(authOptions);
   if (!session) {
-    redirect(`/login?redirectTo=/${params.locale}/profile`);
+    redirect(`/login?redirectTo=/${locale}/profile`);
   }
 
   const profile = await loadCurrentUser();
   if (!profile) {
-    redirect(`/login?redirectTo=/${params.locale}/profile`);
+    redirect(`/login?redirectTo=/${locale}/profile`);
   }
 
   const preferredLanguage = normalizeLanguage(profile.preferred_language);
   const expectedLocale = LANGUAGE_TO_LOCALE[preferredLanguage];
-  const currentLocale = params.locale as Locale;
+  const currentLocale = locale as Locale;
   if (expectedLocale !== currentLocale) {
     redirect(`/${expectedLocale}/profile`);
   }

@@ -14,6 +14,11 @@ from loguru import logger
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 
+from ..helpers import (
+    check_and_handle_cancellation,
+    fetch_step_state,
+    set_step_status_processing,
+)
 from ..steps.podcast.pdf import (
     compose_podcast_step,
     generate_podcast_audio_step,
@@ -247,22 +252,15 @@ async def from_pdf(
 
     try:
         for step_name in steps_order:
-            if task_id and await task_queue.is_task_cancelled(task_id):
-                logger.info(f"Task {task_id} was cancelled during step {step_name}")
-                await state_manager.mark_cancelled(file_id, cancelled_step=step_name)
+            if await check_and_handle_cancellation(file_id, step_name, task_id):
                 return
 
-            st = await state_manager.get_step_status(file_id, step_name)
+            st = await fetch_step_state(file_id, step_name)
             if st and st.get("status") == "completed":
                 logger.info(f"Skipping already completed step: {step_name}")
                 continue
 
-            if task_id:
-                await state_manager.update_step_status_by_task(
-                    task_id, step_name, "processing"
-                )
-            else:
-                await state_manager.update_step_status(file_id, step_name, "processing")
+            await set_step_status_processing(file_id, step_name, task_id)
             logger.info(
                 f"=== Task {task_id} - Executing: {_podcast_step_name(step_name)} ==="
             )

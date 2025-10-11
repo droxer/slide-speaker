@@ -50,12 +50,12 @@ export const getStats = async () => {
 };
 
 export const getTaskById = async (taskId: string): Promise<Task> => {
-  const res = await api.get(`/api/task/${encodeURIComponent(taskId)}`);
+  const res = await api.get(`/api/tasks/${encodeURIComponent(taskId)}`);
   return res.data as Task;
 };
 
 export const deleteTask = async (taskId: string) => {
-  await api.delete(`/api/tasks/${taskId}`);
+  await api.delete(`/api/tasks/${taskId}/delete`);
 };
 
 export const purgeTask = async (taskId: string) => {
@@ -63,7 +63,7 @@ export const purgeTask = async (taskId: string) => {
 };
 
 export const cancelRun = async (taskId: string) => {
-  const res = await api.post<{ message: string }>(`/api/task/${taskId}/cancel`);
+  const res = await api.post<{ message: string }>(`/api/tasks/${taskId}/cancel`);
   return res.data;
 };
 

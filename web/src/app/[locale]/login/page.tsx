@@ -1,11 +1,13 @@
 import LoginPageClient from './LoginPageClient';
 
 type LoginPageProps = {
-  params: {locale: string};
-  searchParams?: {redirectTo?: string};
+  params: Promise<{locale: string}>;
+  searchParams?: Promise<{redirectTo?: string}>;
 };
 
-export default function LoginPage({params, searchParams}: LoginPageProps) {
-  const redirectTo = typeof searchParams?.redirectTo === 'string' ? searchParams.redirectTo : undefined;
-  return <LoginPageClient locale={params.locale} redirectTo={redirectTo} />;
+export default async function LoginPage({params, searchParams}: LoginPageProps) {
+  const {locale} = await params;
+  const query = searchParams ? await searchParams : undefined;
+  const redirectTo = typeof query?.redirectTo === 'string' ? query.redirectTo : undefined;
+  return <LoginPageClient locale={locale} redirectTo={redirectTo} />;
 }

@@ -4,7 +4,8 @@ import type {ProfileResponse, UserProfile} from '@/types/user';
 
 export async function loadCurrentUser(): Promise<UserProfile | null> {
   const baseUrl = resolveServerApiBaseUrl();
-  const cookieHeader = cookies()
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore
     .getAll()
     .map(({name, value}) => `${name}=${value}`)
     .join('; ');

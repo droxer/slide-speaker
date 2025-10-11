@@ -69,6 +69,13 @@
       "breadcrumb": {
         "task": "Task"
       },
+      "type": {
+        "video": "Video",
+        "podcast": "Podcast",
+        "audio": "Audio",
+        "both": "Video & Podcast",
+        "unknown": "Task"
+      },
       "videoPreview": "Video Preview",
       "podcastPreview": "Podcast Preview",
       "audioPreview": "Audio Preview",
@@ -80,6 +87,7 @@
       "downloads": "Downloads",
       "loadingDownloads": "Loading downloads…",
       "noDownloads": "No downloads available yet.",
+      "noDownloadsCancelled": "No downloads available for cancelled task.",
       "created": "Created",
       "updated": "Updated",
       "voice": "Voice",
@@ -96,6 +104,9 @@
       "cancelled": "Cancelled",
       "pending": "Pending",
       "skipped": "Skipped"
+    },
+    "cancelled": {
+      "description": "The task has been successfully cancelled."
     },
     "list": {
       "copyId": "Copy task ID",
@@ -131,7 +142,8 @@
     "generate": "Generate",
     "generating": "Generating…",
     "cancel": "Cancel",
-    "close": "Close"
+    "close": "Close",
+    "createAnother": "Create Another"
   },
   "auth": {
     "loginTitle": "Sign in",
@@ -282,6 +294,11 @@
     },
     "step": {
       "translatingTranscripts": "Translating Transcripts"
+    },
+    "modal": {
+      "title": "Processing details",
+      "close": "Close processing details",
+      "openDetails": "View processing details"
     }
   },
   "uploading": {

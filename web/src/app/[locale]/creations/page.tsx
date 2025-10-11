@@ -1,15 +1,18 @@
 import {redirect} from 'next/navigation';
 import {getServerSession} from 'next-auth';
 import CreationsPageClient from '../../creations/CreationsPageClient';
-import {loadInitialHealth, healthRevalidate} from '../../loadInitialHealth';
+import {loadInitialHealth} from '../../loadInitialHealth';
 import {authOptions} from '@/auth/options';
 
-export const revalidate = healthRevalidate;
+export const revalidate = 300;
 
-export default async function CreationsPage({params}: {params: {locale: string}}) {
+type LocaleParams = { params: Promise<{ locale: string }> };
+
+export default async function CreationsPage({params}: LocaleParams) {
+  const {locale} = await params;
   const session = await getServerSession(authOptions);
   if (!session) {
-    redirect(`/login?redirectTo=/${params.locale}/creations`);
+    redirect(`/login?redirectTo=/${locale}/creations`);
   }
 
   const initialHealth = await loadInitialHealth();

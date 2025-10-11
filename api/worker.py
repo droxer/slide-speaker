@@ -31,6 +31,7 @@ setup_logging(
     component="worker",
 )
 
+from slidespeaker.core.state_manager import state_manager  # noqa: E402
 from slidespeaker.core.task_queue import task_queue  # noqa: E402
 from slidespeaker.pipeline.coordinator import accept_task  # noqa: E402
 
@@ -95,15 +96,21 @@ class TaskProgressMonitor:
         self.monitoring = False
 
 
-async def process_task(task_id: str) -> bool:
-    """Process a single task by ID through the complete presentation pipeline"""
+async def process_task(task_id: str) -> str:
+    """Process a single task by ID through the complete presentation pipeline.
+
+    Returns:
+        "completed" when processing finishes successfully,
+        "cancelled" when the task was cancelled,
+        "failed" when processing raises an exception.
+    """
     logger.info(f"Worker starting to process task {task_id}")
 
     # Get task details from Redis
     task = await task_queue.get_task(task_id)
     if not task:
         logger.error(f"Task {task_id} not found in Redis")
-        return False
+        return "failed"
 
     logger.info(
         f"Task {task_id} retrieved from Redis with status: {task.get('status', 'unknown')}"
@@ -113,9 +120,9 @@ async def process_task(task_id: str) -> bool:
     if task.get("task_type") == "file_purge":
         return await process_file_purge_task(task_id, task)
 
-    if task["status"] == "cancelled":
+    if task.get("status") == "cancelled":
         logger.info(f"Task {task_id} was cancelled, skipping processing")
-        return True
+        return "cancelled"
 
     # Start progress monitoring
     progress_monitor = TaskProgressMonitor(task_id)
@@ -195,13 +202,26 @@ async def process_task(task_id: str) -> bool:
             task_id=task_id,
         )
 
+        # Respect cancellation requests that may have arrived mid-processing
+        if await task_queue.is_task_cancelled(task_id):
+            logger.info(f"Task {task_id} marked as cancelled after pipeline execution")
+            return "cancelled"
+        if file_id:
+            state = await state_manager.get_state(file_id)
+            if state and state.get("status") == "cancelled":
+                logger.info(
+                    "State indicates cancellation for task %s; treating as cancelled",
+                    task_id,
+                )
+                return "cancelled"
+
         logger.info(f"Task {task_id} completed successfully")
-        return True
+        return "completed"
 
     except Exception as e:
         logger.error(f"Task {task_id} failed: {e}")
         await task_queue.update_task_status(task_id, "failed", error=str(e))
-        return False
+        return "failed"
     finally:
         # Stop progress monitoring
         progress_monitor.stop_monitoring()
@@ -256,16 +276,21 @@ async def main() -> None:
     logger.info(f"Task worker starting for task {task_id}")
 
     try:
-        success = await process_task(task_id)
-        if success:
+        final_status = await process_task(task_id)
+        if final_status == "completed":
             await task_queue.update_task_status(task_id, "completed")
             await task_queue.complete_task_processing(task_id)
             logger.info(f"Task worker completed successfully for task {task_id}")
             sys.exit(0)
-        else:
-            logger.error(f"Task worker failed for task {task_id}")
+        if final_status == "cancelled":
+            await task_queue.update_task_status(task_id, "cancelled")
             await task_queue.complete_task_processing(task_id)
-            sys.exit(1)
+            logger.info(f"Task worker respected cancellation for task {task_id}")
+            sys.exit(0)
+
+        logger.error(f"Task worker failed for task {task_id}")
+        await task_queue.complete_task_processing(task_id)
+        sys.exit(1)
     except Exception as e:
         logger.error(f"Task worker encountered unexpected error: {e}")
         await task_queue.update_task_status(task_id, "failed", error=str(e))

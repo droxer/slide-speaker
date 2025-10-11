@@ -1,26 +1,25 @@
-// Mock implementation of the client service
-console.log('Loading mock client service');
-
-const mockAxiosInstance = {
-  get: jest.fn(),
-  post: jest.fn(),
-  delete: jest.fn(),
-  head: jest.fn(),
+// Lightweight stub for axios client mocks when Jest is not installed.
+const notImplemented = async () => {
+  throw new Error("Mock client function not implemented.");
 };
 
-export const api = mockAxiosInstance;
+export const api = {
+  get: notImplemented,
+  post: notImplemented,
+  delete: notImplemented,
+  head: notImplemented,
+};
 
-// Create proper mock functions
-export const getTasks = jest.fn();
-export const searchTasks = jest.fn();
-export const getDownloads = jest.fn();
-export const getTranscriptMarkdown = jest.fn();
-export const getStats = jest.fn();
-export const deleteTask = jest.fn();
-export const purgeTask = jest.fn();
-export const cancelRun = jest.fn();
-export const upload = jest.fn();
-export const getHealth = jest.fn();
-export const headTaskVideo = jest.fn();
-export const getTaskProgress = jest.fn();
-export const getVttText = jest.fn();
+export const getTasks = notImplemented;
+export const searchTasks = notImplemented;
+export const getDownloads = notImplemented;
+export const getTranscriptMarkdown = notImplemented;
+export const getStats = notImplemented;
+export const deleteTask = notImplemented;
+export const purgeTask = notImplemented;
+export const cancelRun = notImplemented;
+export const upload = notImplemented;
+export const getHealth = notImplemented;
+export const headTaskVideo = notImplemented;
+export const getTaskProgress = notImplemented;
+export const getVttText = notImplemented;

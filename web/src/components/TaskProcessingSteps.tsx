@@ -1,34 +1,28 @@
+'use client';
+
 import React from 'react';
 import { useI18n } from '@/i18n/hooks';
 import { STEP_STATUS_ICONS, StepStatusVariant, normalizeStepStatus } from '@/utils/stepLabels';
+import { getTaskStatusLabel } from '@/utils/taskStatus';
+import { sortSteps } from '@/utils/stepOrdering';
 
-type ProcessingViewProps = {
-  apiBaseUrl: string;
+type TaskProcessingStepsProps = {
   taskId: string | null;
   fileId: string | null;
   fileName: string | null;
   progress: number;
   onStop: () => void;
   processingDetails: any;
-  processingPreviewMode: 'video' | 'audio';
-  setProcessingPreviewMode: (v: 'video' | 'audio') => void;
-  videoRef: React.RefObject<HTMLVideoElement>;
-  audioRef: React.RefObject<HTMLAudioElement>;
   formatStepNameWithLanguages: (step: string, vl: string, sl?: string) => string;
 };
 
-const ProcessingView: React.FC<ProcessingViewProps> = ({
-  apiBaseUrl,
+const TaskProcessingSteps: React.FC<TaskProcessingStepsProps> = ({
   taskId,
   fileId,
   fileName,
   progress,
   onStop,
   processingDetails,
-  processingPreviewMode,
-  setProcessingPreviewMode,
-  videoRef,
-  audioRef,
   formatStepNameWithLanguages,
 }) => {
   const { t } = useI18n();
@@ -39,27 +33,9 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
     ? Math.max(0, Math.min(100, Math.round(progress)))
     : 0;
 
-  const hasVideoReady = Boolean(steps['compose_video']?.status === 'completed');
-  const hasPodcastReady = Boolean(steps['compose_podcast']?.status === 'completed');
-  const mode = hasVideoReady ? (processingPreviewMode || 'video') as 'video' | 'audio' : 'audio';
   const shortFileId = fileId ? fileId.slice(0, 8) : '…';
   const locatingLabel = t('processing.meta.locating', undefined, '(locating…)');
-  const describeStepStatus = (variant: StepStatusVariant) => {
-    switch (variant) {
-      case 'completed':
-        return t('task.status.completed');
-      case 'processing':
-        return t('task.status.processing');
-      case 'failed':
-        return t('task.status.failed');
-      case 'cancelled':
-        return t('task.status.cancelled');
-      case 'skipped':
-        return t('task.status.skipped', undefined, 'Skipped');
-      default:
-        return t('task.status.pending', undefined, 'Pending');
-    }
-  };
+  const describeStepStatus = (variant: StepStatusVariant) => getTaskStatusLabel(variant, t);
 
   return (
     <div className="processing-view">
@@ -136,8 +112,7 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
         </h4>
 
         <div className="steps-grid" role="list">
-          {Object.keys(steps).map((stepName) => {
-            const stepData = steps[stepName];
+          {sortSteps(steps).map(([stepName, stepData]) => {
             if (!stepData) return null;
             const vl = String(pd.voice_language || 'english');
             const sl = String(pd.subtitle_language || vl);
@@ -164,44 +139,6 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
           })}
         </div>
 
-        {(hasVideoReady || hasPodcastReady) && (
-          <div className="preview-block">
-            {hasVideoReady && mode !== 'video' && (
-              <div className="preview-toggle">
-                <button type="button" className="toggle-btn" onClick={() => setProcessingPreviewMode('video')}>
-                  {`▶️ ${t('task.preview.watch')}`}
-                </button>
-              </div>
-            )}
-            {mode === 'video' && hasVideoReady && (
-              <div className="video-preview-block" style={{ marginBottom: 12 }}>
-                <video
-                  ref={videoRef}
-                  controls
-                  playsInline
-                  preload="metadata"
-                  crossOrigin="anonymous"
-                  src={`${apiBaseUrl}/api/tasks/${taskId}/video`}
-                  style={{ width: '100%', borderRadius: 8 }}
-                  aria-label={t('task.preview.videoAria', { taskId: taskId ?? '' }, `Video preview for task ${taskId}`)}
-                />
-              </div>
-            )}
-            {mode === 'audio' && (
-              <div className="audio-preview-block">
-                <audio
-                  ref={audioRef}
-                  controls
-                  preload="auto"
-                  src={`${apiBaseUrl}/api/tasks/${taskId}/${(() => { const p = ["podcast","both"].includes(taskType); return p ? 'podcast' : 'audio'; })()}`}
-                  crossOrigin="anonymous"
-                  aria-label={t('task.preview.audioAria')}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
         {Array.isArray(pd.errors) && pd.errors.length > 0 && (
           <div className="error-section">
             <h4>{t('processing.errorsHeading')}</h4>
@@ -223,4 +160,4 @@ const ProcessingView: React.FC<ProcessingViewProps> = ({
   );
 };
 
-export default ProcessingView;
+export default TaskProcessingSteps;

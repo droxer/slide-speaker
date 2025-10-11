@@ -298,6 +298,353 @@ Cancel a specific task if it's still running.
 - 400: Task cannot be cancelled (already completed or not found)
 - 500: Failed to cancel task
 
+**Error Response:**
+- 400: Task cannot be cancelled (already completed or not found)
+- 500: Failed to cancel task
+
+### Get Task Status
+
+```
+GET /api/tasks/{task_id}
+```
+
+Get detailed information about a specific task.
+
+**Response:**
+```json
+{
+  "task_id": "string",
+  "file_id": "string",
+  "task_type": "string",
+  "status": "queued|processing|completed|failed|cancelled",
+  "kwargs": {},
+  "result": null|object,
+  "error": null|string,
+  "created_at": "ISO timestamp",
+  "updated_at": "ISO timestamp",
+  "detailed_state": {
+    "file_id": "string",
+    "file_path": "string",
+    "file_ext": "string",
+    "voice_language": "string",
+    "subtitle_language": "string",
+    "generate_avatar": true|false,
+    "generate_subtitles": true|false,
+    "owner_id": "string",
+    "status": "string",
+    "created_at": "ISO timestamp",
+    "updated_at": "ISO timestamp",
+    "source_type": "string",
+    "source": "string",
+    "task_type": "string",
+    "generate_video": true|false,
+    "generate_podcast": true|false,
+    "steps": [],
+    "slide_results": [],
+    "avatar_video_url": "string",
+    "final_video_url": "string",
+    "final_audio_url": "string",
+    "final_podcast_url": "string",
+    "final_subtitles_vtt_url": "string",
+    "final_subtitles_srt_url": "string"
+  },
+  "result": {},
+  "error": "string",
+  "source_type": "pdf|slides",
+  "completion_percentage": "integer"
+}
+```
+
+### Get Task Status (Simple)
+
+```
+GET /api/tasks/{task_id}/status
+```
+
+Get basic task status by ID.
+
+**Response:**
+```json
+{
+  "task_id": "string",
+  "file_id": "string",
+  "task_type": "string",
+  "status": "queued|processing|completed|failed|cancelled",
+  "kwargs": {},
+  "result": null|object,
+  "error": null|string,
+  "created_at": "ISO timestamp",
+  "updated_at": "ISO timestamp",
+  "detailed_state": {
+    "file_id": "string",
+    "file_path": "string",
+    "file_ext": "string",
+    "voice_language": "string",
+    "subtitle_language": "string",
+    "generate_avatar": true|false,
+    "generate_subtitles": true|false,
+    "owner_id": "string",
+    "status": "string",
+    "created_at": "ISO timestamp",
+    "updated_at": "ISO timestamp",
+    "source_type": "string",
+    "source": "string",
+    "task_type": "string",
+    "generate_video": true|false,
+    "generate_podcast": true|false,
+    "steps": [],
+    "slide_results": [],
+    "avatar_video_url": "string",
+    "final_video_url": "string",
+    "final_audio_url": "string",
+    "final_podcast_url": "string",
+    "final_subtitles_vtt_url": "string",
+    "final_subtitles_srt_url": "string"
+  },
+  "result": {},
+  "error": "string",
+  "source_type": "pdf|slides",
+  "completion_percentage": "integer"
+}
+```
+
+### Cancel Task
+
+```
+POST /api/tasks/{task_id}/cancel
+```
+
+Cancel a task.
+
+**Response:**
+```json
+{
+  "message": "Task cancelled successfully"
+}
+```
+
+**Error Response:**
+- 400: Task cannot be cancelled (already completed or not found)
+- 500: Failed to cancel task
+
+### Delete Task
+
+```
+DELETE /api/tasks/{task_id}/delete
+```
+
+Delete a task completely from the system, including database entry and associated files from storage.
+
+**Response:**
+```json
+{
+  "message": "Task {task_id} deleted successfully"
+}
+```
+
+**Error Response:**
+- 404: Task not found
+- 500: Failed to delete task
+
+### List All Tasks
+
+```
+GET /api/tasks
+```
+
+Get a list of all tasks with optional filtering and pagination.
+
+**Query Parameters:**
+- `status` (optional): Filter by task status (queued, processing, completed, failed, cancelled)
+- `limit` (optional, default: 50): Maximum number of tasks to return (1-1000)
+- `offset` (optional, default: 0): Number of tasks to skip
+- `sort_by` (optional, default: "created_at"): Sort field (created_at, updated_at, status)
+- `sort_order` (optional, default: "desc"): Sort order (asc, desc)
+
+**Response:**
+```json
+{
+  "tasks": [
+    {
+      "task_id": "string",
+      "task_type": "string",
+      "status": "queued|processing|completed|failed|cancelled",
+      "kwargs": {},
+      "result": null|object,
+      "error": null|string,
+      "created_at": "ISO timestamp",
+      "updated_at": "ISO timestamp",
+      "file_id": "string",
+      "owner_id": "string",
+      "voice_language": "string",
+      "subtitle_language": "string",
+      "source_type": "string"
+    }
+  ],
+  "total": "integer",
+  "limit": "integer",
+  "offset": "integer",
+  "has_more": true|false
+}
+```
+
+### Get Task Details
+
+```
+GET /api/tasks/{task_id}
+```
+
+Get detailed information about a specific task.
+
+**Response:**
+```json
+{
+  "task_id": "string",
+  "file_id": "string",
+  "task_type": "string",
+  "status": "queued|processing|completed|failed|cancelled",
+  "kwargs": {},
+  "result": null|object,
+  "error": null|string,
+  "created_at": "ISO timestamp",
+  "updated_at": "ISO timestamp",
+  "detailed_state": {
+    "file_id": "string",
+    "file_path": "string",
+    "file_ext": "string",
+    "voice_language": "string",
+    "subtitle_language": "string",
+    "generate_avatar": true|false,
+    "generate_subtitles": true|false,
+    "owner_id": "string",
+    "status": "string",
+    "created_at": "ISO timestamp",
+    "updated_at": "ISO timestamp",
+    "source_type": "string",
+    "source": "string",
+    "task_type": "string",
+    "generate_video": true|false,
+    "generate_podcast": true|false,
+    "steps": [],
+    "slide_results": [],
+    "avatar_video_url": "string",
+    "final_video_url": "string",
+    "final_audio_url": "string",
+    "final_podcast_url": "string",
+    "final_subtitles_vtt_url": "string",
+    "final_subtitles_srt_url": "string"
+  },
+  "result": {},
+  "error": "string",
+  "source_type": "pdf|slides",
+  "completion_percentage": "integer"
+}
+```
+
+### Search Tasks
+
+```
+GET /api/tasks/search
+```
+
+Search for tasks by file ID or other properties.
+
+**Query Parameters:**
+- `query` (required): Search query for file ID or task properties
+- `limit` (optional, default: 20): Maximum number of results (1-100)
+
+**Response:**
+```json
+{
+  "tasks": [
+    // Array of task objects (same format as /api/tasks)
+  ],
+  "query": "string",
+  "total_found": "integer"
+}
+```
+
+### Get Task Statistics
+
+```
+GET /api/tasks/statistics
+```
+
+Get comprehensive statistics about all tasks.
+
+**Response:**
+```json
+{
+  "total_tasks": "integer",
+  "status_breakdown": {
+    "queued": "integer",
+    "processing": "integer",
+    "completed": "integer",
+    "failed": "integer",
+    "cancelled": "integer"
+  },
+  "language_stats": {
+    "english": "integer",
+    "chinese": "integer",
+    // ... other languages
+  },
+  "recent_activity": {
+    "last_24h": "integer",
+    "last_7d": "integer",
+    "last_30d": "integer"
+  },
+  "processing_stats": {
+    "avg_processing_time_minutes": "number",
+    "success_rate": "number",
+    "failed_rate": "number"
+  }
+}
+```
+
+
+
+### Purge Task
+
+```
+DELETE /api/tasks/{task_id}/purge
+```
+
+Permanently delete a task and its state from the system, removing the task entry, queue references, cancellation flags, and associated state.
+
+**Response:**
+```json
+{
+  "message": "Task purged successfully",
+  "task_id": "string",
+  "file_id": "string",
+  "removed": {
+    "queue": "integer",
+    "task": "integer",
+    "cancel_flag": "integer",
+    "state": "integer"
+  }
+}
+```
+
+## Processing Steps
+
+```
+DELETE /api/task/{task_id}
+```
+
+Delete a task completely from the system, including database entry and associated files from storage.
+
+**Response:**
+```json
+{
+  "message": "Task {task_id} deleted successfully"
+}
+```
+
+**Error Response:**
+- 404: Task not found
+- 500: Failed to delete task
+
 ## Processing Steps
 
 ### PDF Processing Steps

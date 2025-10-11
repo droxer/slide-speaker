@@ -14,7 +14,12 @@ from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.storage import StorageProvider
 
-from .download_utils import file_id_from_task, proxy_cloud_media
+from .download_utils import file_id_from_task
+from .shared_download_utils import (
+    build_cors_headers,
+    build_headers,
+    proxy_cloud_media_with_range,
+)
 
 router = APIRouter(
     prefix="/api",
@@ -47,12 +52,12 @@ async def get_podcast_by_task(task_id: str, request: Request) -> Any:
                         str(actual),
                         media_type="audio/mpeg",
                         filename=f"podcast_{task_id}.mp3",
-                        headers={
-                            "Access-Control-Allow-Origin": "*",
-                            "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-                            "Cache-Control": "public, max-age=3600",
-                            "Content-Disposition": f"inline; filename=podcast_{task_id}.mp3",
-                        },
+                        headers=build_headers(
+                            request,
+                            content_type="audio/mpeg",
+                            disposition=f"inline; filename=podcast_{task_id}.mp3",
+                            cache_control="public, max-age=3600",
+                        ),
                     )
                 # Try next key
                 continue
@@ -60,7 +65,9 @@ async def get_podcast_by_task(task_id: str, request: Request) -> Any:
             # Cloud
             if config.proxy_cloud_media:
                 range_header = request.headers.get("Range")
-                return await proxy_cloud_media(object_key, "audio/mpeg", range_header)
+                return await proxy_cloud_media_with_range(
+                    object_key, "audio/mpeg", range_header
+                )
 
             url = sp.get_file_url(
                 object_key,
@@ -68,9 +75,11 @@ async def get_podcast_by_task(task_id: str, request: Request) -> Any:
                 content_disposition=f"inline; filename=podcast_{task_id}.mp3",
                 content_type="audio/mpeg",
             )
+            headers = build_cors_headers()
+            headers["Location"] = url
             return Response(
                 status_code=307,
-                headers={"Location": url, "Access-Control-Allow-Origin": "*"},
+                headers=headers,
             )
         except HTTPException as e:
             # Try next candidate on 4xx
@@ -84,8 +93,10 @@ async def get_podcast_by_task(task_id: str, request: Request) -> Any:
 
 
 @router.get("/tasks/{task_id}/podcast/download")
-async def download_podcast_by_task(task_id: str) -> Any:
+async def download_podcast_by_task(task_id: str, request: Request) -> Any:
     """Download podcast file for a task."""
+    from .shared_download_utils import check_file_exists
+
     sp: StorageProvider = get_storage_provider()
 
     # Prefer task-id.mp3, then file-id.mp3, then legacy *_podcast.mp3 variants
@@ -98,14 +109,14 @@ async def download_podcast_by_task(task_id: str) -> Any:
     object_key = None
 
     # Check task-id-first
-    if priorities[0] and sp.file_exists(priorities[0]):
+    if priorities[0] and check_file_exists(priorities[0]):
         object_key = priorities[0]
     if object_key is None:
         file_id = await file_id_from_task(task_id)
         priorities[1] = f"{file_id}.mp3"
         priorities[3] = f"{file_id}_podcast.mp3"
         for k in priorities[1:]:
-            if k and sp.file_exists(k):
+            if k and check_file_exists(k):
                 object_key = k
                 break
     if object_key is None:
@@ -117,10 +128,11 @@ async def download_podcast_by_task(task_id: str) -> Any:
             str(actual),
             media_type="audio/mpeg",
             filename=f"podcast_{task_id}.mp3",
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Content-Disposition": f"attachment; filename=podcast_{task_id}.mp3",
-            },
+            headers=build_headers(
+                request,
+                content_type="audio/mpeg",
+                disposition=f"attachment; filename=podcast_{task_id}.mp3",
+            ),
         )
 
     url = sp.get_file_url(
@@ -129,6 +141,6 @@ async def download_podcast_by_task(task_id: str) -> Any:
         content_disposition=f"attachment; filename=podcast_{task_id}.mp3",
         content_type="audio/mpeg",
     )
-    return Response(
-        status_code=307, headers={"Location": url, "Access-Control-Allow-Origin": "*"}
-    )
+    headers = build_cors_headers()
+    headers["Location"] = url
+    return Response(status_code=307, headers=headers)

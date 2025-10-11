@@ -1,7 +1,7 @@
 {
   "header": {
-    "title": "幻燈演說 AI",
-    "subtitle": "將幻燈片轉化為 AI 驅動的影片",
+    "title": "簡報演說 AI",
+    "subtitle": "將簡報轉化為 AI 驅動的影片",
     "login": "使用 Google 登入",
     "logout": "登出",
     "profile": "個人資料",
@@ -69,6 +69,13 @@
       "breadcrumb": {
         "task": "任務"
       },
+      "type": {
+        "video": "影片",
+        "podcast": "播客",
+        "audio": "音訊",
+        "both": "影片 + 播客",
+        "unknown": "任務"
+      },
       "videoPreview": "影片預覽",
       "audioPreview": "音訊預覽",
       "podcastPreview": "播客預覽",
@@ -80,6 +87,7 @@
       "downloads": "可下載項目",
       "loadingDownloads": "正在載入可下載項目…",
       "noDownloads": "目前沒有可下載項目。",
+      "noDownloadsCancelled": "任務已取消，無法下載內容。",
       "created": "建立時間",
       "updated": "更新時間",
       "voice": "配音語言",
@@ -96,6 +104,9 @@
       "cancelled": "已取消",
       "pending": "待處理",
       "skipped": "已跳過"
+    },
+    "cancelled": {
+      "description": "任務已成功取消。"
     },
     "list": {
       "copyId": "複製任務 ID",
@@ -131,7 +142,8 @@
     "generate": "產生",
     "generating": "正在產生…",
     "cancel": "取消",
-    "close": "關閉"
+    "close": "關閉",
+    "createAnother": "建立另一個"
   },
   "auth": {
     "loginTitle": "登入",
@@ -282,6 +294,11 @@
     "preview": {
       "videoEnabled": "已啟用影片產生",
       "podcastEnabled": "已啟用播客產生"
+    },
+    "modal": {
+      "title": "處理詳情",
+      "close": "關閉處理詳情",
+      "openDetails": "檢視處理詳情"
     }
   },
   "uploading": {
