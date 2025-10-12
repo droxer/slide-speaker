@@ -11,10 +11,9 @@ from fastapi import APIRouter, Depends
 
 from slidespeaker.auth import require_authenticated_user
 
-from .download_utils import file_id_from_task, final_audio_object_keys
+from .download_helpers import file_id_from_task, final_audio_object_keys
 
 router = APIRouter(
-    prefix="/api",
     tags=["downloads"],
     dependencies=[Depends(require_authenticated_user)],
 )
@@ -27,7 +26,7 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
     Includes video (inline and download), audio (inline and download),
     subtitles (available locales and formats), and transcript markdown.
     """
-    from .shared_download_utils import check_file_exists
+    from .download_helpers import check_file_exists
 
     file_id = await file_id_from_task(task_id)
     items: list[dict[str, Any]] = []
@@ -160,8 +159,7 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
         # VTT
         items.append(
             {
-                "type": "subtitles",
-                "format": "vtt",
+                "type": "vtt_subtitles",
                 "language": loc,
                 "url": f"/api/tasks/{task_id}/subtitles/vtt?language={loc}",
                 "download_url": f"/api/tasks/{task_id}/subtitles/vtt/download?language={loc}",
@@ -170,8 +168,7 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
         # SRT
         items.append(
             {
-                "type": "subtitles",
-                "format": "srt",
+                "type": "srt_subtitles",
                 "language": loc,
                 "url": f"/api/tasks/{task_id}/subtitles/srt?language={loc}",
                 "download_url": f"/api/tasks/{task_id}/subtitles/srt/download?language={loc}",
@@ -187,11 +184,3 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
     )
 
     return {"task_id": task_id, "file_id": file_id, "items": items}
-
-
-# Legacy endpoints (removed - use the new modular endpoints instead)
-# All endpoints have been moved to their respective modules:
-# - Video endpoints: video_downloads.py
-# - Audio endpoints: audio_downloads.py
-# - Subtitle endpoints: subtitle_downloads.py
-# - Podcast endpoints: podcast_downloads.py

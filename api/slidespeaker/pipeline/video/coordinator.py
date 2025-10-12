@@ -17,6 +17,7 @@ from slidespeaker.core.task_queue import task_queue
 
 from ..helpers import (
     check_and_handle_cancellation,
+    check_and_handle_failure,
     fetch_step_state,
     set_step_status_processing,
 )
@@ -201,6 +202,12 @@ async def from_pdf(
     try:
         for step_name in steps_order:
             current_state_key = step_name
+            # Check for failure state before proceeding with any step
+            if await check_and_handle_failure(file_id, current_state_key, task_id):
+                logger.error(
+                    f"Pipeline already failed before step {current_state_key}, exiting"
+                )
+                return
             if await check_and_handle_cancellation(file_id, current_state_key, task_id):
                 return
 
@@ -292,6 +299,7 @@ def _slide_state_key(step: str) -> str:
 
 
 def _slide_steps(
+    generate_video: bool,
     generate_avatar: bool,
     generate_subtitles: bool,
     *,
@@ -311,12 +319,13 @@ def _slide_steps(
     if subtitle_language and subtitle_language.lower() != "english":
         steps.append("translate_subtitle_transcripts")
     # Audio and optional avatar
-    steps.append("generate_audio")
-    if generate_avatar:
-        steps.append("generate_avatar")
-    if generate_subtitles:
-        steps.append("generate_subtitles")
-    steps.append("compose_video")
+    if generate_video:
+        steps.append("generate_audio")
+        if generate_avatar:
+            steps.append("generate_avatar")
+        if generate_subtitles:
+            steps.append("generate_subtitles")
+        steps.append("compose_video")
     return steps
 
 
@@ -326,8 +335,9 @@ async def from_slide(
     file_ext: str,
     voice_language: str = "english",
     subtitle_language: str | None = None,
-    generate_avatar: bool = True,
+    generate_avatar: bool = False,
     generate_subtitles: bool = True,
+    generate_video: bool = True,
     task_id: str | None = None,
 ) -> None:
     logger.info(f"Starting slides video processing for file {file_id}")
@@ -335,7 +345,10 @@ async def from_slide(
         f"Voice language: {voice_language}, Subtitle language: {subtitle_language}"
     )
     logger.debug(
-        f"Generate avatar: {generate_avatar}, Generate subtitles: {generate_subtitles}"
+        "Generate video: %s, Generate avatar: %s, Generate subtitles: %s",
+        generate_video,
+        generate_avatar,
+        generate_subtitles,
     )
 
     if task_id and await task_queue.is_task_cancelled(task_id):
@@ -343,7 +356,20 @@ async def from_slide(
         await state_manager.mark_cancelled(file_id)
         return
 
+    # Initialize/refresh state flags relevant to slides video processing
+    state = await state_manager.get_state(file_id)
+    if state:
+        state["voice_language"] = voice_language
+        state["subtitle_language"] = subtitle_language
+        state["generate_avatar"] = generate_avatar
+        state["generate_subtitles"] = generate_subtitles
+        state["generate_video"] = generate_video
+        if task_id:
+            state["task_id"] = task_id
+        await state_manager.save_state(file_id, state)
+
     steps_order = _slide_steps(
+        generate_video,
         generate_avatar,
         generate_subtitles,
         voice_language=voice_language,
@@ -354,6 +380,12 @@ async def from_slide(
     try:
         for step_name in steps_order:
             current_state_key = _slide_state_key(step_name)
+            # Check for failure state before proceeding with any step
+            if await check_and_handle_failure(file_id, current_state_key, task_id):
+                logger.error(
+                    f"Pipeline already failed before step {current_state_key}, exiting"
+                )
+                return
             if await check_and_handle_cancellation(file_id, current_state_key, task_id):
                 return
 
@@ -374,11 +406,9 @@ async def from_slide(
             elif step_name == "analyze_slides":
                 await analyze_slides_step(file_id)
             elif step_name == "generate_transcripts":
-                await generate_transcripts_step(file_id, voice_language)
+                await generate_transcripts_step(file_id, "english")
             elif step_name == "revise_transcripts":
-                await slide_revise_transcripts_step(
-                    file_id, voice_language, task_id=task_id
-                )
+                await slide_revise_transcripts_step(file_id, "english", task_id=task_id)
             elif step_name == "translate_voice_transcripts":
                 await slide_translate_voice_step(
                     file_id, source_language="english", target_language=voice_language

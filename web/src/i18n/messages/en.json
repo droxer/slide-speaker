@@ -338,6 +338,11 @@
       "supportedBadge": "Supported File",
       "supportedDescription": "Supports PDF, PPTX, and PPT files"
     },
+    "summary": {
+      "file": "File",
+      "size": "Size",
+      "output": "Output"
+    },
     "notice": "AI-generated content may contain inaccuracies. Review carefully.",
     "createPodcast": "Create Podcast",
     "createVideo": "Create Video"

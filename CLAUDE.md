@@ -41,7 +41,7 @@ make check           # Lint + TS
 - api/: FastAPI backend and workers
   - Entrypoints: server.py, master_worker.py, worker.py
   - Core: slidespeaker/core/ (state + queue + monitoring + rate limiting)
-  - Routes: slidespeaker/routes/ (upload, tasks, stats, downloads, transcripts, metrics, auth)
+  - Routes: slidespeaker/routes/ (upload_routes, task_routes, stats_routes, download_routes, transcript_routes, metrics_routes, auth_routes)
   - Pipeline: slidespeaker/pipeline/ (PDF vs slides coordinators and steps)
   - Processing: slidespeaker/processing/ (audio/video/subtitles/images)
   - Services: slidespeaker/services/ (OpenAI, ElevenLabs, HeyGen, vision, TTS)
@@ -193,11 +193,11 @@ OSS_REGION=...
 - API server: api/server.py
 - Master/Worker: api/master_worker.py, api/worker.py
 - Queue/State: api/slidespeaker/core/task_queue.py, api/slidespeaker/core/state_manager.py
-- Downloads (video/subtitles): api/slidespeaker/routes/downloads.py
-- Transcripts (markdown): api/slidespeaker/routes/transcripts.py
-- Task stats/search: api/slidespeaker/routes/stats.py
-- Metrics endpoints: api/slidespeaker/routes/metrics.py
-- Upload handling: api/slidespeaker/routes/upload.py
+- Downloads (video/subtitles): api/slidespeaker/routes/download_routes.py
+- Transcripts (markdown): api/slidespeaker/routes/transcript_routes.py
+- Task stats/search: api/slidespeaker/routes/stats_routes.py
+- Metrics endpoints: api/slidespeaker/routes/metrics_routes.py
+- Upload handling: api/slidespeaker/routes/upload_routes.py
 - Frontend monitor: web/src/components/TaskMonitor.tsx
 
 ## New API Endpoints

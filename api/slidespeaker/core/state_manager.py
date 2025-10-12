@@ -115,7 +115,7 @@ class RedisStateManager:
         self,
         voice_language: str = "english",
         subtitle_language: str | None = None,
-        generate_avatar: bool = True,
+        generate_avatar: bool = False,
         generate_subtitles: bool = True,
     ) -> dict[str, dict[str, Any]]:
         """Create steps for presentation processing"""
@@ -197,7 +197,7 @@ class RedisStateManager:
         subtitle_language: str | None = None,
         transcript_language: str | None = None,
         video_resolution: str = "hd",
-        generate_avatar: bool = True,
+        generate_avatar: bool = False,
         generate_subtitles: bool = True,
         generate_video: bool = True,
         generate_podcast: bool = False,

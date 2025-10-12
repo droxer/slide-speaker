@@ -44,21 +44,37 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
         const parsed: Cue[] = [];
         let i = 0;
         const timeRe = /(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s+-->\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})/;
+        // Parse WebVTT content
         while (i < lines.length) {
           const line = lines[i++].trim();
+          // Skip empty lines, WEBVTT header, and sequence numbers
           if (!line || line.toUpperCase() === 'WEBVTT' || /^\d+$/.test(line)) continue;
+          
+          // Check if this is a time format line (e.g., "00:00:01.000 --> 00:00:04.000")
           const m = line.match(timeRe);
           if (m) {
             const start = (Number(m[1])*3600 + Number(m[2])*60 + Number(m[3]) + Number(m[4])/1000);
             const end = (Number(m[5])*3600 + Number(m[6])*60 + Number(m[7]) + Number(m[8])/1000);
-        const textLines: string[] = [];
-            while (i < lines.length && lines[i].trim() && !timeRe.test(lines[i])) {
-              textLines.push(lines[i].trim());
+            
+            // Collect all text lines for this cue until we hit an empty line or another time format
+            const textLines: string[] = [];
+            while (i < lines.length) {
+              const textLine = lines[i].trim();
+              // Stop if we encounter an empty line or the start of the next cue
+              if (!textLine || timeRe.test(textLine)) break;
+              textLines.push(textLine);
               i++;
             }
-            // Preserve intra-cue line breaks to follow VTT segmentation faithfully
+            
             parsed.push({ start, end, text: textLines.join('\n') });
+            
+            // If we broke from the inner loop because we hit another timing line,
+            // we need to step back so the outer loop can process that timing line
+            if (i < lines.length && timeRe.test(lines[i].trim())) {
+              i--; // Decrement to re-process the timing line in the outer loop
+            }
           }
+          // If line doesn't match time format, it's ignored (e.g., malformed lines)
         }
         if (!cancelled) setCues(parsed);
       } catch {}
@@ -119,8 +135,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
         onError={onError}
         className="audio-player__native"
       />
-      {showTranscript && cues.length > 0 && (
-        <TranscriptList cues={cues} activeIdx={activeIdx} onSeek={handleSeek} />
+      {showTranscript && (
+        <div>
+          {cues.length > 0 && (
+            <TranscriptList cues={cues} activeIdx={activeIdx} onSeek={handleSeek} />
+          )}
+        </div>
       )}
     </div>
   );

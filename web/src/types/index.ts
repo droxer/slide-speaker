@@ -12,6 +12,8 @@ export interface TaskState {
   updated_at: string;
   errors: string[];
   steps?: Record<string, { status?: string; data?: any }>;
+  file_ext?: string;
+  file_path?: string;
 }
 
 export interface Task {
@@ -19,6 +21,8 @@ export interface Task {
   task_id: string;
   file_id: string;
   task_type: string;
+  filename?: string;
+  file_ext?: string;
   status: string;
   created_at: string;
   updated_at: string;
@@ -26,6 +30,9 @@ export interface Task {
   // Optional DB-surfaced language hints
   voice_language?: string;
   subtitle_language?: string;
+  transcript_language?: string;
+  steps?: Record<string, { status?: string; data?: any }>;
+  progress?: number;
   kwargs: {
     file_id: string;
     file_ext: string;
@@ -36,6 +43,9 @@ export interface Task {
     video_resolution?: string;
     generate_avatar: boolean;
     generate_subtitles: boolean;
+    generate_video?: boolean;
+    generate_podcast?: boolean;
+    source_type?: string;
   };
   state?: TaskState;
   detailed_state?: any;
@@ -50,6 +60,19 @@ export interface DownloadItem {
 
 export interface DownloadsResponse {
   items: DownloadItem[];
+}
+
+export interface PodcastScriptLine {
+  speaker: string;
+  text: string;
+}
+
+export interface PodcastScriptResponse {
+  dialogue: PodcastScriptLine[];
+  host_voice?: string | null;
+  guest_voice?: string | null;
+  language?: string | null;
+  source?: string | null;
 }
 
 export type {UserProfile, ProfileResponse} from './user';

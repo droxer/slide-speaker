@@ -74,6 +74,8 @@ async def insert_task(task: dict[str, Any]) -> None:
             task_type=task_type,
             status=task.get("status", "queued"),
             kwargs=task.get("kwargs"),
+            filename=k.get("filename"),  # Store filename directly in the table
+            file_ext=k.get("file_ext"),  # Store file extension directly in the table
             error=task.get("error"),
             owner_id=task.get("owner_id"),
             voice_language=k.get("voice_language"),
@@ -112,6 +114,8 @@ async def get_task(task_id: str) -> dict[str, Any] | None:
             "subtitle_language": row.subtitle_language,
             "created_at": row.created_at.isoformat() if row.created_at else None,
             "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+            "filename": row.filename or (row.kwargs or {}).get("filename"),
+            "file_ext": row.file_ext or (row.kwargs or {}).get("file_ext"),
         }
 
 
@@ -133,6 +137,8 @@ async def update_task(task_id: str, **fields: Any) -> None:
         "error",
         "task_type",
         "kwargs",
+        "filename",  # Include filename in allowed fields
+        "file_ext",  # Include file_ext in allowed fields
         "voice_language",
         "subtitle_language",
         "file_id",
@@ -205,6 +211,8 @@ async def list_tasks(
                 "voice_language": r.voice_language,
                 "subtitle_language": r.subtitle_language,
                 "source_type": r.source_type,
+                "filename": r.filename or (r.kwargs or {}).get("filename"),
+                "file_ext": r.file_ext or (r.kwargs or {}).get("file_ext"),
             }
             for r in rows
         ]

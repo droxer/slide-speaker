@@ -52,68 +52,63 @@ async def get_final_markdown_transcript_by_task(task_id: str) -> Response:
         state = await state_manager.get_state(file_id)
     if state and "steps" in state:
         steps = state["steps"]
-        # Prefer translated podcast conversation when available; else original
-        pod = None
-        pod_translated = steps.get("translate_podcast_script")
-        pod_original = steps.get("generate_podcast_script")
-        if pod_translated and pod_translated.get("status") == "completed":
-            pod = pod_translated
-        elif pod_original and pod_original.get("status") == "completed":
-            pod = pod_original
+        # Prefer the exact dialogue used for audio playback; fallback to translated/original
+        host_voice = None
+        guest_voice = None
+        audio_dialogue: list[dict[str, Any]] | None = None
+        try:
+            ga = steps.get("generate_podcast_audio") or {}
+            if ga.get("status") == "completed" and isinstance(ga.get("data"), dict):
+                ga_data = ga.get("data")
+                host_voice = ga_data.get("host_voice")
+                guest_voice = ga_data.get("guest_voice")
+                dlg = ga_data.get("dialogue")
+                if isinstance(dlg, list) and dlg:
+                    audio_dialogue = dlg
+        except Exception:
+            pass
 
-        if pod and pod.get("status") == "completed":
-            data = pod.get("data") or []
-            if isinstance(data, list) and data:
-                # Try to fetch voices from podcast audio step
-                host_voice = None
-                guest_voice = None
-                try:
-                    ga = steps.get("generate_podcast_audio") or {}
-                    if (ga.get("status") == "completed") and isinstance(
-                        ga.get("data"), dict
-                    ):
-                        host_voice = (
-                            (ga["data"].get("host_voice") or None)
-                            if isinstance(ga["data"], dict)
-                            else None
+        if audio_dialogue:
+            data = audio_dialogue
+        else:
+            pod = None
+            pod_translated = steps.get("translate_podcast_script")
+            pod_original = steps.get("generate_podcast_script")
+            if pod_translated and pod_translated.get("status") == "completed":
+                pod = pod_translated
+            elif pod_original and pod_original.get("status") == "completed":
+                pod = pod_original
+            data = pod.get("data") if pod and pod.get("status") == "completed" else []
+
+        if isinstance(data, list) and data:
+            # Build conversation-style Markdown
+            lines: list[str] = ["# Podcast Conversation\n"]
+            for item in data:
+                if isinstance(item, dict):
+                    raw_speaker = str(item.get("speaker", "")).strip().lower()
+                    speaker_label = "Speaker"
+                    if raw_speaker.startswith("host"):
+                        # Prefer VoiceId first, then Role; both capitalized
+                        speaker_label = (
+                            f"{str(host_voice).strip().title()} (Host)"
+                            if host_voice
+                            else "Host"
                         )
-                        guest_voice = (
-                            (ga["data"].get("guest_voice") or None)
-                            if isinstance(ga["data"], dict)
-                            else None
+                    elif raw_speaker.startswith("guest"):
+                        speaker_label = (
+                            f"{str(guest_voice).strip().title()} (Guest)"
+                            if guest_voice
+                            else "Guest"
                         )
-                except Exception:
-                    pass
-                # Build conversation-style Markdown
-                lines: list[str] = ["# Podcast Conversation\n"]
-                for item in data:
-                    if isinstance(item, dict):
-                        raw_speaker = str(item.get("speaker", "")).strip().lower()
-                        speaker_label = "Speaker"
-                        if raw_speaker.startswith("host"):
-                            # Prefer VoiceId first, then Role; both capitalized
-                            speaker_label = (
-                                f"{str(host_voice).strip().title()} (Host)"
-                                if host_voice
-                                else "Host"
-                            )
-                        elif raw_speaker.startswith("guest"):
-                            speaker_label = (
-                                f"{str(guest_voice).strip().title()} (Guest)"
-                                if guest_voice
-                                else "Guest"
-                            )
-                        else:
-                            # Fallback to provided speaker label, title-cased
-                            speaker_label = item.get("speaker") or "Speaker"
-                            speaker_label = str(speaker_label).strip().title()
-                        text = str(item.get("text", "")).strip()
-                        if text:
-                            lines.append(f"**{speaker_label}:** {text}")
-                md_conv = "\n\n".join(lines).strip() + "\n"
-                return Response(
-                    content=md_conv, media_type="text/markdown; charset=utf-8"
-                )
+                    else:
+                        # Fallback to provided speaker label, title-cased
+                        speaker_label = item.get("speaker") or "Speaker"
+                        speaker_label = str(speaker_label).strip().title()
+                    text = str(item.get("text", "")).strip()
+                    if text:
+                        lines.append(f"**{speaker_label}:** {text}")
+            md_conv = "\n\n".join(lines).strip() + "\n"
+            return Response(content=md_conv, media_type="text/markdown; charset=utf-8")
         candidate_keys = [
             "revise_pdf_transcripts",
             "revise_transcripts",

@@ -196,7 +196,7 @@ async def _parse_upload_payload(request: Request) -> dict[str, Any]:
             ),
             "video_resolution": _coerce_optional_str(form.get("video_resolution"))
             or "hd",
-            "generate_avatar": _coerce_bool(form.get("generate_avatar"), True),
+            "generate_avatar": _coerce_bool(form.get("generate_avatar"), False),
             "generate_subtitles": _coerce_bool(form.get("generate_subtitles"), True),
             "generate_podcast": _coerce_bool(form.get("generate_podcast"), False),
             "generate_video": _coerce_bool(form.get("generate_video"), True),
@@ -240,7 +240,7 @@ async def _parse_upload_payload(request: Request) -> dict[str, Any]:
         "subtitle_language": _coerce_optional_str(body.get("subtitle_language")),
         "transcript_language": _coerce_optional_str(body.get("transcript_language")),
         "video_resolution": _coerce_optional_str(body.get("video_resolution")) or "hd",
-        "generate_avatar": _coerce_bool(body.get("generate_avatar"), True),
+        "generate_avatar": _coerce_bool(body.get("generate_avatar"), False),
         "generate_subtitles": _coerce_bool(body.get("generate_subtitles"), True),
         "generate_podcast": _coerce_bool(body.get("generate_podcast"), False),
         "generate_video": _coerce_bool(body.get("generate_video"), True),
@@ -281,7 +281,7 @@ async def upload_file(
             else None
         )
         video_resolution = payload.get("video_resolution", "hd")  # Default to HD
-        generate_avatar = payload.get("generate_avatar", True)  # Default to True
+        generate_avatar = payload.get("generate_avatar", False)  # Default to False
         generate_subtitles = payload.get("generate_subtitles", True)
         generate_podcast = payload.get("generate_podcast", False)
         generate_video = payload.get("generate_video", True)

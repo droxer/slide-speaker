@@ -338,6 +338,11 @@
       "supportedBadge": "支援的檔案",
       "supportedDescription": "支援 PDF、PPTX 與 PPT 檔案"
     },
+    "summary": {
+      "file": "檔案",
+      "size": "大小",
+      "output": "輸出"
+    },
     "notice": "AI 生成內容可能不夠精準，請務必檢查。",
     "createPodcast": "建立播客",
     "createVideo": "建立影片"

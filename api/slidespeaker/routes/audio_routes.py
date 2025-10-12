@@ -15,16 +15,14 @@ from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.storage import StorageProvider
 
-from .download_utils import (
+from .download_helpers import (
+    build_headers,
     file_id_from_task,
     final_audio_object_keys,
     get_audio_files_from_state,
+    iter_file,
     proxy_cloud_media,
     stream_concatenated_files,
-)
-from .shared_download_utils import (
-    build_headers,
-    iter_file,
 )
 
 router = APIRouter(
@@ -139,41 +137,6 @@ async def get_final_audio(file_id: str, request: Request) -> Any:
         raise HTTPException(status_code=404, detail="Final audio not found") from e
 
 
-@router.get("/tasks/{task_id}/audio/tracks")
-async def list_audio_files_by_task(task_id: str) -> dict[str, Any]:
-    """List audio tracks using task_id and emit task-based URLs."""
-    from slidespeaker.core.state_manager import state_manager as sm
-
-    file_id = await file_id_from_task(task_id)
-    state = await sm.get_state(file_id)
-    if not state:
-        raise HTTPException(status_code=404, detail="State not found")
-
-    # Collect audio files from state
-    audio_files = await get_audio_files_from_state(file_id)
-    file_ext = (state.get("file_ext") or "").lower()
-    label = "Chapter" if file_ext == ".pdf" else "Slide"
-
-    tracks: list[dict[str, Any]] = []
-    for i, path in enumerate(audio_files):
-        tracks.append(
-            {
-                "index": i + 1,
-                "name": f"{label} {i + 1}",
-                "api_url": f"/api/tasks/{task_id}/audio/{i + 1}",
-                "path": path,
-            }
-        )
-
-    return {
-        "task_id": task_id,
-        "file_id": file_id,
-        "language": state.get("voice_language", "english"),
-        "count": len(tracks),
-        "tracks": tracks,
-    }
-
-
 @router.get("/tasks/{task_id}/audio")
 async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
     """Serve final audio by task, preferring task-id-based object keys.
@@ -181,7 +144,7 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
     Avoid pre-checks that can fail on cloud providers with restricted HEAD permissions.
     Try task-id first; on 404, fall back to file-id mapping.
     """
-    from .shared_download_utils import check_file_exists
+    from .download_helpers import check_file_exists
 
     sp: StorageProvider = get_storage_provider()
     file_id = await file_id_from_task(task_id)
@@ -287,7 +250,7 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
                 pass
     else:
         # Check file-id based keys (same as downloads endpoint)
-        from .download_utils import final_audio_object_keys
+        from .download_helpers import final_audio_object_keys
 
         for key in final_audio_object_keys(file_id):
             if check_file_exists(key):
@@ -301,7 +264,7 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
 @router.get("/tasks/{task_id}/audio/download")
 async def download_final_audio_by_task(task_id: str, request: Request) -> Any:
     """Download endpoint for the final MP3 with attachment disposition."""
-    from .shared_download_utils import check_file_exists
+    from .download_helpers import check_file_exists
 
     sp: StorageProvider = get_storage_provider()
     # Resolve best key (prefer task-id, then file-id variants)

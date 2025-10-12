@@ -11,6 +11,7 @@ from typing import Any
 from loguru import logger
 
 from slidespeaker.configs.config import config
+from slidespeaker.configs.locales import locale_utils
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.llm import chat_completion
 
@@ -52,10 +53,18 @@ def _strip_transition_label(text: str) -> str:
 async def translate_podcast_script_step(
     file_id: str, source_language: str = "english", target_language: str = "english"
 ) -> None:
+    normalized_source = locale_utils.normalize_language(source_language)
+    normalized_target = locale_utils.normalize_language(target_language)
+    target_display = locale_utils.get_display_name(normalized_target)
+
     await state_manager.update_step_status(
         file_id, "translate_podcast_script", "processing"
     )
-    logger.info(f"Translating podcast script for file {file_id} -> {target_language}")
+    logger.info(
+        "Translating podcast script for file %s -> %s",
+        file_id,
+        target_display or normalized_target,
+    )
 
     st = await state_manager.get_state(file_id)
     dialogue: list[dict[str, Any]] = []
@@ -71,15 +80,18 @@ async def translate_podcast_script_step(
         )
         return
 
-    if (target_language or "").lower() == (source_language or "").lower():
-        logger.info("Source and target languages are the same; copying input dialogue")
+    if normalized_target == normalized_source:
+        logger.info(
+            "Source and target languages are the same (%s); copying input dialogue",
+            normalized_target,
+        )
         await state_manager.update_step_status(
             file_id, "translate_podcast_script", "completed", dialogue
         )
         return
 
     try:
-        prompt = _build_translate_prompt(dialogue, target_language)
+        prompt = _build_translate_prompt(dialogue, target_display)
         content = chat_completion(
             model=config.translation_model,
             messages=[

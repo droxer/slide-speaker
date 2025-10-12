@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient, QueryClient } from '@tanstack/react-query';
-import { getTasks, getStats, searchTasks, getDownloads, getTranscriptMarkdown, getVttText, cancelRun, deleteTask, runFile, getTaskById } from './client';
+import { getTasks, getStats, searchTasks, getDownloads, getTranscriptMarkdown, getVttText, cancelRun, deleteTask, runFile, getTaskById, getPodcastScript } from './client';
 import type { Task } from '../types';
 
 export const queries = {
@@ -10,6 +10,7 @@ export const queries = {
   transcript: (taskId: string) => ['transcript', taskId] as const,
   vtt: (taskId: string, language?: string) => (language ? (['vtt', taskId, language] as const) : (['vtt', taskId] as const)),
   task: (taskId: string) => ['task', taskId] as const,
+  podcastScript: (taskId: string) => ['podcastScript', taskId] as const,
 };
 
 export const useTasksQuery = (
@@ -66,6 +67,10 @@ export const prefetchTranscript = async (qc: QueryClient, taskId: string) => {
   return qc.fetchQuery({ queryKey: queries.transcript(taskId), queryFn: () => getTranscriptMarkdown(taskId) });
 };
 
+export const prefetchPodcastScript = async (qc: QueryClient, taskId: string) => {
+  return qc.fetchQuery({ queryKey: queries.podcastScript(taskId), queryFn: () => getPodcastScript(taskId) });
+};
+
 export const prefetchVtt = async (qc: QueryClient, taskId: string, language?: string) => {
   return qc.prefetchQuery({ queryKey: queries.vtt(taskId, language), queryFn: () => getVttText(taskId, language) });
 };
@@ -77,10 +82,34 @@ export const useDownloadsQuery = (taskId: string | null, enabled = true) => {
 
 export const useTranscriptQuery = (taskId: string | null, enabled = true) => {
   const id = taskId || '';
-  return useQuery({ queryKey: queries.transcript(id), queryFn: () => getTranscriptMarkdown(id), enabled: Boolean(taskId) && enabled });
+  return useQuery({
+    queryKey: queries.transcript(id),
+    queryFn: async () => {
+      return getTranscriptMarkdown(id);
+    },
+    enabled: Boolean(taskId) && enabled
+  });
 };
 
-export const useTaskQuery = (taskId: string, initialData?: Task | null) => {
+export const usePodcastScriptQuery = (taskId: string | null, enabled = true) => {
+  const id = taskId || '';
+  return useQuery({
+    queryKey: queries.podcastScript(id),
+    queryFn: async () => {
+      return getPodcastScript(id);
+    },
+    enabled: Boolean(taskId) && enabled,
+  });
+};
+
+export const useTaskQuery = (
+  taskId: string,
+  initialData?: Task | null,
+  opts?: {
+    refetchInterval?: number | false | ((q: any) => number | false);
+    staleTime?: number;
+  }
+) => {
   return useQuery<Task | null>({
     queryKey: queries.task(taskId),
     queryFn: async () => {
@@ -95,7 +124,8 @@ export const useTaskQuery = (taskId: string, initialData?: Task | null) => {
       }
     },
     enabled: Boolean(taskId),
-    staleTime: 30_000,
+    staleTime: opts?.staleTime ?? 30_000,
+    refetchInterval: opts?.refetchInterval,
     initialData: initialData ?? undefined,
   });
 };
@@ -135,7 +165,7 @@ export const prefetchTaskPreview = async (
   const podcast = opts?.podcast === true;
   await prefetchDownloads(qc, taskId);
   if (podcast) {
-    await prefetchTranscript(qc, taskId);
+    await prefetchPodcastScript(qc, taskId);
   } else {
     if (language) await prefetchVtt(qc, taskId, language);
     await prefetchVtt(qc, taskId);
@@ -184,13 +214,14 @@ export const useFilesQuery = (
 
       for (const task of allTasks) {
         const fileId = task.file_id || task.kwargs?.file_id;
-        const key = fileId || `unknown:${task.kwargs?.filename || 'Unknown'}`;
+        const taskFilename = task.filename || task.kwargs?.filename || task.state?.filename;
+        const key = fileId || `unknown:${taskFilename || 'Unknown'}`;
         
         if (!filesMap.has(key)) {
           filesMap.set(key, {
             file_id: fileId,
-            filename: task.kwargs?.filename || task.state?.filename,
-            file_ext: task.kwargs?.file_ext,
+            filename: taskFilename,
+            file_ext: task.file_ext || task.kwargs?.file_ext,
             tasks: []
           });
         }

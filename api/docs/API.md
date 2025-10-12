@@ -28,7 +28,7 @@ Upload a PDF or PowerPoint presentation for processing.
   ```
 - `language`: Audio language (default: "english")
 - `subtitle_language`: Subtitle language (optional)
-- `generate_avatar`: Whether to generate AI avatar (default: true)
+- `generate_avatar`: Whether to generate AI avatar (default: false)
 - `generate_subtitles`: Whether to generate subtitles (default: true)
 
 **Response:**
@@ -86,11 +86,13 @@ GET /api/tasks/{task_id}/video
 GET /api/tasks/{task_id}/audio
 ```
 
-### List Per-Slide Audio Tracks (Debugging)
+### Download Podcast
 
 ```
-GET /api/tasks/{task_id}/audio/tracks
+GET /api/tasks/{task_id}/podcast
 ```
+
+Podcast downloads are available for tasks that generated podcasts. The endpoint returns the final MP3 file.
 
 ### Download Subtitles
 
@@ -104,6 +106,14 @@ GET /api/tasks/{task_id}/subtitles/srt
 ```
 GET /api/tasks/{task_id}/transcripts/markdown
 ```
+
+### Get Podcast Script
+
+```
+GET /api/tasks/{task_id}/podcast/script
+```
+
+Retrieve the structured podcast dialogue used for audio generation. Returns JSON data with host/guest dialogue lines.
 
 Presigned URL variants are available where supported via `/url` suffixes.
 

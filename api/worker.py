@@ -144,7 +144,7 @@ async def process_task(task_id: str) -> str:
         voice_language = kwargs.get("voice_language", "english")
         subtitle_language = kwargs.get("subtitle_language")
         transcript_language = kwargs.get("transcript_language")
-        generate_avatar = kwargs.get("generate_avatar", True)
+        generate_avatar = kwargs.get("generate_avatar", False)
         generate_subtitles = True  # Always generate subtitles
         generate_podcast = kwargs.get("generate_podcast", False)
         generate_video = kwargs.get("generate_video", True)

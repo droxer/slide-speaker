@@ -1,7 +1,7 @@
 import axios from 'axios';
 import {resolveApiBaseUrl} from '@/utils/apiBaseUrl';
 import type {HealthStatus} from '@/types/health';
-import type {Task, DownloadsResponse} from '@/types';
+import type {Task, DownloadsResponse, PodcastScriptResponse} from '@/types';
 import type {ProfileResponse} from '@/types/user';
 
 const API_BASE_URL = resolveApiBaseUrl();
@@ -117,4 +117,9 @@ export const getVttText = async (taskId: string, language?: string) => {
     : `/api/tasks/${taskId}/subtitles/vtt`;
   const res = await api.get(path, { headers: { Accept: 'text/vtt,*/*' } });
   return String(res.data || '');
+};
+
+export const getPodcastScript = async (taskId: string): Promise<PodcastScriptResponse> => {
+  const res = await api.get(`/api/tasks/${taskId}/podcast/script`);
+  return res.data as PodcastScriptResponse;
 };

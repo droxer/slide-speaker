@@ -37,6 +37,62 @@ const TaskProcessingSteps: React.FC<TaskProcessingStepsProps> = ({
   const locatingLabel = t('processing.meta.locating', undefined, '(locating…)');
   const describeStepStatus = (variant: StepStatusVariant) => getTaskStatusLabel(variant, t);
 
+  // Function to get appropriate file icon based on file extension
+  const getFileIcon = (filename: string | null): string => {
+    if (!filename) return '📄'; // Default document icon
+
+    const lowerFilename = filename.toLowerCase();
+
+    // PDF files
+    if (lowerFilename.endsWith('.pdf')) {
+      return '📑'; // PDF document icon
+    }
+
+    // PowerPoint files
+    if (lowerFilename.endsWith('.ppt') || lowerFilename.endsWith('.pptx')) {
+      return '📊'; // Presentation icon
+    }
+
+    // Word files
+    if (lowerFilename.endsWith('.doc') || lowerFilename.endsWith('.docx')) {
+      return '📝'; // Document with text icon
+    }
+
+    // Excel files
+    if (lowerFilename.endsWith('.xls') || lowerFilename.endsWith('.xlsx')) {
+      return '📈'; // Spreadsheet icon
+    }
+
+    // Image files
+    if (lowerFilename.endsWith('.jpg') || lowerFilename.endsWith('.jpeg') ||
+        lowerFilename.endsWith('.png') || lowerFilename.endsWith('.gif') ||
+        lowerFilename.endsWith('.bmp') || lowerFilename.endsWith('.svg')) {
+      return '🖼️'; // Image icon
+    }
+
+    // Video files
+    if (lowerFilename.endsWith('.mp4') || lowerFilename.endsWith('.avi') ||
+        lowerFilename.endsWith('.mov') || lowerFilename.endsWith('.wmv')) {
+      return '🎬'; // Video icon
+    }
+
+    // Audio files
+    if (lowerFilename.endsWith('.mp3') || lowerFilename.endsWith('.wav') ||
+        lowerFilename.endsWith('.ogg') || lowerFilename.endsWith('.flac')) {
+      return '🎵'; // Audio icon
+    }
+
+    // Text files
+    if (lowerFilename.endsWith('.txt') || lowerFilename.endsWith('.md')) {
+      return '📄'; // Text document icon
+    }
+
+    // Default fallback
+    return '📄'; // Generic document icon
+  };
+
+  const fileIcon = getFileIcon(fileName);
+
   return (
     <div className="processing-view">
       <div className="spinner"></div>
@@ -45,7 +101,7 @@ const TaskProcessingSteps: React.FC<TaskProcessingStepsProps> = ({
       <div className="processing-meta" role="group" aria-label={t('processing.meta.aria', undefined, 'Task details')}>
         <div className="meta-card file" title={fileName || fileId || ''}>
           <div className="meta-title">
-            <span className="meta-icon">📄</span>
+            <span className="meta-icon">{fileIcon}</span>
             <span className="meta-text">{fileName || t('processing.file.untitled', undefined, 'Untitled')}</span>
           </div>
           <div className="meta-badge">

@@ -34,7 +34,7 @@ async def accept_task(
     voice_language: str = "english",
     subtitle_language: str | None = None,
     transcript_language: str | None = None,
-    generate_avatar: bool = True,
+    generate_avatar: bool = False,
     generate_subtitles: bool = True,
     generate_podcast: bool = False,
     generate_video: bool = True,
@@ -107,6 +107,7 @@ async def accept_task(
             subtitle_language=subtitle_lang,
             generate_avatar=generate_avatar,
             generate_subtitles=generate_subtitles,
+            generate_video=generate_video,
             task_id=task_id,
         )
 
@@ -279,6 +280,7 @@ async def _run_slide_pipeline(
     subtitle_language: str | None,
     generate_avatar: bool,
     generate_subtitles: bool,
+    generate_video: bool,
     task_id: str | None,
 ) -> None:
     await video_from_slide(
@@ -289,5 +291,6 @@ async def _run_slide_pipeline(
         subtitle_language,
         generate_avatar,
         generate_subtitles,
+        generate_video,
         task_id,
     )

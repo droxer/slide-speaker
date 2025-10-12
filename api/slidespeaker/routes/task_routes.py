@@ -283,49 +283,6 @@ async def get_tasks(
     }
 
 
-@router.get("/tasks/db/{task_id}")
-@limiter.limit("30/minute")  # Limit to 30 task detail requests per minute per IP
-@monitor_endpoint
-async def get_task_db(
-    task_id: str,
-    request: Request,
-    current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
-) -> dict[str, Any]:
-    """DB-only task fetch (no Redis/queue)."""
-    owner_id = extract_user_id(current_user)
-    if not owner_id:
-        raise HTTPException(status_code=403, detail="user session missing id")
-
-    row = await db_get_task(task_id)
-    if not row or row.get("owner_id") != owner_id:
-        return {"error": "not_found", "task_id": task_id}
-    return row
-
-
-@router.delete("/tasks/db/{task_id}")
-@limiter.limit("10/minute")  # Limit to 10 task deletions per minute per IP
-@monitor_endpoint
-async def delete_task_db(
-    task_id: str,
-    request: Request,
-    current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
-) -> dict[str, Any]:
-    """DB-only delete for a task row (does not touch Redis/queue/state)."""
-    owner_id = extract_user_id(current_user)
-    if not owner_id:
-        raise HTTPException(status_code=403, detail="user session missing id")
-
-    row = await db_get_task(task_id)
-    if not row or row.get("owner_id") != owner_id:
-        return {"deleted": False, "task_id": task_id, "error": "not_found"}
-
-    try:
-        await db_delete_task(task_id)
-        return {"deleted": True, "task_id": task_id}
-    except Exception as e:
-        return {"deleted": False, "task_id": task_id, "error": str(e)}
-
-
 @router.get("/tasks/search")
 @limiter.limit("30/minute")  # Limit to 30 search requests per minute per IP
 @monitor_endpoint

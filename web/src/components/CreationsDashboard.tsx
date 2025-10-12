@@ -112,10 +112,12 @@ const CreationsDashboard: React.FC<CreationsDashboardProps> = ({ apiBaseUrl }) =
     const map = new Map<string, { file_id?: string; filename?: string; file_ext?: string; tasks: Task[]; newest: number }>();
     for (const t of items) {
       const fid = t.file_id || (t as any)?.kwargs?.file_id;
-      const key = fid || `unknown:${(t as any)?.kwargs?.filename || 'Unknown'}`;
+      const tFilename = t.filename || (t as any)?.kwargs?.filename || t.state?.filename;
+      const tFileExt = t.file_ext || (t as any)?.kwargs?.file_ext;
+      const key = fid || `unknown:${tFilename || 'Unknown'}`;
       const updated = Date.parse(t.updated_at || t.created_at || '') || 0;
-      if (!map.has(key)) map.set(key, { file_id: fid, filename: (t as any)?.kwargs?.filename || t.state?.filename, file_ext: (t as any)?.kwargs?.file_ext, tasks: [t], newest: updated });
-      else { const g = map.get(key)!; g.tasks.push(t); g.newest = Math.max(g.newest, updated); g.filename ||= (t as any)?.kwargs?.filename || t.state?.filename; g.file_ext ||= (t as any)?.kwargs?.file_ext; }
+      if (!map.has(key)) map.set(key, { file_id: fid, filename: tFilename, file_ext: tFileExt, tasks: [t], newest: updated });
+      else { const g = map.get(key)!; g.tasks.push(t); g.newest = Math.max(g.newest, updated); g.filename ||= tFilename; g.file_ext ||= tFileExt; }
     }
     const groups = Array.from(map.values()).sort((a, b) => b.newest - a.newest);
     for (const g of groups) g.tasks.sort((a, b) => Date.parse(b.updated_at || b.created_at) - Date.parse(a.updated_at || a.created_at));

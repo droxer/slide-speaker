@@ -27,6 +27,8 @@ class TaskRow(Base):
     task_type: Mapped[str] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(32), index=True)
     kwargs: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    file_ext: Mapped[str | None] = mapped_column(String(16), nullable=True)
     owner_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     voice_language: Mapped[str | None] = mapped_column(String(64), nullable=True)
     subtitle_language: Mapped[str | None] = mapped_column(String(64), nullable=True)

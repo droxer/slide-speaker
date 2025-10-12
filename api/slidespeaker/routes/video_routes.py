@@ -14,12 +14,17 @@ from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.storage import StorageProvider
 
-from .download_utils import file_id_from_task, proxy_cloud_media
-from .shared_download_utils import build_headers, check_file_exists, iter_file
+from .download_helpers import (
+    build_headers,
+    check_file_exists,
+    file_id_from_task,
+    iter_file,
+    proxy_cloud_media,
+)
 
 router = APIRouter(
     prefix="/api",
-    tags=["video_downloads"],
+    tags=["video"],
     dependencies=[Depends(require_authenticated_user)],
 )
 

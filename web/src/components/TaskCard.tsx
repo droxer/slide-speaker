@@ -57,8 +57,17 @@ const TaskCard: React.FC<Props> = ({
   const videoRes = task.kwargs?.video_resolution || task.state?.video_resolution || 'hd';
   const { video: isVideoTask, podcast: isPodcastTask } = deriveTaskOutputs(task);
   const transcriptLang = transcriptLanguage;
-  const filename = task.kwargs?.filename || task.state?.filename || 'Unknown file';
-  const fileExt = task.kwargs?.file_ext || '';
+  const filename =
+    task.filename ||
+    task.kwargs?.filename ||
+    task.state?.filename ||
+    task.kwargs?.file_id ||
+    task.file_id;
+  const rawExt =
+    task.file_ext ||
+    task.kwargs?.file_ext ||
+    (task.state && typeof task.state.file_ext === 'string' ? task.state.file_ext : '');
+  const fileExt = typeof rawExt === 'string' ? rawExt.replace(/^\./, '') : '';
   // Prefer cache-driven downloads when the card is expanded
   const queryClient = useQueryClient();
   const { data: dlData } = useDownloadsQuery(task.task_id, isExpanded);
@@ -167,17 +176,16 @@ const TaskCard: React.FC<Props> = ({
           {task.task_id && (
             <button
               type="button"
-              className={`copy-task-id ${task.status !== 'completed' ? 'disabled' : ''}`}
+              className="copy-task-id"
               aria-label={t('task.list.copyId')}
               title={t('task.list.copyId')}
               onClick={() => {
-                if (task.status === 'completed') {
-                  try {
-                    navigator.clipboard.writeText(task.task_id);
-                  } catch {}
+                try {
+                  navigator.clipboard.writeText(task.task_id);
+                } catch (error) {
+                  console.warn('Failed to copy task ID to clipboard:', error);
                 }
               }}
-              disabled={task.status !== 'completed'}
             >
               {t('actions.copy')}
             </button>
@@ -288,7 +296,7 @@ const TaskCard: React.FC<Props> = ({
         {(task.status === 'queued' || task.status === 'processing') && (
           <button onClick={() => onCancel(task.task_id)} className="cancel-button">Cancel</button>
         )}
-        {(task.status === 'completed' || task.status === 'cancelled') && (
+        {(task.status === 'completed' || task.status === 'cancelled' || task.status === 'failed') && (
           <button onClick={() => onDelete(task.task_id)} className="delete-button" title="Delete task" type="button" aria-label="Delete task">
             <svg className="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.343.052.682.106 1.018.162m-1.018-.162L19.5 19.5A2.25 2.25 0 0 1 17.25 21H6.75A2.25 2.25 0 0 1 4.5 19.5L5.77 5.79m13.458 0a48.108 48.108 0 0 0-3.478-.397m-12 .559c.336-.056.675-.11 1.018-.162m0 0A48.11 48.11 0 0 1 9.25 5.25m5.5 0a48.11 48.11 0 0 1 3.482.342m-8.982-.342V4.5A1.5 1.5 0 0 1 10.25 3h3.5A1.5 1.5 0 0 1 15.25 4.5v.75m-8.982 0a48.667 48.667 0 0 0-3.538.397" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>

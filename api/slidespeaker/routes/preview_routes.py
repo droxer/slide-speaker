@@ -75,7 +75,7 @@ async def options_task_preview(_task_id: str) -> dict[str, str]:
 @router.head("/tasks/{task_id}/preview")
 async def head_task_preview(task_id: str) -> Any:
     """Quick existence check for preview resources (video)."""
-    from .shared_download_utils import check_file_exists
+    from .download_helpers import check_file_exists
 
     # Prefer task-id-based video naming
     if check_file_exists(f"{task_id}.mp4"):

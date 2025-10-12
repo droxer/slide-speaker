@@ -122,7 +122,7 @@ async def run_file(
             subtitle_language=subtitle_language,
             transcript_language=transcript_language,
             video_resolution=video_resolution,
-            generate_avatar=True,
+            generate_avatar=False,
             generate_subtitles=True,
             generate_podcast=generate_podcast,
             generate_video=generate_video,

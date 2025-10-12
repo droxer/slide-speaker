@@ -15,8 +15,7 @@ from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.configs.locales import locale_utils
 from slidespeaker.storage import StorageProvider
 
-from .download_utils import file_id_from_task
-from .shared_download_utils import build_headers, check_file_exists
+from .download_helpers import build_headers, check_file_exists, file_id_from_task
 
 router = APIRouter(
     prefix="/api",
@@ -288,7 +287,7 @@ async def head_vtt_subtitles_by_task(
     # Get language
     _, locale_code = await _get_subtitle_language(task_id, language)
 
-    from .shared_download_utils import check_file_exists
+    from .download_helpers import check_file_exists
 
     # Check existence by task-id only (no file-id fallback)
     exists = check_file_exists(f"{task_id}_{locale_code}.vtt")
@@ -312,7 +311,7 @@ async def head_srt_subtitles_by_task(
     # Get language
     _, locale_code = await _get_subtitle_language(task_id, language)
 
-    from .shared_download_utils import check_file_exists
+    from .download_helpers import check_file_exists
 
     exists = check_file_exists(f"{task_id}_{locale_code}.srt")
     if not exists:

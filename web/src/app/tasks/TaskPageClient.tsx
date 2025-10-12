@@ -63,9 +63,6 @@ const TaskPageClient: React.FC<TaskPageClientProps> = ({ taskId, initialTask, in
         task={task}
         downloads={downloads}
         apiBaseUrl={apiBaseUrl}
-        onCancel={handleCancel}
-        isCancelling={cancelMutation.isPending}
-        downloadsLoading={downloadsQuery.isLoading}
       />
     );
   };

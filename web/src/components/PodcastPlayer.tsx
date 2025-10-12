@@ -1,22 +1,22 @@
-import React from 'react';
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import AudioPlayer from '@/components/AudioPlayer';
-import { buildCuesFromMarkdown } from '@/utils/transcript';
+import { buildCuesFromPodcastDialogue } from '@/utils/transcript';
+import type { PodcastScriptResponse } from '@/types';
 
 type PodcastPlayerProps = {
   src: string;
-  transcriptMarkdown?: string;
+  script?: PodcastScriptResponse | null;
   className?: string;
 };
 
-const PodcastPlayer: React.FC<PodcastPlayerProps> = ({ src, transcriptMarkdown, className }) => {
+const PodcastPlayer: React.FC<PodcastPlayerProps> = ({ src, script, className }) => {
   const cues = useMemo(() => {
-    if (!transcriptMarkdown) return undefined;
-    return buildCuesFromMarkdown(transcriptMarkdown);
-  }, [transcriptMarkdown]);
-  return (
-    <AudioPlayer src={src} initialCues={cues} showTranscript className={className} />
-  );
+    const dialogue = script?.dialogue;
+    if (!Array.isArray(dialogue) || dialogue.length === 0) return undefined;
+    return buildCuesFromPodcastDialogue(dialogue);
+  }, [script]);
+
+  return <AudioPlayer src={src} initialCues={cues} showTranscript className={className} />;
 };
 
 export default PodcastPlayer;
