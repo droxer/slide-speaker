@@ -51,7 +51,10 @@
     "unknown": "未知",
     "unknownFile": "未知檔案",
     "untrackedFile": "未關聯檔案",
-    "disabled": "已停用"
+    "disabled": "已停用",
+    "copied": "已複製！",
+    "latest": "最新",
+    "more": "更多"
   },
   "profile": {
     "title": "個人資料",
@@ -182,11 +185,6 @@
     "status": {
       "all": "全部狀態"
     }
-  },
-  "common": {
-    "latest": "最新",
-    "more": "更多",
-    "unknown": "未知"
   },
   "runTask": {
     "adjustHint": "調整產生選項後按下「產生」。",
@@ -390,5 +388,18 @@
   },
   "alerts": {
     "previewUnavailable": "僅支援已完成的任務預覽。"
+  },
+  "videoPlayer": {
+    "noSupport": "您的瀏覽器不支援影片標籤。"
+  },
+  "errorBoundary": {
+    "unexpectedError": "發生未預期的錯誤，請再試一次。",
+    "somethingWentWrong": "出了點問題。",
+    "tryAgain": "再試一次？"
+  },
+  "errorDisplay": {
+    "processingFailed": "處理失敗",
+    "processingError": "影片生成過程中出了點問題，請改用其他檔案再試一次。",
+    "tryAgain": "再試一次"
   }
 }

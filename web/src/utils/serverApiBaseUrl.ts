@@ -1,15 +1,15 @@
-const trimTrailingSlashes = (value: string): string => value.replace(/\/+$/, '');
+const stripTrailingSlashes = (url: string): string => url.replace(/\/+$/, '');
 
 const DEV_FALLBACK = 'http://localhost:8000';
 
 export const resolveServerApiBaseUrl = (): string => {
-  const envUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
-  if (envUrl && envUrl.length > 0) {
-    return trimTrailingSlashes(envUrl);
+  const envValue = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL;
+  if (envValue) {
+    return stripTrailingSlashes(envValue);
   }
 
   if (process.env.NODE_ENV === 'production') {
-    throw new Error('API_BASE_URL (or NEXT_PUBLIC_API_BASE_URL) must be configured outside development environments.');
+    throw new Error('API_BASE_URL must be configured in production.');
   }
 
   return DEV_FALLBACK;

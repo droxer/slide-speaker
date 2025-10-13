@@ -51,7 +51,10 @@
     "unknown": "Unknown",
     "unknownFile": "Unknown file",
     "untrackedFile": "Untracked file",
-    "disabled": "Disabled"
+    "disabled": "Disabled",
+    "copied": "Copied!",
+    "latest": "Latest",
+    "more": "more"
   },
   "profile": {
     "title": "Profile",
@@ -182,11 +185,6 @@
     "status": {
       "all": "All statuses"
     }
-  },
-  "common": {
-    "latest": "Latest",
-    "more": "more",
-    "unknown": "Unknown"
   },
   "runTask": {
     "adjustHint": "Adjust the generation options and press Generate when you are ready.",
@@ -394,5 +392,18 @@
   },
   "alerts": {
     "previewUnavailable": "Preview is only available for completed tasks."
+  },
+  "videoPlayer": {
+    "noSupport": "Your browser does not support the video tag."
+  },
+  "errorBoundary": {
+    "unexpectedError": "An unexpected error occurred. Please try again.",
+    "somethingWentWrong": "Something went wrong.",
+    "tryAgain": "Try again?"
+  },
+  "errorDisplay": {
+    "processingFailed": "Processing Failed",
+    "processingError": "Something went wrong during video generation. Please try again with a different file.",
+    "tryAgain": "Try Again"
   }
 }

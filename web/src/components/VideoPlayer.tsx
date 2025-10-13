@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api as apiClient } from '@/services/client';
+import { useI18n } from '@/i18n/hooks';
 
 type VideoPlayerProps = {
   src: string;
@@ -24,6 +25,7 @@ const VideoPlayer = ({
   onReady,
   onError,
 }: VideoPlayerProps) => {
+  const { t } = useI18n();
   const [subtitleSrc, setSubtitleSrc] = useState<string | undefined>(trackUrl);
 
   useEffect(() => {
@@ -85,7 +87,7 @@ const VideoPlayer = ({
       {subtitleSrc && (
         <track kind="subtitles" src={subtitleSrc} srcLang={trackLang} label={trackLabel} default />
       )}
-      Your browser does not support the video tag.
+      {t('videoPlayer.noSupport', undefined, 'Your browser does not support the video tag.')}
     </video>
   );
 };
