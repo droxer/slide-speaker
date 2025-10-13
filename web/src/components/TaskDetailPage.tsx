@@ -5,7 +5,7 @@ import { Link } from '@/navigation';
 import VideoPlayer from '@/components/VideoPlayer';
 import AudioPlayer from '@/components/AudioPlayer';
 import PodcastPlayer from '@/components/PodcastPlayer';
-import DownloadLinks, { DownloadLinkItem } from '@/components/DownloadLinks';
+import DownloadSection, { DownloadLinkItem } from '@/components/DownloadSection';
 import { resolveLanguages, getLanguageDisplayName } from '@/utils/language';
 import { usePodcastScriptQuery } from '@/services/queries';
 import { useI18n } from '@/i18n/hooks';
@@ -60,17 +60,17 @@ const downloadLabel = (
   }
 };
 
-type TaskDetailProps = {
+type TaskDetailPageProps = {
   task: Task;
   downloads?: DownloadItem[];
   apiBaseUrl: string;
 };
 
-const TaskDetail: React.FC<TaskDetailProps> = ({
+const TaskDetailPage = ({
   task,
   downloads,
   apiBaseUrl,
-}) => {
+}: TaskDetailPageProps) => {
   const { t, locale } = useI18n();
   const { voiceLanguage, subtitleLanguage, transcriptLanguage } = resolveLanguages(task);
   const languageLabel = React.useCallback((code: string) => {
@@ -247,7 +247,7 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
         <section className="task-detail-card__section">
           <h2>{t('task.detail.downloads')}</h2>
           {filteredDownloads.length > 0 ? (
-            <DownloadLinks
+            <DownloadSection
               links={filteredDownloads.map((item) => {
                 const href = buildAssetUrl(apiBaseUrl, item.download_url || item.url);
                 const label = downloadLabel(item.type, t);
@@ -283,4 +283,4 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
   );
 };
 
-export default TaskDetail;
+export default TaskDetailPage;

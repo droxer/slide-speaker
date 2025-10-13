@@ -9,7 +9,7 @@ type PodcastPlayerProps = {
   className?: string;
 };
 
-const PodcastPlayer: React.FC<PodcastPlayerProps> = ({ src, script, className }) => {
+const PodcastPlayer = ({ src, script, className }: PodcastPlayerProps) => {
   const cues = useMemo(() => {
     const dialogue = script?.dialogue;
     if (!Array.isArray(dialogue) || dialogue.length === 0) return undefined;

@@ -6,8 +6,8 @@ import { cancelRun as apiCancelRun, deleteTask as apiDeleteTask, purgeTask as ap
 import type { UploadSummary } from '../services/client';
 import { useCancelTaskMutation, useFilesQuery, useRunFileTaskMutation, useSearchTasksQuery, useTaskQuery } from '../services/queries';
 import { Link } from '@/navigation';
-import RunTaskModal from './RunTaskModal';
-import TaskProcessingModal from './TaskProcessingModal';
+import TaskCreationModal from './TaskCreationModal';
+import TaskProgressModal from './TaskProgressModal';
 import { getGlobalRunDefaults, saveGlobalRunDefaults } from '../utils/defaults';
 import type { Task } from '../types';
 import { useI18n } from '@/i18n/hooks';
@@ -15,7 +15,7 @@ import { getLanguageDisplayName } from '../utils/language';
 import { getTaskStatusClass, getTaskStatusIcon, getTaskStatusLabel, type TaskStatus } from '@/utils/taskStatus';
 import { getFileTypeIcon, getFileTypeCategory, isPdf, isPowerPoint } from '@/utils/fileIcons';
 
-interface CreationsDashboardProps { apiBaseUrl: string }
+interface TaskDashboardProps { apiBaseUrl: string }
 
 const shortId = (id?: string) => {
   if (!id) return '';
@@ -42,7 +42,7 @@ type FileGroup = {
   uploadUpdatedAt?: string | null;
 };
 
-const CreationsDashboard: React.FC<CreationsDashboardProps> = ({ apiBaseUrl }) => {
+const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [status, setStatus] = useState('all');
@@ -671,7 +671,7 @@ const CreationsDashboard: React.FC<CreationsDashboardProps> = ({ apiBaseUrl }) =
         <button onClick={() => setPage(page + 1)} disabled={searching ? ((((searchQuery.data as any)?.tasks) || []).length < 10) : !((filesQuery.data as any)?.has_more)} className="page-button">{t('pagination.next')}</button>
       </div>
 
-      <RunTaskModal
+      <TaskCreationModal
         open={runOpen}
         isPdf={!!runFile?.isPdf}
         defaults={runDefaults}
@@ -693,7 +693,7 @@ const CreationsDashboard: React.FC<CreationsDashboardProps> = ({ apiBaseUrl }) =
           );
         }}
       />
-      <TaskProcessingModal
+      <TaskProgressModal
         open={Boolean(processingTask)}
         task={processingModalTask ?? null}
         onClose={() => setProcessingTask(null)}
@@ -703,4 +703,4 @@ const CreationsDashboard: React.FC<CreationsDashboardProps> = ({ apiBaseUrl }) =
   );
 };
 
-export default CreationsDashboard;
+export default TaskDashboard;

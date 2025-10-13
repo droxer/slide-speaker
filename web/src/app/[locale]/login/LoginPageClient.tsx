@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import GoogleLoginButton from '@/components/GoogleLoginButton';
+import LoginButton from '@/components/LoginButton';
 import { useI18n } from '@/i18n/hooks';
 import { resolveApiBaseUrl } from '@/utils/apiBaseUrl';
 
@@ -115,7 +115,7 @@ export default function LoginPageClient({ locale, redirectTo }: LoginPageClientP
           <span>{t('auth.separator', undefined, 'or')}</span>
         </div>
 
-        <GoogleLoginButton onClick={() => signIn('google', { callbackUrl: redirectTarget })} label={t('auth.loginWithGoogle', undefined, 'Sign in with Google')} />
+        <LoginButton onClick={() => signIn('google', { callbackUrl: redirectTarget })} label={t('auth.loginWithGoogle', undefined, 'Sign in with Google')} />
 
         <button
           type="button"

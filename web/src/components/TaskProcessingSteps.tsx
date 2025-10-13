@@ -16,7 +16,7 @@ type TaskProcessingStepsProps = {
   formatStepNameWithLanguages: (step: string, vl: string, sl?: string) => string;
 };
 
-const TaskProcessingSteps: React.FC<TaskProcessingStepsProps> = ({
+const TaskProcessingSteps = ({
   taskId,
   uploadId,
   fileName,
@@ -24,7 +24,7 @@ const TaskProcessingSteps: React.FC<TaskProcessingStepsProps> = ({
   onStop,
   processingDetails,
   formatStepNameWithLanguages,
-}) => {
+}: TaskProcessingStepsProps) => {
   const { t } = useI18n();
   const pd = processingDetails || {};
   const steps = (pd.steps || {}) as Record<string, any>;

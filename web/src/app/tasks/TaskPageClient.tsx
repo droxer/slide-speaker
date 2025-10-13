@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import TaskDetail from '@/components/TaskDetail';
+import TaskDetailPage from '@/components/TaskDetailPage';
 import AppShell from '@/components/AppShell';
 import { resolveApiBaseUrl } from '@/utils/apiBaseUrl';
 import { useTaskQuery, useDownloadsQuery, useCancelTaskMutation } from '@/services/queries';
@@ -59,7 +59,7 @@ const TaskPageClient: React.FC<TaskPageClientProps> = ({ taskId, initialTask, in
     }
 
     return (
-      <TaskDetail
+      <TaskDetailPage
         task={task}
         downloads={downloads}
         apiBaseUrl={apiBaseUrl}

@@ -24,13 +24,13 @@ type FileUploadingViewProps = {
   outputs?: UploadingOutput[];
 };
 
-const FileUploadingView: React.FC<FileUploadingViewProps> = ({
+const FileUploadingView = ({
   progress,
   fileName,
   fileSize,
   summaryItems = [],
   outputs = [],
-}) => {
+}: FileUploadingViewProps) => {
   const { t, locale } = useI18n();
 
   const displayName = typeof fileName === 'string' && fileName.trim().length > 0 ? fileName.trim() : null;

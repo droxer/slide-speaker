@@ -9,7 +9,7 @@ type ThemeToggleProps = {
   ariaLabel?: string;
 };
 
-const ThemeToggle: React.FC<ThemeToggleProps> = ({className = '', ariaLabel}) => {
+const ThemeToggle = ({className = '', ariaLabel}: ThemeToggleProps) => {
   const {t} = useI18n();
   const {mode, theme, setTheme} = useTheme();
   const [hydrated, setHydrated] = React.useState(false);

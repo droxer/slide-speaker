@@ -1,10 +1,9 @@
+'use client';
+
 import React from 'react';
+import type { ErrorStageProps } from './types';
 
-type ErrorViewProps = {
-  onResetForm: () => void;
-};
-
-const ErrorView: React.FC<ErrorViewProps> = ({ onResetForm }) => {
+const ErrorDisplay = ({ onResetForm }: ErrorStageProps) => {
   return (
     <div className="error-view">
       <div className="error-icon">⚠️</div>
@@ -20,4 +19,4 @@ const ErrorView: React.FC<ErrorViewProps> = ({ onResetForm }) => {
   );
 };
 
-export default ErrorView;
+export default ErrorDisplay;

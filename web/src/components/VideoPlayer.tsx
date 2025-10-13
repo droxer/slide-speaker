@@ -13,7 +13,7 @@ type VideoPlayerProps = {
   onError?: (e: any) => void;
 };
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({
+const VideoPlayer = ({
   src,
   trackUrl,
   trackLang,
@@ -23,7 +23,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   className,
   onReady,
   onError,
-}) => {
+}: VideoPlayerProps) => {
   const [subtitleSrc, setSubtitleSrc] = useState<string | undefined>(trackUrl);
 
   useEffect(() => {

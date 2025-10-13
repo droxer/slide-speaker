@@ -12,7 +12,7 @@ type AudioPlayerProps = {
   className?: string;
 };
 
-const AudioPlayer: React.FC<AudioPlayerProps> = ({
+const AudioPlayer = ({
   src,
   vttUrl,
   initialCues,
@@ -20,7 +20,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   onReady,
   onError,
   className,
-}) => {
+}: AudioPlayerProps) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [cues, setCues] = useState<Cue[]>(initialCues || []);
   const [activeIdx, setActiveIdx] = useState<number | null>(null);

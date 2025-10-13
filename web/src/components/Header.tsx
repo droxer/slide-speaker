@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import GoogleLoginButton from './GoogleLoginButton';
+import LoginButton from './LoginButton';
 import {useSession, signIn, signOut} from 'next-auth/react';
 import {useRouter} from 'next/navigation';
 import {useI18n} from '@/i18n/hooks';
@@ -11,7 +11,7 @@ type HeaderProps = {
   onNavigate: (view: AppView) => void;
 };
 
-const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
+const Header = ({ activeView, onNavigate }: HeaderProps) => {
   const { data: session, status } = useSession();
   const { t, locale } = useI18n();
   const router = useRouter();
@@ -128,7 +128,7 @@ const Header: React.FC<HeaderProps> = ({ activeView, onNavigate }) => {
             </div>
           ) : (
             <div className="auth-buttons">
-              <GoogleLoginButton onClick={() => signIn('google')} label={t('header.login')} />
+              <LoginButton onClick={() => signIn('google')} label={t('header.login')} />
               <button type="button" className="credentials-login-button" onClick={handleCredentialsLogin}>
                 {t('auth.usePassword', undefined, 'Use email & password')}
               </button>

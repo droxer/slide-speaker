@@ -15,10 +15,10 @@ import {
   type UploadPayload,
 } from '@/services/client';
 import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query';
-import {UploadConfiguration} from '@/components/UploadConfiguration';
-import {FileUploadingStage} from '@/components/FileUploadingStage';
-import {TaskProcessingStage} from '@/components/TaskProcessingStage';
-import {ErrorStage} from '@/components/ErrorStage';
+import UploadPanel from '@/components/UploadPanel';
+import FileUploadingView from '@/components/FileUploadingView';
+import TaskProcessingSteps from '@/components/TaskProcessingSteps';
+import ErrorDisplay from '@/components/ErrorDisplay';
 import { showErrorToast } from '@/utils/toast';
 import { validateFile, getFileType, formatFileSize as formatFileSizeUtil } from '@/utils/fileValidation';
 import {getStepLabel} from '@/utils/stepLabels';
@@ -751,7 +751,7 @@ export function StudioWorkspace() {
       <div className="card-container">
         <div className={`content-card ${status === 'completed' ? 'wide' : ''}`}>
           {status === 'idle' && (
-            <UploadConfiguration
+            <UploadPanel
               uploadMode={uploadMode}
               setUploadMode={setUploadMode}
               pdfOutputMode={pdfOutputMode}
@@ -774,7 +774,7 @@ export function StudioWorkspace() {
           )}
 
           {status === 'uploading' && (
-            <FileUploadingStage
+            <FileUploadingView
               progress={progress}
               fileName={file?.name || null}
               fileSize={file?.size ?? null}
@@ -784,18 +784,13 @@ export function StudioWorkspace() {
           )}
 
           {status === 'processing' && processingDetails && (
-            <TaskProcessingStage
-              apiBaseUrl={API_BASE_URL}
+            <TaskProcessingSteps
               taskId={taskId}
               uploadId={uploadId}
               fileName={processingDetails?.filename || file?.name || null}
               progress={progress}
               onStop={handleStopProcessing}
               processingDetails={processingDetails}
-              processingPreviewMode={processingPreviewMode}
-              setProcessingPreviewMode={setProcessingPreviewMode}
-              videoRef={videoRef}
-              audioRef={audioRef}
               formatStepNameWithLanguages={formatStepNameWithLanguages}
             />
           )}
@@ -818,7 +813,7 @@ export function StudioWorkspace() {
             </div>
           )}
 
-          {status === 'error' && <ErrorStage onResetForm={resetForm} />}
+          {status === 'error' && <ErrorDisplay onResetForm={resetForm} />}
         </div>
       </div>
     </div>

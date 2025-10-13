@@ -18,7 +18,7 @@ const formatTS = (t: number): string => {
     : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 };
 
-export const TranscriptList: React.FC<TranscriptListProps> = ({ cues, activeIdx, onSeek, showTimestamps = true }) => {
+export const TranscriptList = ({ cues, activeIdx, onSeek, showTimestamps = true }: TranscriptListProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {

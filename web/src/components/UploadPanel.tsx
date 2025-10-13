@@ -33,7 +33,7 @@ const LANGS = [
   'thai',
 ];
 
-const UploadPanel: React.FC<UploadPanelProps> = ({
+const UploadPanel = ({
   uploadMode,
   setUploadMode,
   pdfOutputMode,
@@ -52,7 +52,7 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
   uploading,
   onCreate,
   getFileTypeHint,
-}) => {
+}: UploadPanelProps) => {
   const { t } = useI18n();
   const subtitleTitle = uploadMode === 'pdf' && pdfOutputMode === 'podcast'
     ? t('runTask.transcriptLanguage')

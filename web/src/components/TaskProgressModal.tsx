@@ -9,7 +9,7 @@ import { useI18n } from '@/i18n/hooks';
 import { sortSteps } from '@/utils/stepOrdering';
 import { useTaskQuery } from '@/services/queries';
 
-type TaskProcessingModalProps = {
+type TaskProgressModalProps = {
   open: boolean;
   task: Task | null;
   onClose: () => void;
@@ -199,12 +199,12 @@ const inferStepsFromTask = (task: Task, state: any) => {
   return steps;
 };
 
-const TaskProcessingModal: React.FC<TaskProcessingModalProps> = ({
+const TaskProgressModal = ({
   open,
   task,
   onClose,
   onCancel,
-}) => {
+}: TaskProgressModalProps) => {
   const { t } = useI18n();
 
   // Use task query with polling for active tasks
@@ -505,4 +505,4 @@ const TaskProcessingModal: React.FC<TaskProcessingModalProps> = ({
   );
 };
 
-export default TaskProcessingModal;
+export default TaskProgressModal;
