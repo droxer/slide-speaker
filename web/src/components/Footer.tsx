@@ -7,7 +7,7 @@ type FooterProps = {
   redisLatencyMs: number | null;
 };
 
-const Footer: React.FC<FooterProps> = ({ queueUnavailable, redisLatencyMs }) => {
+const Footer = ({ queueUnavailable, redisLatencyMs }: FooterProps) => {
   const { t } = useI18n();
   const systemStatusLabel = queueUnavailable ? t('footer.queueUnavailable') : t('footer.queueOk');
   

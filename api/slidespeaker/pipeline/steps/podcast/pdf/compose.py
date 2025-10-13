@@ -13,6 +13,7 @@ from loguru import logger
 
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.core.state_manager import state_manager
+from slidespeaker.storage.paths import output_storage_uri
 
 
 def _concat_with_ffmpeg(inputs: list[str], output_mp3: str) -> bool:
@@ -64,9 +65,14 @@ async def compose_podcast_step(file_id: str) -> None:
         )
         return
 
-    out_dir = config.output_dir
-    out_dir.mkdir(parents=True, exist_ok=True)
-    podcast_path = out_dir / f"{file_id}_podcast.mp3"
+    base_id, storage_key, storage_uri = output_storage_uri(
+        file_id,
+        state=st if isinstance(st, dict) else None,
+        segments=("podcast", "final.mp3"),
+    )
+    podcast_dir = config.output_dir / "/".join(storage_key.split("/")[:-1])
+    podcast_dir.mkdir(parents=True, exist_ok=True)
+    podcast_path = config.output_dir / storage_key
 
     ok = _concat_with_ffmpeg(segments, str(podcast_path))
     if not ok:
@@ -75,26 +81,11 @@ async def compose_podcast_step(file_id: str) -> None:
         )
         raise RuntimeError("Podcast composition failed")
 
-    # Upload to storage (prefer task-id naming)
+    # Upload to storage (using same base_id as local file)
     url = None
     try:
         sp = get_storage_provider()
-        base_id = file_id
-        # Prefer state.task_id
-        if st and isinstance(st, dict) and st.get("task_id"):
-            base_id = str(st["task_id"])  # prefer task-id naming
-        else:
-            # Try Redis mapping file->task
-            try:
-                task_id_hint = await state_manager.redis_client.get(
-                    state_manager._get_file2task_key(file_id)
-                )
-                if task_id_hint:
-                    base_id = str(task_id_hint)
-            except Exception:
-                pass
-        object_key = f"{base_id}.mp3"
-        url = sp.upload_file(str(podcast_path), object_key, "audio/mpeg")
+        url = sp.upload_file(str(podcast_path), storage_key, "audio/mpeg")
     except Exception as e:
         logger.warning(f"Podcast upload failed: {e}")
 
@@ -102,5 +93,21 @@ async def compose_podcast_step(file_id: str) -> None:
         file_id,
         "compose_podcast",
         "completed",
-        {"podcast_file": str(podcast_path), "storage_url": url},
+        {
+            "podcast_file": str(podcast_path),
+            "storage_url": url,
+            "storage_key": storage_key,
+            "storage_uri": storage_uri,
+        },
     )
+
+    if st and isinstance(st, dict):
+        artifacts = dict(st.get("artifacts") or {})
+        artifacts["podcast_audio"] = {
+            "local_path": str(podcast_path),
+            "storage_key": storage_key,
+            "storage_uri": storage_uri,
+            "content_type": "audio/mpeg",
+        }
+        st["artifacts"] = artifacts
+        await state_manager.save_state(file_id, st)

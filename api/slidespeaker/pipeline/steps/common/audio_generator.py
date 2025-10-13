@@ -13,6 +13,7 @@ from loguru import logger
 from slidespeaker.audio import AudioGenerator
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.core.state_manager import state_manager
+from slidespeaker.storage.paths import output_storage_uri
 
 
 async def generate_audio_common(
@@ -111,17 +112,17 @@ async def generate_audio_common(
     try:
         if audio_files:
             storage_provider = get_storage_provider()
-            # Prefer task-id naming for the final audio when available
-            state = await state_manager.get_state(file_id)
-            task_id = None
-            if state and isinstance(state, dict):
-                task_id = state.get("task_id") or (state.get("task") or {}).get(
-                    "task_id"
-                )
-            base = task_id if isinstance(task_id, str) and task_id else file_id
+            # Resolve output storage location (task-first when available)
+            base_id, storage_key, storage_uri = output_storage_uri(
+                file_id,
+                state=state if isinstance(state, dict) else None,
+                segments=("audio", "final.mp3"),
+            )
 
-            # Concatenate files into a single MP3
-            final_local_path = config.output_dir / f"{base}.mp3"
+            # Concatenate files into a single MP3 under output dir (task-organized)
+            local_dir = config.output_dir / "/".join(storage_key.split("/")[:-1])
+            local_dir.mkdir(parents=True, exist_ok=True)
+            final_local_path = config.output_dir / storage_key
             with open(final_local_path, "wb") as outfile:
                 for ap in audio_files:
                     with open(ap, "rb") as infile:
@@ -132,7 +133,6 @@ async def generate_audio_common(
                             outfile.write(chunk)
 
             # Upload to storage with task-id-based key when possible
-            storage_key = f"{base}.mp3"
             storage_provider.upload_file(
                 str(final_local_path), storage_key, "audio/mpeg"
             )
@@ -161,6 +161,18 @@ async def generate_audio_common(
                 logger.warning(
                     f"Final audio upload could not be verified yet: {storage_key}. Using local fallback."
                 )
+
+            # Persist artifact metadata in state for downstream consumers
+            if state and isinstance(state, dict):
+                artifacts = dict(state.get("artifacts") or {})
+                artifacts["final_audio"] = {
+                    "local_path": str(final_local_path),
+                    "storage_key": storage_key,
+                    "storage_uri": storage_uri,
+                    "content_type": "audio/mpeg",
+                }
+                state["artifacts"] = artifacts
+                await state_manager.save_state(file_id, state)
     except Exception as e:
         # Non-fatal; streaming fallback in downloads will still work
         logger.error(f"Failed to create/upload final audio: {e}")

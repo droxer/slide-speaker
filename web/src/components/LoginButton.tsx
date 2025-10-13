@@ -1,28 +1,23 @@
 import React from "react";
-interface GoogleLoginButtonProps {
+interface LoginButtonProps {
   onClick: () => void;
   disabled?: boolean;
   label: string;
   className?: string;
 }
 
-const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
-  onClick,
-  disabled = false,
-  label,
-  className,
-}) => {
+const LoginButton = ({ onClick, disabled = false, label, className }: LoginButtonProps) => {
   return (
     <button
       type="button"
-      className={`google-login-button${className ? ` ${className}` : ''}`}
+      className={`login-button${className ? ` ${className}` : ''}`}
       onClick={onClick}
       disabled={disabled}
       aria-label={label}
     >
-      <div className="google-icon-wrapper">
+      <div className="login-icon-wrapper">
         <svg
-          className="google-icon"
+          className="login-icon"
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 48 48"
           width="18px"
@@ -46,9 +41,9 @@ const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({
           />
         </svg>
       </div>
-      <span className="google-button-text">{label}</span>
+      <span className="login-button-text">{label}</span>
     </button>
   );
 };
 
-export default GoogleLoginButton;
+export default LoginButton;

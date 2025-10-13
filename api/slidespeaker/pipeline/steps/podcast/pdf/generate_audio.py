@@ -53,7 +53,17 @@ async def generate_podcast_audio_step(file_id: str, language: str = "english") -
     if not dialogue:
         logger.warning("No podcast dialogue found; skipping audio generation")
         await state_manager.update_step_status(
-            file_id, "generate_podcast_audio", "completed", []
+            file_id,
+            "generate_podcast_audio",
+            "completed",
+            {
+                "segments": [],
+                "storage_urls": [],
+                "host_voice": None,
+                "guest_voice": None,
+                "dialogue": [],
+                "dialogue_language": language,
+            },
         )
         return
 
@@ -95,5 +105,7 @@ async def generate_podcast_audio_step(file_id: str, language: str = "english") -
             "storage_urls": uploaded_urls,
             "host_voice": host_voice,
             "guest_voice": guest_voice,
+            "dialogue": dialogue,
+            "dialogue_language": language,
         },
     )

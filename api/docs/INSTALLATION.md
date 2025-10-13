@@ -6,9 +6,9 @@
 - Redis server
 - FFmpeg
 - API keys for:
-  - OpenAI (for transcript generation)
+  - OpenAI (for transcript generation, translation, and image generation)
   - ElevenLabs or OpenAI TTS (for audio generation)
-  - HeyGen or DALL-E (for avatar generation)
+  - HeyGen (for avatar generation)
 
 ## Backend Setup
 
@@ -252,31 +252,34 @@ Recent improvements include memory-efficient video composition to prevent hangin
 
 The application supports multiple AI service providers. You can configure which services to use:
 
-- **Transcript Generation:**
+#### Transcript Generation
 - Provider: `SCRIPT_PROVIDER=openai`
-- OpenAI: Set `OPENAI_API_KEY` and `SCRIPT_GENERATOR_MODEL`
-  Qwen removed: use `OPENAI_SCRIPT_MODEL`
+- OpenAI: Set `OPENAI_API_KEY` and `OPENAI_SCRIPT_MODEL`
 
-**Text-to-Speech:**
+#### Text-to-Speech
 - Provider: `TTS_SERVICE=openai|elevenlabs`
 - OpenAI TTS: Uses `OPENAI_API_KEY`, `OPENAI_TTS_MODEL`, `OPENAI_TTS_VOICE`
 - ElevenLabs: Set `ELEVENLABS_API_KEY` and optional `ELEVENLABS_VOICE_ID`
-  Qwen TTS removed
 
-- **Reviewer:**
+#### Review and Revision
 - Provider: `REVIEW_PROVIDER=openai`
-- OpenAI: Set `OPENAI_API_KEY`, `SCRIPT_REVIEWER_MODEL`
-  Qwen reviewer removed
+- OpenAI: Set `OPENAI_API_KEY`, `OPENAI_REVIEW_MODEL`
 
-**Vision:**
+#### Vision Analysis
 - Provider: `VISION_PROVIDER=openai`
 - OpenAI: Set `OPENAI_API_KEY`, `OPENAI_VISION_MODEL`
-  Qwen vision removed
 
-**Avatar Generation / Images:**
+#### PDF Analysis
+- Provider: `PDF_ANALYZER_PROVIDER=openai`
+- OpenAI: Set `OPENAI_API_KEY`, `OPENAI_PDF_ANALYZER_MODEL`
+
+#### Image Generation
 - HeyGen: Set `HEYGEN_API_KEY` for realistic AI presenters
 - OpenAI Images: Uses `OPENAI_API_KEY` with `OPENAI_IMAGE_MODEL`; set `IMAGE_PROVIDER=openai`
-- Qwen Images removed; use `OPENAI_IMAGE_MODEL` with `IMAGE_PROVIDER=openai`
+
+#### Translation
+- Provider: `TRANSLATION_PROVIDER=openai`
+- OpenAI: Set `OPENAI_API_KEY`, `OPENAI_TRANSLATION_MODEL`
 
 ### TTS and LLM Catalog Endpoints
 - List TTS voices: `GET /api/tts/voices?language=english[&provider=openai|elevenlabs]`

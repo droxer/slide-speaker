@@ -14,7 +14,7 @@ class TestHealthEndpoints:
         """Test successful health check."""
         with (
             patch(
-                "slidespeaker.routes.health.RedisConfig.get_redis_client"
+                "slidespeaker.routes.health_routes.RedisConfig.get_redis_client"
             ) as mock_redis,
             patch("slidespeaker.configs.db.get_session") as mock_db,
         ):
@@ -40,7 +40,7 @@ class TestHealthEndpoints:
         """Test health check when Redis is unavailable."""
         with (
             patch(
-                "slidespeaker.routes.health.RedisConfig.get_redis_client"
+                "slidespeaker.routes.health_routes.RedisConfig.get_redis_client"
             ) as mock_redis,
             patch("slidespeaker.configs.db.get_session") as mock_db,
         ):
@@ -66,7 +66,7 @@ class TestHealthEndpoints:
         """Test health check when database is unavailable."""
         with (
             patch(
-                "slidespeaker.routes.health.RedisConfig.get_redis_client"
+                "slidespeaker.routes.health_routes.RedisConfig.get_redis_client"
             ) as mock_redis,
             patch("slidespeaker.configs.db.get_session") as mock_db,
         ):

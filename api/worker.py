@@ -144,7 +144,7 @@ async def process_task(task_id: str) -> str:
         voice_language = kwargs.get("voice_language", "english")
         subtitle_language = kwargs.get("subtitle_language")
         transcript_language = kwargs.get("transcript_language")
-        generate_avatar = kwargs.get("generate_avatar", True)
+        generate_avatar = kwargs.get("generate_avatar", False)
         generate_subtitles = True  # Always generate subtitles
         generate_podcast = kwargs.get("generate_podcast", False)
         generate_video = kwargs.get("generate_video", True)
@@ -250,7 +250,18 @@ async def process_file_purge_task(task_id: str, task: dict[str, Any]) -> bool:
         # Import and use file purger
         from slidespeaker.jobs.file_purger import file_purger
 
-        await file_purger.purge_task_files(file_id)
+        storage_keys = kwargs.get("storage_keys")
+        local_paths = kwargs.get("local_paths")
+        target_task_id = kwargs.get("target_task_id")
+        file_ext = kwargs.get("file_ext")
+
+        await file_purger.purge_task_files(
+            file_id,
+            storage_keys=storage_keys,
+            local_paths=local_paths,
+            target_task_id=target_task_id,
+            file_ext=file_ext,
+        )
 
         # Mark task as completed
         await task_queue.update_task_status(task_id, "completed")

@@ -10,7 +10,7 @@ help:
 	@echo "SlideSpeaker Web - Makefile Commands"
 	@echo "================================"
 	@echo "make install     - Install dependencies (uses pnpm if available, falls back to npm)"
-	@echo "make dev         - Start Next.js development server"
+	@echo "make web         - Start Next.js development server"
 	@echo "make build       - Build production version"
 	@echo "make start       - Start production server"
 	@echo "make lint        - Run ESLint code linting"
@@ -31,8 +31,8 @@ install:
 	fi
 
 # Development server
-.PHONY: dev
-dev:
+.PHONY: web
+web:
 	@if command -v pnpm >/dev/null 2>&1; then \
 		pnpm dev; \
 	else \

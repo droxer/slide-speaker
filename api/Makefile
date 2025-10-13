@@ -18,9 +18,9 @@ help:
 	@echo "SlideSpeaker API - Makefile Commands"
 	@echo "=================================="
 	@echo "make install     - Install dependencies"
-	@echo "make dev         - Start development server (auto-reload)"
+	@echo "make api         - Start development server (auto-reload)"
 	@echo "make start       - Start production server"
-	@echo "make master-worker - Start master worker (automatically manages multiple workers)"
+	@echo "make worker      - Start worker (automatically manages multiple workers)"
 	@echo "make cli         - Show CLI tool help"
 	@echo "make db-upgrade   - Alembic upgrade to head (requires DATABASE_URL)"
 	@echo "make db-downgrade - Alembic downgrade one step (requires DATABASE_URL)"
@@ -48,8 +48,8 @@ install_dev:
 
 
 # Development server
-.PHONY: dev
-dev: install_dev
+.PHONY: api
+api: install_dev
 	$(UVICORN) server:app --host 0.0.0.0 --port 8000 --reload
 
 # Production server
@@ -58,8 +58,8 @@ start: install
 	$(UVICORN) server:app --host 0.0.0.0 --port 8000
 
 # Master worker (automatically spawns/manages multiple worker processes)
-.PHONY: master-worker
-master-worker: install_dev
+.PHONY: worker
+worker: install_dev
 	$(PYTHON) master_worker.py
 
 # CLI tool

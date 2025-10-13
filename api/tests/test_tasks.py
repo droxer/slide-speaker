@@ -8,7 +8,7 @@ from fastapi import Request
 from fastapi.testclient import TestClient
 
 from server import app
-from slidespeaker.routes.tasks import require_authenticated_user
+from slidespeaker.routes.task_routes import require_authenticated_user
 
 
 class TestTasksEndpoints:
@@ -23,7 +23,9 @@ class TestTasksEndpoints:
         assert response.status_code == 401
 
     @patch("slidespeaker.repository.task.get_task", new_callable=AsyncMock)
-    @patch("slidespeaker.routes.tasks.task_queue.get_task", new_callable=AsyncMock)
+    @patch(
+        "slidespeaker.routes.task_routes.task_queue.get_task", new_callable=AsyncMock
+    )
     def test_get_task_status_success(
         self,
         mock_get_task: AsyncMock,
@@ -43,7 +45,7 @@ class TestTasksEndpoints:
             "status": "processing",
             "progress": 50,
             "current_step": "generating_audio",
-            "owner_id": "test-user-id",
+            "user_id": "test-user-id",
         }
         mock_get_task.return_value = mock_task_data
 
@@ -65,7 +67,9 @@ class TestTasksEndpoints:
         mock_db_get_task.assert_not_awaited()
 
     @patch("slidespeaker.repository.task.get_task", new_callable=AsyncMock)
-    @patch("slidespeaker.routes.tasks.task_queue.get_task", new_callable=AsyncMock)
+    @patch(
+        "slidespeaker.routes.task_routes.task_queue.get_task", new_callable=AsyncMock
+    )
     def test_get_task_status_not_found(
         self,
         mock_get_task: AsyncMock,
@@ -99,7 +103,9 @@ class TestTasksEndpoints:
         mock_db_get_task.assert_awaited_once_with("non-existent-task")
 
     @patch("slidespeaker.repository.task.get_task", new_callable=AsyncMock)
-    @patch("slidespeaker.routes.tasks.task_queue.cancel_task", new_callable=AsyncMock)
+    @patch(
+        "slidespeaker.routes.task_routes.task_queue.cancel_task", new_callable=AsyncMock
+    )
     def test_cancel_task_success(
         self,
         mock_cancel_task: AsyncMock,
@@ -117,7 +123,7 @@ class TestTasksEndpoints:
         mock_cancel_task.return_value = True
         mock_db_get_task.return_value = {
             "id": "test-task-id",
-            "owner_id": "test-user-id",
+            "user_id": "test-user-id",
         }
 
         try:

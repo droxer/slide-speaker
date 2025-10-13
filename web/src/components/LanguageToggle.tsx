@@ -20,7 +20,7 @@ const localeLabels: Record<string, string> = {
   'zh-TW': 'language.traditional',
 };
 
-const LanguageToggle: React.FC = () => {
+const LanguageToggle = () => {
   const locale = useLocale();
   const t = useTranslations();
   const router = useRouter();

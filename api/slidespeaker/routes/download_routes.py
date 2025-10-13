@@ -10,8 +10,9 @@ from typing import Any
 from fastapi import APIRouter, Depends
 
 from slidespeaker.auth import require_authenticated_user
+from slidespeaker.storage.paths import output_object_key
 
-from .download_utils import file_id_from_task, final_audio_object_keys
+from .download_helpers import file_id_from_task, final_audio_object_keys
 
 router = APIRouter(
     prefix="/api",
@@ -27,7 +28,7 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
     Includes video (inline and download), audio (inline and download),
     subtitles (available locales and formats), and transcript markdown.
     """
-    from .shared_download_utils import check_file_exists
+    from .download_helpers import check_file_exists
 
     file_id = await file_id_from_task(task_id)
     items: list[dict[str, Any]] = []
@@ -60,11 +61,19 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
             pass
 
     # Video - only for non-podcast tasks
-    if task_type != "podcast" and (
-        check_file_exists(f"{task_id}.mp4")
-        or check_file_exists(f"{file_id}.mp4")
-        or check_file_exists(f"{file_id}_final.mp4")
-    ):
+    if task_type != "podcast":
+        video_candidates = [
+            output_object_key(task_id, "video", "final.mp4"),
+            output_object_key(file_id, "video", "final.mp4"),
+            f"{task_id}.mp4",
+            f"{file_id}.mp4",
+            f"{file_id}_final.mp4",
+        ]
+        video_exists = any(check_file_exists(k) for k in video_candidates)
+    else:
+        video_exists = False
+
+    if video_exists:
         items.append(
             {
                 "type": "video",
@@ -77,7 +86,7 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
     if task_type != "podcast":
         audio_exists = any(
             check_file_exists(k)
-            for k in ([f"{task_id}.mp3"] + final_audio_object_keys(file_id))
+            for k in final_audio_object_keys(file_id, task_id=task_id)
         )
         if audio_exists:
             items.append(
@@ -90,8 +99,10 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
 
     # Podcast MP3 (for podcast-only tasks) - use different endpoint
     if task_type == "podcast":
-        # Prefer {task_id}.mp3, fallback to {file_id}.mp3; keep legacy *_podcast.mp3 for old tasks
+        # Prefer structured outputs, fallback to legacy keys
         podcast_keys = [
+            output_object_key(task_id, "podcast", "final.mp3"),
+            output_object_key(file_id, "podcast", "final.mp3"),
             f"{task_id}.mp3",
             f"{file_id}.mp3",
             f"{task_id}_podcast.mp3",
@@ -143,16 +154,35 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
                             preferred_locales.append(m.group(1))
                 except Exception:
                     pass
+                # Include locales referenced in structured artifacts map
+                try:
+                    artifacts = st.get("artifacts") or {}
+                    subtitle_artifacts = (
+                        artifacts.get("subtitles")
+                        if isinstance(artifacts, dict)
+                        else {}
+                    )
+                    if isinstance(subtitle_artifacts, dict):
+                        for loc_code in subtitle_artifacts:
+                            if isinstance(loc_code, str) and loc_code:
+                                preferred_locales.append(loc_code)
+                except Exception:
+                    pass
         except Exception:
             pass
 
     # Check for existing subtitle files
     seen_locales: set[str] = set()
     for loc in preferred_locales:
-        # Task-id-based keys only
-        if check_file_exists(f"{task_id}_{loc}.vtt") or check_file_exists(
-            f"{task_id}_{loc}.srt"
-        ):
+        subtitle_candidates = [
+            output_object_key(task_id, "subtitles", f"{loc}.vtt"),
+            output_object_key(task_id, "subtitles", f"{loc}.srt"),
+            output_object_key(file_id, "subtitles", f"{loc}.vtt"),
+            output_object_key(file_id, "subtitles", f"{loc}.srt"),
+            f"{task_id}_{loc}.vtt",
+            f"{task_id}_{loc}.srt",
+        ]
+        if any(check_file_exists(k) for k in subtitle_candidates):
             seen_locales.add(loc)
 
     # Add subtitle items
@@ -160,8 +190,7 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
         # VTT
         items.append(
             {
-                "type": "subtitles",
-                "format": "vtt",
+                "type": "vtt_subtitles",
                 "language": loc,
                 "url": f"/api/tasks/{task_id}/subtitles/vtt?language={loc}",
                 "download_url": f"/api/tasks/{task_id}/subtitles/vtt/download?language={loc}",
@@ -170,8 +199,7 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
         # SRT
         items.append(
             {
-                "type": "subtitles",
-                "format": "srt",
+                "type": "srt_subtitles",
                 "language": loc,
                 "url": f"/api/tasks/{task_id}/subtitles/srt?language={loc}",
                 "download_url": f"/api/tasks/{task_id}/subtitles/srt/download?language={loc}",
@@ -187,11 +215,3 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
     )
 
     return {"task_id": task_id, "file_id": file_id, "items": items}
-
-
-# Legacy endpoints (removed - use the new modular endpoints instead)
-# All endpoints have been moved to their respective modules:
-# - Video endpoints: video_downloads.py
-# - Audio endpoints: audio_downloads.py
-# - Subtitle endpoints: subtitle_downloads.py
-# - Podcast endpoints: podcast_downloads.py

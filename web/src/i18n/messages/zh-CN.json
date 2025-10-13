@@ -103,7 +103,8 @@
       "failed": "失败",
       "cancelled": "已取消",
       "pending": "待处理",
-      "skipped": "已跳过"
+      "skipped": "已跳过",
+      "upload_only": "上传就绪"
     },
     "cancelled": {
       "description": "任务已成功取消。"
@@ -140,11 +141,13 @@
   "actions": {
     "copy": "复制",
     "openPreview": "打开预览",
+    "open": "打开",
     "generateVideo": "生成视频",
     "generatePodcast": "生成播客",
     "generate": "生成",
     "generating": "正在生成…",
     "cancel": "取消",
+    "delete": "删除",
     "close": "关闭",
     "createAnother": "创建另一个"
   },
@@ -182,6 +185,11 @@
     "status": {
       "all": "全部状态"
     }
+  },
+  "common": {
+    "latest": "最新",
+    "more": "更多",
+    "unknown": "未知"
   },
   "runTask": {
     "adjustHint": "调整生成选项后点击\"生成\"。",
@@ -227,12 +235,19 @@
     "title": "作品库",
     "summary": "{files} 个文件 · {creations} 个作品 · {running} 个运行中",
     "empty": "暂无任务",
+    "upload": {
+      "placeholder": "文件已上传。立即生成新作品。"
+    },
     "file": {
       "idChip": "ID {id}",
+      "taskGroupLabel": "该上传的任务",
+      "taskListTitle": "任务 ({count})",
       "count": {
         "one": "{count} 个作品",
         "other": "{count} 个作品"
-      }
+      },
+      "collapse": "收起详情",
+      "expand": "展开详情"
     },
     "toast": {
       "taskCreated": "任务已创建：{id}",
@@ -347,7 +362,11 @@
     "summary": {
       "file": "文件",
       "size": "大小",
-      "output": "输出"
+      "output": "输出",
+      "status": "状态",
+      "uploading": "上传中",
+      "type": "类型",
+      "documentType": "文档类型"
     }
   },
   "footer": {

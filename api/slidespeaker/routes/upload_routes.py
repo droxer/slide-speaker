@@ -22,9 +22,15 @@ from starlette.datastructures import UploadFile as StarletteUploadFile
 
 from slidespeaker.auth import extract_user_id, require_authenticated_user
 from slidespeaker.configs.config import config
+from slidespeaker.configs.db import db_enabled
 from slidespeaker.configs.locales import locale_utils
 from slidespeaker.core.monitoring import monitor_endpoint
 from slidespeaker.core.task_queue import task_queue
+from slidespeaker.repository.upload import (
+    list_uploads_for_user,
+    upsert_upload,
+)
+from slidespeaker.storage.paths import upload_storage_uri
 
 # Create a rate limiter for this router
 limiter = Limiter(key_func=get_remote_address)
@@ -196,7 +202,7 @@ async def _parse_upload_payload(request: Request) -> dict[str, Any]:
             ),
             "video_resolution": _coerce_optional_str(form.get("video_resolution"))
             or "hd",
-            "generate_avatar": _coerce_bool(form.get("generate_avatar"), True),
+            "generate_avatar": _coerce_bool(form.get("generate_avatar"), False),
             "generate_subtitles": _coerce_bool(form.get("generate_subtitles"), True),
             "generate_podcast": _coerce_bool(form.get("generate_podcast"), False),
             "generate_video": _coerce_bool(form.get("generate_video"), True),
@@ -240,13 +246,25 @@ async def _parse_upload_payload(request: Request) -> dict[str, Any]:
         "subtitle_language": _coerce_optional_str(body.get("subtitle_language")),
         "transcript_language": _coerce_optional_str(body.get("transcript_language")),
         "video_resolution": _coerce_optional_str(body.get("video_resolution")) or "hd",
-        "generate_avatar": _coerce_bool(body.get("generate_avatar"), True),
+        "generate_avatar": _coerce_bool(body.get("generate_avatar"), False),
         "generate_subtitles": _coerce_bool(body.get("generate_subtitles"), True),
         "generate_podcast": _coerce_bool(body.get("generate_podcast"), False),
         "generate_video": _coerce_bool(body.get("generate_video"), True),
         "task_type": _coerce_optional_str(body.get("task_type")),
         "source_type": _coerce_optional_str(body.get("source_type")),
     }
+
+
+@router.get("/uploads")
+async def list_uploads(
+    current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
+) -> dict[str, Any]:
+    """List uploads for the authenticated user."""
+    user_id = extract_user_id(current_user)
+    if not user_id:
+        raise HTTPException(status_code=403, detail="user session missing id")
+    uploads = await list_uploads_for_user(user_id)
+    return {"uploads": uploads}
 
 
 @router.post("/upload")
@@ -258,12 +276,13 @@ async def upload_file(
 ) -> dict[str, str | None]:
     """Upload a presentation file and start processing."""
     try:
-        owner_id = extract_user_id(current_user)
-        if not owner_id:
+        user_id = extract_user_id(current_user)
+        if not user_id:
             raise HTTPException(status_code=403, detail="user session missing id")
         payload = await _parse_upload_payload(request)
         filename = payload["filename"]
         file_bytes = payload["file_bytes"]
+        file_size = len(file_bytes)
 
         # Normalize incoming languages to internal keys
         raw_voice_language = payload.get("voice_language", "english")
@@ -281,7 +300,7 @@ async def upload_file(
             else None
         )
         video_resolution = payload.get("video_resolution", "hd")  # Default to HD
-        generate_avatar = payload.get("generate_avatar", True)  # Default to True
+        generate_avatar = payload.get("generate_avatar", False)  # Default to False
         generate_subtitles = payload.get("generate_subtitles", True)
         generate_podcast = payload.get("generate_podcast", False)
         generate_video = payload.get("generate_video", True)
@@ -351,10 +370,30 @@ async def upload_file(
                 f"Valid options: {', '.join(valid_resolutions)}",
             )
 
+        if file_ext == ".pdf":
+            content_type = "application/pdf"
+        elif file_ext == ".pptx":
+            content_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        elif file_ext == ".ppt":
+            content_type = "application/vnd.ms-powerpoint"
+        elif file_ext == ".mp3":
+            content_type = "audio/mpeg"
+        elif file_ext == ".wav":
+            content_type = "audio/wav"
+        elif file_ext == ".m4a":
+            content_type = "audio/mp4"
+        elif file_ext == ".aac":
+            content_type = "audio/aac"
+        elif file_ext == ".flac":
+            content_type = "audio/flac"
+        else:
+            content_type = None
+
         # Generate hash-based ID
         file_hash = hashlib.sha256(file_bytes).hexdigest()
         file_id = file_hash[:16]  # Use first 16 chars of hash
         file_path = UPLOAD_DIR / f"{file_id}{file_ext}"
+        storage_object_key, storage_uri = upload_storage_uri(file_id, file_ext)
 
         # Write file to disk
         await run_in_threadpool(file_path.write_bytes, file_bytes)
@@ -362,23 +401,30 @@ async def upload_file(
         # Persist original to storage for future reruns
         try:
             sp = config.get_storage_provider()
-            object_key = f"uploads/{file_id}{file_ext}"
-            # Infer a reasonable content-type
-            content_type = (
-                "application/pdf"
-                if file_ext == ".pdf"
-                else (
-                    "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                    if file_ext == ".pptx"
-                    else (
-                        "application/vnd.ms-powerpoint" if file_ext == ".ppt" else None
-                    )
-                )
+            sp.upload_file(
+                str(file_path), storage_object_key, content_type=content_type
             )
-            sp.upload_file(str(file_path), object_key, content_type=content_type)
         except Exception as e:
             # Non-fatal: log and continue
             logger.warning(f"Failed to upload original to storage: {e}")
+
+        if db_enabled:
+            try:
+                await upsert_upload(
+                    file_id=file_id,
+                    user_id=user_id,
+                    filename=filename,
+                    file_ext=file_ext,
+                    source_type=source_type,
+                    content_type=content_type,
+                    checksum=file_hash,
+                    size_bytes=file_size,
+                    storage_path=storage_uri,
+                )
+            except Exception as exc:
+                logger.warning(
+                    f"Failed to persist upload metadata for {file_id}: {exc}"
+                )
 
         # Normalize task_type and flags consistently
         # Prefer explicit task_type from request body when present; otherwise derive from flags
@@ -408,12 +454,17 @@ async def upload_file(
         # Submit task to Redis task queue (state management is handled internally)
         task_id = await task_queue.submit_task(
             task_type,
-            owner_id=owner_id,
+            user_id=user_id,
             file_id=file_id,
             file_path=str(file_path),
             file_ext=file_ext,
             filename=filename,
             source_type=source_type,
+            checksum=file_hash,
+            file_size=file_size,
+            content_type=content_type,
+            storage_object_key=storage_object_key,
+            storage_uri=storage_uri,
             voice_language=voice_language,
             subtitle_language=subtitle_language,
             transcript_language=transcript_language,

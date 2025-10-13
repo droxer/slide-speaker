@@ -51,24 +51,24 @@ async def get_task_status(
     current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
 ) -> dict[str, Any]:
     """Get task status by ID."""
-    owner_id = extract_user_id(current_user)
-    if not owner_id:
+    user_id = extract_user_id(current_user)
+    if not user_id:
         raise HTTPException(status_code=403, detail="user session missing id")
 
     task_status = await task_queue.get_task(task_id)
     if task_status:
-        task_owner = task_status.get("owner_id")
-        if task_owner and task_owner != owner_id:
+        task_owner = task_status.get("user_id")
+        if task_owner and task_owner != user_id:
             raise HTTPException(status_code=404, detail="Task not found")
-    if not task_status or not task_status.get("owner_id"):
+    if not task_status or not task_status.get("user_id"):
         from slidespeaker.repository.task import get_task as db_get_task
 
         row = await db_get_task(task_id)
-        if not row or row.get("owner_id") != owner_id:
+        if not row or row.get("user_id") != user_id:
             raise HTTPException(status_code=404, detail="Task not found")
         if not task_status:
             return row
-        task_status["owner_id"] = owner_id
+        task_status["user_id"] = user_id
 
     return task_status
 
@@ -82,14 +82,14 @@ async def cancel_task(
     current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
 ) -> dict[str, str]:
     """Cancel a task."""
-    owner_id = extract_user_id(current_user)
-    if not owner_id:
+    user_id = extract_user_id(current_user)
+    if not user_id:
         raise HTTPException(status_code=403, detail="user session missing id")
 
     from slidespeaker.repository.task import get_task as db_get_task
 
     row = await db_get_task(task_id)
-    if not row or row.get("owner_id") != owner_id:
+    if not row or row.get("user_id") != user_id:
         raise HTTPException(status_code=404, detail="Task not found")
 
     try:
@@ -119,9 +119,9 @@ async def delete_task(
 ) -> dict[str, str]:
     """Delete a task and its associated files from database and storage."""
     logger.info(f"delete_task called with task_id: {task_id}")
-    owner_id = extract_user_id(current_user)
-    logger.info(f"Owner ID: {owner_id}")
-    if not owner_id:
+    user_id = extract_user_id(current_user)
+    logger.info(f"User ID: {user_id}")
+    if not user_id:
         logger.error("User session missing ID")
         raise HTTPException(status_code=403, detail="user session missing id")
 
@@ -129,14 +129,34 @@ async def delete_task(
     logger.info(f"Fetching task {task_id} from database")
     row = await db_get_task(task_id)
     logger.info(f"Database row for task {task_id}: {row}")
-    if not row or row.get("owner_id") != owner_id:
-        logger.error(f"Task {task_id} not found or doesn't belong to user {owner_id}")
+    if not row or row.get("user_id") != user_id:
+        logger.error(f"Task {task_id} not found or doesn't belong to user {user_id}")
         raise HTTPException(status_code=404, detail="Task not found")
 
     try:
         # Get the file_id to delete associated files
         file_id = row.get("file_id")
         logger.info(f"File ID for task {task_id}: {file_id}")
+
+        collected_storage_keys: set[str] = set()
+        collected_local_paths: set[str] = set()
+        if file_id:
+            try:
+                (
+                    collected_storage_keys,
+                    collected_local_paths,
+                ) = await file_purger.collect_artifacts(
+                    file_id,
+                    task_id=task_id,
+                    file_ext=row.get("file_ext"),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to collect artifacts prior to purge (task_id=%s, file_id=%s): %s",
+                    task_id,
+                    file_id,
+                    exc,
+                )
 
         # Step 1: Cancel the task in the queue first
         logger.info(f"Cancelling task {task_id} in queue")
@@ -218,7 +238,13 @@ async def delete_task(
         # Step 4: Trigger asynchronous deletion from storage
         if file_id:
             try:
-                await file_purger.enqueue_file_purge(file_id)
+                await file_purger.enqueue_file_purge(
+                    file_id,
+                    target_task_id=task_id,
+                    file_ext=row.get("file_ext"),
+                    storage_keys=collected_storage_keys,
+                    local_paths=collected_local_paths,
+                )
                 logger.info(f"Enqueued file purge for file_id: {file_id}")
             except Exception as e:
                 logger.error(f"Error enqueuing file purge for task {task_id}: {e}")
@@ -261,8 +287,8 @@ async def get_tasks(
     """DB-backed task list. Uses repository; no Redis scanning."""
     """DB-backed task list. Uses repository; no Redis scanning."""
 
-    owner_id = extract_user_id(current_user)
-    if not owner_id:
+    user_id = extract_user_id(current_user)
+    if not user_id:
         return {
             "tasks": [],
             "total": 0,
@@ -272,7 +298,7 @@ async def get_tasks(
         }
 
     db_res = await db_list_tasks(
-        limit=limit, offset=offset, status=status, owner_id=owner_id
+        limit=limit, offset=offset, status=status, user_id=user_id
     )
     return {
         "tasks": db_res["tasks"],
@@ -281,49 +307,6 @@ async def get_tasks(
         "offset": offset,
         "has_more": (db_res["total"] > offset + limit),
     }
-
-
-@router.get("/tasks/db/{task_id}")
-@limiter.limit("30/minute")  # Limit to 30 task detail requests per minute per IP
-@monitor_endpoint
-async def get_task_db(
-    task_id: str,
-    request: Request,
-    current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
-) -> dict[str, Any]:
-    """DB-only task fetch (no Redis/queue)."""
-    owner_id = extract_user_id(current_user)
-    if not owner_id:
-        raise HTTPException(status_code=403, detail="user session missing id")
-
-    row = await db_get_task(task_id)
-    if not row or row.get("owner_id") != owner_id:
-        return {"error": "not_found", "task_id": task_id}
-    return row
-
-
-@router.delete("/tasks/db/{task_id}")
-@limiter.limit("10/minute")  # Limit to 10 task deletions per minute per IP
-@monitor_endpoint
-async def delete_task_db(
-    task_id: str,
-    request: Request,
-    current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
-) -> dict[str, Any]:
-    """DB-only delete for a task row (does not touch Redis/queue/state)."""
-    owner_id = extract_user_id(current_user)
-    if not owner_id:
-        raise HTTPException(status_code=403, detail="user session missing id")
-
-    row = await db_get_task(task_id)
-    if not row or row.get("owner_id") != owner_id:
-        return {"deleted": False, "task_id": task_id, "error": "not_found"}
-
-    try:
-        await db_delete_task(task_id)
-        return {"deleted": True, "task_id": task_id}
-    except Exception as e:
-        return {"deleted": False, "task_id": task_id, "error": str(e)}
 
 
 @router.get("/tasks/search")
@@ -341,12 +324,12 @@ async def search_tasks(
 ) -> dict[str, Any]:
     """DB-backed search across basic fields. No Redis usage."""
 
-    owner_id = extract_user_id(current_user)
-    if not owner_id:
+    user_id = extract_user_id(current_user)
+    if not user_id:
         return {"tasks": [], "query": query, "total_found": 0}
 
     all_tasks_result = await db_list_tasks(
-        limit=10000, offset=0, status=None, owner_id=owner_id
+        limit=10000, offset=0, status=None, user_id=user_id
     )
     all_tasks = all_tasks_result["tasks"]
 
@@ -382,8 +365,8 @@ async def get_task_statistics(
 ) -> dict[str, Any]:
     """Get comprehensive statistics about all tasks (DB only)."""
 
-    owner_id = extract_user_id(current_user)
-    if not owner_id:
+    user_id = extract_user_id(current_user)
+    if not user_id:
         return {
             "total_tasks": 0,
             "status_breakdown": {},
@@ -396,7 +379,7 @@ async def get_task_statistics(
             },
         }
 
-    return await db_get_statistics(owner_id=owner_id)
+    return await db_get_statistics(user_id=user_id)
 
 
 @router.get("/tasks/{task_id}")
@@ -407,32 +390,36 @@ async def get_task_details(
     task_id: str,
     current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
 ) -> dict[str, Any]:
-    """Get detailed information about a specific task."""
+    """Get detailed information about a specific task.
 
-    owner_id = extract_user_id(current_user)
-    if not owner_id:
+    For running tasks: Uses Redis state as primary source with detailed step information.
+    For completed/failed/cancelled tasks: Uses database as primary source, Redis state as enhancement if available.
+    Redis state has 24-hour TTL, so completed tasks gracefully degrade to database-only information."""
+
+    user_id = extract_user_id(current_user)
+    if not user_id:
         raise HTTPException(status_code=403, detail="user session missing id")
 
     # Try to get from task queue first
     task = await task_queue.get_task(task_id)
 
     row = await db_get_task(task_id)
-    if not row or row.get("owner_id") != owner_id:
+    if not row or row.get("user_id") != user_id:
         raise HTTPException(status_code=404, detail="Task not found")
 
     if task:
-        task_owner = task.get("owner_id")
-        if task_owner and task_owner != owner_id:
+        task_owner = task.get("user_id")
+        if task_owner and task_owner != user_id:
             raise HTTPException(status_code=404, detail="Task not found")
-        task.setdefault("owner_id", owner_id)
+        task.setdefault("user_id", user_id)
 
     if not task and task_id.startswith("state_"):
         # Check if it's a state-only task (format: state_{file_id})
         file_id = task_id.replace("state_", "")
         state = await state_manager.get_state(file_id)
         if state:
-            st_owner = state.get("owner_id")
-            if isinstance(st_owner, str) and st_owner and st_owner != owner_id:
+            st_owner = state.get("user_id")
+            if isinstance(st_owner, str) and st_owner and st_owner != user_id:
                 raise HTTPException(status_code=404, detail="Task not found")
             task = {
                 "task_id": task_id,
@@ -454,13 +441,18 @@ async def get_task_details(
             }
 
     if not task:
-        # DB fallback: reconstruct from DB + state
+        # DB fallback: reconstruct from DB + state (for completed tasks)
         file_id = str(row.get("file_id")) if row.get("file_id") is not None else ""
-        st = await state_manager.get_state(file_id) if file_id else None
-        if st:
-            st_owner = st.get("owner_id")
-            if isinstance(st_owner, str) and st_owner and st_owner != owner_id:
-                raise HTTPException(status_code=404, detail="Task not found")
+
+        # For completed/failed/cancelled tasks, try Redis state as enhancement only
+        st = None
+        if file_id and row.get("status") in ["completed", "failed", "cancelled"]:
+            st = await state_manager.get_state(file_id)
+            if st:
+                st_owner = st.get("user_id")
+                if isinstance(st_owner, str) and st_owner and st_owner != user_id:
+                    st = None  # Invalid state ownership, ignore
+
         # Filter sensitive information from kwargs
         filtered_kwargs = _filter_sensitive_kwargs(row.get("kwargs") or {})
 
@@ -476,11 +468,14 @@ async def get_task_details(
             or (st or {}).get("source")
             or (filtered_kwargs.get("source_type")),
             "state": st,
-            "completion_percentage": compute_step_percentage(st) if st else 0,
-            "owner_id": owner_id,
+            "completion_percentage": compute_step_percentage(st)
+            if st
+            else 100,  # Assume 100% for completed tasks
+            # without state
+            "user_id": user_id,
         }
 
-    # Enrich with detailed state information
+    # Enrich with detailed state information (for running tasks or recently completed)
     file_id = task.get("kwargs", {}).get("file_id", "unknown")
     if file_id != "unknown":
         state = await state_manager.get_state(file_id)
@@ -616,17 +611,37 @@ async def purge_task(
 
     This removes the task entry, queue references, cancellation flags, and associated state.
     """
-    owner_id = extract_user_id(current_user)
-    if not owner_id:
+    user_id = extract_user_id(current_user)
+    if not user_id:
         raise HTTPException(status_code=403, detail="user session missing id")
 
     row = await db_get_task(task_id)
-    if not row or row.get("owner_id") != owner_id:
+    if not row or row.get("user_id") != user_id:
         raise HTTPException(status_code=404, detail="Task not found")
 
     try:
         # Resolve file_id via DB first, then queue/state
         file_id = await _resolve_file_id(task_id)
+
+        collected_storage_keys: set[str] = set()
+        collected_local_paths: set[str] = set()
+        if file_id:
+            try:
+                (
+                    collected_storage_keys,
+                    collected_local_paths,
+                ) = await file_purger.collect_artifacts(
+                    file_id,
+                    task_id=task_id,
+                    file_ext=row.get("file_ext"),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to collect artifacts prior to purge (task_id=%s, file_id=%s): %s",
+                    task_id,
+                    file_id,
+                    exc,
+                )
 
         # Build keys
         task_key = f"{task_queue.task_prefix}:{task_id}"
@@ -679,7 +694,13 @@ async def purge_task(
         if file_id and remaining == 0:
             try:
                 # Import here to avoid circular imports
-                await file_purger.enqueue_file_purge(file_id)
+                await file_purger.enqueue_file_purge(
+                    file_id,
+                    target_task_id=task_id,
+                    file_ext=row.get("file_ext"),
+                    storage_keys=collected_storage_keys,
+                    local_paths=collected_local_paths,
+                )
             except Exception as e:
                 logger.error(f"Error enqueuing file purge for file_id {file_id}: {e}")
 

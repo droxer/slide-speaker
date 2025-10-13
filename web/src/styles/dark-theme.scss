@@ -235,6 +235,63 @@ body.dark-theme .file-group-actions .mini-btn:hover {
   border-color: rgba(99, 102, 241, 0.36) !important;
 }
 
+/* File action button dark theme styles */
+body.dark-theme .file-action-btn {
+  background: rgba(15, 23, 42, 0.85) !important;
+  border-color: var(--dark-border) !important;
+  color: var(--dark-text) !important;
+}
+
+body.dark-theme .file-action-btn:hover:not(:disabled) {
+  background: rgba(30, 41, 59, 0.85) !important;
+  border-color: var(--dark-border-strong) !important;
+}
+
+body.dark-theme .file-action-btn.subtle {
+  background: rgba(30, 41, 59, 0.85) !important;
+  border-color: rgba(71, 85, 105, 0.5) !important;
+  color: #93c5fd !important;
+}
+
+body.dark-theme .file-action-btn.danger {
+  background: rgba(151, 28, 28, 0.2) !important;
+  border-color: rgba(248, 113, 113, 0.4) !important;
+  color: #fca5a5 !important;
+}
+
+body.dark-theme .file-action-btn.subtle {
+  background: rgba(30, 41, 59, 0.85) !important;
+  border-color: rgba(71, 85, 105, 0.5) !important;
+  color: #93c5fd !important;
+}
+
+body.dark-theme .file-action-btn.subtle:hover:not(:disabled) {
+  background: rgba(51, 65, 85, 0.85) !important;
+  border-color: rgba(99, 102, 241, 0.5) !important;
+}
+
+body.dark-theme .file-action-btn.primary {
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+  color: white !important;
+  border-color: transparent !important;
+}
+
+body.dark-theme .file-action-btn.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+  border-color: transparent !important;
+}
+
+body.dark-theme .file-action-btn.secondary {
+  background: linear-gradient(135deg, #8b5cf6, #7c3aed) !important;
+  color: white !important;
+  border-color: transparent !important;
+}
+
+body.dark-theme .file-action-btn.secondary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7c3aed, #6d28d9) !important;
+  border-color: transparent !important;
+}
+
 body.dark-theme .content-card h1,
 body.dark-theme .content-card h2,
 body.dark-theme .content-card h3,
@@ -347,9 +404,21 @@ body.dark-theme .content-card .section-title {
 
 body.dark-theme .file-type-badge,
 body.dark-theme .badge {
-  background: rgba(30, 41, 59, 0.85) !important;
-  border-color: var(--dark-border) !important;
-  color: var(--dark-text) !important;
+  background: rgba(51, 65, 85, 0.7) !important;
+  border-color: rgba(71, 85, 105, 0.5) !important;
+  color: var(--dark-text-muted) !important;
+}
+
+body.dark-theme .file-type-badge.pdf {
+  background: rgba(151, 28, 28, 0.25) !important;
+  color: #fca5a5 !important;
+  border-color: rgba(248, 113, 113, 0.4) !important;
+}
+
+body.dark-theme .file-type-badge.ppt {
+  background: rgba(59, 130, 246, 0.25) !important;
+  color: #93c5fd !important;
+  border-color: rgba(59, 130, 246, 0.4) !important;
 }
 
 body.dark-theme .upload-text,
@@ -586,6 +655,226 @@ body.dark-theme .resource-item:hover,
 body.dark-theme .download-card:hover {
   box-shadow: 0 20px 55px rgba(2, 6, 23, 0.6) !important;
   border-color: var(--dark-border-strong) !important;
+}
+
+/* File task list dark theme styles */
+body.dark-theme .file-task-list {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.9), rgba(30, 41, 59, 0.35)) !important;
+}
+
+body.dark-theme .file-task-list-header {
+  border-bottom: 1px solid rgba(148, 163, 184, 0.3) !important;
+}
+
+body.dark-theme .file-task-list-title {
+  color: var(--dark-text) !important;
+}
+
+body.dark-theme .file-task {
+  background: rgba(30, 41, 59, 0.9) !important;
+  border-color: rgba(148, 163, 184, 0.35) !important;
+  border-left-color: rgba(148, 163, 184, 0.35) !important;
+}
+
+body.dark-theme .file-task:hover {
+  border-color: rgba(99, 102, 241, 0.35) !important;
+}
+
+body.dark-theme .file-task.status-processing { 
+  border-left-color: rgba(59, 130, 246, 0.55) !important; 
+}
+body.dark-theme .file-task.status-queued { 
+  border-left-color: rgba(250, 204, 21, 0.55) !important; 
+}
+body.dark-theme .file-task.status-completed { 
+  border-left-color: rgba(34, 197, 94, 0.55) !important; 
+}
+body.dark-theme .file-task.status-failed { 
+  border-left-color: rgba(248, 113, 113, 0.55) !important; 
+}
+body.dark-theme .file-task.status-cancelled { 
+  border-left-color: rgba(148, 163, 184, 0.55) !important; 
+}
+
+body.dark-theme .file-task-link {
+  color: var(--dark-text) !important;
+}
+
+body.dark-theme .file-task-status {
+  border-color: rgba(148, 163, 184, 0.4) !important;
+  background: rgba(30, 41, 59, 0.7) !important;
+  color: var(--dark-text) !important;
+}
+
+body.dark-theme .file-task-status.status-processing { 
+  border-color: rgba(59, 130, 246, 0.55) !important; 
+  background: rgba(59, 130, 246, 0.25) !important; 
+  color: #93c5fd !important; 
+}
+body.dark-theme .file-task-status.status-queued { 
+  border-color: rgba(250, 204, 21, 0.55) !important; 
+  background: rgba(250, 204, 21, 0.25) !important; 
+  color: #fde68a !important; 
+}
+body.dark-theme .file-task-status.status-completed { 
+  border-color: rgba(34, 197, 94, 0.55) !important; 
+  background: rgba(34, 197, 94, 0.25) !important; 
+  color: #bbf7d0 !important; 
+}
+body.dark-theme .file-task-status.status-failed { 
+  border-color: rgba(248, 113, 113, 0.55) !important; 
+  background: rgba(248, 113, 113, 0.25) !important; 
+  color: #fecaca !important; 
+}
+body.dark-theme .file-task-status.status-cancelled { 
+  border-color: rgba(148, 163, 184, 0.4) !important; 
+  background: rgba(148, 163, 184, 0.25) !important; 
+  color: #cbd5f5 !important; 
+}
+
+body.dark-theme .file-task-chip {
+  border-color: rgba(148, 163, 184, 0.4) !important;
+  background: rgba(30, 41, 59, 0.7) !important;
+  color: var(--dark-text) !important;
+}
+
+body.dark-theme .file-task-chip.subtle {
+  background: rgba(30, 41, 59, 0.4) !important;
+}
+
+body.dark-theme .file-task-meta {
+  color: var(--dark-text-muted) !important;
+}
+
+body.dark-theme .file-task-meta-line {
+  color: var(--dark-text-muted) !important;
+}
+
+body.dark-theme .file-task-action {
+  border-color: rgba(148, 163, 184, 0.5) !important;
+  background: rgba(30, 41, 59, 0.9) !important;
+  color: var(--dark-text) !important;
+}
+
+body.dark-theme .file-task-action:hover {
+  border-color: rgba(99, 102, 241, 0.5) !important;
+  background: rgba(30, 41, 59, 0.9) !important;
+}
+
+body.dark-theme .file-task-action.primary {
+  border-color: transparent !important;
+  background: linear-gradient(135deg, #3b82f6, #2563eb) !important;
+  color: #ffffff !important;
+}
+
+body.dark-theme .file-task-action.ghost {
+  background: rgba(15, 23, 42, 0.8) !important;
+  color: #93c5fd !important;
+}
+
+body.dark-theme .file-task-action.danger {
+  border-color: rgba(248, 113, 113, 0.6) !important;
+  background: rgba(151, 28, 28, 0.2) !important;
+  color: #fca5a5 !important;
+}
+
+/* File icon dark theme styles */
+body.dark-theme .file-icon {
+  background: rgba(30, 41, 59, 0.85) !important;
+  color: var(--dark-text-muted) !important;
+}
+
+body.dark-theme .file-icon-pdf {
+  color: #f87171 !important;
+}
+
+body.dark-theme .file-icon-ppt {
+  color: #60a5fa !important;
+}
+
+body.dark-theme .file-icon-generic {
+  background: linear-gradient(135deg, #475569 0%, #334155 100%) !important;
+  color: white !important;
+}
+
+/* File title text dark theme styles */
+body.dark-theme .file-title-text {
+  color: var(--dark-text) !important;
+}
+
+body.dark-theme .file-meta-item {
+  background: rgba(30, 41, 59, 0.85) !important;
+  border-color: rgba(71, 85, 105, 0.5) !important;
+  color: var(--dark-text-muted) !important;
+}
+
+body.dark-theme .file-meta-label {
+  color: var(--dark-text) !important;
+}
+
+body.dark-theme .file-status-pill {
+  border-color: rgba(71, 85, 105, 0.55) !important;
+  background: rgba(30, 41, 59, 0.7) !important;
+  color: var(--dark-text) !important;
+}
+
+body.dark-theme .file-status-pill__count,
+body.dark-theme .file-status-pill__label {
+  color: inherit !important;
+}
+
+body.dark-theme .file-status-pill.is-active {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35) !important;
+  border-color: rgba(96, 165, 250, 0.6) !important;
+  background: rgba(30, 64, 175, 0.4) !important;
+  color: #bfdbfe !important;
+}
+
+body.dark-theme .file-status-pill.status-processing {
+  border-color: rgba(96, 165, 250, 0.55) !important;
+  background: rgba(37, 99, 235, 0.22) !important;
+  color: #bfdbfe !important;
+}
+
+body.dark-theme .file-status-pill.status-queued {
+  border-color: rgba(251, 191, 36, 0.55) !important;
+  background: rgba(180, 83, 9, 0.22) !important;
+  color: #fcd34d !important;
+}
+
+body.dark-theme .file-status-pill.status-completed {
+  border-color: rgba(34, 197, 94, 0.55) !important;
+  background: rgba(22, 163, 74, 0.22) !important;
+  color: #86efac !important;
+}
+
+body.dark-theme .file-status-pill.status-failed {
+  border-color: rgba(248, 113, 113, 0.55) !important;
+  background: rgba(220, 38, 38, 0.22) !important;
+  color: #fca5a5 !important;
+}
+
+body.dark-theme .file-status-pill.status-cancelled {
+  border-color: rgba(148, 163, 184, 0.45) !important;
+  background: rgba(71, 85, 105, 0.35) !important;
+  color: var(--dark-text-muted) !important;
+}
+
+body.dark-theme .file-header-toggle {
+  background: rgba(30, 41, 59, 0.65) !important;
+  border-color: rgba(71, 85, 105, 0.5) !important;
+  color: var(--dark-text) !important;
+}
+
+body.dark-theme .file-header-toggle:hover {
+  background: rgba(51, 65, 85, 0.7) !important;
+  border-color: rgba(96, 165, 250, 0.45) !important;
+  color: #bfdbfe !important;
+}
+
+body.dark-theme .file-header-toggle.collapsed {
+  border-color: rgba(96, 165, 250, 0.6) !important;
+  color: #bfdbfe !important;
 }
 
 body.dark-theme .search-input,
@@ -1456,4 +1745,37 @@ body.dark-theme .preview-toggle .toggle-btn.active {
   background: #3b82f6 !important;
   color: #ffffff !important;
   border-color: #2563eb !important;
+}
+
+/* Pagination dark theme styles */
+body.dark-theme .pagination {
+  color: var(--dark-text) !important;
+}
+
+body.dark-theme .page-button {
+  background: rgba(30, 41, 59, 0.85) !important;
+  color: var(--dark-text) !important;
+  border: 1px solid var(--dark-border) !important;
+}
+
+body.dark-theme .page-button:hover:not(:disabled) {
+  background: rgba(51, 65, 85, 0.85) !important;
+  border-color: var(--dark-border-strong) !important;
+  color: var(--dark-text) !important;
+}
+
+body.dark-theme .page-button:active:not(:disabled) {
+  background: rgba(15, 23, 42, 0.9) !important;
+  border-color: rgba(99, 102, 241, 0.5) !important;
+}
+
+body.dark-theme .page-button:disabled {
+  background: rgba(30, 41, 59, 0.5) !important;
+  color: var(--dark-text-muted) !important;
+  border-color: var(--dark-border) !important;
+  cursor: not-allowed !important;
+}
+
+body.dark-theme .page-info {
+  color: var(--dark-text) !important;
 }

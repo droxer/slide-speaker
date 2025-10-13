@@ -17,6 +17,7 @@ const STATUS_CLASS_MAP: Record<string, string> = {
   failed: 'status-failed',
   cancelled: 'status-cancelled',
   pending: 'status-queued',
+  upload_only: 'status-default',
 };
 
 export const TASK_STATUS_ICONS: Record<string, string> = {
@@ -27,6 +28,7 @@ export const TASK_STATUS_ICONS: Record<string, string> = {
   cancelled: '🚫',
   pending: '•',
   skipped: '⤼',
+  upload_only: '⬆️',
 };
 
 export const normalizeTaskStatus = (status?: string | null): TaskStatus => {

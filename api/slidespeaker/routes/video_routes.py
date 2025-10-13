@@ -13,13 +13,19 @@ from fastapi.responses import FileResponse, StreamingResponse
 from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.storage import StorageProvider
+from slidespeaker.storage.paths import output_object_key
 
-from .download_utils import file_id_from_task, proxy_cloud_media
-from .shared_download_utils import build_headers, check_file_exists, iter_file
+from .download_helpers import (
+    build_headers,
+    check_file_exists,
+    file_id_from_task,
+    iter_file,
+    proxy_cloud_media,
+)
 
 router = APIRouter(
     prefix="/api",
-    tags=["video_downloads"],
+    tags=["video"],
     dependencies=[Depends(require_authenticated_user)],
 )
 
@@ -36,17 +42,15 @@ async def get_video_by_task(task_id: str, request: Request) -> Any:
     sp: StorageProvider = get_storage_provider()
 
     # Resolve the object key to serve
-    object_key: str | None = None
-    if check_file_exists(f"{task_id}.mp4"):
-        object_key = f"{task_id}.mp4"
-    else:
-        file_id = await file_id_from_task(task_id)
-        preferred_key = f"{file_id}.mp4"
-        legacy_key = f"{file_id}_final.mp4"
-        if check_file_exists(preferred_key):
-            object_key = preferred_key
-        elif check_file_exists(legacy_key):
-            object_key = legacy_key
+    file_id = await file_id_from_task(task_id)
+    candidate_keys = [
+        output_object_key(task_id, "video", "final.mp4"),
+        output_object_key(file_id, "video", "final.mp4"),
+        f"{task_id}.mp4",
+        f"{file_id}.mp4",
+        f"{file_id}_final.mp4",
+    ]
+    object_key = next((k for k in candidate_keys if check_file_exists(k)), None)
 
     if not object_key:
         raise HTTPException(status_code=404, detail="Video not found")
@@ -128,15 +132,17 @@ async def download_video_by_task(task_id: str, request: Request) -> Any:
     """Provide a download-focused endpoint for video with attachment disposition."""
     sp: StorageProvider = get_storage_provider()
     # Prefer task-id-based filename when present
-    object_key = f"{task_id}.mp4" if check_file_exists(f"{task_id}.mp4") else None
-    if object_key is None:
-        file_id = await file_id_from_task(task_id)
-        # Fallback to file-id naming (new first, then legacy)
-        preferred_key = f"{file_id}.mp4"
-        legacy_key = f"{file_id}_final.mp4"
-        object_key = preferred_key if check_file_exists(preferred_key) else legacy_key
+    file_id = await file_id_from_task(task_id)
+    candidate_keys = [
+        output_object_key(task_id, "video", "final.mp4"),
+        output_object_key(file_id, "video", "final.mp4"),
+        f"{task_id}.mp4",
+        f"{file_id}.mp4",
+        f"{file_id}_final.mp4",
+    ]
+    object_key = next((k for k in candidate_keys if check_file_exists(k)), None)
 
-    if not check_file_exists(object_key):
+    if not object_key:
         raise HTTPException(status_code=404, detail="Video not found")
 
     # Local: serve file directly with attachment headers
@@ -184,18 +190,18 @@ async def options_video_by_task(task_id: str) -> Response:
 async def head_video_by_task(task_id: str, request: Request) -> Response:
     """HEAD endpoint to check if the generated video exists (task-based)."""
     # Determine existence using task-id-based or file-id-based key
-    exists = False
-    if check_file_exists(f"{task_id}.mp4"):
-        exists = True
-    else:
-        try:
-            file_id = await file_id_from_task(task_id)
-            if check_file_exists(f"{file_id}.mp4") or check_file_exists(
-                f"{file_id}_final.mp4"
-            ):
-                exists = True
-        except Exception:
-            exists = False
+    try:
+        file_id = await file_id_from_task(task_id)
+    except Exception:
+        file_id = task_id
+    candidate_keys = [
+        output_object_key(task_id, "video", "final.mp4"),
+        output_object_key(file_id, "video", "final.mp4"),
+        f"{task_id}.mp4",
+        f"{file_id}.mp4",
+        f"{file_id}_final.mp4",
+    ]
+    exists = any(check_file_exists(k) for k in candidate_keys)
 
     headers = build_headers(
         request,

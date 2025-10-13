@@ -14,13 +14,13 @@ from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.configs.locales import locale_utils
 from slidespeaker.storage import StorageProvider
+from slidespeaker.storage.paths import object_key_from_uri, output_object_key
 
-from .download_utils import file_id_from_task
-from .shared_download_utils import build_headers, check_file_exists
+from .download_helpers import build_headers, check_file_exists, file_id_from_task
 
 router = APIRouter(
     prefix="/api",
-    tags=["subtitle_downloads"],
+    tags=["subtitles"],
     dependencies=[Depends(require_authenticated_user)],
 )
 
@@ -79,10 +79,14 @@ async def get_srt_subtitles_by_task(
 
     sp: StorageProvider = get_storage_provider()
 
-    # Task-id-based filename only
-    task_key = f"{task_id}_{locale_code}.srt"
-    if check_file_exists(task_key):
-        subtitle_content = sp.download_bytes(task_key)
+    candidate_keys = [
+        output_object_key(task_id, "subtitles", f"{locale_code}.srt"),
+        output_object_key(file_id, "subtitles", f"{locale_code}.srt"),
+        f"{task_id}_{locale_code}.srt",
+    ]
+    object_key = next((k for k in candidate_keys if check_file_exists(k)), None)
+    if object_key:
+        subtitle_content = sp.download_bytes(object_key)
         return Response(
             content=subtitle_content,
             media_type="text/plain",
@@ -121,6 +125,42 @@ async def get_srt_subtitles_by_task(
                     disposition=f"inline; filename=presentation_{task_id}_{locale_code}.srt",
                 ),
             )
+        # Check artifacts map for stored URIs/keys
+        artifacts = st2.get("artifacts") if isinstance(st2, dict) else None
+        if isinstance(artifacts, dict):
+            subtitles_artifacts = artifacts.get("subtitles")
+            if isinstance(subtitles_artifacts, dict):
+                entry = subtitles_artifacts.get(locale_code)
+                if isinstance(entry, dict):
+                    storage_key = entry.get("storage_key")
+                    storage_uri = entry.get("storage_uri")
+                    local_path = entry.get("local_path")
+                    key = storage_key or object_key_from_uri(storage_uri)
+                    if key:
+                        try:
+                            subtitle_content = sp.download_bytes(key)
+                            return Response(
+                                content=subtitle_content,
+                                media_type="text/plain",
+                                headers=build_headers(
+                                    request,
+                                    content_type="text/plain",
+                                    disposition=f"inline; filename=presentation_{task_id}_{locale_code}.srt",
+                                ),
+                            )
+                        except Exception:
+                            pass
+                    if local_path and os.path.exists(local_path):
+                        return FileResponse(
+                            local_path,
+                            media_type="text/plain",
+                            filename=f"presentation_{task_id}_{locale_code}.srt",
+                            headers=build_headers(
+                                request,
+                                content_type="text/plain",
+                                disposition=f"inline; filename=presentation_{task_id}_{locale_code}.srt",
+                            ),
+                        )
     raise HTTPException(status_code=404, detail="SRT subtitles not found")
 
 
@@ -137,9 +177,20 @@ async def download_srt_subtitles_by_task(
         file_id_check = file_id
 
     # Resolve object_key (task-id naming only)
-    object_key = f"{task_id}_{locale_code}.srt"
+    object_key = next(
+        (
+            k
+            for k in [
+                output_object_key(task_id, "subtitles", f"{locale_code}.srt"),
+                output_object_key(file_id_check, "subtitles", f"{locale_code}.srt"),
+                f"{task_id}_{locale_code}.srt",
+            ]
+            if check_file_exists(k)
+        ),
+        None,
+    )
     sp: StorageProvider = get_storage_provider()
-    if not check_file_exists(object_key):
+    if not object_key:
         raise HTTPException(status_code=404, detail="SRT subtitles not found")
 
     if config.storage_provider == "local":
@@ -183,9 +234,14 @@ async def get_vtt_subtitles_by_task(
     sp: StorageProvider = get_storage_provider()
 
     # Task-id-based filename only
-    task_key = f"{task_id}_{locale_code}.vtt"
-    if check_file_exists(task_key):
-        subtitle_content = sp.download_bytes(task_key)
+    candidate_keys = [
+        output_object_key(task_id, "subtitles", f"{locale_code}.vtt"),
+        output_object_key(file_id, "subtitles", f"{locale_code}.vtt"),
+        f"{task_id}_{locale_code}.vtt",
+    ]
+    object_key = next((k for k in candidate_keys if check_file_exists(k)), None)
+    if object_key:
+        subtitle_content = sp.download_bytes(object_key)
         return Response(
             content=subtitle_content,
             media_type="text/vtt",
@@ -224,6 +280,42 @@ async def get_vtt_subtitles_by_task(
                     disposition=f"inline; filename=presentation_{task_id}_{locale_code}.vtt",
                 ),
             )
+        # Check artifacts map
+        artifacts = st2.get("artifacts") if isinstance(st2, dict) else None
+        if isinstance(artifacts, dict):
+            subtitles_artifacts = artifacts.get("subtitles")
+            if isinstance(subtitles_artifacts, dict):
+                entry = subtitles_artifacts.get(locale_code)
+                if isinstance(entry, dict):
+                    storage_key = entry.get("storage_key")
+                    storage_uri = entry.get("storage_uri")
+                    local_path = entry.get("local_path")
+                    key = storage_key or object_key_from_uri(storage_uri)
+                    if key:
+                        try:
+                            subtitle_content = sp.download_bytes(key)
+                            return Response(
+                                content=subtitle_content,
+                                media_type="text/vtt",
+                                headers=build_headers(
+                                    request,
+                                    content_type="text/vtt",
+                                    disposition=f"inline; filename=presentation_{task_id}_{locale_code}.vtt",
+                                ),
+                            )
+                        except Exception:
+                            pass
+                    if local_path and os.path.exists(local_path):
+                        return FileResponse(
+                            local_path,
+                            media_type="text/vtt",
+                            filename=f"presentation_{task_id}_{locale_code}.vtt",
+                            headers=build_headers(
+                                request,
+                                content_type="text/vtt",
+                                disposition=f"inline; filename=presentation_{task_id}_{locale_code}.vtt",
+                            ),
+                        )
     raise HTTPException(status_code=404, detail="VTT subtitles not found")
 
 
@@ -240,9 +332,20 @@ async def download_vtt_subtitles_by_task(
         file_id_check = file_id
 
     # Resolve object_key (task-id naming only)
-    object_key = f"{task_id}_{locale_code}.vtt"
+    object_key = next(
+        (
+            k
+            for k in [
+                output_object_key(task_id, "subtitles", f"{locale_code}.vtt"),
+                output_object_key(file_id_check, "subtitles", f"{locale_code}.vtt"),
+                f"{task_id}_{locale_code}.vtt",
+            ]
+            if check_file_exists(k)
+        ),
+        None,
+    )
     sp: StorageProvider = get_storage_provider()
-    if not check_file_exists(object_key):
+    if not object_key:
         raise HTTPException(status_code=404, detail="VTT subtitles not found")
 
     if config.storage_provider == "local":
@@ -285,13 +388,18 @@ async def head_vtt_subtitles_by_task(
     task_id: str, language: str | None = None
 ) -> Response:
     """HEAD endpoint to check if VTT subtitles exist."""
-    # Get language
-    _, locale_code = await _get_subtitle_language(task_id, language)
+    file_id, locale_code = await _get_subtitle_language(task_id, language)
+    if not file_id:
+        file_id = await file_id_from_task(task_id)
 
-    from .shared_download_utils import check_file_exists
+    from .download_helpers import check_file_exists
 
-    # Check existence by task-id only (no file-id fallback)
-    exists = check_file_exists(f"{task_id}_{locale_code}.vtt")
+    candidates = [
+        output_object_key(task_id, "subtitles", f"{locale_code}.vtt"),
+        output_object_key(file_id, "subtitles", f"{locale_code}.vtt"),
+        f"{task_id}_{locale_code}.vtt",
+    ]
+    exists = any(check_file_exists(key) for key in candidates)
     if not exists:
         return Response(status_code=404)
     headers = {
@@ -309,12 +417,18 @@ async def head_srt_subtitles_by_task(
     task_id: str, language: str | None = None
 ) -> Response:
     """HEAD endpoint to check if SRT subtitles exist."""
-    # Get language
-    _, locale_code = await _get_subtitle_language(task_id, language)
+    file_id, locale_code = await _get_subtitle_language(task_id, language)
+    if not file_id:
+        file_id = await file_id_from_task(task_id)
 
-    from .shared_download_utils import check_file_exists
+    from .download_helpers import check_file_exists
 
-    exists = check_file_exists(f"{task_id}_{locale_code}.srt")
+    candidates = [
+        output_object_key(task_id, "subtitles", f"{locale_code}.srt"),
+        output_object_key(file_id, "subtitles", f"{locale_code}.srt"),
+        f"{task_id}_{locale_code}.srt",
+    ]
+    exists = any(check_file_exists(key) for key in candidates)
     if not exists:
         return Response(status_code=404)
     headers = {

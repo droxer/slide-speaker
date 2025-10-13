@@ -62,12 +62,12 @@ async def get_progress_by_task(
     from slidespeaker.core.task_queue import task_queue
     from slidespeaker.repository.task import get_task as db_get_task
 
-    owner_id = extract_user_id(current_user)
-    if not owner_id:
+    user_id = extract_user_id(current_user)
+    if not user_id:
         raise HTTPException(status_code=403, detail="user session missing id")
 
     db_row = await db_get_task(task_id)
-    if not db_row or db_row.get("owner_id") != owner_id:
+    if not db_row or db_row.get("user_id") != user_id:
         raise HTTPException(status_code=404, detail="Task not found")
 
     # Prefer task-based state alias
@@ -77,8 +77,8 @@ async def get_progress_by_task(
     if st is None and db_row and db_row.get("file_id"):
         st = await state_manager.get_state(str(db_row["file_id"]))
     if st and isinstance(st, dict):
-        st_owner = st.get("owner_id")
-        if isinstance(st_owner, str) and st_owner and st_owner != owner_id:
+        st_owner = st.get("user_id")
+        if isinstance(st_owner, str) and st_owner and st_owner != user_id:
             raise HTTPException(status_code=404, detail="Task not found")
         result = _progress_from_state(st)
         # Attach task_type from DB if available and derive generate_* for compatibility
@@ -103,8 +103,8 @@ async def get_progress_by_task(
             file_id = task_id.replace("state_", "")
             st2 = await state_manager.get_state(file_id)
             if st2:
-                st_owner = st2.get("owner_id")
-                if isinstance(st_owner, str) and st_owner and st_owner != owner_id:
+                st_owner = st2.get("user_id")
+                if isinstance(st_owner, str) and st_owner and st_owner != user_id:
                     raise HTTPException(status_code=404, detail="Task not found")
             return _progress_from_state(st2)
         raise HTTPException(status_code=404, detail="Task not found")
@@ -113,8 +113,8 @@ async def get_progress_by_task(
         raise HTTPException(status_code=404, detail="File not found for task")
     st2 = await state_manager.get_state(task_file_id)
     if st2:
-        st_owner = st2.get("owner_id")
-        if isinstance(st_owner, str) and st_owner and st_owner != owner_id:
+        st_owner = st2.get("user_id")
+        if isinstance(st_owner, str) and st_owner and st_owner != user_id:
             raise HTTPException(status_code=404, detail="Task not found")
     result2 = _progress_from_state(st2)
     # Attach DB task_type if possible

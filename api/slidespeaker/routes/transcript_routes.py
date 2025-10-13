@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response
 
 from slidespeaker.auth import require_authenticated_user
 from slidespeaker.core.state_manager import state_manager
+from slidespeaker.storage.paths import output_object_key
 from slidespeaker.transcript.markdown import transcripts_to_markdown
 
 router = APIRouter(
@@ -52,68 +53,63 @@ async def get_final_markdown_transcript_by_task(task_id: str) -> Response:
         state = await state_manager.get_state(file_id)
     if state and "steps" in state:
         steps = state["steps"]
-        # Prefer translated podcast conversation when available; else original
-        pod = None
-        pod_translated = steps.get("translate_podcast_script")
-        pod_original = steps.get("generate_podcast_script")
-        if pod_translated and pod_translated.get("status") == "completed":
-            pod = pod_translated
-        elif pod_original and pod_original.get("status") == "completed":
-            pod = pod_original
+        # Prefer the exact dialogue used for audio playback; fallback to translated/original
+        host_voice = None
+        guest_voice = None
+        audio_dialogue: list[dict[str, Any]] | None = None
+        try:
+            ga = steps.get("generate_podcast_audio") or {}
+            if ga.get("status") == "completed" and isinstance(ga.get("data"), dict):
+                ga_data = ga.get("data")
+                host_voice = ga_data.get("host_voice")
+                guest_voice = ga_data.get("guest_voice")
+                dlg = ga_data.get("dialogue")
+                if isinstance(dlg, list) and dlg:
+                    audio_dialogue = dlg
+        except Exception:
+            pass
 
-        if pod and pod.get("status") == "completed":
-            data = pod.get("data") or []
-            if isinstance(data, list) and data:
-                # Try to fetch voices from podcast audio step
-                host_voice = None
-                guest_voice = None
-                try:
-                    ga = steps.get("generate_podcast_audio") or {}
-                    if (ga.get("status") == "completed") and isinstance(
-                        ga.get("data"), dict
-                    ):
-                        host_voice = (
-                            (ga["data"].get("host_voice") or None)
-                            if isinstance(ga["data"], dict)
-                            else None
+        if audio_dialogue:
+            data = audio_dialogue
+        else:
+            pod = None
+            pod_translated = steps.get("translate_podcast_script")
+            pod_original = steps.get("generate_podcast_script")
+            if pod_translated and pod_translated.get("status") == "completed":
+                pod = pod_translated
+            elif pod_original and pod_original.get("status") == "completed":
+                pod = pod_original
+            data = pod.get("data") if pod and pod.get("status") == "completed" else []
+
+        if isinstance(data, list) and data:
+            # Build conversation-style Markdown
+            lines: list[str] = ["# Podcast Conversation\n"]
+            for item in data:
+                if isinstance(item, dict):
+                    raw_speaker = str(item.get("speaker", "")).strip().lower()
+                    speaker_label = "Speaker"
+                    if raw_speaker.startswith("host"):
+                        # Prefer VoiceId first, then Role; both capitalized
+                        speaker_label = (
+                            f"{str(host_voice).strip().title()} (Host)"
+                            if host_voice
+                            else "Host"
                         )
-                        guest_voice = (
-                            (ga["data"].get("guest_voice") or None)
-                            if isinstance(ga["data"], dict)
-                            else None
+                    elif raw_speaker.startswith("guest"):
+                        speaker_label = (
+                            f"{str(guest_voice).strip().title()} (Guest)"
+                            if guest_voice
+                            else "Guest"
                         )
-                except Exception:
-                    pass
-                # Build conversation-style Markdown
-                lines: list[str] = ["# Podcast Conversation\n"]
-                for item in data:
-                    if isinstance(item, dict):
-                        raw_speaker = str(item.get("speaker", "")).strip().lower()
-                        speaker_label = "Speaker"
-                        if raw_speaker.startswith("host"):
-                            # Prefer VoiceId first, then Role; both capitalized
-                            speaker_label = (
-                                f"{str(host_voice).strip().title()} (Host)"
-                                if host_voice
-                                else "Host"
-                            )
-                        elif raw_speaker.startswith("guest"):
-                            speaker_label = (
-                                f"{str(guest_voice).strip().title()} (Guest)"
-                                if guest_voice
-                                else "Guest"
-                            )
-                        else:
-                            # Fallback to provided speaker label, title-cased
-                            speaker_label = item.get("speaker") or "Speaker"
-                            speaker_label = str(speaker_label).strip().title()
-                        text = str(item.get("text", "")).strip()
-                        if text:
-                            lines.append(f"**{speaker_label}:** {text}")
-                md_conv = "\n\n".join(lines).strip() + "\n"
-                return Response(
-                    content=md_conv, media_type="text/markdown; charset=utf-8"
-                )
+                    else:
+                        # Fallback to provided speaker label, title-cased
+                        speaker_label = item.get("speaker") or "Speaker"
+                        speaker_label = str(speaker_label).strip().title()
+                    text = str(item.get("text", "")).strip()
+                    if text:
+                        lines.append(f"**{speaker_label}:** {text}")
+            md_conv = "\n\n".join(lines).strip() + "\n"
+            return Response(content=md_conv, media_type="text/markdown; charset=utf-8")
         candidate_keys = [
             "revise_pdf_transcripts",
             "revise_transcripts",
@@ -131,6 +127,12 @@ async def get_final_markdown_transcript_by_task(task_id: str) -> Response:
                 storage_url = step.get("markdown_storage_url")
                 if isinstance(storage_url, str) and storage_url:
                     headers["X-Storage-URL"] = storage_url
+                storage_key = step.get("markdown_storage_key")
+                if isinstance(storage_key, str) and storage_key:
+                    headers["X-Storage-Key"] = storage_key
+                storage_uri = step.get("markdown_storage_uri")
+                if isinstance(storage_uri, str) and storage_uri:
+                    headers["X-Storage-URI"] = storage_uri
                 return Response(
                     content=md,
                     media_type="text/markdown; charset=utf-8",
@@ -174,14 +176,18 @@ async def get_final_markdown_transcript_by_task(task_id: str) -> Response:
     sp = get_storage_provider()
     # Prefer task-id-based transcript filename first; fall back to file-id if known
     fallback_keys = [
+        output_object_key(task_id, "transcripts", "transcript.md"),
+        output_object_key(task_id, "transcripts", "podcast_transcript.md"),
         f"{task_id}_transcript.md",
-        f"{task_id}_podcast_transcript.md",  # Podcast-specific transcript
+        f"{task_id}_podcast_transcript.md",
     ]
     if file_id:
         fallback_keys.extend(
             [
+                output_object_key(file_id, "transcripts", "transcript.md"),
+                output_object_key(file_id, "transcripts", "podcast_transcript.md"),
                 f"{file_id}_transcript.md",
-                f"{file_id}_podcast_transcript.md",  # Podcast-specific transcript
+                f"{file_id}_podcast_transcript.md",
             ]
         )
     for key in fallback_keys:

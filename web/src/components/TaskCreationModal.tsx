@@ -40,7 +40,7 @@ const shortenFileName = (name?: string, fallback = 'Selected file', max = 48): s
   return base.slice(0, head) + '…' + base.slice(-tail);
 };
 
-const RunTaskModal: React.FC<Props> = ({ open, isPdf, defaults, onClose, onSubmit, filename, submitting }) => {
+const TaskCreationModal = ({ open, isPdf, defaults, onClose, onSubmit, filename, submitting }: Props) => {
   const { t } = useI18n();
   const [taskType, setTaskType] = useState<'video'|'podcast'>(defaults.task_type as any || 'video');
   const [voiceLang, setVoiceLang] = useState<string>(defaults.voice_language || 'english');
@@ -191,4 +191,4 @@ const RunTaskModal: React.FC<Props> = ({ open, isPdf, defaults, onClose, onSubmi
   );
 };
 
-export default RunTaskModal;
+export default TaskCreationModal;

@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from slidespeaker.routes.health import router
+from slidespeaker.routes.health_routes import router
 
 
 class TestHealthRoutes:
@@ -26,8 +26,8 @@ class TestHealthRoutes:
     async def test_health_endpoint_success(self, client):
         """Test that the health endpoint returns success when all services are up."""
         with (
-            patch("slidespeaker.routes.health.RedisConfig") as mock_redis_config,
-            patch("slidespeaker.routes.health.get_session") as mock_get_session,
+            patch("slidespeaker.routes.health_routes.RedisConfig") as mock_redis_config,
+            patch("slidespeaker.routes.health_routes.get_session") as mock_get_session,
         ):
             # Mock Redis client
             mock_redis_client = AsyncMock()
@@ -57,8 +57,8 @@ class TestHealthRoutes:
     async def test_health_endpoint_redis_failure(self, client):
         """Test that the health endpoint returns failure when Redis is down."""
         with (
-            patch("slidespeaker.routes.health.RedisConfig") as mock_redis_config,
-            patch("slidespeaker.routes.health.get_session") as mock_get_session,
+            patch("slidespeaker.routes.health_routes.RedisConfig") as mock_redis_config,
+            patch("slidespeaker.routes.health_routes.get_session") as mock_get_session,
         ):
             # Mock Redis client to fail
             mock_redis_client = AsyncMock()
@@ -90,8 +90,8 @@ class TestHealthRoutes:
     async def test_health_endpoint_database_failure(self, client):
         """Test that the health endpoint returns failure when database is down."""
         with (
-            patch("slidespeaker.routes.health.RedisConfig") as mock_redis_config,
-            patch("slidespeaker.routes.health.get_session") as mock_get_session,
+            patch("slidespeaker.routes.health_routes.RedisConfig") as mock_redis_config,
+            patch("slidespeaker.routes.health_routes.get_session") as mock_get_session,
         ):
             # Mock Redis client
             mock_redis_client = AsyncMock()

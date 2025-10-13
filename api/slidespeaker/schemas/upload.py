@@ -24,7 +24,7 @@ class UploadPayload(BaseModel):
         default="hd", description="Video resolution"
     )
     generate_avatar: bool = Field(
-        default=True, description="Whether to generate avatar"
+        default=False, description="Whether to generate avatar"
     )
     generate_subtitles: bool = Field(
         default=True, description="Whether to generate subtitles"
@@ -137,7 +137,7 @@ class MultipartUploadPayload(BaseModel):
         default="hd", description="Video resolution"
     )
     generate_avatar: bool = Field(
-        default=True, description="Whether to generate avatar"
+        default=False, description="Whether to generate avatar"
     )
     generate_subtitles: bool = Field(
         default=True, description="Whether to generate subtitles"

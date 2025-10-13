@@ -13,18 +13,17 @@ from fastapi.responses import FileResponse, StreamingResponse
 
 from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.config import config, get_storage_provider
+from slidespeaker.core.state_manager import state_manager
 from slidespeaker.storage import StorageProvider
 
-from .download_utils import (
+from .download_helpers import (
+    build_headers,
     file_id_from_task,
     final_audio_object_keys,
     get_audio_files_from_state,
+    iter_file,
     proxy_cloud_media,
     stream_concatenated_files,
-)
-from .shared_download_utils import (
-    build_headers,
-    iter_file,
 )
 
 router = APIRouter(
@@ -45,7 +44,18 @@ async def get_final_audio(file_id: str, request: Request) -> Any:
     sp: StorageProvider = get_storage_provider()
 
     # 1) Prebuilt final audio in storage
-    for key in final_audio_object_keys(file_id):
+    state = await state_manager.get_state(file_id)
+    task_hint = None
+    if state and isinstance(state, dict):
+        candidate = state.get("task_id")
+        if isinstance(candidate, str) and candidate.strip():
+            task_hint = candidate.strip()
+        elif isinstance(state.get("task"), dict):
+            candidate = state["task"].get("task_id")
+            if isinstance(candidate, str) and candidate.strip():
+                task_hint = candidate.strip()
+
+    for key in final_audio_object_keys(file_id, task_id=task_hint):
         if config.storage_provider == "local":
             # Local FS: verify and serve directly
             actual = config.output_dir / key
@@ -139,41 +149,6 @@ async def get_final_audio(file_id: str, request: Request) -> Any:
         raise HTTPException(status_code=404, detail="Final audio not found") from e
 
 
-@router.get("/tasks/{task_id}/audio/tracks")
-async def list_audio_files_by_task(task_id: str) -> dict[str, Any]:
-    """List audio tracks using task_id and emit task-based URLs."""
-    from slidespeaker.core.state_manager import state_manager as sm
-
-    file_id = await file_id_from_task(task_id)
-    state = await sm.get_state(file_id)
-    if not state:
-        raise HTTPException(status_code=404, detail="State not found")
-
-    # Collect audio files from state
-    audio_files = await get_audio_files_from_state(file_id)
-    file_ext = (state.get("file_ext") or "").lower()
-    label = "Chapter" if file_ext == ".pdf" else "Slide"
-
-    tracks: list[dict[str, Any]] = []
-    for i, path in enumerate(audio_files):
-        tracks.append(
-            {
-                "index": i + 1,
-                "name": f"{label} {i + 1}",
-                "api_url": f"/api/tasks/{task_id}/audio/{i + 1}",
-                "path": path,
-            }
-        )
-
-    return {
-        "task_id": task_id,
-        "file_id": file_id,
-        "language": state.get("voice_language", "english"),
-        "count": len(tracks),
-        "tracks": tracks,
-    }
-
-
 @router.get("/tasks/{task_id}/audio")
 async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
     """Serve final audio by task, preferring task-id-based object keys.
@@ -181,30 +156,25 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
     Avoid pre-checks that can fail on cloud providers with restricted HEAD permissions.
     Try task-id first; on 404, fall back to file-id mapping.
     """
-    from .shared_download_utils import check_file_exists
+    from .download_helpers import check_file_exists
 
     sp: StorageProvider = get_storage_provider()
     file_id = await file_id_from_task(task_id)
 
-    # Check for audio files using the same logic as downloads endpoint
-    # First check task-id based key
-    if check_file_exists(f"{task_id}.mp3"):
-        task_key = f"{task_id}.mp3"
-        # Found task-id based audio file, use it directly
+    candidate_keys = final_audio_object_keys(file_id, task_id=task_id)
+    found_key = next((k for k in candidate_keys if check_file_exists(k)), None)
+
+    if found_key:
         if config.storage_provider == "local":
-            actual = config.output_dir / task_key
+            actual = config.output_dir / found_key
             try:
                 if actual.exists() and actual.is_file():
-                    # Get file size for Content-Length header
                     file_size = actual.stat().st_size
-
-                    # Handle Range requests for proper audio streaming
                     range_header = request.headers.get("range") or request.headers.get(
                         "Range"
                     )
                     if range_header:
                         try:
-                            # Parse Range: bytes=start-end
                             units, _, rng = range_header.partition("=")
                             start_s, _, end_s = rng.partition("-")
                             if units.strip().lower() != "bytes":
@@ -214,7 +184,6 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
                             start = max(0, start)
                             end = min(end, file_size - 1)
                             if start > end:
-                                # Invalid range
                                 raise ValueError("Invalid range")
                             length = end - start + 1
 
@@ -230,14 +199,12 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
 
                             return StreamingResponse(
                                 iter_file(str(actual), start, length),
-                                status_code=206,  # Partial Content
+                                status_code=206,
                                 headers=headers,
                             )
                         except Exception:
-                            # Malformed range header, fall back to full file
                             pass
 
-                    # No range request or range parsing failed, serve full file
                     return FileResponse(
                         str(actual),
                         media_type="audio/mpeg",
@@ -252,21 +219,19 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
             except Exception:
                 pass
         else:
-            # Cloud: try proxying the object key without relying on HEAD permissions
             try:
                 if config.proxy_cloud_media:
                     origin = request.headers.get("origin") or request.headers.get(
                         "Origin"
                     )
                     return await proxy_cloud_media(
-                        task_key,
+                        found_key,
                         "audio/mpeg",
                         None,
                         origin=origin,
                     )
-                # If proxy disabled, attempt redirect
                 url = sp.get_file_url(
-                    task_key,
+                    found_key,
                     expires_in=300,
                     content_disposition=f"inline; filename=presentation_{task_id}.mp3",
                     content_type="audio/mpeg",
@@ -279,41 +244,27 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
                 headers["Location"] = url
                 return Response(status_code=307, headers=headers)
             except HTTPException as e:
-                # Continue to fallback on 404/403; re-raise others
                 if e.status_code not in (403, 404):
                     raise
             except Exception:
-                # Continue to fallback on any provider error
                 pass
-    else:
-        # Check file-id based keys (same as downloads endpoint)
-        from .download_utils import final_audio_object_keys
 
-        for key in final_audio_object_keys(file_id):
-            if check_file_exists(key):
-                # Found file-id based audio file, use the file-based logic
-                return await get_final_audio(file_id, request)
-
-    # Final fallback to file-id based logic
     return await get_final_audio(file_id, request)
 
 
 @router.get("/tasks/{task_id}/audio/download")
 async def download_final_audio_by_task(task_id: str, request: Request) -> Any:
     """Download endpoint for the final MP3 with attachment disposition."""
-    from .shared_download_utils import check_file_exists
+    from .download_helpers import check_file_exists
 
     sp: StorageProvider = get_storage_provider()
     # Resolve best key (prefer task-id, then file-id variants)
-    if check_file_exists(f"{task_id}.mp3"):
-        object_key = f"{task_id}.mp3"
-    else:
-        file_id = await file_id_from_task(task_id)
-        keys = final_audio_object_keys(file_id)
-        found = next((k for k in keys if check_file_exists(k)), None)
-        if not found:
-            raise HTTPException(status_code=404, detail="Final audio not found")
-        object_key = found
+    file_id = await file_id_from_task(task_id)
+    keys = final_audio_object_keys(file_id, task_id=task_id)
+    found = next((k for k in keys if check_file_exists(k)), None)
+    if not found:
+        raise HTTPException(status_code=404, detail="Final audio not found")
+    object_key = found
 
     if config.storage_provider == "local":
         actual = config.output_dir / object_key

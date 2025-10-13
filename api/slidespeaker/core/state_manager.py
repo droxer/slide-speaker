@@ -115,7 +115,7 @@ class RedisStateManager:
         self,
         voice_language: str = "english",
         subtitle_language: str | None = None,
-        generate_avatar: bool = True,
+        generate_avatar: bool = False,
         generate_subtitles: bool = True,
     ) -> dict[str, dict[str, Any]]:
         """Create steps for presentation processing"""
@@ -197,13 +197,13 @@ class RedisStateManager:
         subtitle_language: str | None = None,
         transcript_language: str | None = None,
         video_resolution: str = "hd",
-        generate_avatar: bool = True,
+        generate_avatar: bool = False,
         generate_subtitles: bool = True,
         generate_video: bool = True,
         generate_podcast: bool = False,
         task_id: str | None = None,
         source_type: str | None = None,
-        owner_id: str | None = None,
+        user_id: str | None = None,
     ) -> dict[str, Any]:
         """Create initial state for a file processing task"""
         # Initialize steps based on file type
@@ -258,8 +258,8 @@ class RedisStateManager:
         }
         if task_id:
             state["task_id"] = task_id
-        if owner_id:
-            state["owner_id"] = owner_id
+        if user_id:
+            state["user_id"] = user_id
         # If task-scoped, store task-first and bind mappings; otherwise store by file-id
         if task_id:
             try:

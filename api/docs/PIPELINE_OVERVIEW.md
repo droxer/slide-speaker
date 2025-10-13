@@ -40,14 +40,24 @@ Input PDF File
     ↓
 [segment_pdf_content] - Analyze and segment PDF into chapters
     ↓
-[generate_podcast_script] - Create 2-person conversation script
+[generate_podcast_script] - Create 2-person conversation script in English
     ↓
-[Optional: translate_podcast_script] - Translate script if needed
+[Optional: translate_podcast_script] - Translate script to target language if needed
     ↓
-[generate_podcast_audio] - Generate multi-voice audio
+[generate_podcast_audio] - Generate multi-voice audio with host/guest voices
     ↓
-[compose_podcast] - Combine audio tracks into final podcast
+[compose_podcast] - Combine audio tracks into final podcast MP3
 ```
+
+The PDF podcast pipeline converts documents into engaging audio conversations:
+
+1. **Content Segmentation**: The PDF is first analyzed and segmented into logical chapters with key points
+2. **Script Generation**: A natural 2-person conversation script is generated in English, with alternating Host and Guest dialogue
+3. **Translation**: If a non-English language is requested, the script is translated while preserving speaker roles
+4. **Audio Generation**: Multi-voice audio is created using distinct voices for Host and Guest roles
+5. **Composition**: All audio segments are combined into a single podcast MP3 file
+
+The podcast script generation uses AI to create engaging conversations that explain complex topics clearly, avoiding references to visual elements since podcasts are audio-only.
 
 ### Slides Processing Pipeline
 

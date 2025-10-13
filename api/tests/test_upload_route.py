@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from slidespeaker.configs.config import config
 from slidespeaker.core.task_queue import task_queue
-from slidespeaker.routes.upload import require_authenticated_user, router
+from slidespeaker.routes.upload_routes import require_authenticated_user, router
 
 
 @pytest.fixture()

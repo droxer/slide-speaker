@@ -15,26 +15,28 @@ from fastapi.staticfiles import StaticFiles
 from slidespeaker.configs.config import config
 from slidespeaker.configs.logging_config import setup_logging
 from slidespeaker.core.rate_limit import add_rate_limiting
-from slidespeaker.routes.audio_downloads import router as audio_downloads_router
-from slidespeaker.routes.auth import router as auth_router
-from slidespeaker.routes.diagnostic import router as diagnostic_router
-from slidespeaker.routes.downloads import router as downloads_router
-from slidespeaker.routes.files import router as files_router
-from slidespeaker.routes.health import router as health_router
-from slidespeaker.routes.languages import router as languages_router
-from slidespeaker.routes.metrics import protected_router as metrics_protected_router
-from slidespeaker.routes.metrics import router as metrics_router
-from slidespeaker.routes.podcast_downloads import router as podcast_downloads_router
-from slidespeaker.routes.preview import router as preview_router
-from slidespeaker.routes.progress import router as progress_router
-from slidespeaker.routes.stats import router as stats_router
-from slidespeaker.routes.subtitle_downloads import router as subtitle_downloads_router
-from slidespeaker.routes.tasks import router as tasks_router
-from slidespeaker.routes.transcripts import router as transcripts_router
-from slidespeaker.routes.tts import router as tts_router
-from slidespeaker.routes.upload import router as upload_router
-from slidespeaker.routes.users import router as users_router
-from slidespeaker.routes.video_downloads import router as video_downloads_router
+from slidespeaker.routes.audio_routes import router as audio_router
+from slidespeaker.routes.auth_routes import router as auth_router
+from slidespeaker.routes.diagnostic_routes import router as diagnostic_router
+from slidespeaker.routes.download_routes import router as downloads_router
+from slidespeaker.routes.file_routes import router as files_router
+from slidespeaker.routes.health_routes import router as health_router
+from slidespeaker.routes.language_routes import router as languages_router
+from slidespeaker.routes.metrics_routes import (
+    protected_router as metrics_protected_router,
+)
+from slidespeaker.routes.metrics_routes import router as metrics_router
+from slidespeaker.routes.podcast_routes import router as podcast_router
+from slidespeaker.routes.preview_routes import router as preview_router
+from slidespeaker.routes.progress_routes import router as progress_router
+from slidespeaker.routes.stats_routes import router as stats_router
+from slidespeaker.routes.subtitle_routes import router as subtitle_downloads_router
+from slidespeaker.routes.task_routes import router as tasks_router
+from slidespeaker.routes.transcript_routes import router as transcripts_router
+from slidespeaker.routes.tts_routes import router as tts_router
+from slidespeaker.routes.upload_routes import router as upload_router
+from slidespeaker.routes.user_routes import router as users_router
+from slidespeaker.routes.video_routes import router as video_downloads_router
 
 app = FastAPI(title="AI Slider API")
 
@@ -79,9 +81,9 @@ app.include_router(tasks_router)
 app.include_router(progress_router)
 app.include_router(downloads_router)
 app.include_router(video_downloads_router)
-app.include_router(audio_downloads_router)
+app.include_router(audio_router)
 app.include_router(subtitle_downloads_router)
-app.include_router(podcast_downloads_router)
+app.include_router(podcast_router)
 app.include_router(languages_router)
 app.include_router(health_router)
 app.include_router(stats_router)

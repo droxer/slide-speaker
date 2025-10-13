@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useI18n } from '@/i18n/hooks';
 import { getLanguageDisplayName } from '../utils/language';
+import { getFileTypeIcon } from '@/utils/fileIcons';
 
 type UploadPanelProps = {
   uploadMode: 'slides' | 'pdf';
@@ -32,7 +33,7 @@ const LANGS = [
   'thai',
 ];
 
-const UploadPanel: React.FC<UploadPanelProps> = ({
+const UploadPanel = ({
   uploadMode,
   setUploadMode,
   pdfOutputMode,
@@ -51,7 +52,7 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
   uploading,
   onCreate,
   getFileTypeHint,
-}) => {
+}: UploadPanelProps) => {
   const { t } = useI18n();
   const subtitleTitle = uploadMode === 'pdf' && pdfOutputMode === 'podcast'
     ? t('runTask.transcriptLanguage')
@@ -61,42 +62,6 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
     const normalized = (code || '').toLowerCase();
     const fallback = getLanguageDisplayName(code);
     return t(`language.display.${normalized}`, undefined, fallback || t('common.unknown', undefined, 'Unknown'));
-  };
-
-  const getFileTypeIcon = (filename: string) => {
-    if (!filename) return '📄';
-    const ext = filename.toLowerCase().split('.').pop() || '';
-    switch (ext) {
-      case 'pdf':
-        return '📑'; // Document icon for PDF
-      case 'ppt':
-      case 'pptx':
-        return '📊'; // Presentation icon for PowerPoint
-      case 'doc':
-      case 'docx':
-        return '📝'; // Document icon for Word
-      case 'xls':
-      case 'xlsx':
-        return '📈'; // Spreadsheet icon for Excel
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'gif':
-      case 'svg':
-        return '🖼️'; // Image icon
-      case 'mp4':
-      case 'avi':
-      case 'mov':
-      case 'wmv':
-        return '🎬'; // Video icon
-      case 'mp3':
-      case 'wav':
-      case 'aac':
-      case 'flac':
-        return '🎵'; // Audio icon
-      default:
-        return '📄'; // Default document icon
-    }
   };
 
   const fileLabel = useMemo(() => {
@@ -186,6 +151,10 @@ const UploadPanel: React.FC<UploadPanelProps> = ({
             className="file-input"
           />
           <label htmlFor="file-upload" className="file-upload-label">
+            <div className="upload-section-header">
+              <span className="upload-section-icon">📁</span>
+              <span className="upload-section-title">{uploadMode === 'pdf' ? 'PDF Document' : 'Presentation Slides'}</span>
+            </div>
             <div className="upload-icon">
               {getFileTypeIcon(file?.name || '')}
             </div>

@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.redis_config import RedisConfig
 from slidespeaker.core.task_queue import task_queue
+from slidespeaker.storage.paths import output_object_key
 from slidespeaker.video import VideoPreviewer
 
 router = APIRouter(
@@ -75,13 +76,16 @@ async def options_task_preview(_task_id: str) -> dict[str, str]:
 @router.head("/tasks/{task_id}/preview")
 async def head_task_preview(task_id: str) -> Any:
     """Quick existence check for preview resources (video)."""
-    from .shared_download_utils import check_file_exists
+    from .download_helpers import check_file_exists
 
-    # Prefer task-id-based video naming
-    if check_file_exists(f"{task_id}.mp4"):
-        return {}
-    # Otherwise resolve to file_id and check file-id-based keys
     file_id = await _file_id_from_task(task_id)
-    if check_file_exists(f"{file_id}.mp4") or check_file_exists(f"{file_id}_final.mp4"):
+    candidate_keys = [
+        output_object_key(task_id, "video", "final.mp4"),
+        output_object_key(file_id, "video", "final.mp4"),
+        f"{task_id}.mp4",
+        f"{file_id}.mp4",
+        f"{file_id}_final.mp4",
+    ]
+    if any(check_file_exists(k) for k in candidate_keys):
         return {}
     raise HTTPException(status_code=404, detail="Preview not available")

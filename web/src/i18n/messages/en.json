@@ -103,7 +103,8 @@
       "failed": "Failed",
       "cancelled": "Cancelled",
       "pending": "Pending",
-      "skipped": "Skipped"
+      "skipped": "Skipped",
+      "upload_only": "Upload ready"
     },
     "cancelled": {
       "description": "The task has been successfully cancelled."
@@ -137,11 +138,13 @@
   "actions": {
     "copy": "Copy",
     "openPreview": "Open preview",
+    "open": "Open",
     "generateVideo": "Generate Video",
     "generatePodcast": "Generate Podcast",
     "generate": "Generate",
     "generating": "Generating…",
     "cancel": "Cancel",
+    "delete": "Delete",
     "close": "Close",
     "createAnother": "Create Another"
   },
@@ -179,6 +182,11 @@
     "status": {
       "all": "All statuses"
     }
+  },
+  "common": {
+    "latest": "Latest",
+    "more": "more",
+    "unknown": "Unknown"
   },
   "runTask": {
     "adjustHint": "Adjust the generation options and press Generate when you are ready.",
@@ -224,12 +232,19 @@
     "title": "Creations",
     "summary": "{files} files · {creations} creations · {running} running",
     "empty": "No tasks found",
+    "upload": {
+      "placeholder": "Upload is ready. Run a new creation to get started."
+    },
     "file": {
       "idChip": "ID {id}",
+      "taskGroupLabel": "Tasks for this upload",
+      "taskListTitle": "Tasks ({count})",
       "count": {
         "one": "{count} creation",
         "other": "{count} creations"
-      }
+      },
+      "collapse": "Collapse details",
+      "expand": "Expand details"
     },
     "toast": {
       "taskCreated": "Task created: {id}",
@@ -255,7 +270,11 @@
     "meta": {
       "aria": "Task details",
       "locating": "(locating…)",
-      "locatingHint": "from file {id}"
+      "locatingHint": "from file {id}",
+      "taskId": "Task ID",
+      "copyTaskId": "Copy task ID",
+      "configuration": "Configuration",
+      "languages": "Languages"
     },
     "file": {
       "untitled": "Untitled"
@@ -337,6 +356,15 @@
       "pptDescription": "AI will convert your slides into a narrated video.",
       "supportedBadge": "Supported File",
       "supportedDescription": "Supports PDF, PPTX, and PPT files"
+    },
+    "summary": {
+      "file": "File",
+      "size": "Size",
+      "output": "Output",
+      "status": "Status",
+      "uploading": "Uploading",
+      "type": "Type",
+      "documentType": "Document Type"
     },
     "notice": "AI-generated content may contain inaccuracies. Review carefully.",
     "createPodcast": "Create Podcast",

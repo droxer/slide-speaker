@@ -30,17 +30,20 @@ class CueBuilder:
         language: str,
     ) -> list[tuple[timedelta, timedelta, str]]:
         cues: list[tuple[timedelta, timedelta, str]] = []
-        if not scripts or not audio_files:
+        if not scripts:
             return cues
         start_time = timedelta(seconds=0)
         max_cue_seconds = self._max_cue_seconds(language)
-        for _i, (script_data, audio_path) in enumerate(
-            zip(scripts, audio_files, strict=False)
-        ):
+        audio_paths = list(audio_files or [])
+
+        for idx, script_data in enumerate(scripts):
             script_text = script_data.get("script", "").strip() if script_data else ""
             if not script_text:
                 continue
-            duration = self.audio_generator._get_audio_duration(audio_path)
+            audio_path = audio_paths[idx] if idx < len(audio_paths) else None
+            duration = self._resolve_duration(audio_path, script_text)
+            if duration <= 0:
+                continue
             text_chunks = self._split_text_for_subtitles(script_text, language)
             chunk_durations = calculate_chunk_durations(
                 duration, text_chunks, script_text, language
@@ -121,6 +124,17 @@ class CueBuilder:
                 start_time = chunk_end_time
         logger.info(f"Built {len(cues)} cues for subtitles")
         return cues
+
+    def _resolve_duration(self, audio_path: Path | None, script_text: str) -> float:
+        if audio_path:
+            try:
+                return float(self.audio_generator._get_audio_duration(audio_path))
+            except Exception:
+                pass
+        words = max(1, len(script_text.split()))
+        avg_words_per_sec = 2.6  # ~156 WPM
+        estimated = max(2.0, words / avg_words_per_sec)
+        return float(min(estimated, 12.0) if words <= 6 else estimated)
 
     def _max_cue_seconds(self, language: str | None) -> float:
         lang = (language or "").lower()

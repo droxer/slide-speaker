@@ -65,32 +65,45 @@ This document provides clear definitions for all processing steps in the SlideSp
 ### PDF Podcast Pipeline Steps
 
 1. **generate_podcast_script**
-   - **Description**: Generates a two-person conversation script based on PDF content
-   - **Input**: Chapter data from segmentation
-   - **Output**: Structured conversation script with host/guest dialog
+   - **Description**: Generates a natural two-person conversation script (Host and Guest) based on PDF chapter content
+   - **Input**: Chapter data from segmentation step, including titles, descriptions, and key points
+   - **Output**: Structured conversation script as a list of dialogue items: [{"speaker": "Host|Guest", "text": "..."}]
    - **Dependencies**: segment_pdf_content
    - **Status**: Always required for podcast generation
+   - **Details**: Uses AI to create engaging conversations that explain complex topics clearly. Always generates in English first, avoiding references to visual elements since podcasts are audio-only.
 
 2. **translate_podcast_script** *(Optional)*
-   - **Description**: Translates podcast script to target language
+   - **Description**: Translates the English podcast script to the target language while preserving speaker roles
    - **Input**: English podcast script, target language
-   - **Output**: Translated podcast script
+   - **Output**: Translated podcast script with same structure as input
    - **Dependencies**: generate_podcast_script
    - **Status**: Required when transcript_language != "english"
+   - **Details**: Maintains Host/Guest speaker labels and dialogue structure during translation
 
 3. **generate_podcast_audio**
-   - **Description**: Generates multi-voice audio from podcast script
-   - **Input**: Podcast script, voice settings
-   - **Output**: Multi-track audio files
+   - **Description**: Generates multi-voice audio from podcast script using distinct voices for Host and Guest
+   - **Input**: Podcast script (translated if needed), voice language settings
+   - **Output**: Individual MP3 audio segments for each dialogue line, plus metadata about selected voices
    - **Dependencies**: generate_podcast_script (and translation step if applicable)
    - **Status**: Always required for podcast generation
+   - **Details**: Automatically selects appropriate voices for host/guest roles. Generates per-line audio segments that are later composed into final podcast.
 
 4. **compose_podcast**
-   - **Description**: Combines audio tracks into final podcast MP3
-   - **Input**: Multi-track audio files
-   - **Output**: Final MP3 podcast file
+   - **Description**: Combines individual audio segments into a single final podcast MP3 file
+   - **Input**: Individual MP3 audio segments from generate_podcast_audio step
+   - **Output**: Final MP3 podcast file ready for download
    - **Dependencies**: generate_podcast_audio
    - **Status**: Always required for podcast generation
+   - **Details**: Concatenates all audio segments in order and applies final processing to create the complete podcast
+
+### Podcast Script Storage and Retrieval
+
+The podcast script is stored in two formats for different uses:
+- **Markdown Format**: `{task_id}_podcast_transcript.md` - For human-readable display in the UI
+- **JSON Format**: `{task_id}_podcast_script.json` - For programmatic access via API
+
+The script can be retrieved via the API endpoint: `GET /api/tasks/{task_id}/podcast/script`
+This endpoint returns the structured dialogue data that was used for audio generation, including information about the selected host and guest voices.
 
 ## Slides Processing Steps
 

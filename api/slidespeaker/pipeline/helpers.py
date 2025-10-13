@@ -12,6 +12,29 @@ from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 
 
+async def check_and_handle_failure(
+    file_id: str, step_key: str, task_id: str | None = None
+) -> bool:
+    """
+    Return True when the overall task has already failed, preventing further processing
+    and ensuring the failure state is maintained.
+    """
+    state = await state_manager.get_state(file_id)
+    if state and state.get("status") == "failed":
+        logger.error(
+            "Task %s already marked as failed; step %s will not execute",
+            task_id or file_id,
+            step_key,
+        )
+        # Ensure the step is marked as failed too
+        if task_id:
+            await state_manager.update_step_status_by_task(task_id, step_key, "failed")
+        else:
+            await state_manager.update_step_status(file_id, step_key, "failed")
+        return True
+    return False
+
+
 async def check_and_handle_cancellation(
     file_id: str, step_key: str, task_id: str | None = None
 ) -> bool:

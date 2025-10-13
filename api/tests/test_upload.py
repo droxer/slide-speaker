@@ -8,7 +8,7 @@ from fastapi import Request
 from fastapi.testclient import TestClient
 
 from server import app
-from slidespeaker.routes.upload import require_authenticated_user
+from slidespeaker.routes.upload_routes import require_authenticated_user
 
 
 class TestUploadEndpoints:

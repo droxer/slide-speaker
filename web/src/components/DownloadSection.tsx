@@ -10,13 +10,13 @@ export type DownloadLinkItem = {
   hideInput?: boolean;
 };
 
-export type DownloadLinksProps = {
+export type DownloadSectionProps = {
   links: DownloadLinkItem[];
   className?: string;
   id?: string;
 };
 
-const DownloadLinks: React.FC<DownloadLinksProps> = ({ links, className, id }) => {
+const DownloadSection = ({ links, className, id }: DownloadSectionProps) => {
   const { t } = useI18n();
 
   if (!links || links.length === 0) {
@@ -56,4 +56,4 @@ const DownloadLinks: React.FC<DownloadLinksProps> = ({ links, className, id }) =
   );
 };
 
-export default DownloadLinks;
+export default DownloadSection;
