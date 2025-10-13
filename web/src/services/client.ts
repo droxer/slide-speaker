@@ -44,10 +44,7 @@ export const getTranscriptMarkdown = async (taskId: string) => {
   return String(res.data || '');
 };
 
-export const getStats = async () => {
-  const res = await api.get(`/api/tasks/statistics`);
-  return res.data as Record<string, unknown>;
-};
+
 
 export const getTaskById = async (taskId: string): Promise<Task> => {
   const res = await api.get(`/api/tasks/${encodeURIComponent(taskId)}`);
@@ -67,21 +64,59 @@ export const cancelRun = async (taskId: string) => {
   return res.data;
 };
 
-export const upload = async (payload: FormData | Record<string, unknown>) => {
+export interface UploadPayload {
+  filename: string;
+  file_data: string;
+  voice_language?: string;
+  subtitle_language?: string | null;
+  transcript_language?: string | null;
+  video_resolution?: string;
+  generate_avatar?: boolean;
+  generate_subtitles?: boolean;
+  generate_podcast?: boolean;
+  generate_video?: boolean;
+  task_type?: 'video' | 'podcast' | 'both';
+  source_type?: 'pdf' | 'slides' | 'audio';
+}
+
+export interface UploadResponse {
+  file_id: string;
+  upload_id?: string;
+  task_id: string;
+  message?: string | null;
+}
+
+export interface UploadSummary {
+  id: string;
+  user_id?: string | null;
+  filename?: string | null;
+  file_ext?: string | null;
+  source_type?: string | null;
+  content_type?: string | null;
+  checksum?: string | null;
+  size_bytes?: number | null;
+  storage_path?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export const upload = async (payload: FormData | UploadPayload): Promise<UploadResponse> => {
   if (typeof FormData !== 'undefined' && payload instanceof FormData) {
-    const res = await api.post(`/api/upload`, payload);
-    return res.data as { file_id: string; task_id: string };
+    const res = await api.post<UploadResponse>(`/api/upload`, payload);
+    return res.data;
   }
 
-  const res = await api.post(`/api/upload`, payload, {
+  const res = await api.post<UploadResponse>(`/api/upload`, payload, {
     headers: { 'Content-Type': 'application/json' },
   });
-  return res.data as { file_id: string; task_id: string };
+  return res.data;
 };
+
+
 
 export const runFile = async (fileId: string, payload: any) => {
   const res = await api.post(`/api/files/${encodeURIComponent(fileId)}/run`, payload, { headers: { 'Content-Type': 'application/json' } });
-  return res.data as { file_id: string; task_id: string };
+  return res.data as { upload_id: string; task_id: string };
 };
 
 export const getHealth = async (): Promise<HealthStatus> => {
@@ -89,27 +124,30 @@ export const getHealth = async (): Promise<HealthStatus> => {
   return res.data;
 };
 
-export const headTaskVideo = async (taskId: string) => {
-  const res = await api.head(`/api/tasks/${taskId}/video`);
-  return res.status >= 200 && res.status < 400;
-};
+export interface TaskProgressResponse {
+  status: string;
+  progress: number;
+  current_step: string;
+  steps: Record<string, unknown>;
+  errors?: unknown[];
+  filename?: string;
+  file_ext?: string;
+  source_type?: string;
+  voice_language?: string;
+  subtitle_language?: string;
+  generate_podcast?: boolean;
+  generate_video?: boolean;
+  task_type?: string;
+  created_at?: string;
+  updated_at?: string;
+  message?: string;
+}
 
-export const getTaskProgress = async <T = any>(taskId: string) => {
+export const getTaskProgress = async <T = TaskProgressResponse>(taskId: string): Promise<T> => {
   const res = await api.get<T>(`/api/tasks/${taskId}/progress`);
   return res.data;
 };
 
-export const getCurrentUserProfile = async (): Promise<ProfileResponse> => {
-  const res = await api.get<ProfileResponse>('/api/users/me');
-  return res.data;
-};
-
-export const updateCurrentUserProfile = async (
-  payload: {name?: string | null; preferred_language?: string | null},
-): Promise<ProfileResponse> => {
-  const res = await api.patch<ProfileResponse>('/api/users/me', payload);
-  return res.data;
-};
 
 export const getVttText = async (taskId: string, language?: string) => {
   const path = language
@@ -122,4 +160,25 @@ export const getVttText = async (taskId: string, language?: string) => {
 export const getPodcastScript = async (taskId: string): Promise<PodcastScriptResponse> => {
   const res = await api.get(`/api/tasks/${taskId}/podcast/script`);
   return res.data as PodcastScriptResponse;
+};
+
+export const getUploads = async (): Promise<{ uploads: UploadSummary[] }> => {
+  const res = await api.get(`/api/uploads`);
+  const data = res.data as { uploads?: UploadSummary[] } | UploadSummary[];
+  if (Array.isArray(data)) {
+    return { uploads: data };
+  }
+  return { uploads: Array.isArray(data?.uploads) ? data.uploads : [] };
+};
+
+export const getCurrentUserProfile = async (): Promise<ProfileResponse> => {
+  const res = await api.get<ProfileResponse>('/api/users/me');
+  return res.data;
+};
+
+export const updateCurrentUserProfile = async (
+  payload: {name?: string | null; preferred_language?: string | null},
+): Promise<ProfileResponse> => {
+  const res = await api.patch<ProfileResponse>('/api/users/me', payload);
+  return res.data;
 };

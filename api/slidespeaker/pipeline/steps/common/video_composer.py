@@ -13,6 +13,7 @@ from loguru import logger
 
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.core.state_manager import state_manager
+from slidespeaker.storage.paths import output_storage_uri
 from slidespeaker.video import VideoComposer
 
 
@@ -63,18 +64,23 @@ async def compose_video(
             if not audio_files:
                 raise ValueError("No audio files available for video composition")
 
-        # Prepare output directory
+        # Prepare output directory for intermediate assets
         work_dir = config.output_dir / file_id
-        video_dir = work_dir / "videos"
-        video_dir.mkdir(exist_ok=True, parents=True)
+        work_dir.mkdir(exist_ok=True, parents=True)
+
+        # Resolve final storage key/path prior to composition
+        state = await state_manager.get_state(file_id)
+        _, storage_key, storage_uri = output_storage_uri(
+            file_id,
+            state=state if isinstance(state, dict) else None,
+            segments=("video", "final.mp4"),
+        )
+
+        final_video_path = config.output_dir / storage_key
+        final_video_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Generate video using shared composer
         composer = VideoComposer()
-
-        # Determine output filename (local). Keep by file_id for workspace organization
-        file_type = "pdf" if is_pdf else "presentation"
-        video_filename = f"{file_id}_{file_type}.mp4"
-        final_video_path = video_dir / video_filename
 
         # Get subtitle files (SRT and VTT) if available
         subtitle_files = []
@@ -106,24 +112,32 @@ async def compose_video(
 
         # Upload to storage (use task-id based key if available, otherwise file_id)
         storage_provider = get_storage_provider()
-        base_id = file_id
-        try:
-            state = await state_manager.get_state(file_id)
-            if state and isinstance(state, dict) and state.get("task_id"):
-                base_id = str(state["task_id"])  # prefer task-id based naming
-        except Exception:
-            base_id = file_id
-        storage_key = f"{base_id}.mp4"
         storage_url = storage_provider.upload_file(
             str(final_video_path), storage_key, "video/mp4"
         )
 
         # Store in state
-        video_data = {"local_path": str(final_video_path), "storage_url": storage_url}
+        video_data = {
+            "local_path": str(final_video_path),
+            "storage_url": storage_url,
+            "storage_key": storage_key,
+            "storage_uri": storage_uri,
+        }
 
         await state_manager.update_step_status(
             file_id, state_key, "completed", video_data
         )
+
+        if state and isinstance(state, dict):
+            artifacts = dict(state.get("artifacts") or {})
+            artifacts["final_video"] = {
+                "local_path": str(final_video_path),
+                "storage_key": storage_key,
+                "storage_uri": storage_uri,
+                "content_type": "video/mp4",
+            }
+            state["artifacts"] = artifacts
+            await state_manager.save_state(file_id, state)
 
         logger.info(f"Video composition completed: {final_video_path}")
         return str(final_video_path), storage_url

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useI18n } from '@/i18n/hooks';
+import { getFileTypeIcon } from '@/utils/fileIcons';
 
 type UploadingSummaryItem = {
   key: string;
@@ -32,41 +33,6 @@ const FileUploadingView: React.FC<FileUploadingViewProps> = ({
 }) => {
   const { t, locale } = useI18n();
 
-  const getFileTypeIcon = (filename: string | null | undefined) => {
-    if (!filename) return '📄';
-    const ext = filename.toLowerCase().split('.').pop() || '';
-    switch (ext) {
-      case 'pdf':
-        return '📑'; // Document icon for PDF
-      case 'ppt':
-      case 'pptx':
-        return '📊'; // Presentation icon for PowerPoint
-      case 'doc':
-      case 'docx':
-        return '📝'; // Document icon for Word
-      case 'xls':
-      case 'xlsx':
-        return '📈'; // Spreadsheet icon for Excel
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'gif':
-      case 'svg':
-        return '🖼️'; // Image icon
-      case 'mp4':
-      case 'avi':
-      case 'mov':
-      case 'wmv':
-        return '🎬'; // Video icon
-      case 'mp3':
-      case 'wav':
-      case 'aac':
-      case 'flac':
-        return '🎵'; // Audio icon
-      default:
-        return '📄'; // Default document icon
-    }
-  };
   const displayName = typeof fileName === 'string' && fileName.trim().length > 0 ? fileName.trim() : null;
   const clampedProgress = Number.isFinite(progress)
     ? Math.max(0, Math.min(100, Math.round(progress)))
@@ -87,20 +53,28 @@ const FileUploadingView: React.FC<FileUploadingViewProps> = ({
   }, [fileSize, locale]);
   const hasSummary = summaryItems.length > 0 || outputs.length > 0;
   return (
-    <div className="processing-view">
-      <div className="spinner"></div>
-      <h3>{t('uploading.title')}</h3>
+    <div className="processing-view file-upload-view">
+      <div className="file-upload-header">
+        <div className="spinner"></div>
+        <h3>{t('uploading.title')}</h3>
+      </div>
+
       {displayName && (
-        <p className="uploading-file" title={displayName}>
-          <span className="uploading-file__icon" aria-hidden>{getFileTypeIcon(displayName)}</span>
-          <span className="uploading-file__text">{displayName}</span>
-          {formattedFileSize && (
-            <span className="uploading-file__meta">{formattedFileSize}</span>
-          )}
-        </p>
+        <div className="file-info-card">
+          <div className="file-info-content">
+            <p className="uploading-file" title={displayName}>
+              <span className="file-info-icon">{getFileTypeIcon(displayName)}</span>
+              <span className="uploading-file__text">{displayName}</span>
+              {formattedFileSize && (
+                <span className="uploading-file__meta">{formattedFileSize}</span>
+              )}
+            </p>
+          </div>
+        </div>
       )}
+
       <div
-        className="progress-container"
+        className="progress-container file-upload-progress"
         role="group"
         aria-label={t('uploading.progressLabel', undefined, 'Upload progress')}
       >

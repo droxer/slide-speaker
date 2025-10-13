@@ -360,16 +360,16 @@ const TaskProcessingModal: React.FC<TaskProcessingModalProps> = ({
           }
         }
 
-        // Create filename from file_id and extension if available
+        // Create filename from upload_id and extension if available
         const extCandidate =
           effectiveTask.file_ext ||
           effectiveTask.kwargs?.file_ext ||
           (typeof state.file_ext === 'string' ? state.file_ext : undefined);
-        if (effectiveTask.file_id && extCandidate &&
-            typeof effectiveTask.file_id === 'string' && typeof extCandidate === 'string') {
+        if (effectiveTask.upload_id && extCandidate &&
+            typeof effectiveTask.upload_id === 'string' && typeof extCandidate === 'string') {
           // Ensure file_ext starts with a dot
           const ext = extCandidate.startsWith('.') ? extCandidate : `.${extCandidate}`;
-          return `${effectiveTask.file_id}${ext}`;
+          return `${effectiveTask.upload_id}${ext}`;
         }
 
         // Fallback to task_id with extension if available
@@ -380,9 +380,9 @@ const TaskProcessingModal: React.FC<TaskProcessingModalProps> = ({
           return `${effectiveTask.task_id}${ext}`;
         }
 
-        // Try to construct filename from file_id without extension
-        if (effectiveTask.file_id && typeof effectiveTask.file_id === 'string') {
-          return `${effectiveTask.file_id}`;
+        // Try to construct filename from upload_id without extension
+        if (effectiveTask.upload_id && typeof effectiveTask.upload_id === 'string') {
+          return `${effectiveTask.upload_id}`;
         }
 
         // Try to construct filename from task_id without extension
@@ -492,7 +492,7 @@ const TaskProcessingModal: React.FC<TaskProcessingModalProps> = ({
         <div className="processing-modal__body">
           <TaskProcessingSteps
             taskId={task.task_id}
-            fileId={task.file_id}
+            uploadId={task.upload_id}
             fileName={details?.filename || null}
             progress={details?.progress ?? 0}
             onStop={handleStop}

@@ -63,7 +63,7 @@ class TestTaskRepository:
             # Mock query result
             mock_row = MagicMock()
             mock_row.id = "test_task_id"
-            mock_row.file_id = "test_file_id"
+            mock_row.upload_id = "test_file_id"
             mock_row.task_type = "test_type"
             mock_row.status = "queued"
             mock_row.kwargs = {"test": "data"}
@@ -224,7 +224,7 @@ class TestTaskRepository:
             mock_rows = [
                 MagicMock(
                     task_id="test_task_id_1",
-                    file_id="test_file_id_1",
+                    upload_id="test_file_id_1",
                     task_type="test_type_1",
                     status="completed",
                     created_at=datetime(2023, 1, 1, 12, 0, 0),

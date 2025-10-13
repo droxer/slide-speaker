@@ -34,7 +34,7 @@ class TestHealthEndpoints(unittest.TestCase):
         """Set up test client before each test."""
         self.client = TestClient(app)
 
-    @patch("slidespeaker.routes.health.RedisConfig.get_redis_client")
+    @patch("slidespeaker.routes.health_routes.RedisConfig.get_redis_client")
     @patch("slidespeaker.configs.db.get_session")
     def test_health_endpoint(
         self, mock_get_session: MagicMock, mock_get_redis_client: MagicMock
@@ -66,7 +66,7 @@ class TestAuthEndpoints(unittest.TestCase):
         self.client = TestClient(app)
 
     @patch(
-        "slidespeaker.routes.auth.verify_user_credentials",
+        "slidespeaker.routes.auth_routes.verify_user_credentials",
         new_callable=AsyncMock,
     )
     def test_login_endpoint_invalid_credentials(

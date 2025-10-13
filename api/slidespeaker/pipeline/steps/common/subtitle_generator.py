@@ -14,6 +14,7 @@ from loguru import logger
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.configs.locales import locale_utils
 from slidespeaker.core.state_manager import state_manager
+from slidespeaker.storage.paths import output_storage_uri
 from slidespeaker.subtitle import SubtitleGenerator
 
 
@@ -92,7 +93,11 @@ async def generate_subtitles_common(
         else:
             # Create subtitles with actual audio timing
             # Convert to Path objects and filter out non-existent files
-            audio_paths = [Path(f) for f in audio_files_data if Path(f).exists()]
+            audio_paths = [
+                Path(str(f)).expanduser()
+                for f in audio_files_data
+                if isinstance(f, (str, Path)) and str(f).strip()
+            ]
             srt_path, vtt_path = subtitle_generator.generate_subtitles(
                 scripts=transcripts_data,
                 audio_files=audio_paths,
@@ -105,24 +110,27 @@ async def generate_subtitles_common(
         # Upload subtitle files to storage provider
         subtitle_urls: list[str] = []
         storage_provider = get_storage_provider()
+        state_snapshot = await state_manager.get_state(file_id)
+        storage_keys: list[str] = []
+        storage_uris: list[str] = []
         try:
-            # Prefer task-id based naming if available in state
-            try:
-                _state = await state_manager.get_state(file_id)
-                base_id = (
-                    str(_state.get("task_id"))
-                    if _state and isinstance(_state, dict) and _state.get("task_id")
-                    else file_id
-                )
-            except Exception:
-                base_id = file_id
-            srt_key = f"{base_id}_{locale_code}.srt"
-            vtt_key = f"{base_id}_{locale_code}.vtt"
+            _, srt_key, srt_uri = output_storage_uri(
+                file_id,
+                state=state_snapshot if isinstance(state_snapshot, dict) else None,
+                segments=("subtitles", f"{locale_code}.srt"),
+            )
+            _, vtt_key, vtt_uri = output_storage_uri(
+                file_id,
+                state=state_snapshot if isinstance(state_snapshot, dict) else None,
+                segments=("subtitles", f"{locale_code}.vtt"),
+            )
 
             srt_url = storage_provider.upload_file(str(srt_path), srt_key, "text/plain")
             vtt_url = storage_provider.upload_file(str(vtt_path), vtt_key, "text/vtt")
 
             subtitle_urls = [srt_url, vtt_url]
+            storage_keys = [srt_key, vtt_key]
+            storage_uris = [srt_uri, vtt_uri]
             logger.info(f"Uploaded subtitles to storage: {srt_url}, {vtt_url}")
         except Exception as storage_error:
             logger.error(f"Failed to upload subtitles to storage: {storage_error}")
@@ -133,12 +141,33 @@ async def generate_subtitles_common(
         storage_data = {
             "subtitle_files": [str(srt_path), str(vtt_path)],
             "storage_urls": subtitle_urls,
+            "storage_keys": storage_keys,
+            "storage_uris": storage_uris,
         }
 
         await state_manager.update_step_status(
             file_id, state_key, "completed", storage_data
         )
         logger.info("Subtitle generation completed successfully")
+
+        if state_snapshot and isinstance(state_snapshot, dict):
+            artifacts = dict(state_snapshot.get("artifacts") or {})
+            subtitles_map = dict(artifacts.get("subtitles") or {})
+            subtitles_map[locale_code] = {
+                "srt": {
+                    "local_path": str(srt_path),
+                    "storage_key": storage_keys[0] if storage_keys else None,
+                    "storage_uri": storage_uris[0] if storage_uris else None,
+                },
+                "vtt": {
+                    "local_path": str(vtt_path),
+                    "storage_key": storage_keys[1] if len(storage_keys) > 1 else None,
+                    "storage_uri": storage_uris[1] if len(storage_uris) > 1 else None,
+                },
+            }
+            artifacts["subtitles"] = subtitles_map
+            state_snapshot["artifacts"] = artifacts
+            await state_manager.save_state(file_id, state_snapshot)
     except Exception as e:
         logger.error(f"Failed to generate subtitles: {e}")
         import traceback

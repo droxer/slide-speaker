@@ -9,7 +9,9 @@ import DownloadLinks, { DownloadLinkItem } from '@/components/DownloadLinks';
 import { resolveLanguages, getLanguageDisplayName } from '@/utils/language';
 import { usePodcastScriptQuery } from '@/services/queries';
 import { useI18n } from '@/i18n/hooks';
+import { getTaskStatusClass, getTaskStatusIcon, getTaskStatusLabel } from '@/utils/taskStatus';
 import type { Task, DownloadItem } from '@/types';
+import { api as apiClient } from '@/services/client';
 
 const formatDateTime = (value?: string) => {
   if (!value) return 'Unknown';
@@ -82,14 +84,20 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
     task.filename ||
     task.kwargs?.filename ||
     task.state?.filename ||
-    task.kwargs?.file_id ||
-    task.file_id;
+    task.kwargs?.upload_id ||
+    task.upload_id;
   const taskTypeKey = (task.task_type ?? '').toString().toLowerCase();
   const displayTaskType = t(
     `task.detail.type.${taskTypeKey || 'unknown'}`,
     undefined,
     formatTaskType(task.task_type),
   );
+
+  // Get consistent status styling using utility functions
+  const statusClass = getTaskStatusClass(task.status);
+  const statusIcon = getTaskStatusIcon(task.status);
+  const statusLabel = getTaskStatusLabel(task.status, t);
+  const statusContent = `${statusIcon} ${statusLabel}`;
   const [previewTab, setPreviewTab] = useState<'video' | 'audio'>('video');
   const hasVideoAsset = downloads?.some((item) => item.type === 'video') ?? false;
   const hasPodcastAsset = downloads?.some((item) => item.type === 'podcast') ?? false;
@@ -102,11 +110,20 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
     return tabs;
   }, [mediaType, hasVideoAsset, hasAudioAsset, hasPodcastAsset, taskType]);
   
-  const videoUrl = `${apiBaseUrl}/api/tasks/${task.task_id}/video`;
-  const podcastUrl = `${apiBaseUrl}/api/tasks/${task.task_id}/podcast`;
-  const audioUrl = `${apiBaseUrl}/api/tasks/${task.task_id}/audio`;
+  const pathFor = (path: string) => {
+    try {
+      const base = apiClient.defaults.baseURL || apiBaseUrl;
+      return base ? new URL(path, base).toString() : path;
+    } catch {
+      return `${apiBaseUrl}${path}`;
+    }
+  };
+
+  const videoUrl = pathFor(`/api/tasks/${task.task_id}/video`);
+  const podcastUrl = pathFor(`/api/tasks/${task.task_id}/podcast`);
+  const audioUrl = pathFor(`/api/tasks/${task.task_id}/audio`);
   const audioPreviewUrl = (taskType === 'podcast' || hasPodcastAsset) ? podcastUrl : audioUrl;
-  const subtitleUrl = `${apiBaseUrl}/api/tasks/${task.task_id}/subtitles/vtt${captionLang ? `?language=${encodeURIComponent(captionLang)}` : ''}`;
+  const subtitleUrl = pathFor(`/api/tasks/${task.task_id}/subtitles/vtt${captionLang ? `?language=${encodeURIComponent(captionLang)}` : ''}`);
   const podcastScriptQuery = usePodcastScriptQuery(task.task_id, availableTabs.includes('audio') && hasPodcastAsset);
 
   useEffect(() => {
@@ -136,8 +153,8 @@ const TaskDetail: React.FC<TaskDetailProps> = ({
             <div className="task-detail-card__title-row">
               <h1>{filename}</h1>
               <span className="task-detail-card__type-pill">{displayTaskType}</span>
-              <div className="task-status task-status--completed">
-                ✅ {t('task.status.completed')}
+              <div className={`task-status ${statusClass}`}>
+                {statusContent}
               </div>
             </div>
             <p className="task-detail-card__meta">

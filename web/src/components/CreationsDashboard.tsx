@@ -3,18 +3,20 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { cancelRun as apiCancelRun, deleteTask as apiDeleteTask, purgeTask as apiPurgeTask, getHealth } from '../services/client';
-import { getCachedDownloads, useCancelTaskMutation, useFilesQuery, useRunFileTaskMutation, useSearchTasksQuery, useTaskQuery } from '../services/queries';
-import TaskCard from './TaskCard';
+import type { UploadSummary } from '../services/client';
+import { useCancelTaskMutation, useFilesQuery, useRunFileTaskMutation, useSearchTasksQuery, useTaskQuery } from '../services/queries';
+import { Link } from '@/navigation';
 import RunTaskModal from './RunTaskModal';
 import TaskProcessingModal from './TaskProcessingModal';
 import { getGlobalRunDefaults, saveGlobalRunDefaults } from '../utils/defaults';
 import type { Task } from '../types';
 import { useI18n } from '@/i18n/hooks';
 import { getLanguageDisplayName } from '../utils/language';
+import { getTaskStatusClass, getTaskStatusIcon, getTaskStatusLabel, type TaskStatus } from '@/utils/taskStatus';
+import { getFileTypeIcon, getFileTypeCategory, isPdf, isPowerPoint } from '@/utils/fileIcons';
 
 interface CreationsDashboardProps { apiBaseUrl: string }
 
-const isPdf = (ext?: string) => (ext || '').toLowerCase() === '.pdf';
 const shortId = (id?: string) => {
   if (!id) return '';
   if (id.length <= 12) return id;
@@ -28,22 +30,33 @@ const RESOLUTION_KEYS: Record<string, string> = {
   fullhd: 'runTask.resolution.fullhd',
 };
 
+type FileGroup = {
+  upload_id?: string;
+  filename?: string;
+  file_ext?: string;
+  source_type?: string | null;
+  tasks: Task[];
+  uploadOnly?: boolean;
+  upload?: UploadSummary;
+  uploadCreatedAt?: string | null;
+  uploadUpdatedAt?: string | null;
+};
+
 const CreationsDashboard: React.FC<CreationsDashboardProps> = ({ apiBaseUrl }) => {
   const [search, setSearch] = useState('');
   const [debounced, setDebounced] = useState('');
   const [status, setStatus] = useState('all');
-  const [expandedFiles, setExpandedFiles] = useState<Set<string>>(new Set());
-  const [expandedTasks, setExpandedTasks] = useState<Set<string>>(new Set());
   const { t } = useI18n();
   const [page, setPage] = useState(1);
   const [toast, setToast] = useState<{ type: 'success'|'error'; message: string }|null>(null);
   const [runOpen, setRunOpen] = useState(false);
-  const [runFile, setRunFile] = useState<{ file_id: string; filename?: string; isPdf: boolean } | null>(null);
+  const [runFile, setRunFile] = useState<{ upload_id: string; filename?: string; isPdf: boolean } | null>(null);
   const [runDefaults, setRunDefaults] = useState<any>({});
   const [runSubmitting, setRunSubmitting] = useState(false);
   const [processingTask, setProcessingTask] = useState<Task | null>(null);
   const queryClient = useQueryClient();
   const [hiddenTasks, setHiddenTasks] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => { const t = setTimeout(() => setDebounced(search.trim()), 350); return () => clearTimeout(t); }, [search]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2600); return () => clearTimeout(t); }, [toast]);
@@ -105,18 +118,18 @@ const CreationsDashboard: React.FC<CreationsDashboardProps> = ({ apiBaseUrl }) =
     ? t('creations.health.databaseLatency', { latency: typeof dbLatency === 'number' ? dbLatency : 'n/a' }, `Database latency: ${dbLatency ?? 'n/a'} ms`)
     : (dbError || t('creations.health.databaseUnavailable'));
 
-  // Build groups when searching (file_id -> tasks)
+  // Build groups when searching (upload_id -> tasks)
   const searchGroups = useMemo(() => {
-    if (!searching) return [] as Array<{ file_id?: string; filename?: string; file_ext?: string; tasks: Task[] }>;
+    if (!searching) return [] as Array<{ upload_id?: string; filename?: string; file_ext?: string; tasks: Task[] }>;
     const items: Task[] = (((searchQuery.data as any)?.tasks) || []) as Task[];
-    const map = new Map<string, { file_id?: string; filename?: string; file_ext?: string; tasks: Task[]; newest: number }>();
+    const map = new Map<string, { upload_id?: string; filename?: string; file_ext?: string; tasks: Task[]; newest: number }>();
     for (const t of items) {
-      const fid = t.file_id || (t as any)?.kwargs?.file_id;
+      const fid = t.upload_id || (t as any)?.kwargs?.upload_id;
       const tFilename = t.filename || (t as any)?.kwargs?.filename || t.state?.filename;
       const tFileExt = t.file_ext || (t as any)?.kwargs?.file_ext;
       const key = fid || `unknown:${tFilename || 'Unknown'}`;
       const updated = Date.parse(t.updated_at || t.created_at || '') || 0;
-      if (!map.has(key)) map.set(key, { file_id: fid, filename: tFilename, file_ext: tFileExt, tasks: [t], newest: updated });
+      if (!map.has(key)) map.set(key, { upload_id: fid, filename: tFilename, file_ext: tFileExt, tasks: [t], newest: updated });
       else { const g = map.get(key)!; g.tasks.push(t); g.newest = Math.max(g.newest, updated); g.filename ||= tFilename; g.file_ext ||= tFileExt; }
     }
     const groups = Array.from(map.values()).sort((a, b) => b.newest - a.newest);
@@ -140,19 +153,197 @@ const CreationsDashboard: React.FC<CreationsDashboardProps> = ({ apiBaseUrl }) =
       const runningCount = searchGroups.reduce((n, g) => n + filterHidden(g.tasks).filter((t) => t.status === 'processing').length, 0);
       return { filesCount, creationsCount, runningCount };
     }
-    const files = ((filesQuery.data as any)?.files || []) as Array<{ tasks?: Task[] }>;
+    const files = ((filesQuery.data as any)?.files || []) as Array<{ tasks?: Task[]; uploadOnly?: boolean }>;
     let filesCount = 0, creationsCount = 0, runningCount = 0;
     for (const f of files) {
       const tasks = filterHidden((f.tasks || []) as Task[]);
       const vis = status === 'all' ? tasks : tasks.filter((t) => t.status === status);
-      if (vis.length > 0) filesCount++;
+      const isUploadOnly = Boolean(f.uploadOnly);
+      if (vis.length > 0 || (status === 'all' && isUploadOnly)) filesCount++;
       creationsCount += vis.length;
       runningCount += tasks.filter((t) => t.status === 'processing').length;
     }
     return { filesCount, creationsCount, runningCount };
   }, [searching, searchGroups, filesQuery.data, status, hiddenTasks]);
 
-  const toggleFile = (k: string) => setExpandedFiles((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
+  const STATUS_ORDER: TaskStatus[] = ['processing', 'queued', 'completed', 'failed', 'cancelled'];
+
+  const formatTimestamp = useCallback(
+    (iso?: string | null) => {
+      if (!iso) return t('common.unknown', undefined, 'Unknown');
+      const date = new Date(iso);
+      if (Number.isNaN(date.getTime())) {
+        return t('common.unknown', undefined, 'Unknown');
+      }
+      return date.toLocaleString();
+    },
+    [t],
+  );
+
+  const toggleGroup = useCallback((groupKey: string) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  }, []);
+
+  const renderFileGroup = (group: FileGroup, key: string) => {
+    const allTasks = [...(group.tasks || [])]
+      .filter((task) => !hiddenTasks.has(task.task_id))
+      .sort(
+        (a, b) =>
+          Date.parse(b.updated_at || b.created_at || '') - Date.parse(a.updated_at || a.created_at || ''),
+      );
+    const filteredTasks = status === 'all' ? allTasks : allTasks.filter((task) => task.status === status);
+    const showPlaceholder = group.uploadOnly && status === 'all' && allTasks.length === 0;
+
+    if (!showPlaceholder && filteredTasks.length === 0) {
+      return null;
+    }
+
+    const referenceTask = filteredTasks[0] ?? allTasks[0];
+    const fileName = group.filename || referenceTask?.filename || group.upload?.filename;
+    const fileExt = group.file_ext || referenceTask?.file_ext || group.upload?.file_ext;
+    const actionUploadId = group.upload_id || group.upload?.id || referenceTask?.upload_id || null;
+    const effectiveFileExt = fileExt || referenceTask?.file_ext || '';
+
+    const statusCounts = allTasks.reduce<Record<string, number>>((acc, task) => {
+      if (task.status === 'upload_only') return acc;
+      acc[task.status] = (acc[task.status] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    const hasUploadActions = Boolean(actionUploadId);
+    const normalizedExt = (effectiveFileExt || '').toLowerCase();
+    const isPdfFile = isPdf(effectiveFileExt);
+    const isPresentationFile = normalizedExt.includes('ppt');
+    const activeStatus = allTasks.find((task) => task.status === 'processing' || task.status === 'queued')?.status ?? null;
+    const lastUpdatedIso =
+      referenceTask?.updated_at ??
+      referenceTask?.created_at ??
+      group.uploadUpdatedAt ??
+      group.upload?.updated_at ??
+      group.uploadCreatedAt ??
+      group.upload?.created_at ??
+      null;
+    const statusPills = STATUS_ORDER.filter((state) => statusCounts[state]).map((state) => (
+      <span
+        key={state}
+        className={`file-status-pill status-${state}${activeStatus === state ? ' is-active' : ''}`}
+      >
+        <span className="file-status-pill__count">{statusCounts[state]}</span>
+        <span className="file-status-pill__label">{getTaskStatusLabel(state, t)}</span>
+      </span>
+    ));
+    const canToggle = !showPlaceholder && filteredTasks.length > 0;
+    const isCollapsed = canToggle ? collapsedGroups.has(key) : false;
+    const taskListId = `file-group-${encodeURIComponent(key)}-tasks`;
+
+    return (
+      <section key={key} className={`file-group${isCollapsed ? ' is-collapsed' : ''}`}>
+        <header className="file-group-header">
+          <div className="file-overview">
+            <div className="file-title-row" title={fileName || t('common.unknownFile', undefined, 'Unknown file')}>
+              <div className="file-icon">
+                <span className={`file-icon-${getFileTypeCategory(effectiveFileExt)}`}>{getFileTypeIcon(effectiveFileExt)}</span>
+              </div>
+              <div className="file-title-info">
+                <div className="file-title-text">
+                  {formatFileName(fileName || undefined, 48)}
+                  {fileExt && (
+                    <div className={`file-type-badge${isPdfFile ? ' pdf' : isPresentationFile ? ' ppt' : ''}`}>
+                      {fileExt.replace(/^\./, '').toUpperCase()}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div
+              className="file-meta-row"
+              aria-label={t(
+                'creations.file.taskGroupLabel',
+                { fileName: fileName || '' },
+                'Tasks for this upload',
+              )}
+            >
+              <div className="file-meta-item">
+                {t('creations.file.taskListTitle', { count: allTasks.length }, `Tasks (${allTasks.length})`)}
+              </div>
+              {lastUpdatedIso && (
+                <div className="file-meta-item">
+                  <span className="file-meta-label">
+                    {t('task.detail.updated', undefined, 'Updated')}
+                  </span>
+                  <time dateTime={lastUpdatedIso}>{formatTimestamp(lastUpdatedIso)}</time>
+                </div>
+              )}
+            </div>
+            {statusPills.length > 0 && (
+              <div className="file-status-row">
+                {statusPills}
+              </div>
+            )}
+          </div>
+          <div className="file-actions">
+            {canToggle && (
+              <button
+                type="button"
+                className={`file-header-toggle${isCollapsed ? ' collapsed' : ''}`}
+                onClick={() => toggleGroup(key)}
+                aria-expanded={!isCollapsed}
+                aria-controls={taskListId}
+              >
+                <span className="file-header-toggle-icon" aria-hidden>
+                  {isCollapsed ? '▸' : '▾'}
+                </span>
+                <span className="file-header-toggle-label">
+                  {isCollapsed
+                    ? t('creations.file.expand', undefined, 'Expand details')
+                    : t('creations.file.collapse', undefined, 'Collapse details')}
+                </span>
+              </button>
+            )}
+            {hasUploadActions && actionUploadId && (
+              <>
+                <button
+                  className="file-action-btn primary"
+                  title={t('actions.generateVideo')}
+                  onClick={() => onRun(actionUploadId, group.filename, effectiveFileExt, 'video')}
+                  disabled={!actionUploadId}
+                >
+                  {t('actions.generateVideo')}
+                </button>
+                {isPdf(effectiveFileExt) && (
+                  <button
+                    className="file-action-btn secondary"
+                    title={t('actions.generatePodcast')}
+                    onClick={() => onRun(actionUploadId, group.filename, effectiveFileExt, 'podcast')}
+                    disabled={!actionUploadId}
+                  >
+                    {t('actions.generatePodcast')}
+                  </button>
+                )}
+              </>
+            )}
+
+          </div>
+        </header>
+        {!showPlaceholder && !isCollapsed && filteredTasks.length > 0 && (
+          <div
+            id={taskListId}
+            className="file-task-list"
+            role="group"
+            aria-label={t('creations.file.taskGroupLabel', { fileName: fileName || '' }, 'Tasks for this upload')}
+          >
+            <ul>{filteredTasks.map(renderTaskItem)}</ul>
+          </div>
+        )}
+      </section>
+    );
+  };
+
 
   const runFileTask = useRunFileTaskMutation();
   const cancelMutation = useCancelTaskMutation();
@@ -160,81 +351,250 @@ const CreationsDashboard: React.FC<CreationsDashboardProps> = ({ apiBaseUrl }) =
   const { data: processingTaskData } = useTaskQuery(processingTaskId || '', processingTask ?? null);
   const processingModalTask = processingTaskData ?? processingTask;
 
-  const onCancel = async (taskId: string) => {
-    try {
-      console.log('Cancelling task:', taskId);
-      const result = await cancelMutation.mutateAsync(taskId);
-      console.log('Cancel result:', result);
-      // Also invalidate the specific task query to ensure UI updates
-      await queryClient.invalidateQueries({ queryKey: ['task', taskId] });
-      // Also refetch the files query to ensure the task list updates
-      await queryClient.invalidateQueries({ queryKey: ['files'], exact: false });
-      console.log('Queries invalidated');
-    }
-    catch (error) {
-      console.error('Failed to cancel task:', error);
-      alert(t('creations.toast.cancelFailed', undefined, 'Failed to cancel task'));
-    }
-  };
-  const onDelete = async (taskId: string) => {
-    if (!window.confirm(t('creations.confirm.delete', undefined, 'This will permanently remove the task and its state. Continue?'))) return;
-    try {
-      await apiDeleteTask(taskId);
-    } catch (error: any) {
-      const message = error?.response?.data?.error || error?.message || '';
-      if (typeof message === 'string' && message.toLowerCase().includes('cannot be cancelled')) {
-        await apiPurgeTask(taskId);
-      } else {
-        throw error;
+  const onCancel = useCallback(
+    async (taskId: string) => {
+      try {
+        console.log('Cancelling task:', taskId);
+        const result = await cancelMutation.mutateAsync(taskId);
+        console.log('Cancel result:', result);
+        // Also invalidate the specific task query to ensure UI updates
+        await queryClient.invalidateQueries({ queryKey: ['task', taskId] });
+        // Also refetch the files query to ensure the task list updates
+        await queryClient.invalidateQueries({ queryKey: ['files'], exact: false });
+        console.log('Queries invalidated');
       }
-    }
-    try {
-      setHiddenTasks((prev) => {
-        const next = new Set(prev);
-        next.add(taskId);
-        return next;
-      });
-      // Optimistically remove the task from any cached lists
-      queryClient.setQueriesData({ predicate: ({ queryKey }) => Array.isArray(queryKey) && queryKey[0] === 'files' }, (old: any) => {
-        if (!old || !Array.isArray(old.files)) return old;
-        const files = old.files
-          .map((file: any) => ({
-            ...file,
-            tasks: Array.isArray(file.tasks)
-              ? file.tasks.filter((t: any) => t?.task_id !== taskId)
-              : file.tasks,
-          }))
-          .filter((file: any) => Array.isArray(file.tasks) ? file.tasks.length > 0 : true);
-        return { ...old, files };
-      });
-      queryClient.setQueriesData({ predicate: ({ queryKey }) => Array.isArray(queryKey) && queryKey[0] === 'tasks' }, (old: any) => {
-        if (!Array.isArray(old)) return old;
-        return old.filter((t: any) => t?.task_id !== taskId);
-      });
-      queryClient.setQueriesData({ predicate: ({ queryKey }) => Array.isArray(queryKey) && queryKey[0] === 'tasksSearch' }, (old: any) => {
-        if (!old || !Array.isArray(old.tasks)) return old;
-        return { ...old, tasks: old.tasks.filter((t: any) => t?.task_id !== taskId) };
-      });
-      await queryClient.invalidateQueries({ queryKey: ['tasks'] });
-      await queryClient.invalidateQueries({ queryKey: ['files'] });
-    } catch (error) {
-      console.error('Failed to delete task from creations', error);
-      alert(t('creations.toast.deleteFailed', undefined, 'Failed to delete task'));
-    }
-  };
+      catch (error) {
+        console.error('Failed to cancel task:', error);
+        alert(t('creations.toast.cancelFailed', undefined, 'Failed to cancel task'));
+      }
+    },
+    [cancelMutation, queryClient, t],
+  );
 
-  const deriveOutputs = (task: Task) => {
-    const tt = String(task.task_type || (task.state as any)?.task_type || '').toLowerCase();
-    if (tt === 'video') return { video: true, podcast: false };
-    if (tt === 'podcast') return { video: false, podcast: true };
-    if (tt === 'both') return { video: true, podcast: true };
-    const dl = getCachedDownloads(queryClient, task.task_id);
-    const items = dl?.items || [];
-    return { video: items.some((i: any) => i?.type === 'video'), podcast: items.some((i: any) => i?.type === 'podcast') };
-  };
+  const onDelete = useCallback(
+    async (taskId: string) => {
+      if (!window.confirm(t('creations.confirm.delete', undefined, 'This will permanently remove the task and its state. Continue?'))) return;
+      try {
+        await apiDeleteTask(taskId);
+      } catch (error: any) {
+        const message = error?.response?.data?.error || error?.message || '';
+        if (typeof message === 'string' && message.toLowerCase().includes('cannot be cancelled')) {
+          await apiPurgeTask(taskId);
+        } else {
+          throw error;
+        }
+      }
+      try {
+        setHiddenTasks((prev) => {
+          const next = new Set(prev);
+          next.add(taskId);
+          return next;
+        });
+        // Optimistically remove the task from any cached lists
+        queryClient.setQueriesData({ predicate: ({ queryKey }) => Array.isArray(queryKey) && queryKey[0] === 'files' }, (old: any) => {
+          if (!old || !Array.isArray(old.files)) return old;
+          const files = old.files
+            .map((file: any) => ({
+              ...file,
+              tasks: Array.isArray(file.tasks)
+                ? file.tasks.filter((t: any) => t?.task_id !== taskId)
+                : file.tasks,
+            }))
+            .filter((file: any) => Array.isArray(file.tasks) ? file.tasks.length > 0 : true);
+          return { ...old, files };
+        });
+        queryClient.setQueriesData({ predicate: ({ queryKey }) => Array.isArray(queryKey) && queryKey[0] === 'tasks' }, (old: any) => {
+          if (!Array.isArray(old)) return old;
+          return old.filter((t: any) => t?.task_id !== taskId);
+        });
+        queryClient.setQueriesData({ predicate: ({ queryKey }) => Array.isArray(queryKey) && queryKey[0] === 'tasksSearch' }, (old: any) => {
+          if (!old || !Array.isArray(old.tasks)) return old;
+          return { ...old, tasks: old.tasks.filter((t: any) => t?.task_id !== taskId) };
+        });
+        await queryClient.invalidateQueries({ queryKey: ['tasks'] });
+        await queryClient.invalidateQueries({ queryKey: ['files'] });
+      } catch (error) {
+        console.error('Failed to delete task from creations', error);
+        alert(t('creations.toast.deleteFailed', undefined, 'Failed to delete task'));
+      }
+    },
+    [queryClient, t],
+  );
 
-  const onRun = (file_id: string, filename?: string, file_ext?: string, taskType: 'video'|'podcast' = 'video') => {
-    setRunFile({ file_id, filename, isPdf: isPdf(file_ext) });
+  const renderTaskItem = useCallback(
+    (task: Task) => {
+      const statusClass = getTaskStatusClass(task.status);
+      const icon = getTaskStatusIcon(task.status);
+      const label = getTaskStatusLabel(task.status, t);
+      const short = shortId(task.task_id);
+      const canCancel = task.status === 'processing' || task.status === 'queued';
+      const canDelete = !canCancel;
+      const createdAt = formatTimestamp(task.created_at);
+      const updatedAt = formatTimestamp(task.updated_at);
+      const voiceLanguage =
+        task.voice_language ??
+        task.kwargs?.voice_language ??
+        task.state?.voice_language ??
+        null;
+      const subtitleLanguage =
+        task.subtitle_language ??
+        task.kwargs?.subtitle_language ??
+        task.state?.subtitle_language ??
+        null;
+      const transcriptLanguage =
+        task.transcript_language ??
+        task.kwargs?.transcript_language ??
+        task.state?.podcast_transcript_language ??
+        null;
+      const videoResolution =
+        task.kwargs?.video_resolution ??
+        task.state?.video_resolution ??
+        null;
+
+      const generationParamsChips: React.ReactNode[] = [];
+      const datetimeChips: React.ReactNode[] = [];
+
+      // Line 1: Task generation parameters
+      if (voiceLanguage) {
+        generationParamsChips.push(
+          <span key="voice" className="file-task-chip">
+            {t(
+              'task.list.voice',
+              { language: getLanguageName(voiceLanguage) },
+              `Voice: ${getLanguageName(voiceLanguage)}`,
+            )}
+          </span>,
+        );
+      }
+      if (subtitleLanguage) {
+        generationParamsChips.push(
+          <span key="subs" className="file-task-chip">
+            {t(
+              'task.list.subtitles',
+              { language: getLanguageName(subtitleLanguage) },
+              `Subs: ${getLanguageName(subtitleLanguage)}`,
+            )}
+          </span>,
+        );
+      }
+      if (transcriptLanguage) {
+        generationParamsChips.push(
+          <span key="transcript" className="file-task-chip">
+            {t(
+              'task.list.transcript',
+              { language: getLanguageName(transcriptLanguage) },
+              `Transcript: ${getLanguageName(transcriptLanguage)}`,
+            )}
+          </span>,
+        );
+      }
+      if (videoResolution) {
+        generationParamsChips.push(
+          <span key="resolution" className="file-task-chip">
+            {getResolutionName(videoResolution)}
+          </span>,
+        );
+      }
+
+      // Line 2: Task create/update datetime information
+      datetimeChips.push(
+        <span key="created" className="file-task-chip subtle">
+          {`${t('task.detail.created', undefined, 'Created')}: ${createdAt}`}
+        </span>,
+      );
+      if (updatedAt && updatedAt !== createdAt) {
+        datetimeChips.push(
+          <span key="updated" className="file-task-chip subtle">
+            {`${t('task.detail.updated', undefined, 'Updated')}: ${updatedAt}`}
+          </span>,
+        );
+      }
+
+      return (
+        <li key={task.task_id} className={`file-task ${statusClass}`}>
+          <div className="file-task-header">
+            <Link
+              href={`/tasks/${task.task_id}`}
+              className="file-task-link"
+              title={t('task.list.openTaskTitle', { id: task.task_id }, `Open task ${task.task_id}`)}
+            >
+              <span className="file-task-icon" aria-hidden>
+                {icon}
+              </span>
+              <span className="file-task-id">{short}</span>
+            </Link>
+            {task.status === 'processing' ? (
+              <button
+                type="button"
+                className={`file-task-status ${statusClass}`}
+                onClick={() => setProcessingTask(task)}
+                title={t('processing.modal.openDetails', undefined, 'View processing details')}
+              >
+                {label}
+              </button>
+            ) : (
+              <span className={`file-task-status ${statusClass}`}>
+                {label}
+              </span>
+            )}
+          </div>
+          {(generationParamsChips.length > 0 || datetimeChips.length > 0) && (
+            <div className="file-task-meta">
+              {generationParamsChips.length > 0 && (
+                <div className="file-task-meta-line file-task-meta-params">{generationParamsChips}</div>
+              )}
+              {datetimeChips.length > 0 && (
+                <div className="file-task-meta-line file-task-meta-datetime">{datetimeChips}</div>
+              )}
+            </div>
+          )}
+          <div className="file-task-actions">
+            <Link
+              className="file-task-action primary"
+              href={`/tasks/${task.task_id}`}
+              title={t('task.list.openTaskTitle', { id: task.task_id }, `Open task ${task.task_id}`)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {t('actions.open', undefined, 'Open')}
+            </Link>
+            {canCancel && (
+              <button
+                type="button"
+                className="file-task-action danger"
+                onClick={() => onCancel(task.task_id)}
+                title={t('actions.cancel', undefined, 'Cancel')}
+              >
+                {t('actions.cancel', undefined, 'Cancel')}
+              </button>
+            )}
+            {canDelete && (
+              <button
+                type="button"
+                className="file-task-action danger"
+                onClick={() => onDelete(task.task_id)}
+                title={t('actions.delete', undefined, 'Delete')}
+              >
+                {t('actions.delete', undefined, 'Delete')}
+              </button>
+            )}
+          </div>
+        </li>
+      );
+    },
+    [
+      formatTimestamp,
+      getLanguageName,
+      getResolutionName,
+      onCancel,
+      onDelete,
+      setProcessingTask,
+      t,
+    ],
+  );
+
+  const onRun = (upload_id: string, filename?: string, file_ext?: string, taskType: 'video'|'podcast' = 'video') => {
+    setRunFile({ upload_id, filename, isPdf: isPdf(file_ext) });
     const defs = getGlobalRunDefaults();
     setRunDefaults(taskType === 'video' ? {
       task_type: 'video', voice_language: defs.voice_language, subtitle_language: defs.subtitle_language ?? null, video_resolution: defs.video_resolution || 'hd',
@@ -246,142 +606,36 @@ const CreationsDashboard: React.FC<CreationsDashboardProps> = ({ apiBaseUrl }) =
 
   const renderGroups = () => {
     if (searching) {
-      if (!searchGroups.length) return <div className="no-tasks">{t('creations.empty', undefined, 'No tasks found')}</div>;
+      if (!searchGroups.length) {
+        return <div className="no-tasks">{t('creations.empty', undefined, 'No tasks found')}</div>;
+      }
       return (
         <div className="file-groups">
-          {searchGroups.map((g, idx) => {
-            const key = g.file_id || g.filename || `search-${idx}`;
-            const visible = g.tasks.filter((t) => !hiddenTasks.has(t.task_id));
-            const vis = status === 'all' ? visible : visible.filter((t) => t.status === status);
-            if (!vis.length) return null;
-            return (
-              <section key={key} className={`file-group ${expandedFiles.has(key) ? 'open' : ''}`}>
-                <header className="file-group-header">
-                  <button
-                    type="button"
-                    className="file-toggle"
-                    aria-expanded={expandedFiles.has(key)}
-                    onClick={() => toggleFile(key)}
-                  >
-                    <div className="file-title" title={g.filename || t('common.unknownFile', undefined, 'Unknown file')}>
-                      <span className="file-title-text">{formatFileName(g.filename, 48)}</span>
-                    </div>
-                    <div className="file-meta">
-                      <span className="file-id-chip" title={g.file_id || ''}>{g.file_id ? t('creations.file.idChip', { id: shortId(g.file_id) }, `ID ${shortId(g.file_id)}`) : t('common.untrackedFile', undefined, 'Untracked file')}</span>
-                      <span className="task-count">{vis.length === 1
-                        ? t('creations.file.count.one', { count: vis.length }, '1 creation')
-                        : t('creations.file.count.other', { count: vis.length }, `${vis.length} creations`)}
-                      </span>
-                    </div>
-                    <span className="chev" aria-hidden>▾</span>
-                  </button>
-                  {!!g.file_id && (
-                    <div className="file-group-actions" onClick={(e) => e.stopPropagation()}>
-                      <button className="mini-btn" title={t('actions.generateVideo')} onClick={() => onRun(g.file_id!, g.filename, g.file_ext, 'video')}>
-                        <span aria-hidden>🎬</span>
-                        <span>{t('actions.generateVideo')}</span>
-                      </button>
-                      {isPdf(g.file_ext) && (
-                        <button className="mini-btn" title={t('actions.generatePodcast')} onClick={() => onRun(g.file_id!, g.filename, g.file_ext, 'podcast')}>
-                          <span aria-hidden>🎧</span>
-                          <span>{t('actions.generatePodcast')}</span>
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </header>
-                {expandedFiles.has(key) && (
-                  <div className="file-task-list">
-                    {vis.map((task) => (
-                      <TaskCard
-                        key={task.task_id}
-                        task={task}
-                        apiBaseUrl={apiBaseUrl}
-                        isRemoving={false}
-                        isExpanded={expandedTasks.has(task.task_id)}
-                        onCancel={onCancel}
-                        onDelete={onDelete}
-                        onShowProcessingDetails={(t) => setProcessingTask(t)}
-                        deriveTaskOutputs={deriveOutputs}
-                        getLanguageDisplayName={getLanguageName}
-                        getVideoResolutionDisplayName={getResolutionName}
-                      />
-                    ))}
-                  </div>
-                )}
-              </section>
-            );
-          })}
+          {searchGroups.map((g, idx) =>
+            renderFileGroup(
+              {
+                upload_id: g.upload_id,
+                filename: g.filename,
+                file_ext: g.file_ext,
+                source_type: undefined,
+                tasks: g.tasks,
+                uploadOnly: false,
+              },
+              g.upload_id || g.filename || `search-${idx}`,
+            ),
+          )}
         </div>
       );
     }
-    const files = ((filesQuery.data as any)?.files || []) as Array<{ file_id?: string; filename?: string; file_ext?: string; tasks?: Task[] }>;
-    if (!files.length) return <div className="no-tasks">{t('creations.empty', undefined, 'No tasks found')}</div>;
+
+    const files = ((filesQuery.data as any)?.files || []) as FileGroup[];
+    if (!files.length) {
+      return <div className="no-tasks">{t('creations.empty', undefined, 'No tasks found')}</div>;
+    }
+
     return (
       <div className="file-groups">
-        {files.map((f, idx) => {
-          const key = f.file_id || f.filename || `file-${idx}`;
-          const tasks = ((f.tasks || []) as Task[]).filter((t) => !hiddenTasks.has(t.task_id));
-          const vis = status === 'all' ? tasks : tasks.filter((t) => t.status === status);
-          if (!vis.length) return null;
-          return (
-              <section key={key} className={`file-group ${expandedFiles.has(key) ? 'open' : ''}`}>
-                <header className="file-group-header">
-                <button
-                  type="button"
-                  className="file-toggle"
-                  aria-expanded={expandedFiles.has(key)}
-                  onClick={() => toggleFile(key)}
-                >
-                  <div className="file-title" title={f.filename || t('common.unknownFile', undefined, 'Unknown file')}>
-                    <span className="file-title-text">{formatFileName(f.filename, 48)}</span>
-                  </div>
-                  <div className="file-meta">
-                    <span className="file-id-chip" title={f.file_id || ''}>{f.file_id ? t('creations.file.idChip', { id: shortId(f.file_id) }, `ID ${shortId(f.file_id)}`) : t('common.untrackedFile', undefined, 'Untracked file')}</span>
-                    <span className="task-count">{vis.length === 1
-                      ? t('creations.file.count.one', { count: vis.length }, '1 creation')
-                      : t('creations.file.count.other', { count: vis.length }, `${vis.length} creations`)}
-                    </span>
-                  </div>
-                  <span className="chev" aria-hidden>▾</span>
-                </button>
-                {!!f.file_id && (
-                  <div className="file-group-actions" onClick={(e) => e.stopPropagation()}>
-                    <button className="mini-btn" title={t('actions.generateVideo')} onClick={() => onRun(f.file_id!, f.filename, f.file_ext, 'video')}>
-                      <span aria-hidden>🎬</span>
-                      <span>{t('actions.generateVideo')}</span>
-                    </button>
-                    {isPdf(f.file_ext) && (
-                      <button className="mini-btn" title={t('actions.generatePodcast')} onClick={() => onRun(f.file_id!, f.filename, f.file_ext, 'podcast')}>
-                        <span aria-hidden>🎧</span>
-                        <span>{t('actions.generatePodcast')}</span>
-                      </button>
-                    )}
-                  </div>
-                )}
-              </header>
-              {expandedFiles.has(key) && (
-                <div className="file-task-list">
-                  {vis.map((task) => (
-                      <TaskCard
-                        key={task.task_id}
-                        task={task}
-                        apiBaseUrl={apiBaseUrl}
-                        isRemoving={false}
-                        isExpanded={expandedTasks.has(task.task_id)}
-                        onCancel={onCancel}
-                        onDelete={onDelete}
-                        onShowProcessingDetails={(t) => setProcessingTask(t)}
-                        deriveTaskOutputs={deriveOutputs}
-                        getLanguageDisplayName={getLanguageName}
-                        getVideoResolutionDisplayName={getResolutionName}
-                      />
-                  ))}
-                </div>
-              )}
-            </section>
-          );
-        })}
+        {files.map((f, idx) => renderFileGroup(f, f.upload_id || f.filename || `upload-${idx}`))}
       </div>
     );
   };
@@ -425,11 +679,11 @@ const CreationsDashboard: React.FC<CreationsDashboardProps> = ({ apiBaseUrl }) =
         submitting={runSubmitting}
         onClose={() => setRunOpen(false)}
         onSubmit={(payload) => {
-          if (!runFile?.file_id) return;
+          if (!runFile?.upload_id) return;
           setRunSubmitting(true);
           saveGlobalRunDefaults({ voice_language: payload.voice_language, subtitle_language: payload.subtitle_language ?? null, transcript_language: payload.transcript_language ?? null, video_resolution: payload.video_resolution || 'hd' });
           runFileTask.mutate(
-            { fileId: runFile.file_id, payload },
+            { uploadId: runFile.upload_id, payload },
             { onSuccess: (res: any) => {
                 setRunOpen(false);
                 setToast({ type: 'success', message: t('creations.toast.taskCreated', { id: res?.task_id || '' }, `Task created: ${res?.task_id || ''}`) });

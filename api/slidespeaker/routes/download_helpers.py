@@ -15,6 +15,7 @@ from starlette.background import BackgroundTask
 
 from slidespeaker.configs.config import get_storage_provider
 from slidespeaker.storage import StorageProvider
+from slidespeaker.storage.paths import output_object_key
 
 
 def build_headers(
@@ -197,9 +198,22 @@ def stream_concatenated_files(
     return iterator()
 
 
-def final_audio_object_keys(file_id: str) -> list[str]:
-    # Prefer new non-final naming first; include legacy for backward compatibility
-    return [f"{file_id}.mp3", f"{file_id}_final_audio.mp3", f"{file_id}_final.mp3"]
+def final_audio_object_keys(file_id: str, task_id: str | None = None) -> list[str]:
+    """Return possible storage object keys for final audio outputs."""
+    keys: list[str] = []
+    bases: list[str] = []
+    if task_id:
+        bases.append(task_id)
+    bases.append(file_id)
+    for base in bases:
+        base = base.strip()
+        if base:
+            keys.append(output_object_key(base, "audio", "final.mp3"))
+    # Legacy fallbacks
+    keys.extend(
+        [f"{file_id}.mp3", f"{file_id}_final_audio.mp3", f"{file_id}_final.mp3"]
+    )
+    return keys
 
 
 async def proxy_cloud_media(

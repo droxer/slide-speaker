@@ -103,7 +103,8 @@
       "failed": "失敗",
       "cancelled": "已取消",
       "pending": "待處理",
-      "skipped": "已跳過"
+      "skipped": "已跳過",
+      "upload_only": "上傳就緒"
     },
     "cancelled": {
       "description": "任務已成功取消。"
@@ -137,11 +138,13 @@
   "actions": {
     "copy": "複製",
     "openPreview": "打開預覽",
+    "open": "開啟",
     "generateVideo": "產生影片",
     "generatePodcast": "產生播客",
     "generate": "產生",
     "generating": "正在產生…",
     "cancel": "取消",
+    "delete": "刪除",
     "close": "關閉",
     "createAnother": "建立另一個"
   },
@@ -179,6 +182,11 @@
     "status": {
       "all": "全部狀態"
     }
+  },
+  "common": {
+    "latest": "最新",
+    "more": "更多",
+    "unknown": "未知"
   },
   "runTask": {
     "adjustHint": "調整產生選項後按下「產生」。",
@@ -224,12 +232,19 @@
     "title": "作品庫",
     "summary": "{files} 個檔案 · {creations} 個作品 · {running} 個進行中",
     "empty": "目前沒有任務",
+    "upload": {
+      "placeholder": "檔案已上傳。立即建立新的作品。"
+    },
     "file": {
       "idChip": "ID {id}",
+      "taskGroupLabel": "此上傳的任務",
+      "taskListTitle": "任務 ({count})",
       "count": {
         "one": "{count} 個作品",
         "other": "{count} 個作品"
-      }
+      },
+      "collapse": "收起詳情",
+      "expand": "展開詳情"
     },
     "toast": {
       "taskCreated": "任務已建立：{id}",
@@ -341,7 +356,11 @@
     "summary": {
       "file": "檔案",
       "size": "大小",
-      "output": "輸出"
+      "output": "輸出",
+      "status": "狀態",
+      "uploading": "上傳中",
+      "type": "類型",
+      "documentType": "文件類型"
     },
     "notice": "AI 生成內容可能不夠精準，請務必檢查。",
     "createPodcast": "建立播客",

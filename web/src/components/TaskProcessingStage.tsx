@@ -6,7 +6,7 @@ import type { TaskProcessingStageProps } from './types';
 
 export const TaskProcessingStage: React.FC<TaskProcessingStageProps> = ({
   taskId,
-  fileId,
+  uploadId,
   fileName,
   progress,
   onStop,
@@ -18,7 +18,7 @@ export const TaskProcessingStage: React.FC<TaskProcessingStageProps> = ({
   return (
     <TaskProcessingSteps
       taskId={taskId}
-      fileId={fileId}
+      uploadId={uploadId}
       fileName={fileName}
       progress={progress}
       onStop={onStop}

@@ -11,7 +11,8 @@ from datetime import datetime
 from typing import Any
 
 from slidespeaker.configs.db import get_session
-from slidespeaker.core.models import TaskRow
+from slidespeaker.core.models import TaskRow, UploadRow
+from slidespeaker.storage.paths import build_storage_uri
 
 
 def _filter_sensitive_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -19,7 +20,51 @@ def _filter_sensitive_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
     filtered = kwargs.copy()
     # Remove sensitive fields that shouldn't be exposed to clients
     filtered.pop("file_path", None)
+    filtered.pop("storage_object_key", None)
     return filtered
+
+
+def _serialize_task(row: TaskRow) -> dict[str, Any]:
+    """Serialize a TaskRow (and optional upload) into a response dict."""
+    upload = getattr(row, "upload", None)
+    kwargs = _filter_sensitive_kwargs(row.kwargs or {})
+    upload_filename = upload.filename if upload and upload.filename else None
+    upload_file_ext = upload.file_ext if upload and upload.file_ext else None
+    filename = upload_filename or kwargs.get("filename")
+    file_ext = upload_file_ext or kwargs.get("file_ext")
+
+    data: dict[str, Any] = {
+        "id": row.id,
+        "task_id": row.id,
+        "upload_id": row.upload_id,  # Internal model and API response now use upload_id for consistency
+        "task_type": row.task_type,
+        "status": row.status,
+        "kwargs": kwargs,
+        "error": row.error,
+        "user_id": upload.user_id if upload else None,
+        "voice_language": row.voice_language,
+        "subtitle_language": row.subtitle_language,
+        "source_type": upload.source_type if upload else None,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        "filename": filename,
+        "file_ext": file_ext,
+    }
+    if upload:
+        data["upload"] = {
+            "id": upload.id,
+            "user_id": upload.user_id,
+            "filename": upload.filename,
+            "file_ext": upload.file_ext,
+            "source_type": upload.source_type,
+            "content_type": upload.content_type,
+            "checksum": upload.checksum,
+            "size_bytes": upload.size_bytes,
+            "storage_path": upload.storage_path,
+            "created_at": upload.created_at.isoformat() if upload.created_at else None,
+            "updated_at": upload.updated_at.isoformat() if upload.updated_at else None,
+        }
+    return data
 
 
 async def insert_task(task: dict[str, Any]) -> None:
@@ -44,12 +89,83 @@ async def insert_task(task: dict[str, Any]) -> None:
 
         # Derive source_type from kwargs if present
         k = task.get("kwargs") or {}
-        file_ext = (k.get("file_ext") or "").lower()
+        file_ext_raw = k.get("file_ext")
+        file_ext = (file_ext_raw or "").lower()
         source_type = (
             "pdf"
             if file_ext == ".pdf"
             else ("slides" if file_ext in (".ppt", ".pptx") else None)
         )
+
+        raw_file_id = (
+            k.get("file_id")
+            or task.get("file_id")
+            or task.get("id")
+            or task.get("task_id")
+        )
+        file_id = str(raw_file_id).strip() if raw_file_id else "unknown"
+        if not file_id:
+            file_id = "unknown"
+
+        filename = k.get("filename")
+        content_type = k.get("content_type")
+        checksum = k.get("checksum")
+        raw_size_bytes = k.get("file_size") or k.get("size_bytes")
+        try:
+            size_bytes = int(raw_size_bytes) if raw_size_bytes is not None else None
+        except (TypeError, ValueError):
+            size_bytes = None
+        storage_object_key = k.get("storage_object_key") or k.get("storage_path")
+        storage_uri = k.get("storage_uri")
+        if not storage_uri and storage_object_key:
+            storage_uri = build_storage_uri(str(storage_object_key))
+
+        upload_row = await s.get(UploadRow, file_id)
+        if upload_row is None:
+            s.add(
+                UploadRow(
+                    id=file_id,
+                    user_id=task.get("user_id"),
+                    filename=filename or file_id,
+                    file_ext=file_ext_raw,
+                    source_type=source_type,
+                    content_type=content_type,
+                    checksum=checksum,
+                    size_bytes=size_bytes,
+                    storage_path=storage_uri,
+                    created_at=created_at,
+                    updated_at=updated_at,
+                )
+            )
+        else:
+            updated_upload = False
+            user_id = task.get("user_id")
+            if user_id and user_id != upload_row.user_id:
+                upload_row.user_id = user_id
+                updated_upload = True
+            if filename and filename != upload_row.filename:
+                upload_row.filename = filename
+                updated_upload = True
+            if file_ext_raw and file_ext_raw != upload_row.file_ext:
+                upload_row.file_ext = file_ext_raw
+                updated_upload = True
+            if source_type and source_type != upload_row.source_type:
+                upload_row.source_type = source_type
+                updated_upload = True
+            if content_type and content_type != upload_row.content_type:
+                upload_row.content_type = content_type
+                updated_upload = True
+            if checksum and checksum != upload_row.checksum:
+                upload_row.checksum = checksum
+                updated_upload = True
+            if size_bytes and size_bytes != upload_row.size_bytes:
+                upload_row.size_bytes = size_bytes
+                updated_upload = True
+            if storage_uri and storage_uri != upload_row.storage_path:
+                upload_row.storage_path = storage_uri
+                updated_upload = True
+            if updated_upload:
+                upload_row.updated_at = updated_at
 
         # Decide which language to persist into subtitle_language column:
         # For podcast tasks, persist the transcript language selection under subtitle_language
@@ -70,17 +186,13 @@ async def insert_task(task: dict[str, Any]) -> None:
 
         row = TaskRow(
             id=task.get("id") or task.get("task_id"),
-            file_id=k.get("file_id", "unknown"),
+            upload_id=file_id,
             task_type=task_type,
             status=task.get("status", "queued"),
             kwargs=task.get("kwargs"),
-            filename=k.get("filename"),  # Store filename directly in the table
-            file_ext=k.get("file_ext"),  # Store file extension directly in the table
             error=task.get("error"),
-            owner_id=task.get("owner_id"),
             voice_language=k.get("voice_language"),
             subtitle_language=sub_lang,
-            source_type=source_type,
             created_at=created_at,
             updated_at=updated_at,
         )
@@ -94,35 +206,37 @@ async def get_task(task_id: str) -> dict[str, Any] | None:
     Returns a plain dict or None when not found.
     """
     from sqlalchemy import select
+    from sqlalchemy.orm import joinedload
 
     async with get_session() as s:
-        row = (
-            await s.execute(select(TaskRow).where(TaskRow.id == task_id))
-        ).scalar_one_or_none()
+        stmt = (
+            select(TaskRow)
+            .options(joinedload(TaskRow.upload))
+            .where(TaskRow.id == task_id)
+        )
+        row = (await s.execute(stmt)).scalar_one_or_none()
         if not row:
             return None
-        return {
-            "id": row.id,
-            "task_id": row.id,
-            "file_id": row.file_id,
-            "task_type": row.task_type,
-            "status": row.status,
-            "kwargs": _filter_sensitive_kwargs(row.kwargs or {}),
-            "error": row.error,
-            "owner_id": row.owner_id,
-            "voice_language": row.voice_language,
-            "subtitle_language": row.subtitle_language,
-            "created_at": row.created_at.isoformat() if row.created_at else None,
-            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
-            "filename": row.filename or (row.kwargs or {}).get("filename"),
-            "file_ext": row.file_ext or (row.kwargs or {}).get("file_ext"),
-        }
+        return _serialize_task(row)
 
 
 async def get_file_id_by_task(task_id: str) -> str | None:
     """Return file_id for a given task_id using DB, or None if unavailable."""
     t = await get_task(task_id)
     return (t or {}).get("file_id") if t else None
+
+
+async def get_tasks_by_upload_id(upload_id: str) -> list[dict[str, Any]]:
+    """Return all tasks associated with a given upload_id."""
+    from sqlalchemy import select
+
+    from slidespeaker.core.models import TaskRow
+
+    async with get_session() as s:
+        query = select(TaskRow).where(TaskRow.upload_id == upload_id)
+        result = await s.execute(query)
+        rows = result.scalars().all()
+        return [_serialize_task(r) for r in rows]
 
 
 async def update_task(task_id: str, **fields: Any) -> None:
@@ -137,14 +251,11 @@ async def update_task(task_id: str, **fields: Any) -> None:
         "error",
         "task_type",
         "kwargs",
-        "filename",  # Include filename in allowed fields
-        "file_ext",  # Include file_ext in allowed fields
         "voice_language",
         "subtitle_language",
-        "file_id",
+        "upload_id",
         "created_at",
         "updated_at",
-        "owner_id",
     }
     vals: dict[str, Any] = {k: v for k, v in fields.items() if k in allowed}
     if "updated_at" not in vals:
@@ -174,59 +285,45 @@ async def list_tasks(
     limit: int,
     offset: int,
     status: str | None = None,
-    owner_id: str | None = None,
+    user_id: str | None = None,
 ) -> dict[str, Any]:
     from sqlalchemy import func, select
+    from sqlalchemy.orm import joinedload
 
     async with get_session() as s:
-        q = select(TaskRow)
+        base_query = select(TaskRow)
         if status:
-            q = q.where(TaskRow.status == status)
-        if owner_id:
-            q = q.where(TaskRow.owner_id == owner_id)
-        total = (
-            await s.execute(select(func.count()).select_from(q.subquery()))
-        ).scalar_one()
-        rows = (
-            (
-                await s.execute(
-                    q.order_by(TaskRow.created_at.desc()).limit(limit).offset(offset)
-                )
+            base_query = base_query.where(TaskRow.status == status)
+        if user_id:
+            base_query = base_query.join(TaskRow.upload).where(
+                UploadRow.user_id == user_id
             )
-            .scalars()
-            .all()
+
+        total = (
+            await s.execute(select(func.count()).select_from(base_query.subquery()))
+        ).scalar_one()
+
+        data_query = (
+            base_query.options(joinedload(TaskRow.upload))
+            .order_by(TaskRow.created_at.desc())
+            .limit(limit)
+            .offset(offset)
         )
-        tasks = [
-            {
-                "task_id": r.id,
-                "id": r.id,
-                "file_id": r.file_id,
-                "task_type": r.task_type,
-                "status": r.status,
-                "created_at": r.created_at.isoformat(),
-                "updated_at": r.updated_at.isoformat(),
-                "kwargs": _filter_sensitive_kwargs(r.kwargs or {}),
-                "owner_id": r.owner_id,
-                # Surface language hints for UI if needed in the future
-                "voice_language": r.voice_language,
-                "subtitle_language": r.subtitle_language,
-                "source_type": r.source_type,
-                "filename": r.filename or (r.kwargs or {}).get("filename"),
-                "file_ext": r.file_ext or (r.kwargs or {}).get("file_ext"),
-            }
-            for r in rows
-        ]
+        rows = (await s.execute(data_query)).scalars().all()
+        tasks = [_serialize_task(r) for r in rows]
         return {"tasks": tasks, "total": int(total or 0)}
 
 
-async def get_statistics(owner_id: str | None = None) -> dict[str, Any]:
+async def get_statistics(user_id: str | None = None) -> dict[str, Any]:
     """Compute aggregate statistics from the DB."""
     from sqlalchemy import func, select, text
 
     async with get_session() as s:
         base_query = select(TaskRow)
-        if owner_id:
-            base_query = base_query.where(TaskRow.owner_id == owner_id)
+        if user_id:
+            base_query = base_query.join(TaskRow.upload).where(
+                UploadRow.user_id == user_id
+            )
 
         # Total
         total = (
@@ -235,8 +332,10 @@ async def get_statistics(owner_id: str | None = None) -> dict[str, Any]:
 
         # Status breakdown
         status_stmt = select(TaskRow.status, func.count())
-        if owner_id:
-            status_stmt = status_stmt.where(TaskRow.owner_id == owner_id)
+        if user_id:
+            status_stmt = status_stmt.join(TaskRow.upload).where(
+                UploadRow.user_id == user_id
+            )
         rows = (await s.execute(status_stmt.group_by(TaskRow.status))).all()
         status_breakdown = {str(st): int(cnt) for st, cnt in rows}
 
@@ -262,10 +361,10 @@ async def get_statistics(owner_id: str | None = None) -> dict[str, Any]:
                 TaskRow.created_at >= text("(CURRENT_TIMESTAMP - INTERVAL '30 days')")
             )
         )
-        if owner_id:
-            stmt_24 = stmt_24.where(TaskRow.owner_id == owner_id)
-            stmt_7 = stmt_7.where(TaskRow.owner_id == owner_id)
-            stmt_30 = stmt_30.where(TaskRow.owner_id == owner_id)
+        if user_id:
+            stmt_24 = stmt_24.join(TaskRow.upload).where(UploadRow.user_id == user_id)
+            stmt_7 = stmt_7.join(TaskRow.upload).where(UploadRow.user_id == user_id)
+            stmt_30 = stmt_30.join(TaskRow.upload).where(UploadRow.user_id == user_id)
         last_24h = int((await s.execute(stmt_24)).scalar_one() or 0)
         last_7d = int((await s.execute(stmt_7)).scalar_one() or 0)
         last_30d = int((await s.execute(stmt_30)).scalar_one() or 0)
@@ -277,9 +376,13 @@ async def get_statistics(owner_id: str | None = None) -> dict[str, Any]:
         subtitle_stmt = select(TaskRow.subtitle_language, func.count()).where(
             TaskRow.subtitle_language.is_not(None)
         )
-        if owner_id:
-            voice_stmt = voice_stmt.where(TaskRow.owner_id == owner_id)
-            subtitle_stmt = subtitle_stmt.where(TaskRow.owner_id == owner_id)
+        if user_id:
+            voice_stmt = voice_stmt.join(TaskRow.upload).where(
+                UploadRow.user_id == user_id
+            )
+            subtitle_stmt = subtitle_stmt.join(TaskRow.upload).where(
+                UploadRow.user_id == user_id
+            )
         voice_rows = (
             await s.execute(voice_stmt.group_by(TaskRow.voice_language))
         ).all()
@@ -298,8 +401,8 @@ async def get_statistics(owner_id: str | None = None) -> dict[str, Any]:
         avg_stmt = select(
             func.avg(func.extract("epoch", TaskRow.updated_at - TaskRow.created_at))
         ).where(TaskRow.status == "completed")
-        if owner_id:
-            avg_stmt = avg_stmt.where(TaskRow.owner_id == owner_id)
+        if user_id:
+            avg_stmt = avg_stmt.join(TaskRow.upload).where(UploadRow.user_id == user_id)
         avg_proc = (await s.execute(avg_stmt)).scalar()
         avg_minutes = round(float(avg_proc) / 60.0, 2) if avg_proc else None
 

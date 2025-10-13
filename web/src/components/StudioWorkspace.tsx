@@ -8,9 +8,11 @@ import React, {
   useCallback,
 } from 'react';
 import {
+  api as apiClient,
   upload as apiUpload,
   cancelRun as apiCancel,
   getTaskProgress as apiGetProgress,
+  type UploadPayload,
 } from '@/services/client';
 import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query';
 import {UploadConfiguration} from '@/components/UploadConfiguration';
@@ -66,7 +68,7 @@ export function StudioWorkspace() {
 
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [fileId, setFileId] = useState<string | null>(null);
+  const [uploadId, setUploadId] = useState<string | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [status, setStatus] = useState<AppStatus>('idle');
   const [progress, setProgress] = useState<number>(0);
@@ -86,6 +88,7 @@ export function StudioWorkspace() {
   const processingSubtitleCleanupRef = useRef<(() => void) | null>(null);
   const completionRedirectRef = useRef(false);
   const [processingPreviewMode, setProcessingPreviewMode] = useState<'video' | 'audio'>('video');
+  const subtitleObjectUrlRef = useRef<string | null>(null);
 
   const getLanguageDisplayName = useCallback(
     (languageCode: string): string => {
@@ -111,7 +114,7 @@ export function StudioWorkspace() {
 
   const resetForm = useCallback(() => {
     setFile(null);
-    setFileId(null);
+    setUploadId(null);
     setTaskId(null);
     setStatus('idle');
     setUploading(false);
@@ -152,54 +155,28 @@ export function StudioWorkspace() {
         label: t('upload.summary.size', undefined, 'Size'),
         value: formatFileSize(file.size),
       },
+      {
+        key: 'filetype',
+        label: t('upload.summary.type', undefined, 'Type'),
+        value: uploadMode === 'pdf' ? 'PDF Document' : 'Presentation Slides',
+      },
     ];
 
-    if (uploadMode === 'pdf') {
-      items.push({
-        key: 'outputMode',
-        label: t('upload.summary.output', undefined, 'Output'),
-        value: pdfOutputMode === 'video' ? t('actions.generateVideo', undefined, 'Generate Video') : t('actions.generatePodcast', undefined, 'Generate Podcast'),
-      });
-    }
-
     return items;
-  }, [file, formatFileSize, t, uploadMode, pdfOutputMode]);
+  }, [file, formatFileSize, t, uploadMode]);
 
   const uploadingOutputs = useMemo(() => {
     const outputs: {key: string; label: string; value: string}[] = [];
 
-    if (uploadMode === 'slides' || (uploadMode === 'pdf' && pdfOutputMode === 'video')) {
-      outputs.push({
-        key: 'video',
-        label: t('task.list.videoLabel', undefined, 'Video'),
-        value: t('task.list.videoLabel', undefined, 'Video'),
-      });
-    }
-
-    if (uploadMode === 'pdf' && pdfOutputMode === 'podcast') {
-      outputs.push({
-        key: 'podcast',
-        label: t('task.list.podcastLabel', undefined, 'Podcast'),
-        value: t('task.list.podcastLabel', undefined, 'Podcast'),
-      });
-    }
-
+    // Only show file-related information, not task outputs
     outputs.push({
-      key: 'audio',
-      label: t('task.list.audioLabel', undefined, 'Audio'),
-      value: t('task.list.audioLabel', undefined, 'Audio'),
+      key: 'status',
+      label: t('upload.summary.status', undefined, 'Status'),
+      value: t('upload.summary.uploading', undefined, 'Uploading'),
     });
 
-    if (generateSubtitles) {
-      outputs.push({
-        key: 'subtitles',
-        label: t('task.detail.subtitles', undefined, 'Subtitles'),
-        value: t('task.detail.subtitles', undefined, 'Subtitles'),
-      });
-    }
-
     return outputs;
-  }, [t, uploadMode, pdfOutputMode, generateSubtitles]);
+  }, [t]);
 
   const summaryItems = useMemo(() => {
     if (!file) return [] as {key: string; label: string; value: string}[];
@@ -220,52 +197,18 @@ export function StudioWorkspace() {
       });
     }
 
+    // Add file type information only
     items.push({
-      key: 'voice',
-      label: t('runTask.voiceLanguage', undefined, 'Voice language'),
-      value: getLanguageDisplayName(voiceLanguage),
+      key: 'type',
+      label: t('upload.summary.documentType', undefined, 'Document Type'),
+      value: uploadMode === 'pdf' ? 'PDF Document' : 'PowerPoint Presentation',
     });
-
-    const subtitlesValue = generateSubtitles
-      ? getLanguageDisplayName(subtitleLanguage)
-      : t('common.disabled', undefined, 'Disabled');
-
-    items.push({
-      key: 'subtitles',
-      label: t('task.detail.subtitles'),
-      value: subtitlesValue,
-    });
-
-    if (transcriptLanguage) {
-      items.push({
-        key: 'transcript',
-        label: t('task.detail.transcript'),
-        value: getLanguageDisplayName(transcriptLanguage),
-      });
-    }
-
-    const hasVideo = uploadMode === 'slides' || (uploadMode === 'pdf' && pdfOutputMode === 'video');
-    if (hasVideo) {
-      const resolutionKey = `runTask.resolution.${videoResolution}` as const;
-      items.push({
-        key: 'resolution',
-        label: t('runTask.videoResolution', undefined, 'Video resolution'),
-        value: t(resolutionKey, undefined, videoResolution.toUpperCase()),
-      });
-    }
 
     return items;
   }, [
     file,
     formatFileSize,
-    generateSubtitles,
-    getLanguageDisplayName,
-    pdfOutputMode,
-    subtitleLanguage,
-    transcriptLanguage,
     uploadMode,
-    videoResolution,
-    voiceLanguage,
     t,
   ]);
 
@@ -321,42 +264,73 @@ export function StudioWorkspace() {
         : 'video';
       const sourceType = uploadMode === 'pdf' ? 'pdf' : 'slides';
 
-      const base64File = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          const base64Data = result.includes(',') ? result.split(',')[1] : result;
-          resolve(base64Data);
+      let payload: FormData | UploadPayload;
+
+      if (typeof FormData !== 'undefined') {
+        const formData = new FormData();
+        formData.append('file', file, file.name);
+        formData.append('filename', file.name);
+        formData.append('voice_language', voiceLanguage);
+        formData.append('video_resolution', videoResolution);
+        formData.append('generate_avatar', String(generateAvatar));
+        formData.append('generate_subtitles', String(generateSubtitles));
+        formData.append('generate_podcast', String(taskType !== 'video'));
+        formData.append('generate_video', String(taskType !== 'podcast'));
+        formData.append('task_type', taskType);
+        formData.append('source_type', sourceType);
+
+        if (subtitleLanguage) {
+          formData.append('subtitle_language', subtitleLanguage);
+        }
+        if (taskType === 'podcast' && transcriptLanguage) {
+          formData.append('transcript_language', transcriptLanguage);
+        }
+
+        payload = formData;
+      } else {
+        const base64File = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            const base64Data = result.includes(',') ? result.split(',')[1] : result;
+            resolve(base64Data);
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        const jsonPayload: UploadPayload = {
+          filename: file.name,
+          file_data: base64File,
+          voice_language: voiceLanguage,
+          video_resolution: videoResolution,
+          generate_avatar: generateAvatar,
+          generate_subtitles: generateSubtitles,
+          task_type: taskType,
+          source_type: sourceType,
+          generate_video: taskType !== 'podcast',
+          generate_podcast: taskType !== 'video',
         };
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
 
-      const payload: Record<string, unknown> = {
-        filename: file.name,
-        file_data: base64File,
-        voice_language: voiceLanguage,
-        video_resolution: videoResolution,
-        generate_avatar: generateAvatar,
-        generate_subtitles: generateSubtitles,
-        task_type: taskType,
-        source_type: sourceType,
-        generate_video: taskType !== 'podcast',
-        generate_podcast: taskType !== 'video',
-      };
+        if (subtitleLanguage) {
+          jsonPayload.subtitle_language = subtitleLanguage;
+        }
 
-      if (subtitleLanguage) {
-        payload.subtitle_language = subtitleLanguage;
-      }
+        if (taskType === 'podcast' && transcriptLanguage) {
+          jsonPayload.transcript_language = transcriptLanguage;
+        }
 
-      if (taskType === 'podcast' && transcriptLanguage) {
-        payload.transcript_language = transcriptLanguage;
+        payload = jsonPayload;
       }
 
       const response = await uploadMutation.mutateAsync(payload);
 
-      setFileId(response.file_id);
-      setTaskId(response.task_id);
+      if (response.upload_id) {
+        setUploadId(response.upload_id);
+      }
+      if (response.task_id) {
+        setTaskId(response.task_id);
+      }
       clearUploadProgressTimer();
       setProgress(100);
       await new Promise((resolve) => setTimeout(resolve, 150));
@@ -467,6 +441,15 @@ export function StudioWorkspace() {
       }
     };
 
+    if (!video || !taskId || !subtitleLanguage) {
+      return () => {
+        if (subtitleObjectUrlRef.current) {
+          URL.revokeObjectURL(subtitleObjectUrlRef.current);
+          subtitleObjectUrlRef.current = null;
+        }
+      };
+    }
+
     let activeTrack: HTMLTrackElement | null = null;
     let loadHandler: ((event: Event) => void) | null = null;
     let errorHandler: ((event: Event) => void) | null = null;
@@ -480,12 +463,27 @@ export function StudioWorkspace() {
           video.removeChild(activeTrack);
         }
       }
+      if (subtitleObjectUrlRef.current) {
+        URL.revokeObjectURL(subtitleObjectUrlRef.current);
+        subtitleObjectUrlRef.current = null;
+      }
       activeTrack = null;
       loadHandler = null;
       errorHandler = null;
     };
 
-    const attachTrack = (useFallbackSrc = false) => {
+    const buildCandidatePaths = (languageValue: string | undefined): string[] => {
+      const basePath = `/api/tasks/${taskId}/subtitles/vtt`;
+      if (languageValue) {
+        return [
+          `${basePath}?language=${encodeURIComponent(languageValue)}`,
+          basePath,
+        ];
+      }
+      return [basePath];
+    };
+
+    const attachTrack = async (useFallbackSrc = false) => {
       detachActiveTrack();
       if (retryTimeout) {
         globalThis.clearTimeout(retryTimeout);
@@ -495,12 +493,44 @@ export function StudioWorkspace() {
       const track = document.createElement('track');
       track.kind = 'subtitles';
       track.dataset.processingTrack = 'true';
-      track.src = useFallbackSrc
-        ? `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt`
-        : `${API_BASE_URL}/api/tasks/${taskId}/subtitles/vtt?language=${encodeURIComponent(subtitleLanguage)}`;
       track.setAttribute('srclang', resolveSrclang(subtitleLanguage));
       track.label = getLanguageDisplayName(subtitleLanguage);
       track.default = true;
+
+      try {
+        const languageParam = useFallbackSrc ? undefined : subtitleLanguage;
+        const candidatePaths = buildCandidatePaths(languageParam);
+        let objectUrl: string | null = null;
+        let lastError: unknown = null;
+
+        for (const candidatePath of candidatePaths) {
+          try {
+            const response = await apiClient.get(candidatePath, {
+              headers: { Accept: 'text/vtt,*/*' },
+              responseType: 'blob',
+              withCredentials: true,
+            });
+            const blob = response.data as Blob;
+            if (!blob || blob.size === 0) continue;
+            objectUrl = URL.createObjectURL(blob);
+            subtitleObjectUrlRef.current = objectUrl;
+            track.src = objectUrl;
+            break;
+          } catch (candidateError) {
+            lastError = candidateError;
+          }
+        }
+
+        if (!objectUrl) {
+          throw lastError ?? new Error('Unable to fetch subtitles');
+        }
+      } catch (error) {
+        console.error('Subtitle fetch error:', error);
+        if (!useFallbackSrc) {
+          await attachTrack(true);
+        }
+        return;
+      }
 
       loadHandler = () => {
         if (!video || video.textTracks.length === 0) return;
@@ -511,7 +541,7 @@ export function StudioWorkspace() {
       errorHandler = (event: Event) => {
         console.error('Subtitle track loading error:', event);
         if (!useFallbackSrc) {
-          attachTrack(true);
+          void attachTrack(true);
         }
       };
 
@@ -523,7 +553,7 @@ export function StudioWorkspace() {
       if (!useFallbackSrc) {
         retryTimeout = globalThis.setTimeout(() => {
           if (video && video.textTracks.length === 0) {
-            attachTrack(true);
+            void attachTrack(true);
           }
         }, 1200);
       }
@@ -533,7 +563,7 @@ export function StudioWorkspace() {
       if (!video || video.readyState === 0) {
         return;
       }
-      attachTrack(false);
+      void attachTrack(false);
     };
 
     if (video.readyState >= HTMLMediaElement.HAVE_METADATA) {
@@ -654,14 +684,14 @@ export function StudioWorkspace() {
 
   useEffect(() => {
     const hydrateTaskId = async () => {
-      if (status === 'completed' && fileId && (!taskId || taskId === 'null')) {
+      if (status === 'completed' && uploadId && (!taskId || taskId === 'null')) {
         try {
           const {searchTasks} = await import('@/services/client');
-          const res = await searchTasks(fileId);
+          const res = await searchTasks(uploadId);
           const tasks = Array.isArray(res?.tasks) ? res.tasks : [];
           const match = tasks.find(
             (t: any) =>
-              t?.file_id === fileId &&
+              t?.upload_id === uploadId &&
               typeof t?.task_id === 'string' &&
               !t.task_id.startsWith('state_'),
           );
@@ -675,7 +705,7 @@ export function StudioWorkspace() {
     };
 
     hydrateTaskId();
-  }, [fileId, status, taskId]);
+  }, [uploadId, status, taskId]);
 
   const getFileTypeHint = useCallback((filename: string): JSX.Element => {
     const ext = filename.toLowerCase().split('.').pop();
@@ -757,7 +787,7 @@ export function StudioWorkspace() {
             <TaskProcessingStage
               apiBaseUrl={API_BASE_URL}
               taskId={taskId}
-              fileId={fileId}
+              uploadId={uploadId}
               fileName={processingDetails?.filename || file?.name || null}
               progress={progress}
               onStop={handleStopProcessing}

@@ -19,14 +19,14 @@ export interface TaskState {
 export interface Task {
   id?: string;
   task_id: string;
-  file_id: string;
+  upload_id: string;
   task_type: string;
   filename?: string;
   file_ext?: string;
   status: string;
   created_at: string;
   updated_at: string;
-  owner_id?: string | null;
+  user_id?: string | null;
   // Optional DB-surfaced language hints
   voice_language?: string;
   subtitle_language?: string;
@@ -34,7 +34,7 @@ export interface Task {
   steps?: Record<string, { status?: string; data?: any }>;
   progress?: number;
   kwargs: {
-    file_id: string;
+    upload_id: string;
     file_ext: string;
     filename?: string;
     voice_language: string;
@@ -50,6 +50,20 @@ export interface Task {
   state?: TaskState;
   detailed_state?: any;
   completion_percentage?: number;
+  upload?: {
+    id: string;
+    user_id?: string | null;
+    filename?: string | null;
+    file_ext?: string | null;
+    source_type?: string | null;
+    content_type?: string | null;
+    checksum?: string | null;
+    size_bytes?: number | null;
+    storage_path?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+  };
+  _uploadOnly?: boolean;
 }
 
 export interface DownloadItem {

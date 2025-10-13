@@ -64,7 +64,7 @@ export interface FileUploadingStageProps {
 
 export interface TaskProcessingStageProps {
   taskId: string | null;
-  fileId: string | null;
+  uploadId: string | null;
   fileName: string | null;
   progress: number;
   onStop: () => void;

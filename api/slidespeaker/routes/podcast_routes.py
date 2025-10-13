@@ -18,6 +18,7 @@ from slidespeaker.pipeline.podcast.coordinator import (
     extract_podcast_dialogue_from_state,
 )
 from slidespeaker.storage import StorageProvider
+from slidespeaker.storage.paths import output_object_key
 
 from .download_helpers import (
     build_cors_headers,
@@ -47,6 +48,8 @@ async def get_podcast_by_task(task_id: str, request: Request) -> Any:
 
     # Prefer task-id.mp3 (new scheme), then fallback to legacy *_podcast.mp3
     candidate_keys = [
+        output_object_key(task_id, "podcast", "final.mp3"),
+        output_object_key(file_id, "podcast", "final.mp3"),
         f"{task_id}.mp3",
         f"{file_id}.mp3",
         f"{task_id}_podcast.mp3",
@@ -110,20 +113,24 @@ async def download_podcast_by_task(task_id: str, request: Request) -> Any:
 
     # Prefer task-id.mp3, then file-id.mp3, then legacy *_podcast.mp3 variants
     priorities: list[str] = [
+        output_object_key(task_id, "podcast", "final.mp3"),
+        "",  # structured file-id placeholder
         f"{task_id}.mp3",
-        "",  # will be replaced with file_id.mp3 after resolving file_id
         f"{task_id}_podcast.mp3",
-        "",  # will be replaced with file_id_podcast.mp3
+        "",  # legacy file-id placeholder
+        "",  # legacy podcast placeholder
     ]
     object_key = None
 
     # Check task-id-first
-    if priorities[0] and check_file_exists(priorities[0]):
-        object_key = priorities[0]
+    structured_key = priorities[0]
+    if structured_key and check_file_exists(structured_key):
+        object_key = structured_key
     if object_key is None:
         file_id = await file_id_from_task(task_id)
-        priorities[1] = f"{file_id}.mp3"
-        priorities[3] = f"{file_id}_podcast.mp3"
+        priorities[1] = output_object_key(file_id, "podcast", "final.mp3")
+        priorities[4] = f"{file_id}.mp3"
+        priorities[5] = f"{file_id}_podcast.mp3"
         for k in priorities[1:]:
             if k and check_file_exists(k):
                 object_key = k
@@ -181,12 +188,12 @@ async def get_podcast_script(
     from slidespeaker.core.task_queue import task_queue
     from slidespeaker.repository.task import get_task as db_get_task
 
-    owner_id = extract_user_id(current_user)
-    if not owner_id:
+    user_id = extract_user_id(current_user)
+    if not user_id:
         raise HTTPException(status_code=403, detail="user session missing id")
 
     db_row = await db_get_task(task_id)
-    if not db_row or db_row.get("owner_id") != owner_id:
+    if not db_row or db_row.get("user_id") != user_id:
         raise HTTPException(status_code=404, detail="Task not found")
 
     file_id = None
@@ -208,8 +215,8 @@ async def get_podcast_script(
             file_id = state.get("file_id")
 
     if state and isinstance(state, dict):
-        st_owner = state.get("owner_id")
-        if isinstance(st_owner, str) and st_owner and st_owner != owner_id:
+        st_owner = state.get("user_id")
+        if isinstance(st_owner, str) and st_owner and st_owner != user_id:
             raise HTTPException(status_code=404, detail="Task not found")
 
     storage_provider = get_storage_provider()

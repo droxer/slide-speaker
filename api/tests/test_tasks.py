@@ -45,7 +45,7 @@ class TestTasksEndpoints:
             "status": "processing",
             "progress": 50,
             "current_step": "generating_audio",
-            "owner_id": "test-user-id",
+            "user_id": "test-user-id",
         }
         mock_get_task.return_value = mock_task_data
 
@@ -123,7 +123,7 @@ class TestTasksEndpoints:
         mock_cancel_task.return_value = True
         mock_db_get_task.return_value = {
             "id": "test-task-id",
-            "owner_id": "test-user-id",
+            "user_id": "test-user-id",
         }
 
         try:

@@ -11,6 +11,7 @@ from typing import Any
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
+from slidespeaker.storage.paths import output_storage_uri
 from slidespeaker.transcript import TranscriptReviewer
 from slidespeaker.transcript.markdown import transcripts_to_markdown
 
@@ -101,16 +102,30 @@ async def revise_transcripts_common(
             from slidespeaker.configs.config import get_storage_provider
 
             storage_provider = get_storage_provider()
-            # Prefer task-id-based filename when available
-            base_id = task_id if isinstance(task_id, str) and task_id else file_id
-            object_key = f"{base_id}_transcript.md"
-            url = storage_provider.upload_bytes(
-                md.encode("utf-8"), object_key, "text/markdown"
-            )
             state = await state_manager.get_state(file_id)
-            if state and "steps" in state and state_key in state["steps"]:
-                state["steps"][state_key]["markdown_storage_url"] = url
-                await state_manager.save_state(file_id, state)
+            _, transcript_key, transcript_uri = output_storage_uri(
+                file_id,
+                state=state if isinstance(state, dict) else None,
+                task_id=task_id,
+                segments=("transcripts", "transcript.md"),
+            )
+            url = storage_provider.upload_bytes(
+                md.encode("utf-8"), transcript_key, "text/markdown"
+            )
+            latest_state = await state_manager.get_state(file_id)
+            if (
+                latest_state
+                and "steps" in latest_state
+                and state_key in latest_state["steps"]
+            ):
+                latest_state["steps"][state_key]["markdown_storage_url"] = url
+                latest_state["steps"][state_key]["markdown_storage_key"] = (
+                    transcript_key
+                )
+                latest_state["steps"][state_key]["markdown_storage_uri"] = (
+                    transcript_uri
+                )
+                await state_manager.save_state(file_id, latest_state)
         except Exception as e:
             logger.error(f"Failed to upload transcript markdown to storage: {e}")
         logger.info(

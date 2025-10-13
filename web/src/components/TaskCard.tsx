@@ -3,6 +3,7 @@ import { Link } from '@/navigation';
 import { STEP_STATUS_ICONS, getStepLabel, normalizeStepStatus, StepStatusVariant } from '@/utils/stepLabels';
 import { resolveLanguages, getLanguageDisplayName } from '@/utils/language';
 import { getTaskStatusClass, getTaskStatusIcon, getTaskStatusLabel } from '@/utils/taskStatus';
+import { getFileTypeIcon } from '@/utils/fileIcons';
 import type { Task, DownloadItem } from '@/types';
 import { useDownloadsQuery, useTranscriptQuery, hasCachedVtt, prefetchTaskPreview } from '@/services/queries';
 import { useI18n } from '@/i18n/hooks';
@@ -57,23 +58,82 @@ const TaskCard: React.FC<Props> = ({
   const videoRes = task.kwargs?.video_resolution || task.state?.video_resolution || 'hd';
   const { video: isVideoTask, podcast: isPodcastTask } = deriveTaskOutputs(task);
   const transcriptLang = transcriptLanguage;
-  const filename =
-    task.filename ||
-    task.kwargs?.filename ||
-    task.state?.filename ||
-    task.kwargs?.file_id ||
-    task.file_id;
+  const isUploadOnly = task.status === 'upload_only' || Boolean(task._uploadOnly);
+  const uploadMeta = task.upload;
+  const extractFilename = (): string => {
+    // Prefer upload metadata first when available
+    if (uploadMeta?.filename && typeof uploadMeta.filename === 'string' && uploadMeta.filename.trim()) {
+      return uploadMeta.filename.trim();
+    }
+    // Try to get actual filename first
+    if (task.filename && typeof task.filename === 'string' && task.filename.trim()) {
+      return task.filename.trim();
+    }
+
+    // Try kwargs filename
+    if (task.kwargs?.filename && typeof task.kwargs.filename === 'string' && task.kwargs.filename.trim()) {
+      return task.kwargs.filename.trim();
+    }
+
+    // Try state filename
+    if (task.state?.filename && typeof task.state.filename === 'string' && task.state.filename.trim()) {
+      return task.state.filename.trim();
+    }
+
+    // Try to construct filename from file_path if available
+    const filePath = (task.kwargs as any)?.file_path || (task.state as any)?.file_path;
+    if (filePath && typeof filePath === 'string') {
+      const filename = filePath.split('/').pop()?.split('\\').pop();
+      if (filename && filename.trim()) {
+        return filename.trim();
+      }
+    }
+
+    // Construct filename from upload_id and extension if both are available
+    const fileId = task.upload_id || task.kwargs?.upload_id || uploadMeta?.id;
+    const fileExt = task.file_ext || task.kwargs?.file_ext || task.state?.file_ext || uploadMeta?.file_ext;
+
+    if (fileId && typeof fileId === 'string' && fileId.trim()) {
+      if (fileExt && typeof fileExt === 'string' && fileExt.trim()) {
+        // Ensure extension starts with a dot
+        const ext = fileExt.trim().startsWith('.') ? fileExt.trim() : `.${fileExt.trim()}`;
+        return `${fileId.trim()}${ext}`;
+      }
+      // Return upload_id if no extension is available
+      return fileId.trim();
+    }
+
+    // Try task_id as fallback
+    if (task.task_id && typeof task.task_id === 'string' && task.task_id.trim()) {
+      const taskId = task.task_id.trim();
+      if (fileExt && typeof fileExt === 'string' && fileExt.trim()) {
+        const ext = fileExt.trim().startsWith('.') ? fileExt.trim() : `.${fileExt.trim()}`;
+        return `${taskId}${ext}`;
+      }
+      return taskId;
+    }
+
+    // Last resort - generic name
+    return 'Untitled File';
+  };
+
+  const filename = extractFilename();
   const rawExt =
     task.file_ext ||
     task.kwargs?.file_ext ||
-    (task.state && typeof task.state.file_ext === 'string' ? task.state.file_ext : '');
+    (task.state && typeof task.state.file_ext === 'string' ? task.state.file_ext : '') ||
+    (uploadMeta && typeof uploadMeta.file_ext === 'string' ? uploadMeta.file_ext : '') ||
+    filename.split('.').pop()?.toLowerCase() ||
+    '';
   const fileExt = typeof rawExt === 'string' ? rawExt.replace(/^\./, '') : '';
   // Prefer cache-driven downloads when the card is expanded
   const queryClient = useQueryClient();
-  const { data: dlData } = useDownloadsQuery(task.task_id, isExpanded);
+  const downloadsTaskId = isUploadOnly ? null : task.task_id;
+  const { data: dlData } = useDownloadsQuery(downloadsTaskId, !isUploadOnly && isExpanded);
   const dlItems: DownloadItem[] | undefined = dlData?.items;
-  const transcriptQuery = useTranscriptQuery(task.task_id, isExpanded);
-  const hasVtt = !isPodcastTask && hasCachedVtt(queryClient, task.task_id, transcriptLang);
+  const transcriptQuery = useTranscriptQuery(downloadsTaskId, !isUploadOnly && isExpanded);
+  void transcriptQuery;
+  const hasVtt = !isPodcastTask && !isUploadOnly && hasCachedVtt(queryClient, task.task_id, transcriptLang);
   const progressPercent = Number.isFinite(task.completion_percentage)
     ? Math.max(0, Math.min(100, Math.round(task.completion_percentage ?? 0)))
     : null;
@@ -86,75 +146,48 @@ const TaskCard: React.FC<Props> = ({
 
   // Prefetch preview assets when expanded to improve responsiveness
   React.useEffect(() => {
-    if (!isExpanded) return;
+    if (!isExpanded || isUploadOnly) return;
     (async () => {
       try {
         await prefetchTaskPreview(queryClient, task.task_id, { language: transcriptLang, podcast: isPodcastTask });
       } catch { /* ignore */ }
     })();
-  }, [isExpanded, isPodcastTask, queryClient, task.task_id, transcriptLang]);
+  }, [isExpanded, isPodcastTask, isUploadOnly, queryClient, task.task_id, transcriptLang]);
 
   const statusClass = getTaskStatusClass(task.status);
   const statusLabel = getTaskStatusLabel(task.status, t);
   const statusIcon = getTaskStatusIcon(task.status);
   const statusContent = `${statusIcon} ${statusLabel}`;
+  const displayId = isUploadOnly
+    ? task.upload_id || uploadMeta?.id || filename || task.task_id
+    : task.task_id;
+  const idLabel = isUploadOnly
+    ? t('creations.file.idChip', { id: displayId ?? '-' }, `Upload ${displayId}`)
+    : t('task.list.idPrefix', { id: displayId ?? '-' }, `Task: ${displayId}`);
 
   const languageLabel = (code: string) => {
     const normalized = (code || '').toLowerCase();
     return t(`language.display.${normalized}`, undefined, getLanguageDisplayName(code));
   };
 
-  const getFileTypeIcon = (fileExt: string) => {
-    const ext = fileExt.toLowerCase();
-    switch (ext) {
-      case 'pdf':
-        return '📑'; // Document icon for PDF
-      case 'ppt':
-      case 'pptx':
-        return '📊'; // Presentation icon for PowerPoint
-      case 'doc':
-      case 'docx':
-        return '📝'; // Document icon for Word
-      case 'xls':
-      case 'xlsx':
-        return '📈'; // Spreadsheet icon for Excel
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-      case 'gif':
-      case 'svg':
-        return '🖼️'; // Image icon
-      case 'mp4':
-      case 'avi':
-      case 'mov':
-      case 'wmv':
-        return '🎬'; // Video icon
-      case 'mp3':
-      case 'wav':
-      case 'aac':
-      case 'flac':
-        return '🎵'; // Audio icon
-      default:
-        return '📄'; // Default document icon
-    }
-  };
+  // Use unified file icon utility for consistency
 
   return (
     <div className={`task-item ${statusClass} ${isRemoving ? 'removing' : ''}`}>
       <div className="task-header">
         <div className="task-id">
           {/* Output badges inline before task id (one line) */}
-          {(isVideoTask || (dlItems?.some((d) => d.type === 'video') ?? false)) && (
+          {!isUploadOnly && (isVideoTask || (dlItems?.some((d) => d.type === 'video') ?? false)) && (
             <span className="output-inline"><span className="output-dot video" aria-hidden></span>{t('task.list.videoLabel')}</span>
           )}
-          {(isPodcastTask || (dlItems?.some((d) => d.type === 'podcast') ?? false)) && (
+          {!isUploadOnly && (isPodcastTask || (dlItems?.some((d) => d.type === 'podcast') ?? false)) && (
             <span className="output-inline"><span className="output-dot podcast" aria-hidden></span>{t('task.list.podcastLabel')}</span>
           )}
-          {!task.task_id ? (
+          {!task.task_id && !isUploadOnly ? (
             <span className="task-id-link disabled" aria-disabled="true">
               {t('task.list.idPrefix', { id: 'unknown' }, `Task: Unknown`)}
             </span>
-          ) : task.status === 'completed' ? (
+          ) : !isUploadOnly && task.status === 'completed' ? (
             <Link
               href={`/tasks/${task.task_id}`}
               className="task-id-link"
@@ -162,18 +195,18 @@ const TaskCard: React.FC<Props> = ({
               target="_blank"
               rel="noopener noreferrer"
             >
-              {t('task.list.idPrefix', { id: task.task_id }, `Task: ${task.task_id}`)}
+              {idLabel}
             </Link>
           ) : (
             <span
               className="task-id-link disabled"
               aria-disabled="true"
-              title={t('task.list.openTaskTitle', { id: task.task_id }, `Open task ${task.task_id}`)}
+              title={displayId ? idLabel : undefined}
             >
-              {t('task.list.idPrefix', { id: task.task_id }, `Task: ${task.task_id}`)}
+              {idLabel}
             </span>
           )}
-          {task.task_id && (
+          {task.task_id && !isUploadOnly && (
             <button
               type="button"
               className="copy-task-id"
@@ -234,6 +267,12 @@ const TaskCard: React.FC<Props> = ({
             <span className="chip">{getVideoResolutionDisplayName(videoRes)}</span>
           </div>
 
+          {isUploadOnly && (
+            <div className="queued-note" role="status" aria-live="polite">
+              {t('creations.upload.placeholder', undefined, 'Upload is ready. Run a new creation to get started.')}
+            </div>
+          )}
+
           {/* Progress shown only while processing */}
           {task.status === 'processing' && task.state && (
             <div className="step-progress">
@@ -292,18 +331,22 @@ const TaskCard: React.FC<Props> = ({
         </>
       </div>
 
-      <div className="task-actions">
-        {(task.status === 'queued' || task.status === 'processing') && (
-          <button onClick={() => onCancel(task.task_id)} className="cancel-button">Cancel</button>
-        )}
-        {(task.status === 'completed' || task.status === 'cancelled' || task.status === 'failed') && (
-          <button onClick={() => onDelete(task.task_id)} className="delete-button" title="Delete task" type="button" aria-label="Delete task">
-            <svg className="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.343.052.682.106 1.018.162m-1.018-.162L19.5 19.5A2.25 2.25 0 0 1 17.25 21H6.75A2.25 2.25 0 0 1 4.5 19.5L5.77 5.79m13.458 0a48.108 48.108 0 0 0-3.478-.397m-12 .559c.336-.056.675-.11 1.018-.162m0 0A48.11 48.11 0 0 1 9.25 5.25m5.5 0a48.11 48.11 0 0 1 3.482.342m-8.982-.342V4.5A1.5 1.5 0 0 1 10.25 3h3.5A1.5 1.5 0 0 1 15.25 4.5v.75m-8.982 0a48.667 48.667 0 0 0-3.538.397" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-        )}
-      </div>
+      {isUploadOnly ? (
+        <div className="task-actions placeholder-actions" />
+      ) : (
+        <div className="task-actions">
+          {(task.status === 'queued' || task.status === 'processing') && (
+            <button onClick={() => onCancel(task.task_id)} className="cancel-button">Cancel</button>
+          )}
+          {(task.status === 'completed' || task.status === 'cancelled' || task.status === 'failed') && (
+            <button onClick={() => onDelete(task.task_id)} className="delete-button" title="Delete task" type="button" aria-label="Delete task">
+              <svg className="icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.343.052.682.106 1.018.162m-1.018-.162L19.5 19.5A2.25 2.25 0 0 1 17.25 21H6.75A2.25 2.25 0 0 1 4.5 19.5L5.77 5.79m13.458 0a48.108 48.108 0 0 0-3.478-.397m-12 .559c.336-.056.675-.11 1.018-.162m0 0A48.11 48.11 0 0 1 9.25 5.25m5.5 0a48.11 48.11 0 0 1 3.482.342m-8.982-.342V4.5A1.5 1.5 0 0 1 10.25 3h3.5A1.5 1.5 0 0 1 15.25 4.5v.75m-8.982 0a48.667 48.667 0 0 0-3.538.397" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };

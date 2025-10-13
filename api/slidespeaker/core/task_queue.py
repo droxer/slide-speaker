@@ -39,7 +39,7 @@ class RedisTaskQueue:
         return f"{self.task_prefix}:{task_id}"
 
     async def submit_task(
-        self, task_type: str, *, owner_id: str | None = None, **kwargs: Any
+        self, task_type: str, *, user_id: str | None = None, **kwargs: Any
     ) -> str:
         """Submit a task to the Redis queue and return task ID"""
         task_id = str(uuid.uuid4())
@@ -54,7 +54,7 @@ class RedisTaskQueue:
             "result": None,
             "error": None,
             "created_at": created_at,
-            "owner_id": owner_id,
+            "user_id": user_id,
         }
 
         # Store task in Redis
@@ -111,7 +111,7 @@ class RedisTaskQueue:
                         generate_podcast,
                         task_id=task_id,
                         source_type=source_type,
-                        owner_id=owner_id,
+                        user_id=user_id,
                     )
 
                     # Bind task_id <-> file_id (redundant when create_state passed task_id; kept for safety)

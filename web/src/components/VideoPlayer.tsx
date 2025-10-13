@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { api as apiClient } from '@/services/client';
 
 type VideoPlayerProps = {
   src: string;
@@ -23,6 +24,52 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
   onReady,
   onError,
 }) => {
+  const [subtitleSrc, setSubtitleSrc] = useState<string | undefined>(trackUrl);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    const run = async () => {
+      if (!trackUrl) {
+        setSubtitleSrc(undefined);
+        return;
+      }
+      try {
+        const base = apiClient.defaults.baseURL || '';
+        const resolved = base ? new URL(trackUrl, base).toString() : trackUrl;
+        const response = await apiClient.get(resolved, {
+          headers: { Accept: 'text/vtt,*/*' },
+          responseType: 'blob',
+          withCredentials: true,
+        });
+        const blob = response.data as Blob;
+        if (!blob || blob.size === 0) {
+          setSubtitleSrc(undefined);
+          return;
+        }
+        objectUrl = URL.createObjectURL(blob);
+        if (!cancelled) {
+          setSubtitleSrc(objectUrl);
+        }
+      } catch (error) {
+        console.warn('Failed to load subtitle track', error);
+        if (!cancelled) {
+          setSubtitleSrc(undefined);
+        }
+      }
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [trackUrl]);
+
   return (
     <video
       className={className}
@@ -35,8 +82,8 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({
       onCanPlay={onReady}
       onError={onError}
     >
-      {trackUrl && (
-        <track kind="subtitles" src={trackUrl} srcLang={trackLang} label={trackLabel} default />
+      {subtitleSrc && (
+        <track kind="subtitles" src={subtitleSrc} srcLang={trackLang} label={trackLabel} default />
       )}
       Your browser does not support the video tag.
     </video>

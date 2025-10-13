@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import TranscriptList, { Cue } from './TranscriptList';
+import { api as apiClient } from '@/services/client';
 
 type AudioPlayerProps = {
   src: string;
@@ -37,9 +38,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
     let cancelled = false;
     (async () => {
       try {
-        const resp = await fetch(vttUrl, { headers: { Accept: 'text/vtt,*/*' } });
-        if (!resp.ok) return;
-        const text = await resp.text();
+        const base = apiClient.defaults.baseURL || '';
+        const resolvedUrl = base ? new URL(vttUrl, base).toString() : vttUrl;
+        const resp = await apiClient.get(resolvedUrl, {
+          headers: { Accept: 'text/vtt,*/*' },
+          responseType: 'text',
+          withCredentials: true,
+        });
+        const text = resp.data as string;
         const lines = text.split(/\r?\n/);
         const parsed: Cue[] = [];
         let i = 0;

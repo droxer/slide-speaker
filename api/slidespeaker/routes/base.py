@@ -41,12 +41,12 @@ async def require_task_for_user(
     belong to the current user. Returns the database row (always) and the
     in-memory state when `include_state=True`.
     """
-    owner_id = extract_user_id(current_user)
-    if not owner_id:
+    user_id = extract_user_id(current_user)
+    if not user_id:
         raise HTTPException(status_code=403, detail="user session missing id")
 
     row = await db_get_task(task_id)
-    if not row or row.get("owner_id") != owner_id:
+    if not row or row.get("user_id") != user_id:
         raise HTTPException(status_code=404, detail="Task not found")
 
     state: dict[str, Any] | None = None
@@ -58,8 +58,8 @@ async def require_task_for_user(
             state = await state_manager.get_state_by_task(task_id)
 
         if state and isinstance(state, dict):
-            st_owner = state.get("owner_id")
-            if isinstance(st_owner, str) and st_owner and st_owner != owner_id:
+            st_owner = state.get("user_id")
+            if isinstance(st_owner, str) and st_owner and st_owner != user_id:
                 raise HTTPException(status_code=404, detail="Task not found")
 
     return row, state

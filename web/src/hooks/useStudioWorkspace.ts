@@ -54,7 +54,7 @@ export function useStudioWorkspace() {
   // State management
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [fileId, setFileId] = useState<string | null>(null);
+  const [uploadId, setUploadId] = useState<string | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [status, setStatus] = useState<AppStatus>('idle');
   const [progress, setProgress] = useState<number>(0);
@@ -102,7 +102,7 @@ export function useStudioWorkspace() {
 
   const resetForm = useCallback(() => {
     setFile(null);
-    setFileId(null);
+    setUploadId(null);
     setTaskId(null);
     setStatus('idle');
     setUploading(false);
@@ -126,7 +126,7 @@ export function useStudioWorkspace() {
     // State
     file,
     uploading,
-    fileId,
+    uploadId,
     taskId,
     status,
     progress,
@@ -150,7 +150,7 @@ export function useStudioWorkspace() {
     // Actions
     setFile,
     setUploading,
-    setFileId,
+    setUploadId,
     setTaskId,
     setStatus,
     setProgress,
