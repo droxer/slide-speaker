@@ -460,7 +460,13 @@ body.dark-theme .file-upload-label .upload-hint {
 }
 
 body.dark-theme .mode-explainer {
+  background: rgba(30, 41, 59, 0.85) !important;
+  border: 1px solid var(--dark-border) !important;
   color: var(--dark-text-muted) !important;
+}
+
+body.dark-theme .mode-explainer strong {
+  color: var(--dark-text) !important;
 }
 
 body.dark-theme .file-upload-label {

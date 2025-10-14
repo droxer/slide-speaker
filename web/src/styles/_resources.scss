@@ -1,0 +1,197 @@
+/* Resource Section */
+.resource-section {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.resource-item {
+  margin-bottom: 0.75rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem;
+  background: #f8fafc;
+  transition: all 0.2s ease;
+}
+
+.resource-item:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.resource-info {
+  margin-bottom: 0.5rem;
+}
+
+.resource-info label {
+  display: block;
+  margin-bottom: 0.3rem;
+  color: #475569;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.resource-info .url-input {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  background: white;
+  color: #1e293b;
+  outline: none;
+  font-family: monospace;
+  transition: all 0.2s ease;
+}
+
+.resource-info .url-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.resource-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.copy-btn, .download-btn {
+  flex: 1;
+  padding: 0.65rem 0.85rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  position: relative;
+  overflow: hidden;
+  outline: none;
+}
+
+.copy-btn {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  color: white;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+.copy-btn:hover {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.35);
+  transform: translateY(-2px);
+}
+
+.copy-btn:active {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+}
+
+.copy-btn:focus {
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.4);
+}
+
+.download-btn {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+}
+
+.download-btn:hover {
+  background: linear-gradient(135deg, #059669, #047857);
+  box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+  transform: translateY(-2px);
+}
+
+.download-btn:active {
+  background: linear-gradient(135deg, #047857, #065f46);
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.25);
+}
+
+.download-btn:focus {
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.4);
+}
+
+/* Enhanced Resource Links */
+.resource-links {
+  border-top: 2px solid rgba(226, 232, 240, 0.8);
+  padding-top: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.url-copy-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(248, 250, 252, 0.8);
+  border: 1px solid rgba(203, 213, 225, 0.6);
+  border-radius: 12px;
+  padding: 0.5rem;
+  margin-bottom: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.url-copy-row:hover {
+  background: rgba(241, 245, 249, 0.9);
+  border-color: rgba(148, 163, 184, 0.8);
+}
+
+.resource-label-inline {
+  font-weight: 700;
+  color: #1e293b;
+  font-size: 0.85rem;
+  min-width: 40px;
+  text-align: center;
+  letter-spacing: -0.1px;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-transform: uppercase;
+}
+
+.url-input-enhanced {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+  color: #1e293b;
+  outline: none;
+  min-width: 0;
+}
+
+.copy-btn-enhanced {
+  background: linear-gradient(135deg, #4f46e5, #4338ca);
+  color: white;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgba(79, 70, 229, 0.2);
+  min-width: 44px;
+  position: relative;
+  overflow: hidden;
+}
+
+.copy-btn-enhanced:hover {
+  background: linear-gradient(135deg, #4338ca, #3730a3);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+}
+
+.copy-btn-enhanced:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(79, 70, 229, 0.25);
+}

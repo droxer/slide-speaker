@@ -6,6 +6,9 @@ import { showErrorToast } from '@/utils/toast';
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
+  errorMessage?: string;
+  somethingWentWrong?: string;
+  tryAgain?: string;
 }
 
 interface State {
@@ -28,6 +31,8 @@ class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
+    // For now, we'll use the fallback text since this is a class component
+    // and getting i18n here is complex. The parent component should handle i18n.
     showErrorToast('An unexpected error occurred. Please try again.');
   }
 
@@ -40,9 +45,9 @@ class ErrorBoundary extends Component<Props, State> {
       
       return (
         <div className="error-boundary">
-          <h2>Something went wrong.</h2>
+          <h2>{this.props.somethingWentWrong || 'Something went wrong.'}</h2>
           <button onClick={() => this.setState({ hasError: false })}>
-            Try again?
+            {this.props.tryAgain || 'Try again?'}
           </button>
         </div>
       );

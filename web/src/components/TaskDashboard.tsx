@@ -57,6 +57,7 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
   const queryClient = useQueryClient();
   const [hiddenTasks, setHiddenTasks] = useState<Set<string>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [copiedTaskId, setCopiedTaskId] = useState<string | null>(null);
 
   useEffect(() => { const t = setTimeout(() => setDebounced(search.trim()), 350); return () => clearTimeout(t); }, [search]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2600); return () => clearTimeout(t); }, [toast]);
@@ -187,6 +188,19 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
       else next.add(groupKey);
       return next;
     });
+  }, []);
+
+  const handleCopyTaskId = useCallback(async (taskId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(taskId);
+      setCopiedTaskId(taskId);
+      // Show feedback for 2 seconds
+      setTimeout(() => setCopiedTaskId(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy task ID:', error);
+    }
   }, []);
 
   const renderFileGroup = (group: FileGroup, key: string) => {
@@ -521,7 +535,14 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
               <span className="file-task-icon" aria-hidden>
                 {icon}
               </span>
-              <span className="file-task-id">{short}</span>
+              <span
+                className={`file-task-id ${copiedTaskId === task.task_id ? 'copied' : ''}`}
+                onClick={(e) => handleCopyTaskId(task.task_id, e)}
+                style={{ cursor: 'pointer', userSelect: 'none' }}
+                title={copiedTaskId === task.task_id ? t('common.copied', undefined, 'Copied!') : t('task.list.copyId', undefined, 'Copy task ID')}
+              >
+                {copiedTaskId === task.task_id ? '✓' : short}
+              </span>
             </Link>
             {task.status === 'processing' ? (
               <button
@@ -590,6 +611,8 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
       onDelete,
       setProcessingTask,
       t,
+      copiedTaskId,
+      handleCopyTaskId,
     ],
   );
 

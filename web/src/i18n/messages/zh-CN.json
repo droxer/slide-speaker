@@ -51,7 +51,10 @@
     "unknown": "未知",
     "unknownFile": "未知文件",
     "untrackedFile": "未关联文件",
-    "disabled": "已停用"
+    "disabled": "已停用",
+    "copied": "已复制！",
+    "latest": "最新",
+    "more": "更多"
   },
   "profile": {
     "title": "个人资料",
@@ -185,11 +188,6 @@
     "status": {
       "all": "全部状态"
     }
-  },
-  "common": {
-    "latest": "最新",
-    "more": "更多",
-    "unknown": "未知"
   },
   "runTask": {
     "adjustHint": "调整生成选项后点击\"生成\"。",
@@ -393,5 +391,18 @@
   },
   "alerts": {
     "previewUnavailable": "仅已完成的任务可预览。"
+  },
+  "videoPlayer": {
+    "noSupport": "您的浏览器不支持视频标签。"
+  },
+  "errorBoundary": {
+    "unexpectedError": "发生意外错误，请重试。",
+    "somethingWentWrong": "出了点问题。",
+    "tryAgain": "重试？"
+  },
+  "errorDisplay": {
+    "processingFailed": "处理失败",
+    "processingError": "视频生成过程中出了点问题，请改用其他文件重试。",
+    "tryAgain": "重试"
   }
 }

@@ -18,17 +18,22 @@ const LOCALE_TO_LANGUAGE: Record<Locale, SupportedLanguage> = {
 };
 
 const LANGUAGE_ALIASES: Record<string, SupportedLanguage> = {
+  // English
   english: 'english',
   en: 'english',
   'en-us': 'english',
   'en_gb': 'english',
   'en-gb': 'english',
-  simplified_chinese: 'simplified_chinese',
+  
+  // Simplified Chinese
+  'simplified_chinese': 'simplified_chinese',
   'simplified-chinese': 'simplified_chinese',
   'zh-cn': 'simplified_chinese',
   'zh_cn': 'simplified_chinese',
   'zh-hans': 'simplified_chinese',
-  traditional_chinese: 'traditional_chinese',
+  
+  // Traditional Chinese
+  'traditional_chinese': 'traditional_chinese',
   'traditional-chinese': 'traditional_chinese',
   'zh-tw': 'traditional_chinese',
   'zh_tw': 'traditional_chinese',
@@ -36,7 +41,7 @@ const LANGUAGE_ALIASES: Record<string, SupportedLanguage> = {
 };
 
 const LOCALE_ALIASES: Record<string, Locale> = {
-  en: 'en',
+  'en': 'en',
   'en-us': 'en',
   'en_gb': 'en',
   'en-gb': 'en',
@@ -48,69 +53,48 @@ const LOCALE_ALIASES: Record<string, Locale> = {
   'zh-hant': 'zh-TW',
 };
 
-const LOCALE_SET = new Set<Locale>(locales);
+const SUPPORTED_LOCALES = new Set<Locale>(locales);
 
-export const normalizeSupportedLanguage = (
-  value: string | null | undefined,
-): SupportedLanguage => {
-  const normalized = (value ?? '').trim().toLowerCase();
-  if (SUPPORTED_LANGUAGES.includes(normalized as SupportedLanguage)) {
-    return normalized as SupportedLanguage;
-  }
-  const alias = LANGUAGE_ALIASES[normalized];
-  return alias ?? DEFAULT_LANGUAGE;
+const normalizeString = (value: string | null | undefined): string => (value ?? '').trim().toLowerCase();
+
+export const normalizeSupportedLanguage = (value: string | null | undefined): SupportedLanguage => {
+  const normalized = normalizeString(value);
+  return SUPPORTED_LANGUAGES.includes(normalized as SupportedLanguage)
+    ? (normalized as SupportedLanguage)
+    : LANGUAGE_ALIASES[normalized] ?? DEFAULT_LANGUAGE;
 };
 
-export const coerceSupportedLanguage = (
-  value: string | null | undefined,
-): SupportedLanguage | null => {
-  const normalized = (value ?? '').trim().toLowerCase();
-  if (!normalized) {
-    return null;
-  }
-  if (SUPPORTED_LANGUAGES.includes(normalized as SupportedLanguage)) {
-    return normalized as SupportedLanguage;
-  }
-  return LANGUAGE_ALIASES[normalized] ?? null;
+export const coerceSupportedLanguage = (value: string | null | undefined): SupportedLanguage | null => {
+  const normalized = normalizeString(value);
+  if (!normalized) return null;
+  
+  return SUPPORTED_LANGUAGES.includes(normalized as SupportedLanguage)
+    ? (normalized as SupportedLanguage)
+    : LANGUAGE_ALIASES[normalized] ?? null;
 };
 
 const normalizeLocaleCode = (value: string | null | undefined): Locale | null => {
-  const raw = (value ?? '').trim();
-  if (!raw) {
-    return null;
-  }
-  if (LOCALE_SET.has(raw as Locale)) {
-    return raw as Locale;
-  }
-  const alias = LOCALE_ALIASES[raw.toLowerCase()];
-  return alias ?? null;
+  const normalized = normalizeString(value);
+  if (!normalized) return null;
+  
+  return SUPPORTED_LOCALES.has(normalized as Locale)
+    ? (normalized as Locale)
+    : LOCALE_ALIASES[normalized] ?? null;
 };
 
-export const preferredLanguageToLocale = (
-  value: string | null | undefined,
-): Locale => {
-  const language = normalizeSupportedLanguage(value);
-  return LANGUAGE_TO_LOCALE[language];
-};
+export const preferredLanguageToLocale = (value: string | null | undefined): Locale => 
+  LANGUAGE_TO_LOCALE[normalizeSupportedLanguage(value)];
 
-export const localeToPreferredLanguage = (
-  locale: string | null | undefined,
-): SupportedLanguage => {
+export const localeToPreferredLanguage = (locale: string | null | undefined): SupportedLanguage => {
   const normalized = normalizeLocaleCode(locale);
-  if (!normalized) {
-    return DEFAULT_LANGUAGE;
-  }
-  return LOCALE_TO_LANGUAGE[normalized] ?? DEFAULT_LANGUAGE;
+  return normalized ? LOCALE_TO_LANGUAGE[normalized] : DEFAULT_LANGUAGE;
 };
 
 export const normalizePreferredLocale = (value: unknown): Locale | null => {
-  if (typeof value !== 'string') {
-    return null;
-  }
+  if (typeof value !== 'string') return null;
+  
   const language = coerceSupportedLanguage(value);
-  if (!language) {
-    const normalizedLocale = normalizeLocaleCode(value);
-    return normalizedLocale;
-  }
-  return LANGUAGE_TO_LOCALE[language];
+  if (language) return LANGUAGE_TO_LOCALE[language];
+  
+  return normalizeLocaleCode(value);
 };

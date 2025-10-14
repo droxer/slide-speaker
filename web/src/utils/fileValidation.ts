@@ -1,41 +1,37 @@
-/**
- * File validation utilities for the SlideSpeaker web application.
- */
-
-// Supported file types
-const SUPPORTED_FILE_TYPES = {
+const FILE_TYPES = {
   pdf: ['.pdf'],
   slides: ['.pptx', '.ppt'],
 } as const;
 
-// Maximum file sizes (in bytes)
 const MAX_FILE_SIZES = {
   pdf: 100 * 1024 * 1024, // 100 MB
   slides: 200 * 1024 * 1024, // 200 MB
 } as const;
 
-/**
- * Validates a file based on its type and size.
- * @param file The file to validate
- * @param fileType The expected file type ('pdf' or 'slides')
- * @returns Object with isValid flag and optional error message
- */
 export const validateFile = (
   file: File,
-  fileType: keyof typeof SUPPORTED_FILE_TYPES
+  fileType: keyof typeof FILE_TYPES
 ): { isValid: boolean; errorMessage?: string } => {
-  // Check file extension
   const extension = '.' + file.name.toLowerCase().split('.').pop();
-  const supportedExtensions = SUPPORTED_FILE_TYPES[fileType];
 
-  if (!supportedExtensions.some((ext) => ext === extension)) {
+  // Type guard to check if extension is valid for the given fileType
+  const isExtensionValid = (ext: string): boolean => {
+    if (fileType === 'pdf') {
+      return FILE_TYPES.pdf.includes(ext as any);
+    } else if (fileType === 'slides') {
+      return FILE_TYPES.slides.includes(ext as any);
+    }
+    return false;
+  };
+
+  if (!isExtensionValid(extension)) {
+    const supported = FILE_TYPES[fileType];
     return {
       isValid: false,
-      errorMessage: `Invalid file type. Supported types for ${fileType}: ${supportedExtensions.join(', ')}`,
+      errorMessage: `Invalid file type. Supported types for ${fileType}: ${supported.join(', ')}`,
     };
   }
 
-  // Check file size
   const maxSize = MAX_FILE_SIZES[fileType];
   if (file.size > maxSize) {
     const maxSizeMB = maxSize / (1024 * 1024);
@@ -48,30 +44,15 @@ export const validateFile = (
   return { isValid: true };
 };
 
-/**
- * Gets the file type based on its extension.
- * @param fileName The name of the file
- * @returns The file type ('pdf', 'slides', or null if unsupported)
- */
 export const getFileType = (fileName: string): 'pdf' | 'slides' | null => {
   const extension = '.' + fileName.toLowerCase().split('.').pop();
 
-  if (SUPPORTED_FILE_TYPES.pdf.some((ext) => ext === extension)) {
-    return 'pdf';
-  }
-  
-  if (SUPPORTED_FILE_TYPES.slides.some((ext) => ext === extension)) {
-    return 'slides';
-  }
-  
+  if (FILE_TYPES.pdf.includes(extension as any)) return 'pdf';
+  if (FILE_TYPES.slides.includes(extension as any)) return 'slides';
+
   return null;
 };
 
-/**
- * Formats file size in a human-readable format.
- * @param bytes The file size in bytes
- * @returns Formatted file size string
- */
 export const formatFileSize = (bytes: number): string => {
   if (bytes === 0) return '0 Bytes';
   

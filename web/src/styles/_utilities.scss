@@ -1,0 +1,193 @@
+/* Shared badge style for chips */
+.badge {
+  font-size: 12px;
+  font-weight: 700;
+  color: #1e293b;
+  background: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  padding: 4px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.2px;
+}
+
+/* Link-style button (match task card) */
+.link-button {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.link-button:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+/* Small file type badge */
+.file-type-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+}
+
+/* Output type indicators (video / podcast) */
+.output-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.output-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  border: 1px solid transparent;
+}
+
+.output-pill.video {
+  color: #1d4ed8;
+  background: #dbeafe;
+  border-color: #bfdbfe;
+}
+
+.output-pill.podcast {
+  color: #6d28d9;
+  background: #ede9fe;
+  border-color: #ddd6fe;
+}
+
+.steps-subtitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 12px 0 8px;
+}
+
+/* AI Content Disclaimer Styles - Made more subtle */
+.ai-disclaimer {
+  text-align: center;
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 400;
+  opacity: 0.8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.ai-disclaimer::before {
+  content: '🤖';
+  font-size: 0.9rem;
+  filter: grayscale(0.3);
+}
+
+.ai-warning {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin: 1rem 0;
+  text-align: center;
+  opacity: 0.9;
+}
+
+.ai-warning p {
+  color: #4b5563;
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 400;
+  line-height: 1.4;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.ai-warning p::before {
+  content: '🤖';
+  font-size: 1rem;
+  filter: grayscale(0.3);
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+/* Subtle AI notice for upload view */
+.ai-notice-subtle {
+  text-align: center;
+  margin: 0.75rem 0;
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 400;
+  opacity: 0.7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+}
+
+.ai-notice-subtle::before {
+  content: '🤖';
+  font-size: 0.8rem;
+  filter: grayscale(0.4);
+}
+
+/* Accessible focus states */
+.preview-toggle .toggle-btn:focus-visible,
+.link-button:focus-visible,
+.copy-btn-enhanced:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Shared animations */
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes fadeInScale {
+  0% {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Responsive helper classes */
+@media (max-width: 768px) {
+  .mobile-hidden {
+    display: none;
+  }
+}
+
+@media (min-width: 769px) {
+  .desktop-hidden {
+    display: none;
+  }
+}
