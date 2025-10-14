@@ -1,0 +1,222 @@
+/* Steps */
+.steps-container {
+  margin-top: 2rem;
+  text-align: left;
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0;
+}
+
+.steps-container h4 {
+  margin-bottom: 1.25rem;
+  color: #1a202c;
+  font-size: 1.25rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: left;
+}
+
+.steps-container h4 .steps-title { flex: 1 1 auto; }
+
+/* File type indicator for processing steps */
+.file-type-indicator {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.file-type-indicator .file-type-badge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 24px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #4f46e5, #7c3aed);
+  color: white;
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.25);
+}
+
+.file-type-indicator .file-type-badge.pdf {
+  background: linear-gradient(135deg, #ef4444, #dc2626);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.25);
+}
+
+.file-type-indicator .file-type-badge.ppt {
+  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+/* File context text in processing view */
+.file-context-text {
+  font-size: 1rem;
+  color: #64748b;
+  margin: 0.5rem 0 1.5rem;
+  font-weight: 500;
+  text-align: center;
+}
+
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.progress-steps {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.progress-step {
+  --progress-step-accent: #64748b;
+  --progress-step-surface: rgba(148, 163, 184, 0.18);
+  --progress-step-border: rgba(148, 163, 184, 0.34);
+  --progress-step-icon-surface: rgba(148, 163, 184, 0.18);
+  position: relative;
+  display: flex;
+  gap: 0.9rem;
+  align-items: flex-start;
+  padding: 1rem 1.25rem 1rem 1.85rem;
+  border-radius: 18px;
+  border: 1px solid var(--progress-step-border);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.97), var(--progress-step-surface));
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.progress-step:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.12);
+}
+
+.progress-step::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 6px;
+  height: 100%;
+  border-radius: 16px 0 0 16px;
+  background: var(--progress-step-accent);
+  opacity: 0.85;
+}
+
+.progress-step::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.progress-step > * {
+  position: relative;
+  z-index: 1;
+}
+
+.progress-step__icon {
+  flex: 0 0 auto;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--progress-step-accent);
+  background: var(--progress-step-icon-surface);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
+}
+
+.progress-step__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.progress-step__title {
+  font-weight: 600;
+  color: #0f172a;
+  letter-spacing: 0.01em;
+}
+
+.progress-step__meta {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(71, 85, 105, 0.82);
+  font-weight: 600;
+}
+
+.progress-step--processing {
+  --progress-step-accent: #6366f1;
+  --progress-step-surface: rgba(99, 102, 241, 0.16);
+  --progress-step-border: rgba(99, 102, 241, 0.32);
+  --progress-step-icon-surface: rgba(99, 102, 241, 0.18);
+}
+
+.progress-step--processing {
+  animation: progressPulse 2.6s ease-in-out infinite;
+}
+
+.progress-step--processing .progress-step__icon {
+  animation: progressSpin 1.4s linear infinite;
+}
+
+.progress-step--completed {
+  --progress-step-accent: #16a34a;
+  --progress-step-surface: rgba(134, 239, 172, 0.24);
+  --progress-step-border: rgba(22, 163, 74, 0.34);
+  --progress-step-icon-surface: rgba(134, 239, 172, 0.26);
+}
+
+.progress-step--pending {
+  --progress-step-accent: #0ea5e9;
+  --progress-step-surface: rgba(14, 165, 233, 0.18);
+  --progress-step-border: rgba(14, 165, 233, 0.32);
+  --progress-step-icon-surface: rgba(14, 165, 233, 0.18);
+}
+
+.progress-step--failed {
+  --progress-step-accent: #dc2626;
+  --progress-step-surface: rgba(248, 113, 113, 0.2);
+  --progress-step-border: rgba(220, 38, 38, 0.35);
+  --progress-step-icon-surface: rgba(248, 113, 113, 0.24);
+}
+
+.progress-step--cancelled {
+  --progress-step-accent: #f97316;
+  --progress-step-surface: rgba(251, 146, 60, 0.18);
+  --progress-step-border: rgba(249, 115, 22, 0.32);
+  --progress-step-icon-surface: rgba(251, 146, 60, 0.2);
+}
+
+.progress-step--skipped {
+  --progress-step-accent: #94a3b8;
+  --progress-step-surface: rgba(148, 163, 184, 0.12);
+  --progress-step-border: rgba(148, 163, 184, 0.28);
+  --progress-step-icon-surface: rgba(148, 163, 184, 0.16);
+  opacity: 0.85;
+}
+
+@keyframes progressSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes progressPulse {
+  0% { box-shadow: 0 16px 40px rgba(99, 102, 241, 0.2); }
+  50% { box-shadow: 0 22px 52px rgba(99, 102, 241, 0.28); }
+  100% { box-shadow: 0 16px 40px rgba(99, 102, 241, 0.2); }
+}

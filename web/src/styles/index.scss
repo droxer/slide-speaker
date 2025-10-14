@@ -1,12 +1,13 @@
-body {
-    margin: 0;
-    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', Arial, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-  
-  code {
-    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-      monospace;
-  }
+// Core styles and reset
+@use './app.scss';
+
+// Theme styles
+@use './themes/light-theme.scss';
+@use './themes/dark-theme.scss';
+
+// Component styles
+@use './components/GoogleLoginButton.scss';
+@use './components/TaskDetailPage.scss';
+@use './components/TaskDashboard.scss';
+@use './components/TaskProgressModal.scss';
+@use './components/TaskProcessingSteps.scss';

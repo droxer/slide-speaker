@@ -1,0 +1,19 @@
+/* Brand color tokens (override in themes as needed) */
+:root {
+  --brand-1: #6366f1; /* indigo-500 */
+  --brand-2: #06b6d4; /* cyan-500 */
+  --brand-3: #22c55e; /* green-500 */
+  --brand-aurora-a: rgba(99, 102, 241, 0.25); /* indigo */
+  --brand-aurora-b: rgba(56, 189, 248, 0.18); /* sky/cyan */
+}
+
+/* CSS custom properties for consistent theming */
+:root {
+  --footer-height: 56px;
+}
+
+/* Media section styling */
+:root {
+  --media-controls-bg-video: rgba(0, 0, 0, 0.6);
+  --media-controls-bg-audio: #f1f5f9;
+}

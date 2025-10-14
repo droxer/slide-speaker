@@ -1,0 +1,231 @@
+/* Responsive adjustments */
+
+/* General responsive header adjustments */
+@media (max-width: 768px) {
+  .app-header {
+    padding: 1.5rem 1rem;
+  }
+
+  .app-header h1 {
+    font-size: 2rem;
+  }
+
+  .app-header p {
+    font-size: 1rem;
+  }
+
+  .main-content {
+    padding: 1.5rem;
+  }
+
+  .content-card {
+    padding: 2rem;
+    max-width: 100%;
+  }
+
+  .file-upload-label {
+    padding: 1.5rem;
+  }
+
+  .steps-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .primary-btn, .secondary-btn {
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+  }
+
+  .action-buttons {
+    max-width: 100%;
+  }
+
+  .video-preview .preview-video {
+    max-width: 100%;
+  }
+
+  .language-section {
+    padding: 1rem;
+  }
+
+  .options-section {
+    padding: 1rem;
+  }
+
+  .option-item {
+    padding: 0.75rem;
+  }
+
+  .advanced-options-button {
+    font-size: 0.9rem;
+    padding: 0.4rem 0.8rem;
+  }
+
+  /* Responsive preview layout */
+  .preview-container {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+
+  .preview-sidebar {
+    order: -1;
+  }
+
+  .preview-video-large {
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-header {
+    padding: 1.5rem 1rem;
+  }
+
+  .app-header h1 {
+    font-size: 1.75rem;
+  }
+
+  .content-card {
+    padding: 1.5rem;
+  }
+
+  .file-upload-label {
+    padding: 1.5rem;
+  }
+
+  .upload-text {
+    font-size: 1rem;
+  }
+
+  .upload-hint {
+    font-size: 0.85rem;
+  }
+
+  .language-section {
+    padding: 1rem;
+  }
+
+  .language-section-title {
+    font-size: 1.15rem;
+  }
+
+  .language-selector label {
+    font-size: 1rem;
+  }
+
+  .options-section {
+    padding: 1rem;
+  }
+
+  .options-section h4 {
+    font-size: 1.15rem;
+  }
+
+  .option-item {
+    padding: 0.75rem;
+  }
+
+  .option-item label {
+    font-size: 1rem;
+  }
+
+  .steps-container {
+    padding: 1rem;
+  }
+
+  .step-item {
+    padding: 0.875rem;
+  }
+}
+
+/* Processing meta responsive adjustments */
+@media (max-width: 768px) {
+  .processing-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .file-info-card {
+    margin: 0 1rem 2rem;
+    padding: 1.25rem;
+  }
+
+  .upload-section-header {
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+  }
+
+  .upload-section-icon {
+    font-size: 1.1rem;
+  }
+
+  .upload-section-title {
+    font-size: 0.85rem;
+  }
+}
+
+/* Profile card responsive */
+@media (max-width: 768px) {
+  .profile-card {
+    padding: 2rem;
+  }
+}
+
+/* Task detail card responsive styles */
+.task-detail-card__facts {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.task-detail-card__facts .subtle-meta {
+  opacity: 0.8;
+}
+
+.task-detail-card__facts .subtle-meta__value {
+  font-size: 0.9rem;
+}
+
+.task-detail-card__progress-step {
+  margin: 0.75rem 0 1.25rem;
+}
+
+.task-detail-card__steps {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.task-detail-card__steps .progress-step {
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+}
+
+@media (min-width: 768px) {
+  .task-detail-card__facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Progress container responsive */
+@media (max-width: 640px) {
+  .progress-container {
+    padding: 1.25rem;
+    border-radius: 18px;
+  }
+  .progress-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.35rem;
+  }
+  .progress-value { font-size: 1.25rem; }
+  .uploading-summary {
+    padding: 1.1rem;
+    border-radius: 16px;
+    gap: 0.85rem;
+  }
+  .uploading-summary__list {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem 1rem;
+  }
+}
