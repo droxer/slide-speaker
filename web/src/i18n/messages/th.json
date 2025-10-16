@@ -1,0 +1,409 @@
+{
+  "header": {
+    "title": "SlideSpeaker AI",
+    "subtitle": "แปลงสไลด์เป็นวิดีโอด้วยปัญญาประดิษฐ์",
+    "login": "ลงชื่อเข้าใช้ด้วย Google",
+    "logout": "ออกจากระบบ",
+    "profile": "โปรไฟล์",
+    "defaultName": "ท่านผู้ใช้",
+    "welcome": "ยินดีต้อนรับ {name}",
+    "welcomeShort": "สวัสดี {name}",
+    "view": {
+      "studio": "สตูดิโอ",
+      "creations": "ผลงาน"
+    },
+    "menu": {
+      "studio": "สตูดิโอ",
+      "creations": "ผลงาน",
+      "logout": "ออกจากระบบ"
+    }
+  },
+  "language": {
+    "english": "อังกฤษ",
+    "simplified": "จีนตัวย่อ",
+    "traditional": "จีนตัวเต็ม",
+    "japanese": "ญี่ปุ่น",
+    "korean": "เกาหลี",
+    "thai": "ไทย",
+    "display": {
+      "english": "อังกฤษ",
+      "simplified_chinese": "จีนตัวย่อ",
+      "traditional_chinese": "จีนตัวเต็ม",
+      "japanese": "ญี่ปุ่น",
+      "korean": "เกาหลี",
+      "thai": "ไทย",
+      "spanish": "สเปน",
+      "french": "ฝรั่งเศส",
+      "german": "เยอรมัน",
+      "italian": "อิตาลี",
+      "portuguese": "โปรตุเกส",
+      "russian": "รัสเซีย",
+      "arabic": "อารบิก",
+      "hindi": "ฮินดี"
+    },
+    "switcher": {
+      "label": "ภาษาอินเตอร์เฟซ",
+      "tooltip": "เปลี่ยนภาษา"
+    },
+    "unknown": "{code}"
+  },
+  "common": {
+    "unknown": "ไม่ทราบ",
+    "unknownFile": "ไฟล์ไม่ทราบชนิด",
+    "untrackedFile": "ไฟล์ไม่ได้ติดตาม",
+    "disabled": "ปิดใช้งาน",
+    "copied": "คัดลอกแล้ว!",
+    "latest": "ล่าสุด",
+    "more": "เพิ่มเติม"
+  },
+  "profile": {
+    "title": "โปรไฟล์",
+    "subtitle": "จัดการชื่อที่แสดงและการตั้งค่าภาษา",
+    "nameLabel": "ชื่อที่แสดง",
+    "namePlaceholder": "เราจะเรียกท่านว่าอย่างไรดี?",
+    "languageLabel": "ภาษาที่ต้องการ",
+    "saveButton": "บันทึกการเปลี่ยนแปลง",
+    "saving": "กำลังบันทึก…",
+    "saveSuccess": "อัปเดตโปรไฟล์แล้ว",
+    "saveError": "ไม่สามารถอัปเดตโปรไฟล์ได้ กรุณาลองใหม่"
+  },
+  "task": {
+    "detail": {
+      "breadcrumb": {
+        "task": "งาน"
+      },
+      "type": {
+        "video": "วิดีโอ",
+        "podcast": "พอดคาสต์",
+        "audio": "เสียง",
+        "both": "วิดีโอและพอดคาสต์",
+        "unknown": "งาน"
+      },
+      "videoPreview": "ดูตัวอย่างวิดีโอ",
+      "podcastPreview": "ฟังตัวอย่างพอดคาสต์",
+      "audioPreview": "ฟังตัวอย่างเสียง",
+      "previewTabs": "สลับแท็บตัวอย่าง",
+      "cancel": "ยกเลิกงาน",
+      "cancelling": "กำลังยกเลิก…",
+      "currentProgress": "ความคืบหน้าปัจจุบัน",
+      "steps": "ขั้นตอน",
+      "downloads": "ดาวน์โหลด",
+      "loadingDownloads": "กำลังโหลดลิงก์ดาวน์โหลด…",
+      "noDownloads": "ยังไม่มีลิงก์ดาวน์โหลด",
+      "noDownloadsCancelled": "ไม่มีลิงก์ดาวน์โหลดสำหรับงานที่ยกเลิก",
+      "created": "สร้างเมื่อ",
+      "updated": "อัปเดตเมื่อ",
+      "voice": "เสียงพูด",
+      "subtitles": "คำบรรยาย",
+      "subtitlesFormats": "VTT / SRT",
+      "transcript": "บทความ",
+      "metadataAria": "ข้อมูลเมตาของงาน"
+    },
+    "status": {
+      "completed": "เสร็จสมบูรณ์",
+      "processing": "กำลังดำเนินการ",
+      "queued": "รอดำเนินการ",
+      "failed": "ล้มเหลว",
+      "cancelled": "ยกเลิกแล้ว",
+      "pending": "รอดำเนินการ",
+      "skipped": "ข้าม",
+      "upload_only": "อัปโหลดพร้อม"
+    },
+    "cancelled": {
+      "description": "งานนี้ถูกยกเลิกเรียบร้อยแล้ว"
+    },
+    "list": {
+      "copyId": "คัดลอกรหัสงาน",
+      "voice": "เสียง: {language}",
+      "transcript": "บทความ: {language}",
+      "subtitles": "คำบรรยาย: {language}",
+      "downloads": "ดาวน์โหลด",
+      "videoLabel": "วิดีโอ",
+      "podcastLabel": "พอดคาสต์",
+      "audioLabel": "เสียง",
+      "transcriptLabel": "บทความ",
+      "vttLabel": "VTT",
+      "srtLabel": "SRT",
+      "idPrefix": "งาน: {id}",
+      "openTaskTitle": "เปิดงาน {id}",
+      "queuedMessage": "รอดำเนินการ • กำลังรอเริ่มต้น",
+      "createdStamp": "สร้างเมื่อ: {timestamp}",
+      "completedStamp": "เสร็จสมบูรณ์: {timestamp}",
+      "statusAria": "สถานะ: {status}"
+    },
+    "preview": {
+      "watch": "ดู",
+      "listen": "ฟัง",
+      "videoAria": "ตัวอย่างวิดีโอสำหรับงาน {taskId}",
+      "audioAria": "ตัวอย่างเสียงบรรยาย"
+    }
+  },
+  "actions": {
+    "copy": "คัดลอก",
+    "openPreview": "เปิดตัวอย่าง",
+    "open": "เปิด",
+    "generateVideo": "สร้างวิดีโอ",
+    "generatePodcast": "สร้างพอดคาสต์",
+    "generate": "สร้าง",
+    "generating": "กำลังสร้าง…",
+    "cancel": "ยกเลิก",
+    "delete": "ลบ",
+    "close": "ปิด",
+    "createAnother": "สร้างอีก"
+  },
+  "auth": {
+    "loginTitle": "เข้าสู่ระบบ",
+    "registerTitle": "สร้างบัญชี",
+    "emailLabel": "อีเมล",
+    "passwordLabel": "รหัสผ่าน",
+    "loading": "กรุณารอสักครู่…",
+    "loginAction": "เข้าสู่ระบบ",
+    "registerAction": "สร้างบัญชี",
+    "separator": "หรือ",
+    "loginWithGoogle": "ลงชื่อเข้าใช้ด้วย Google",
+    "switchToRegister": "ยังไม่มีบัญชีใช่ไหม? สร้างบัญชีใหม่",
+    "switchToLogin": "มีบัญชีอยู่แล้วใช่ไหม? เข้าสู่ระบบ",
+    "usePassword": "ใช้อีเมลและรหัสผ่าน",
+    "messages": {
+      "registerSuccess": "สร้างบัญชีสำเร็จแล้ว สามารถเข้าสู่ระบบได้ทันที"
+    },
+    "errors": {
+      "invalidCredentials": "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
+      "registerFailed": "การสร้างบัญชีล้มเหลว",
+      "generic": "เกิดข้อผิดพลาดบางอย่าง"
+    }
+  },
+  "notifications": {
+    "videoCopied": "คัดลอกลิงก์วิดีโอแล้ว!",
+    "audioCopied": "คัดลอกลิงก์เสียงแล้ว!",
+    "podcastCopied": "คัดลอกลิงก์พอดคาสต์แล้ว!",
+    "transcriptCopied": "คัดลอกลิงก์บทความแล้ว!",
+    "vttCopied": "คัดลอกลิงก์ VTT แล้ว!",
+    "srtCopied": "คัดลอกลิงก์ SRT แล้ว!"
+  },
+  "filters": {
+    "status": {
+      "all": "ทุกสถานะ"
+    }
+  },
+  "runTask": {
+    "adjustHint": "ปรับการตั้งค่าการสร้างแล้วกดปุ่มสร้างเมื่อพร้อม",
+    "tagSuffix": "งาน",
+    "source": "แหล่งที่มา",
+    "output": {
+      "video": "วิดีโอ",
+      "podcast": "พอดคาสต์",
+      "label": "ผลลัพธ์"
+    },
+    "voiceLanguage": "ภาษาเสียงพูด",
+    "subtitleLanguage": "ภาษาคำบรรยาย",
+    "transcriptLanguage": "ภาษาบทความ",
+    "videoResolution": "ความละเอียดวิดีโอ",
+    "sameAsVoice": "เหมือนกับเสียงพูด",
+    "noFileSelected": "เลือกไฟล์",
+    "resolution": {
+      "sd": "SD (640×480)",
+      "hd": "HD (1280×720)",
+      "fullhd": "Full HD (1920×1080)"
+    }
+  },
+  "creations": {
+    "health": {
+      "overall": {
+        "okLabel": "ระบบทำงานปกติ",
+        "degradedLabel": "ระบบทำงานบางส่วน",
+        "downLabel": "ระบบออฟไลน์",
+        "unknownLabel": "ไม่ทราบสถานะ",
+        "ok": "ปกติ",
+        "degraded": "เสีย",
+        "down": "ออฟไลน์",
+        "unknown": "ไม่ทราบ"
+      },
+      "status": "สถานะ",
+      "queue": "คิว",
+      "database": "ฐานข้อมูล",
+      "queueLatency": "ความหน่วงคิว: {latency} ms",
+      "databaseLatency": "ความหน่วงฐานข้อมูล: {latency} ms",
+      "queueUnavailable": "คิวไม่พร้อมใช้งาน",
+      "databaseUnavailable": "ฐานข้อมูลไม่พร้อมใช้งาน"
+    },
+    "title": "ผลงาน",
+    "summary": "{files} ไฟล์ · {creations} ผลงาน · {running} กำลังดำเนินการ",
+    "empty": "ไม่พบงาน",
+    "upload": {
+      "placeholder": "อัปโหลดพร้อมแล้ว เริ่มสร้างผลงานใหม่เพื่อเริ่มต้น"
+    },
+    "file": {
+      "idChip": "ID {id}",
+      "taskGroupLabel": "งานสำหรับการอัปโหลดนี้",
+      "taskListTitle": "งาน ({count})",
+      "count": {
+        "one": "{count} ผลงาน",
+        "other": "{count} ผลงาน"
+      },
+      "collapse": "ย่อรายละเอียด",
+      "expand": "ขยายรายละเอียด"
+    },
+    "toast": {
+      "taskCreated": "สร้างงานแล้ว: {id}",
+      "createFailed": "สร้างงานล้มเหลว",
+      "cancelFailed": "ยกเลิกงานล้มเหลว",
+      "deleteFailed": "ลบงานล้มเหลว"
+    },
+    "confirm": {
+      "delete": "การดำเนินการนี้จะลบงานและสถานะทั้งหมดถาวร ดำเนินการต่อ?"
+    }
+  },
+  "search": {
+    "placeholder": "ค้นหางาน...",
+    "submit": "ค้นหา"
+  },
+  "completed": {
+    "redirecting": "กำลังเปิดรายละเอียดงาน…"
+  },
+  "processing": {
+    "title": "กำลังสร้างผลงานชิ้นเอกของคุณ",
+    "stop": "หยุด",
+    "errorsHeading": "พบข้อผิดพลาด",
+    "meta": {
+      "aria": "รายละเอียดงาน",
+      "locating": "(กำลังค้นหา…)",
+      "locatingHint": "จากไฟล์ {id}",
+      "taskId": "รหัสงาน",
+      "copyTaskId": "คัดลอกรหัสงาน",
+      "configuration": "การตั้งค่า",
+      "languages": "ภาษา"
+    },
+    "file": {
+      "untitled": "ไม่มีชื่อ"
+    },
+    "stepsHeading": "ขั้นตอนการดำเนินการ",
+    "metadataAria": "ข้อมูลเมตาของงาน",
+    "progressLabel": "ความคืบหน้าโดยรวม",
+    "progressStatus": "เรากำลังนำการนำเสนอของคุณมาสู่ชีวิต…",
+    "steps": {
+      "extract_slides": "แยกสไลด์",
+      "analyze_slide_images": "วิเคราะห์เนื้อหา",
+      "generate_transcripts": "สร้างบทความ",
+      "revise_transcripts": "แก้ไขบทความ",
+      "translate_voice_transcripts": "แปลบทความเสียงพูด",
+      "translate_subtitle_transcripts": "แปลบทความคำบรรยาย",
+      "generate_subtitle_transcripts": "สร้างบทความคำบรรยาย",
+      "generate_audio": "สร้างเสียง",
+      "generate_avatar_videos": "สร้างอวาตาร์",
+      "convert_slides_to_images": "แปลงสไลด์เป็นรูปภาพ",
+      "generate_subtitles": "สร้างคำบรรยาย",
+      "compose_video": "ประกอบวิดีโอ",
+      "segment_pdf_content": "แบ่งส่วนเนื้อหา",
+      "revise_pdf_transcripts": "แก้ไขบทความ",
+      "generate_pdf_chapter_images": "สร้างเฟรมวิดีโอ",
+      "generate_pdf_audio": "สร้างเสียง",
+      "generate_pdf_subtitles": "สร้างคำบรรยาย",
+      "generate_podcast_script": "สร้างบทพอดคาสต์",
+      "translate_podcast_script": "แปลบทพอดคาสต์",
+      "generate_podcast_audio": "สร้างเสียงพอดคาสต์",
+      "compose_podcast": "ประกอบพอดคาสต์",
+      "unknown": "กำลังเริ่มต้น"
+    },
+    "preview": {
+      "videoEnabled": "เปิดใช้งานการสร้างวิดีโอ",
+      "podcastEnabled": "เปิดใช้งานการสร้างพอดคาสต์"
+    },
+    "step": {
+      "translatingTranscripts": "กำลังแปลบทความ"
+    },
+    "modal": {
+      "title": "รายละเอียดการดำเนินการ",
+      "close": "ปิดรายละเอียดการดำเนินการ",
+      "openDetails": "ดูรายละเอียดการดำเนินการ"
+    }
+  },
+  "uploading": {
+    "title": "กำลังอัปโหลดการนำเสนอของคุณ",
+    "status": "กำลังเตรียมเนื้อหาของคุณสำหรับการแปลงด้วย AI...",
+    "progress": "อัปโหลดแล้ว {progress}%",
+    "progressLabel": "ความคืบหน้าการอัปโหลด",
+    "summaryLabel": "สรุปการอัปโหลด",
+    "modeLabel": "โหมด",
+    "fileSizeLabel": "ขนาดไฟล์",
+    "outputsLabel": "ผลลัพธ์"
+  },
+  "upload": {
+    "modeToggle": {
+      "aria": "โหมดการป้อนข้อมูล"
+    },
+    "mode": {
+      "slides": "สไลด์",
+      "pdf": "PDF",
+      "slidesHeading": "โหมดสไลด์:",
+      "slidesDescription": "ประมวลผลแต่ละสไลด์แยกกันสำหรับบทความ เสียง คำบรรยาย และประกอบวิดีโอสุดท้าย",
+      "pdfHeading": "โหมด PDF:",
+      "pdfDescription": "แบ่งเอกสารเป็นบท สร้างวิดีโอ (เสียง + คำบรรยาย) หรือพอดคาสต์สองผู้พูด (MP3)"
+    },
+    "pdfOutput": {
+      "aria": "ผลลัพธ์ PDF"
+    },
+    "file": {
+      "choosePdf": "เลือกไฟล์ PDF",
+      "chooseSlides": "เลือกไฟล์ PPTX/PPT",
+      "hintPdf": "PDF จะถูกประมวลผลเป็นวิดีโอหรือพอดคาสต์",
+      "hintSlides": "สไลด์จะถูกประมวลผลเป็นวิดีโอบรรยาย",
+      "pdfBadge": "PDF",
+      "pdfDescription": "AI จะวิเคราะห์และแปลง PDF ของคุณเป็นวิดีโอบทที่น่าสนใจพร้อมบรรยายและคำบรรยาย",
+      "pptBadge": "PPT",
+      "pptDescription": "AI จะแปลงสไลด์ของคุณเป็นวิดีโอบรรยาย",
+      "supportedBadge": "ไฟล์ที่รองรับ",
+      "supportedDescription": "รองรับไฟล์ PDF, PPTX และ PPT"
+    },
+    "summary": {
+      "file": "ไฟล์",
+      "size": "ขนาด",
+      "output": "ผลลัพธ์",
+      "status": "สถานะ",
+      "uploading": "กำลังอัปโหลด",
+      "type": "ชนิด",
+      "documentType": "ชนิดเอกสาร"
+    },
+    "notice": "เนื้อหาที่สร้างโดย AI อาจมีความไม่ถูกต้อง กรุณาตรวจสอบอย่างละเอียด",
+    "createPodcast": "สร้างพอดคาสต์",
+    "createVideo": "สร้างวิดีโอ"
+  },
+  "footer": {
+    "slogan": "Powered by SlideSpeaker AI • ที่ที่การนำเสนอกลายเป็นผลงานชิ้นเอกของคุณ",
+    "queueUnavailable": "สถานะระบบ: ไม่พร้อมใช้งาน",
+    "queueOk": "สถานะระบบ: ปกติ",
+    "queueTooltipUnavailable": "สถานะระบบไม่พร้อมใช้งาน",
+    "queueTooltipOk": "สถานะระบบปกติ",
+    "queueTooltipLatency": "สถานะระบบปกติ • {latency}ms",
+    "theme": {
+      "toggleLabel": "สลับธีม",
+      "auto": "อัตโนมัติ",
+      "light": "สว่าง",
+      "dark": "มืด"
+    }
+  },
+  "pagination": {
+    "previous": "ก่อนหน้า",
+    "next": "ถัดไป",
+    "page": "หน้า {page}"
+  },
+  "modal": {
+    "previewTitle": "ตัวอย่างสื่อ"
+  },
+  "alerts": {
+    "previewUnavailable": "ตัวอย่างพร้อมใช้งานเฉพาะงานที่เสร็จสมบูรณ์เท่านั้น"
+  },
+  "videoPlayer": {
+    "noSupport": "เบราว์เซอร์ของคุณไม่รองรับแท็กวิดีโอ"
+  },
+  "errorBoundary": {
+    "unexpectedError": "เกิดข้อผิดพลาดที่ไม่คาดคิด กรุณาลองใหม่",
+    "somethingWentWrong": "มีบางอย่างผิดพลาด",
+    "tryAgain": "ลองใหม่?"
+  },
+  "errorDisplay": {
+    "processingFailed": "การดำเนินการล้มเหลว",
+    "processingError": "เกิดข้อผิดพลาดระหว่างการสร้างวิดีโอ กรุณาลองใหม่ด้วยไฟล์อื่น",
+    "tryAgain": "ลองใหม่"
+  }
+}

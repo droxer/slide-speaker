@@ -18,6 +18,9 @@ const localeLabels: Record<string, string> = {
   en: 'language.english',
   'zh-CN': 'language.simplified',
   'zh-TW': 'language.traditional',
+  ja: 'language.japanese',
+  ko: 'language.korean',
+  th: 'language.thai',
 };
 
 const LanguageToggle = () => {

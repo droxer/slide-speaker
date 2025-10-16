@@ -1,6 +1,9 @@
 // Core styles and reset
 @use './app.scss';
 
+// Font definitions
+@use './fonts.scss';
+
 // Theme styles
 @use './themes/light-theme.scss';
 @use './themes/dark-theme.scss';

@@ -1,0 +1,36 @@
+/* Locale-specific font definitions */
+
+/* Default font stack with Open Sans */
+body {
+  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Thai language font stack */
+:lang(th) {
+  font-family: 'Open Sans', 'Leelawadee UI', 'Tahoma', 'Microsoft Sans Serif', sans-serif;
+}
+
+/* Simplified Chinese font stack */
+:lang(zh-CN) {
+  font-family: 'Open Sans', 'Microsoft YaHei', 'SimHei', 'PingFang SC', 'Noto Sans CJK SC', sans-serif;
+}
+
+/* Traditional Chinese font stack */
+:lang(zh-TW) {
+  font-family: 'Open Sans', 'Microsoft JhengHei', 'PMingLiU', 'PingFang TC', 'Noto Sans CJK TC', sans-serif;
+}
+
+/* Japanese font stack */
+:lang(ja) {
+  font-family: 'Open Sans', 'Yu Gothic', 'Meiryo', 'MS Gothic', 'Hiragino Kaku Gothic Pro', 'Noto Sans JP', sans-serif;
+}
+
+/* Korean font stack */
+:lang(ko) {
+  font-family: 'Open Sans', 'Malgun Gothic', 'Dotum', 'Apple Gothic', 'Noto Sans KR', sans-serif;
+}
+
+/* English (default) font stack */
+:lang(en) {
+  font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+}

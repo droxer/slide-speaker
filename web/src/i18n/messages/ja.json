@@ -1,0 +1,409 @@
+{
+  "header": {
+    "title": "SlideSpeaker AI",
+    "subtitle": "スライドをAI動画に変換",
+    "login": "Googleでサインイン",
+    "logout": "ログアウト",
+    "profile": "プロフィール",
+    "defaultName": "みなさま",
+    "welcome": "ようこそ、{name}",
+    "welcomeShort": "こんにちは、{name}",
+    "view": {
+      "studio": "スタジオ",
+      "creations": "作品"
+    },
+    "menu": {
+      "studio": "スタジオ",
+      "creations": "作品",
+      "logout": "サインアウト"
+    }
+  },
+  "language": {
+    "english": "英語",
+    "simplified": "簡体字中国語",
+    "traditional": "繁体字中国語",
+    "japanese": "日本語",
+    "korean": "韓国語",
+    "thai": "タイ語",
+    "display": {
+      "english": "英語",
+      "simplified_chinese": "簡体字中国語",
+      "traditional_chinese": "繁体字中国語",
+      "japanese": "日本語",
+      "korean": "韓国語",
+      "thai": "タイ語",
+      "spanish": "スペイン語",
+      "french": "フランス語",
+      "german": "ドイツ語",
+      "italian": "イタリア語",
+      "portuguese": "ポルトガル語",
+      "russian": "ロシア語",
+      "arabic": "アラビア語",
+      "hindi": "ヒンディー語"
+    },
+    "switcher": {
+      "label": "インターフェース言語",
+      "tooltip": "言語を切り替える"
+    },
+    "unknown": "{code}"
+  },
+  "common": {
+    "unknown": "不明",
+    "unknownFile": "不明なファイル",
+    "untrackedFile": "未登録のファイル",
+    "disabled": "無効",
+    "copied": "コピーしました！",
+    "latest": "最新",
+    "more": "さらに表示"
+  },
+  "profile": {
+    "title": "プロフィール",
+    "subtitle": "表示名と言語の設定を管理します。",
+    "nameLabel": "表示名",
+    "namePlaceholder": "どのようにお呼びすればよいですか？",
+    "languageLabel": "希望言語",
+    "saveButton": "変更を保存",
+    "saving": "保存中…",
+    "saveSuccess": "プロフィールを更新しました",
+    "saveError": "プロフィールを更新できませんでした。もう一度お試しください。"
+  },
+  "task": {
+    "detail": {
+      "breadcrumb": {
+        "task": "タスク"
+      },
+      "type": {
+        "video": "動画",
+        "podcast": "ポッドキャスト",
+        "audio": "音声",
+        "both": "動画とポッドキャスト",
+        "unknown": "タスク"
+      },
+      "videoPreview": "動画プレビュー",
+      "podcastPreview": "ポッドキャストプレビュー",
+      "audioPreview": "オーディオプレビュー",
+      "previewTabs": "プレビュータブの切り替え",
+      "cancel": "タスクをキャンセル",
+      "cancelling": "キャンセル中…",
+      "currentProgress": "現在の進捗",
+      "steps": "ステップ",
+      "downloads": "ダウンロード",
+      "loadingDownloads": "ダウンロードを読み込み中…",
+      "noDownloads": "利用可能なダウンロードはまだありません。",
+      "noDownloadsCancelled": "キャンセルしたタスクのダウンロードはありません。",
+      "created": "作成日時",
+      "updated": "更新日時",
+      "voice": "音声",
+      "subtitles": "字幕",
+      "subtitlesFormats": "VTT / SRT",
+      "transcript": "原稿",
+      "metadataAria": "タスクのメタデータ"
+    },
+    "status": {
+      "completed": "完了",
+      "processing": "処理中",
+      "queued": "待機中",
+      "failed": "失敗",
+      "cancelled": "キャンセル済み",
+      "pending": "保留中",
+      "skipped": "スキップ済み",
+      "upload_only": "アップロード準備完了"
+    },
+    "cancelled": {
+      "description": "タスクは正常にキャンセルされました。"
+    },
+    "list": {
+      "copyId": "タスクIDをコピー",
+      "voice": "音声: {language}",
+      "transcript": "原稿: {language}",
+      "subtitles": "字幕: {language}",
+      "downloads": "ダウンロード",
+      "videoLabel": "動画",
+      "podcastLabel": "ポッドキャスト",
+      "audioLabel": "音声",
+      "transcriptLabel": "原稿",
+      "vttLabel": "VTT",
+      "srtLabel": "SRT",
+      "idPrefix": "タスク: {id}",
+      "openTaskTitle": "タスク {id} を開く",
+      "queuedMessage": "待機中 • 開始を待っています",
+      "createdStamp": "作成: {timestamp}",
+      "completedStamp": "完了: {timestamp}",
+      "statusAria": "ステータス: {status}"
+    },
+    "preview": {
+      "watch": "視聴",
+      "listen": "聴く",
+      "videoAria": "タスク {taskId} の動画プレビュー",
+      "audioAria": "音声ナレーションのプレビュー"
+    }
+  },
+  "actions": {
+    "copy": "コピー",
+    "openPreview": "プレビューを開く",
+    "open": "開く",
+    "generateVideo": "動画を生成",
+    "generatePodcast": "ポッドキャストを生成",
+    "generate": "生成",
+    "generating": "生成中…",
+    "cancel": "キャンセル",
+    "delete": "削除",
+    "close": "閉じる",
+    "createAnother": "もう一つ作成"
+  },
+  "auth": {
+    "loginTitle": "サインイン",
+    "registerTitle": "アカウント作成",
+    "emailLabel": "メールアドレス",
+    "passwordLabel": "パスワード",
+    "loading": "お待ちください…",
+    "loginAction": "サインイン",
+    "registerAction": "アカウントを作成",
+    "separator": "または",
+    "loginWithGoogle": "Googleでサインイン",
+    "switchToRegister": "アカウントをお持ちでない場合はこちら",
+    "switchToLogin": "すでにアカウントをお持ちですか？サインイン",
+    "usePassword": "メールとパスワードを使用",
+    "messages": {
+      "registerSuccess": "アカウントを作成しました。サインインできます。"
+    },
+    "errors": {
+      "invalidCredentials": "メールアドレスまたはパスワードが正しくありません。",
+      "registerFailed": "登録に失敗しました",
+      "generic": "問題が発生しました。"
+    }
+  },
+  "notifications": {
+    "videoCopied": "動画のURLをコピーしました！",
+    "audioCopied": "音声のURLをコピーしました！",
+    "podcastCopied": "ポッドキャストのURLをコピーしました！",
+    "transcriptCopied": "原稿のURLをコピーしました！",
+    "vttCopied": "VTTのURLをコピーしました！",
+    "srtCopied": "SRTのURLをコピーしました！"
+  },
+  "filters": {
+    "status": {
+      "all": "すべてのステータス"
+    }
+  },
+  "runTask": {
+    "adjustHint": "生成オプションを調整し、準備ができたら「生成」を押してください。",
+    "tagSuffix": "タスク",
+    "source": "ソース",
+    "output": {
+      "video": "動画",
+      "podcast": "ポッドキャスト",
+      "label": "出力"
+    },
+    "voiceLanguage": "音声の言語",
+    "subtitleLanguage": "字幕の言語",
+    "transcriptLanguage": "原稿の言語",
+    "videoResolution": "動画解像度",
+    "sameAsVoice": "音声と同じ",
+    "noFileSelected": "選択されたファイル",
+    "resolution": {
+      "sd": "SD (640×480)",
+      "hd": "HD (1280×720)",
+      "fullhd": "フルHD (1920×1080)"
+    }
+  },
+  "creations": {
+    "health": {
+      "overall": {
+        "okLabel": "全システム正常",
+        "degradedLabel": "一部利用可能",
+        "downLabel": "システム停止中",
+        "unknownLabel": "状態不明",
+        "ok": "正常",
+        "degraded": "低下",
+        "down": "停止",
+        "unknown": "不明"
+      },
+      "status": "ステータス",
+      "queue": "キュー",
+      "database": "データベース",
+      "queueLatency": "キュー遅延: {latency} ms",
+      "databaseLatency": "データベース遅延: {latency} ms",
+      "queueUnavailable": "キューを利用できません",
+      "databaseUnavailable": "データベースを利用できません"
+    },
+    "title": "作品",
+    "summary": "{files} ファイル · {creations} 件の作品 · {running} 件処理中",
+    "empty": "タスクが見つかりません",
+    "upload": {
+      "placeholder": "アップロードの準備ができました。新しい作品を実行して始めましょう。"
+    },
+    "file": {
+      "idChip": "ID {id}",
+      "taskGroupLabel": "このアップロードのタスク",
+      "taskListTitle": "タスク ({count})",
+      "count": {
+        "one": "{count} 件の作品",
+        "other": "{count} 件の作品"
+      },
+      "collapse": "詳細を折りたたむ",
+      "expand": "詳細を展開"
+    },
+    "toast": {
+      "taskCreated": "タスクを作成しました: {id}",
+      "createFailed": "タスクの作成に失敗しました",
+      "cancelFailed": "タスクのキャンセルに失敗しました",
+      "deleteFailed": "タスクの削除に失敗しました"
+    },
+    "confirm": {
+      "delete": "タスクとその状態を完全に削除します。続行しますか？"
+    }
+  },
+  "search": {
+    "placeholder": "タスクを検索...",
+    "submit": "検索"
+  },
+  "completed": {
+    "redirecting": "タスク詳細を開いています…"
+  },
+  "processing": {
+    "title": "傑作を制作しています",
+    "stop": "停止",
+    "errorsHeading": "発生したエラー",
+    "meta": {
+      "aria": "タスクの詳細",
+      "locating": "（検索中…）",
+      "locatingHint": "ファイル {id} より",
+      "taskId": "タスクID",
+      "copyTaskId": "タスクIDをコピー",
+      "configuration": "設定",
+      "languages": "言語"
+    },
+    "file": {
+      "untitled": "無題"
+    },
+    "stepsHeading": "処理ステップ",
+    "metadataAria": "タスクのメタデータ",
+    "progressLabel": "全体の進捗",
+    "progressStatus": "プレゼンテーションを形にしています…",
+    "steps": {
+      "extract_slides": "スライドを抽出",
+      "analyze_slide_images": "コンテンツを分析",
+      "generate_transcripts": "原稿を生成",
+      "revise_transcripts": "原稿を校正",
+      "translate_voice_transcripts": "音声用原稿を翻訳",
+      "translate_subtitle_transcripts": "字幕用原稿を翻訳",
+      "generate_subtitle_transcripts": "字幕原稿を生成",
+      "generate_audio": "音声を生成",
+      "generate_avatar_videos": "アバターを作成",
+      "convert_slides_to_images": "スライドを画像に変換",
+      "generate_subtitles": "字幕を作成",
+      "compose_video": "動画を合成",
+      "segment_pdf_content": "コンテンツを分割",
+      "revise_pdf_transcripts": "原稿を校正",
+      "generate_pdf_chapter_images": "動画フレームを作成",
+      "generate_pdf_audio": "音声を生成",
+      "generate_pdf_subtitles": "字幕を作成",
+      "generate_podcast_script": "ポッドキャスト台本を作成",
+      "translate_podcast_script": "ポッドキャスト台本を翻訳",
+      "generate_podcast_audio": "ポッドキャスト音声を生成",
+      "compose_podcast": "ポッドキャストを合成",
+      "unknown": "初期化中"
+    },
+    "preview": {
+      "videoEnabled": "動画生成が有効",
+      "podcastEnabled": "ポッドキャスト生成が有効"
+    },
+    "step": {
+      "translatingTranscripts": "原稿を翻訳中"
+    },
+    "modal": {
+      "title": "処理の詳細",
+      "close": "処理の詳細を閉じる",
+      "openDetails": "処理の詳細を表示"
+    }
+  },
+  "uploading": {
+    "title": "プレゼンテーションをアップロード中",
+    "status": "コンテンツをAI変換のために準備しています...",
+    "progress": "{progress}% アップロード済み",
+    "progressLabel": "アップロードの進捗",
+    "summaryLabel": "アップロード概要",
+    "modeLabel": "モード",
+    "fileSizeLabel": "ファイルサイズ",
+    "outputsLabel": "出力"
+  },
+  "upload": {
+    "modeToggle": {
+      "aria": "入力モード"
+    },
+    "mode": {
+      "slides": "スライド",
+      "pdf": "PDF",
+      "slidesHeading": "スライドモード:",
+      "slidesDescription": "各スライドを個別に処理して原稿・音声・字幕を生成し、最終的な動画を作成します。",
+      "pdfHeading": "PDFモード:",
+      "pdfDescription": "文書を章に分割し、動画（音声＋字幕）または2人の話者によるポッドキャスト（MP3）を生成します。"
+    },
+    "pdfOutput": {
+      "aria": "PDFの出力"
+    },
+    "file": {
+      "choosePdf": "PDFファイルを選択",
+      "chooseSlides": "PPTX/PPTファイルを選択",
+      "hintPdf": "PDFは動画またはポッドキャストとして処理されます",
+      "hintSlides": "スライドはナレーション付き動画として処理されます",
+      "pdfBadge": "PDF",
+      "pdfDescription": "AIがPDFを解析し、ナレーションと字幕付きの魅力的な動画チャプターに変換します。",
+      "pptBadge": "PPT",
+      "pptDescription": "AIがスライドをナレーション付き動画に変換します。",
+      "supportedBadge": "対応ファイル",
+      "supportedDescription": "PDF、PPTX、PPTファイルに対応"
+    },
+    "summary": {
+      "file": "ファイル",
+      "size": "サイズ",
+      "output": "出力",
+      "status": "ステータス",
+      "uploading": "アップロード中",
+      "type": "種類",
+      "documentType": "ドキュメントタイプ"
+    },
+    "notice": "AIが生成したコンテンツには不正確な内容が含まれる場合があります。必ず確認してください。",
+    "createPodcast": "ポッドキャストを作成",
+    "createVideo": "動画を作成"
+  },
+  "footer": {
+    "slogan": "SlideSpeaker AI 提供 • プレゼンテーションを傑作へ",
+    "queueUnavailable": "システム状態: 利用不可",
+    "queueOk": "システム状態: 正常",
+    "queueTooltipUnavailable": "システム状態を取得できません",
+    "queueTooltipOk": "システム状態は正常です",
+    "queueTooltipLatency": "システム状態は正常 • {latency}ms",
+    "theme": {
+      "toggleLabel": "テーマの切り替え",
+      "auto": "自動",
+      "light": "ライト",
+      "dark": "ダーク"
+    }
+  },
+  "pagination": {
+    "previous": "前へ",
+    "next": "次へ",
+    "page": "ページ {page}"
+  },
+  "modal": {
+    "previewTitle": "メディアプレビュー"
+  },
+  "alerts": {
+    "previewUnavailable": "プレビューは完了したタスクでのみ利用できます。"
+  },
+  "videoPlayer": {
+    "noSupport": "ご使用のブラウザーはvideoタグをサポートしていません。"
+  },
+  "errorBoundary": {
+    "unexpectedError": "予期しないエラーが発生しました。もう一度お試しください。",
+    "somethingWentWrong": "問題が発生しました。",
+    "tryAgain": "再試行しますか？"
+  },
+  "errorDisplay": {
+    "processingFailed": "処理に失敗しました",
+    "processingError": "動画の生成中に問題が発生しました。別のファイルでお試しください。",
+    "tryAgain": "再試行"
+  }
+}
