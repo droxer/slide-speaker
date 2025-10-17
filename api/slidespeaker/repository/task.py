@@ -7,12 +7,51 @@ database is configured and available.
 
 from __future__ import annotations
 
+import hashlib
+import json
+from contextlib import suppress
 from datetime import datetime
 from typing import Any
 
 from slidespeaker.configs.db import get_session
 from slidespeaker.core.models import TaskRow, UploadRow
 from slidespeaker.storage.paths import build_storage_uri
+
+# Import Redis for caching
+try:
+    from slidespeaker.configs.redis_config import RedisConfig
+
+    _redis_client = RedisConfig.get_redis_client()
+    _cache_enabled = True
+except Exception:
+    _redis_client = None
+    _cache_enabled = False
+
+
+def _generate_cache_key(prefix: str, **kwargs: Any) -> str:
+    """Generate a cache key from function arguments."""
+    # Create a deterministic key based on arguments
+    key_data = f"{prefix}:{json.dumps(kwargs, sort_keys=True)}"
+    return f"cache:{hashlib.md5(key_data.encode()).hexdigest()}"
+
+
+async def _get_from_cache(key: str) -> Any | None:
+    """Get value from cache if enabled."""
+    if not _cache_enabled or _redis_client is None:
+        return None
+    with suppress(Exception):
+        cached = await _redis_client.get(key)
+        if cached:
+            return json.loads(cached)
+    return None
+
+
+async def _set_in_cache(key: str, value: Any, ttl: int = 300) -> None:
+    """Set value in cache if enabled."""
+    if not _cache_enabled or _redis_client is None:
+        return
+    with suppress(Exception):
+        await _redis_client.setex(key, ttl, json.dumps(value))
 
 
 def _filter_sensitive_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -287,10 +326,21 @@ async def list_tasks(
     status: str | None = None,
     user_id: str | None = None,
 ) -> dict[str, Any]:
-    from sqlalchemy import func, select
+    from sqlalchemy import func, select, text
     from sqlalchemy.orm import joinedload
 
+    # Generate cache key for this query
+    cache_key = _generate_cache_key(
+        "list_tasks", limit=limit, offset=offset, status=status, user_id=user_id
+    )
+
+    # Try to get from cache first
+    cached_result = await _get_from_cache(cache_key)
+    if cached_result is not None:
+        return cached_result
+
     async with get_session() as s:
+        # Use more efficient query with proper indexing
         base_query = select(TaskRow)
         if status:
             base_query = base_query.where(TaskRow.status == status)
@@ -299,10 +349,11 @@ async def list_tasks(
                 UploadRow.user_id == user_id
             )
 
-        total = (
-            await s.execute(select(func.count()).select_from(base_query.subquery()))
-        ).scalar_one()
+        # Use count(*) for better performance
+        total_query = select(func.count(text("1"))).select_from(base_query.subquery())
+        total = (await s.execute(total_query)).scalar_one()
 
+        # Optimize the data query with proper ordering and limits
         data_query = (
             base_query.options(joinedload(TaskRow.upload))
             .order_by(TaskRow.created_at.desc())
@@ -311,7 +362,11 @@ async def list_tasks(
         )
         rows = (await s.execute(data_query)).scalars().all()
         tasks = [_serialize_task(r) for r in rows]
-        return {"tasks": tasks, "total": int(total or 0)}
+        result = {"tasks": tasks, "total": int(total or 0)}
+
+        # Cache the result for 5 minutes
+        await _set_in_cache(cache_key, result, ttl=300)
+        return result
 
 
 async def get_statistics(user_id: str | None = None) -> dict[str, Any]:

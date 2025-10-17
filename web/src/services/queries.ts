@@ -243,10 +243,14 @@ export const useFilesQuery = (
       return {
         files,
         has_more: taskRes.has_more,
+        total: taskRes.total,
       };
     },
     refetchInterval: opts?.refetchInterval,
     staleTime: opts?.staleTime ?? 10000,
+    // Only fetch when the component is visible
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 };
 

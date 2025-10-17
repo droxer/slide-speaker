@@ -15,10 +15,27 @@ import {
   type UploadPayload,
 } from '@/services/client';
 import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query';
-import UploadPanel from '@/components/UploadPanel';
-import FileUploadingView from '@/components/FileUploadingView';
-import TaskProcessingSteps from '@/components/TaskProcessingSteps';
-import ErrorDisplay from '@/components/ErrorDisplay';
+import dynamic from 'next/dynamic';
+
+const UploadPanel = dynamic(() => import('@/components/UploadPanel'), {
+  ssr: false,
+  loading: () => <div className="loading-placeholder">Loading upload panel...</div>
+});
+
+const FileUploadingView = dynamic(() => import('@/components/FileUploadingView'), {
+  ssr: false,
+  loading: () => <div className="loading-placeholder">Loading upload view...</div>
+});
+
+const TaskProcessingSteps = dynamic(() => import('@/components/TaskProcessingSteps'), {
+  ssr: false,
+  loading: () => <div className="loading-placeholder">Loading processing steps...</div>
+});
+
+const ErrorDisplay = dynamic(() => import('@/components/ErrorDisplay'), {
+  ssr: false,
+  loading: () => <div className="loading-placeholder">Loading error display...</div>
+});
 import { showErrorToast } from '@/utils/toast';
 import { validateFile, getFileType, formatFileSize as formatFileSizeUtil } from '@/utils/fileValidation';
 import {getStepLabel} from '@/utils/stepLabels';

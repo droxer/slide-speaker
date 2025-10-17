@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { cancelRun as apiCancelRun, deleteTask as apiDeleteTask, purgeTask as apiPurgeTask, getHealth } from '../services/client';
 import type { UploadSummary } from '../services/client';
@@ -58,9 +58,33 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
   const [hiddenTasks, setHiddenTasks] = useState<Set<string>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [copiedTaskId, setCopiedTaskId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(20); // Initial visible items for virtualization
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { const t = setTimeout(() => setDebounced(search.trim()), 350); return () => clearTimeout(t); }, [search]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2600); return () => clearTimeout(t); }, [toast]);
+
+  // Intersection Observer for infinite scrolling
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          // Load more items when user scrolls near the bottom
+          setVisibleCount((prev) => Math.min(prev + 10, 100)); // Cap at 100 items
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const sentinel = containerRef.current.querySelector('.pagination-sentinel');
+    if (sentinel) {
+      observer.observe(sentinel);
+    }
+
+    return () => observer.disconnect();
+  }, []);
 
   const formatFileName = useCallback((name?: string, max = 42): string => {
     if (!name) return t('common.unknownFile', undefined, 'Unknown file');
@@ -154,7 +178,8 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
       const runningCount = searchGroups.reduce((n, g) => n + filterHidden(g.tasks).filter((t) => t.status === 'processing').length, 0);
       return { filesCount, creationsCount, runningCount };
     }
-    const files = ((filesQuery.data as any)?.files || []) as Array<{ tasks?: Task[]; uploadOnly?: boolean }>;
+    const filesData = filesQuery.data as any;
+    const files = (filesData?.files || []) as Array<{ tasks?: Task[]; uploadOnly?: boolean }>;
     let filesCount = 0, creationsCount = 0, runningCount = 0;
     for (const f of files) {
       const tasks = filterHidden((f.tasks || []) as Task[]);
@@ -164,7 +189,7 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
       creationsCount += vis.length;
       runningCount += tasks.filter((t) => t.status === 'processing').length;
     }
-    return { filesCount, creationsCount, runningCount };
+    return { filesCount, creationsCount, runningCount, total: filesData?.total || 0 };
   }, [searching, searchGroups, filesQuery.data, status, hiddenTasks]);
 
   const STATUS_ORDER: TaskStatus[] = ['processing', 'queued', 'completed', 'failed', 'cancelled'];
@@ -632,9 +657,11 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
       if (!searchGroups.length) {
         return <div className="no-tasks">{t('creations.empty', undefined, 'No tasks found')}</div>;
       }
+      // Apply virtualization for search results
+      const visibleGroups = searchGroups.slice(0, visibleCount);
       return (
         <div className="file-groups">
-          {searchGroups.map((g, idx) =>
+          {visibleGroups.map((g, idx) =>
             renderFileGroup(
               {
                 upload_id: g.upload_id,
@@ -647,6 +674,9 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
               g.upload_id || g.filename || `search-${idx}`,
             ),
           )}
+          {searchGroups.length > visibleCount && (
+            <div className="pagination-sentinel" style={{ height: '20px' }} />
+          )}
         </div>
       );
     }
@@ -656,19 +686,29 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
       return <div className="no-tasks">{t('creations.empty', undefined, 'No tasks found')}</div>;
     }
 
+    // Apply virtualization for regular file list
+    const visibleFiles = files.slice(0, visibleCount);
     return (
       <div className="file-groups">
-        {files.map((f, idx) => renderFileGroup(f, f.upload_id || f.filename || `upload-${idx}`))}
+        {visibleFiles.map((f, idx) => renderFileGroup(f, f.upload_id || f.filename || `upload-${idx}`))}
+        {files.length > visibleCount && (
+          <div className="pagination-sentinel" style={{ height: '20px' }} />
+        )}
       </div>
     );
   };
 
   return (
-    <div className="task-monitor">
+    <div className="task-monitor" ref={containerRef}>
       {toast && <div className={`toast ${toast.type}`} role="status" aria-live="polite">{toast.message}</div>}
       <div className="monitor-header">
         <h2 className="ai-title">{t('creations.title', undefined, 'Creations')}</h2>
-        <div className="monitor-counts" aria-live="polite">{t('creations.summary', { files: counts.filesCount, creations: counts.creationsCount, running: counts.runningCount }, `${counts.filesCount} files · ${counts.creationsCount} creations · ${counts.runningCount} running`)}</div>
+        <div className="monitor-counts" aria-live="polite">
+          {t('creations.summary', { files: counts.filesCount, creations: counts.creationsCount, running: counts.runningCount }, `${counts.filesCount} files · ${counts.creationsCount} creations · ${counts.runningCount} running`)}
+          {counts.total > 0 && (
+            <span> · {counts.total} total</span>
+          )}
+        </div>
         <div className="monitor-controls">
           <form onSubmit={(e)=>{e.preventDefault(); setDebounced(search.trim());}} className="search-form">
             <input type="text" placeholder={t('search.placeholder')} value={search} onChange={(e)=>setSearch(e.target.value)} className="search-input" />

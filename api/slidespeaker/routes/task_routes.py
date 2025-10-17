@@ -5,6 +5,7 @@ This module provides API endpoints for retrieving task status and canceling task
 It interfaces with the Redis task queue system to manage presentation processing tasks.
 """
 
+import json
 from contextlib import suppress
 from typing import Annotated, Any
 
@@ -267,6 +268,49 @@ def _filter_sensitive_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
     return filtered
 
 
+def _serialize_task(row: Any) -> dict[str, Any]:
+    """Serialize a TaskRow (and optional upload) into a response dict."""
+    upload = getattr(row, "upload", None)
+    kwargs = _filter_sensitive_kwargs(row.kwargs or {})
+    upload_filename = upload.filename if upload and upload.filename else None
+    upload_file_ext = upload.file_ext if upload and upload.file_ext else None
+    filename = upload_filename or kwargs.get("filename")
+    file_ext = upload_file_ext or kwargs.get("file_ext")
+
+    data: dict[str, Any] = {
+        "id": row.id,
+        "task_id": row.id,
+        "upload_id": row.upload_id,  # Internal model and API response now use upload_id for consistency
+        "task_type": row.task_type,
+        "status": row.status,
+        "kwargs": kwargs,
+        "error": row.error,
+        "user_id": upload.user_id if upload else None,
+        "voice_language": row.voice_language,
+        "subtitle_language": row.subtitle_language,
+        "source_type": upload.source_type if upload else None,
+        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        "filename": filename,
+        "file_ext": file_ext,
+    }
+    if upload:
+        data["upload"] = {
+            "id": upload.id,
+            "user_id": upload.user_id,
+            "filename": upload.filename,
+            "file_ext": upload.file_ext,
+            "source_type": upload.source_type,
+            "content_type": upload.content_type,
+            "checksum": upload.checksum,
+            "size_bytes": upload.size_bytes,
+            "storage_path": upload.storage_path,
+            "created_at": upload.created_at.isoformat() if upload.created_at else None,
+            "updated_at": upload.updated_at.isoformat() if upload.updated_at else None,
+        }
+    return data
+
+
 @router.get("/tasks")
 @limiter.limit("30/minute")  # Limit to 30 task list requests per minute per IP
 @monitor_endpoint
@@ -328,32 +372,41 @@ async def search_tasks(
     if not user_id:
         return {"tasks": [], "query": query, "total_found": 0}
 
-    all_tasks_result = await db_list_tasks(
-        limit=10000, offset=0, status=None, user_id=user_id
-    )
-    all_tasks = all_tasks_result["tasks"]
+    # Try to get from cache first (cache key based on user and query)
+    cache_key = f"search_tasks:{user_id}:{query}:{limit}"
+    with suppress(Exception):
+        cached_result = await task_queue.redis_client.get(cache_key)
+        if cached_result:
+            return json.loads(cached_result)
 
-    q = query.lower()
-    matches: list[dict[str, Any]] = []
-    for t in all_tasks:
-        if q in (t.get("task_id") or "").lower():
-            matches.append(t)
-            continue
-        if q in (t.get("file_id") or "").lower():
-            matches.append(t)
-            continue
-        if q in (t.get("status") or "").lower():
-            matches.append(t)
-            continue
-        if q in (t.get("task_type") or "").lower():
-            matches.append(t)
-            continue
-        kwargs = t.get("kwargs") or {}
-        if kwargs and q in str(kwargs).lower():
-            matches.append(t)
+    # Search in DB with optimized query using the repository function
+    from sqlalchemy import select
 
-    matches = matches[:limit]
-    return {"tasks": matches, "query": query, "total_found": len(matches)}
+    from slidespeaker.configs.db import get_session
+    from slidespeaker.core.models import TaskRow, UploadRow
+
+    async with get_session() as s:
+        # Create a more efficient search query with proper indexing
+        stmt = (
+            select(TaskRow)
+            .join(TaskRow.upload)
+            .where(UploadRow.user_id == user_id)
+            .where(TaskRow.id.ilike(f"%{query}%"))
+            .limit(limit)
+        )
+
+        result = await s.execute(stmt)
+        rows = result.scalars().all()
+
+        matches = [_serialize_task(r) for r in rows]
+
+        response = {"tasks": matches, "query": query, "total_found": len(matches)}
+
+        # Cache for 2 minutes
+        with suppress(Exception):
+            await task_queue.redis_client.setex(cache_key, 120, json.dumps(response))
+
+        return response
 
 
 @router.get("/tasks/statistics")

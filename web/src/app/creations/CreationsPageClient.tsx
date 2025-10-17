@@ -3,9 +3,14 @@
 import {useLocale} from 'next-intl';
 import {useRouter} from '@/navigation';
 import AppShell from '@/components/AppShell';
-import TaskDashboard from '@/components/TaskDashboard';
 import {resolveApiBaseUrl} from '@/utils/apiBaseUrl';
 import type {HealthStatus} from '@/types/health';
+import dynamic from 'next/dynamic';
+
+const TaskDashboard = dynamic(() => import('@/components/TaskDashboard'), {
+  ssr: false,
+  loading: () => <div className="loading-placeholder">Loading task dashboard...</div>
+});
 
 export type CreationsPageClientProps = {
   initialHealth?: HealthStatus | null;
