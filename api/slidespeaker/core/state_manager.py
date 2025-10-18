@@ -152,20 +152,11 @@ class RedisStateManager:
                 "data": None,
             }
 
-        # Only include subtitle script generation steps if languages are different
-        # Default to audio language if subtitle language is not specified
-        effective_subtitle_language = (
-            subtitle_language if subtitle_language is not None else voice_language
-        )
-        if voice_language != effective_subtitle_language:
-            steps.update(
-                {
-                    "generate_subtitle_transcripts": {
-                        "status": "pending",
-                        "data": None,
-                    },
-                }
-            )
+        if generate_subtitles:
+            steps["generate_subtitle_transcripts"] = {
+                "status": "pending",
+                "data": None,
+            }
 
         return steps
 

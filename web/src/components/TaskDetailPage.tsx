@@ -7,7 +7,7 @@ import AudioPlayer from '@/components/AudioPlayer';
 import PodcastPlayer from '@/components/PodcastPlayer';
 import DownloadSection, { DownloadLinkItem } from '@/components/DownloadSection';
 import { resolveLanguages, getLanguageDisplayName } from '@/utils/language';
-import { usePodcastScriptQuery } from '@/services/queries';
+import { usePodcastScriptQuery, prefetchTaskDetail } from '@/services/queries';
 import { useI18n } from '@/i18n/hooks';
 import { getTaskStatusClass, getTaskStatusIcon, getTaskStatusLabel } from '@/utils/taskStatus';
 import type { Task, DownloadItem } from '@/types';
@@ -19,12 +19,7 @@ const formatDateTime = (value?: string) => {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 };
 
-const buildAssetUrl = (baseUrl: string, path: string) => {
-  if (!path) return '#';
-  if (!baseUrl) return path;
-  if (path.startsWith('http')) return path;
-  return `${baseUrl}${path}`;
-};
+// This function is no longer used since download URLs from the API are already complete paths
 
 const formatTaskType = (type?: string) => {
   if (!type) return 'Unknown';
@@ -79,6 +74,12 @@ const TaskDetailPage = ({
   }, [t]);
   const captionLang = transcriptLanguage ?? subtitleLanguage;
 
+  // Prefetch related task data for better navigation experience
+  React.useEffect(() => {
+    // In a real implementation, you might want to prefetch data for related tasks
+    // or adjacent tasks in the list for smoother navigation
+  }, [task.task_id]);
+
   const taskType = String(task.task_type || '').toLowerCase();
   const filename =
     task.filename ||
@@ -113,9 +114,20 @@ const TaskDetailPage = ({
   const pathFor = (path: string) => {
     try {
       const base = apiClient.defaults.baseURL || apiBaseUrl;
-      return base ? new URL(path, base).toString() : path;
+      // If we have a base URL, construct the full URL properly
+      if (base) {
+        // Ensure path starts with '/'
+        const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+        return new URL(normalizedPath, base).toString();
+      }
+      // If no base URL, return path directly but ensure it starts with '/'
+      return path.startsWith('/') ? path : `/${path}`;
     } catch {
-      return `${apiBaseUrl}${path}`;
+      // Fallback: ensure path starts with '/' and concatenate with apiBaseUrl
+      const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+      if (!apiBaseUrl || apiBaseUrl === '/') return normalizedPath;
+      const normalizedBaseUrl = apiBaseUrl.endsWith('/') ? apiBaseUrl.slice(0, -1) : apiBaseUrl;
+      return `${normalizedBaseUrl}${normalizedPath}`;
     }
   };
 
@@ -147,7 +159,7 @@ const TaskDetailPage = ({
           <div className="task-detail-card__heading">
             <p className="task-detail-card__breadcrumb">
               <Link href="/creations" locale={locale}>{t('header.view.creations')}</Link>
-              <span aria-hidden> / </span>
+              <span aria-hidden="true"> / </span>
               <span>{t('task.detail.breadcrumb.task')}</span>
             </p>
             <div className="task-detail-card__title-row">
@@ -249,7 +261,13 @@ const TaskDetailPage = ({
           {filteredDownloads.length > 0 ? (
             <DownloadSection
               links={filteredDownloads.map((item) => {
-                const href = buildAssetUrl(apiBaseUrl, item.download_url || item.url);
+                // Construct full URLs by combining the API base URL with the relative paths from the API
+                const baseUrl = apiClient.defaults.baseURL || apiBaseUrl || '';
+                const path = item.download_url || item.url;
+                // Ensure path starts with '/' and construct full URL
+                const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+                const fullUrl = baseUrl ? `${baseUrl.replace(/\/+$/, '')}${normalizedPath}` : normalizedPath;
+
                 const label = downloadLabel(item.type, t);
                 const typeKey = String(item.type || '').toLowerCase();
                 const copyMessageKey = typeKey === 'podcast'
@@ -266,9 +284,9 @@ const TaskDetailPage = ({
                             ? 'notifications.srtCopied'
                             : undefined;
                 return {
-                  key: `${item.type}-${href}`,
+                  key: `${item.type}-${fullUrl}`,
                   label,
-                  url: href,
+                  url: fullUrl,
                   copyLabel: t('actions.copy'),
                   copyMessage: copyMessageKey ? t(copyMessageKey) : undefined,
                 } satisfies DownloadLinkItem;

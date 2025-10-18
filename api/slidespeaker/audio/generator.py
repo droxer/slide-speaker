@@ -207,11 +207,11 @@ class AudioGenerator:
                     )
                     if result.returncode != 0:
                         if attempt == max_retries - 1:
-                            return self._estimate_duration_from_text(audio_path)
+                            return self._fallback_audio_duration(audio_path)
                         continue
                     if not result.stdout.strip():
                         if attempt == max_retries - 1:
-                            return self._estimate_duration_from_text(audio_path)
+                            return self._fallback_audio_duration(audio_path)
                         continue
                     data = json.loads(result.stdout)
                     if "format" in data and "duration" in data["format"]:
@@ -222,25 +222,38 @@ class AudioGenerator:
                                 return float(stream["duration"])
                 except subprocess.TimeoutExpired:
                     if attempt == max_retries - 1:
-                        return self._estimate_duration_from_text(audio_path)
+                        return self._fallback_audio_duration(audio_path)
                     continue
                 except json.JSONDecodeError:
                     if attempt == max_retries - 1:
-                        return self._estimate_duration_from_text(audio_path)
+                        return self._fallback_audio_duration(audio_path)
                     continue
                 except Exception:
                     if attempt == max_retries - 1:
-                        return self._estimate_duration_from_text(audio_path)
+                        return self._fallback_audio_duration(audio_path)
                     continue
         except Exception:
-            return self._estimate_duration_from_text(audio_path)
-        return self._estimate_duration_from_text(audio_path)
+            return self._fallback_audio_duration(audio_path)
+        return self._fallback_audio_duration(audio_path)
 
     def _estimate_duration_from_text(self, _audio_path: Path) -> float:
         try:
             return 10.0
         except Exception:
             return 5.0
+
+    def _fallback_audio_duration(self, audio_path: Path) -> float:
+        """Attempt secondary strategies to measure audio duration."""
+        try:
+            from moviepy import AudioFileClip
+
+            with AudioFileClip(str(audio_path)) as clip:
+                duration = float(getattr(clip, "duration", 0.0) or 0.0)
+                if duration > 0:
+                    return duration
+        except Exception:
+            pass
+        return self._estimate_duration_from_text(audio_path)
 
     def get_supported_voices(self, language: str = "english") -> list[str]:
         if not self.tts_service:

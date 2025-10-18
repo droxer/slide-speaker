@@ -1,19 +1,21 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef, lazy, Suspense } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { cancelRun as apiCancelRun, deleteTask as apiDeleteTask, purgeTask as apiPurgeTask, getHealth } from '../services/client';
 import type { UploadSummary } from '../services/client';
-import { useCancelTaskMutation, useFilesQuery, useRunFileTaskMutation, useSearchTasksQuery, useTaskQuery } from '../services/queries';
+import { useCancelTaskMutation, useFilesQuery, useRunFileTaskMutation, useSearchTasksQuery, useTaskQuery, prefetchTaskDetail, evictOldTaskQueries, evictOldListQueries } from '../services/queries';
 import { Link } from '@/navigation';
-import TaskCreationModal from './TaskCreationModal';
-import TaskProgressModal from './TaskProgressModal';
 import { getGlobalRunDefaults, saveGlobalRunDefaults } from '../utils/defaults';
 import type { Task } from '../types';
 import { useI18n } from '@/i18n/hooks';
 import { getLanguageDisplayName } from '../utils/language';
 import { getTaskStatusClass, getTaskStatusIcon, getTaskStatusLabel, type TaskStatus } from '@/utils/taskStatus';
 import { getFileTypeIcon, getFileTypeCategory, isPdf, isPowerPoint } from '@/utils/fileIcons';
+
+// Lazy load non-critical modal components
+const TaskCreationModal = lazy(() => import('./TaskCreationModal'));
+const TaskProgressModal = lazy(() => import('./TaskProgressModal'));
 
 interface TaskDashboardProps { apiBaseUrl: string }
 
@@ -60,6 +62,16 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
   const [copiedTaskId, setCopiedTaskId] = useState<string | null>(null);
   const [visibleCount, setVisibleCount] = useState(20); // Initial visible items for virtualization
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Periodically clean up old cache entries
+  useEffect(() => {
+    const interval = setInterval(() => {
+      evictOldTaskQueries(queryClient, 60); // Evict task detail queries older than 60 minutes
+      evictOldListQueries(queryClient, 30); // Evict list queries older than 30 minutes
+    }, 10 * 60 * 1000); // Run every 10 minutes
+
+    return () => clearInterval(interval);
+  }, [queryClient]);
 
   useEffect(() => { const t = setTimeout(() => setDebounced(search.trim()), 350); return () => clearTimeout(t); }, [search]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2600); return () => clearTimeout(t); }, [toast]);
@@ -110,17 +122,29 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
 
   const filesQuery = useFilesQuery(
     { page, limit: 10, includeTasks: true, q: debounced || undefined },
-    { refetchInterval: (q: any) => {
+    {
+      refetchInterval: (q: any) => {
         const files = (q?.state?.data as any)?.files || [];
         const hasActive = files.some((f: any) => (f.tasks || []).some((t: Task) => t.status === 'processing' || t.status === 'queued'));
         return hasActive ? 15000 : false;
-      }, staleTime: 10000 },
+      },
+      staleTime: 2 * 60 * 1000, // 2 minutes for files data
+      // Disable polling when page is not visible to enable bfcache
+      refetchIntervalInBackground: false,
+    },
   );
   const searchQuery = useSearchTasksQuery(debounced);
   const searching = debounced.length > 0;
 
-  // Health indicator (Redis/DB)
-  const healthQuery = useQuery({ queryKey: ['health'], queryFn: getHealth, refetchInterval: 30000, staleTime: 20000 });
+  // Health indicator (Redis/DB) - with cleanup for bfcache compatibility
+  const healthQuery = useQuery({
+    queryKey: ['health'],
+    queryFn: getHealth,
+    refetchInterval: 30000,
+    staleTime: 20000,
+    // Disable polling when page is not visible to enable bfcache
+    refetchIntervalInBackground: false,
+  });
   const health = (healthQuery.data as any) || {};
   const overall = String(health.status || 'unknown');
   const redisOk = Boolean(health?.redis?.ok);
@@ -334,7 +358,7 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
                 aria-expanded={!isCollapsed}
                 aria-controls={taskListId}
               >
-                <span className="file-header-toggle-icon" aria-hidden>
+                <span className="file-header-toggle-icon" aria-hidden="true">
                   {isCollapsed ? '▸' : '▾'}
                 </span>
                 <span className="file-header-toggle-label">
@@ -396,18 +420,15 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
         console.log('Cancelling task:', taskId);
         const result = await cancelMutation.mutateAsync(taskId);
         console.log('Cancel result:', result);
-        // Also invalidate the specific task query to ensure UI updates
-        await queryClient.invalidateQueries({ queryKey: ['task', taskId] });
-        // Also refetch the files query to ensure the task list updates
-        await queryClient.invalidateQueries({ queryKey: ['files'], exact: false });
-        console.log('Queries invalidated');
+        // The mutation now handles cache updates optimistically
+        console.log('Queries updated');
       }
       catch (error) {
         console.error('Failed to cancel task:', error);
         alert(t('creations.toast.cancelFailed', undefined, 'Failed to cancel task'));
       }
     },
-    [cancelMutation, queryClient, t],
+    [cancelMutation, t],
   );
 
   const onDelete = useCallback(
@@ -450,6 +471,7 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
           if (!old || !Array.isArray(old.tasks)) return old;
           return { ...old, tasks: old.tasks.filter((t: any) => t?.task_id !== taskId) };
         });
+        // Use the new query structure for invalidation
         await queryClient.invalidateQueries({ queryKey: ['tasks'] });
         await queryClient.invalidateQueries({ queryKey: ['files'] });
       } catch (error) {
@@ -550,14 +572,18 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
       }
 
       return (
-        <li key={task.task_id} className={`file-task ${statusClass}`}>
+        <li
+          key={task.task_id}
+          className={`file-task ${statusClass}`}
+          onMouseEnter={() => prefetchTaskDetail(queryClient, task.task_id)}
+        >
           <div className="file-task-header">
             <Link
               href={`/tasks/${task.task_id}`}
               className="file-task-link"
               title={t('task.list.openTaskTitle', { id: task.task_id }, `Open task ${task.task_id}`)}
             >
-              <span className="file-task-icon" aria-hidden>
+              <span className="file-task-icon" aria-hidden="true">
                 {icon}
               </span>
               <span
@@ -638,6 +664,7 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
       t,
       copiedTaskId,
       handleCopyTaskId,
+      queryClient,
     ],
   );
 
@@ -734,34 +761,38 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
         <button onClick={() => setPage(page + 1)} disabled={searching ? ((((searchQuery.data as any)?.tasks) || []).length < 10) : !((filesQuery.data as any)?.has_more)} className="page-button">{t('pagination.next')}</button>
       </div>
 
-      <TaskCreationModal
-        open={runOpen}
-        isPdf={!!runFile?.isPdf}
-        defaults={runDefaults}
-        filename={runFile?.filename}
-        submitting={runSubmitting}
-        onClose={() => setRunOpen(false)}
-        onSubmit={(payload) => {
-          if (!runFile?.upload_id) return;
-          setRunSubmitting(true);
-          saveGlobalRunDefaults({ voice_language: payload.voice_language, subtitle_language: payload.subtitle_language ?? null, transcript_language: payload.transcript_language ?? null, video_resolution: payload.video_resolution || 'hd' });
-          runFileTask.mutate(
-            { uploadId: runFile.upload_id, payload },
-            { onSuccess: (res: any) => {
-                setRunOpen(false);
-                setToast({ type: 'success', message: t('creations.toast.taskCreated', { id: res?.task_id || '' }, `Task created: ${res?.task_id || ''}`) });
-              },
-              onError: () => setToast({ type: 'error', message: t('creations.toast.createFailed', undefined, 'Failed to create task') }),
-              onSettled: () => setRunSubmitting(false) }
-          );
-        }}
-      />
-      <TaskProgressModal
-        open={Boolean(processingTask)}
-        task={processingModalTask ?? null}
-        onClose={() => setProcessingTask(null)}
-        onCancel={onCancel}
-      />
+      <Suspense fallback={<div className="modal-loading">Loading...</div>}>
+        <TaskCreationModal
+          open={runOpen}
+          isPdf={!!runFile?.isPdf}
+          defaults={runDefaults}
+          filename={runFile?.filename}
+          submitting={runSubmitting}
+          onClose={() => setRunOpen(false)}
+          onSubmit={(payload) => {
+            if (!runFile?.upload_id) return;
+            setRunSubmitting(true);
+            saveGlobalRunDefaults({ voice_language: payload.voice_language, subtitle_language: payload.subtitle_language ?? null, transcript_language: payload.transcript_language ?? null, video_resolution: payload.video_resolution || 'hd' });
+            runFileTask.mutate(
+              { uploadId: runFile.upload_id, payload },
+              { onSuccess: (res: any) => {
+                  setRunOpen(false);
+                  setToast({ type: 'success', message: t('creations.toast.taskCreated', { id: res?.task_id || '' }, `Task created: ${res?.task_id || ''}`) });
+                },
+                onError: () => setToast({ type: 'error', message: t('creations.toast.createFailed', undefined, 'Failed to create task') }),
+                onSettled: () => setRunSubmitting(false) }
+            );
+          }}
+        />
+      </Suspense>
+      <Suspense fallback={<div className="modal-loading">Loading...</div>}>
+        <TaskProgressModal
+          open={Boolean(processingTask)}
+          task={processingModalTask ?? null}
+          onClose={() => setProcessingTask(null)}
+          onCancel={onCancel}
+        />
+      </Suspense>
     </div>
   );
 };

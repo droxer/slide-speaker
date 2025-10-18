@@ -11,7 +11,7 @@ import time
 from time import perf_counter
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 from sqlalchemy import text
 
 from slidespeaker.configs.db import get_session
@@ -24,8 +24,10 @@ router = APIRouter(
 
 
 @router.get("/health")
-async def health() -> dict[str, Any]:
+async def health(response: Response) -> dict[str, Any]:
     """Return basic health info for Redis and DB connectivity."""
+    # Set cache-friendly headers to enable bfcache
+    response.headers["Cache-Control"] = "public, max-age=30, must-revalidate"
     # Redis check
     redis_ok = False
     redis_latency_ms: float | None = None

@@ -161,10 +161,27 @@
   flex: 1 1 auto;
 }
 
+/* Podcast speaker highlighting */
+.podcast-speaker {
+  font-weight: 700;
+  color: #4f46e5; /* brand color for speakers */
+  margin-right: 4px;
+}
+
+.podcast-content {
+  color: #0f172a; /* text primary */
+}
+
 /* Emphasize timestamp for active row */
 .audio-transcript-row.active .audio-transcript-ts {
   background: #c7d2fe; /* brand-tinted badge */
   color: #1e3a8a;
+}
+
+/* Highlight active podcast speaker */
+.audio-transcript-row.active .podcast-speaker {
+  color: #3730a3; /* darker brand color for active speaker */
+  text-decoration: underline;
 }
 
 /* Ensure audio players and transcripts fill available width in Completed/Modal views */

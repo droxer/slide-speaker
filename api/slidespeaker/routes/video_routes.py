@@ -119,7 +119,7 @@ async def get_video_by_task(task_id: str, request: Request) -> Any:
 
     # Redirect to signed URL (no response overrides to keep range-friendly)
     url = sp.get_file_url(object_key, expires_in=300)
-    headers = {"Location": url, "Cache-Control": "no-cache, no-store, must-revalidate"}
+    headers = {"Location": url, "Cache-Control": "public, max-age=300, must-revalidate"}
     origin = request.headers.get("origin") or request.headers.get("Origin")
     if origin:
         headers["Access-Control-Allow-Origin"] = origin
@@ -160,13 +160,19 @@ async def download_video_by_task(task_id: str, request: Request) -> Any:
         )
 
     # Cloud: redirect to presigned URL with attachment disposition
-    url = sp.get_file_url(
-        object_key,
-        expires_in=600,
-        content_disposition=f"attachment; filename=presentation_{task_id}.mp4",
-        content_type="video/mp4",
-    )
-    headers = {"Location": url, "Cache-Control": "no-cache, no-store, must-revalidate"}
+    # For OSS storage, avoid setting content_type to prevent header override errors
+    get_file_url_kwargs = {
+        "object_key": object_key,
+        "expires_in": 600,
+        "content_disposition": f"attachment; filename=presentation_{task_id}.mp4",
+    }
+
+    # Only set content_type for non-OSS providers
+    if config.storage_provider != "oss":
+        get_file_url_kwargs["content_type"] = "video/mp4"
+
+    url = sp.get_file_url(**get_file_url_kwargs)
+    headers = {"Location": url, "Cache-Control": "public, max-age-600, must-revalidate"}
     origin = request.headers.get("origin") or request.headers.get("Origin")
     if origin:
         headers["Access-Control-Allow-Origin"] = origin

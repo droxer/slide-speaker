@@ -32,7 +32,7 @@ def _generate_cache_key(prefix: str, **kwargs: Any) -> str:
     """Generate a cache key from function arguments."""
     # Create a deterministic key based on arguments
     key_data = f"{prefix}:{json.dumps(kwargs, sort_keys=True)}"
-    return f"cache:{hashlib.md5(key_data.encode()).hexdigest()}"
+    return f"cache:{prefix}:{hashlib.md5(key_data.encode()).hexdigest()}"
 
 
 async def _get_from_cache(key: str) -> Any | None:
@@ -52,6 +52,19 @@ async def _set_in_cache(key: str, value: Any, ttl: int = 300) -> None:
         return
     with suppress(Exception):
         await _redis_client.setex(key, ttl, json.dumps(value))
+
+
+async def _invalidate_cache(prefix: str) -> None:
+    """Invalidate cached entries for a given prefix."""
+    if not _cache_enabled or _redis_client is None:
+        return
+    pattern = f"cache:{prefix}:*"
+    try:
+        async for key in _redis_client.scan_iter(match=pattern, count=50):
+            if key:
+                await _redis_client.delete(key)
+    except Exception:
+        pass
 
 
 def _filter_sensitive_kwargs(kwargs: dict[str, Any]) -> dict[str, Any]:
@@ -237,6 +250,7 @@ async def insert_task(task: dict[str, Any]) -> None:
         )
         s.add(row)
         await s.commit()
+    await _invalidate_cache("list_tasks")
 
 
 async def get_task(task_id: str) -> dict[str, Any] | None:
@@ -304,6 +318,7 @@ async def update_task(task_id: str, **fields: Any) -> None:
     async with get_session() as s:
         await s.execute(sa_update(TaskRow).where(TaskRow.id == task_id).values(**vals))
         await s.commit()
+    await _invalidate_cache("list_tasks")
 
 
 async def delete_task(task_id: str) -> None:
@@ -318,6 +333,7 @@ async def delete_task(task_id: str) -> None:
         # Log the number of affected rows if available
         rowcount = getattr(result, "rowcount", "unknown")
         logger.info(f"Repository: Delete operation affected {rowcount} rows")
+    await _invalidate_cache("list_tasks")
 
 
 async def list_tasks(

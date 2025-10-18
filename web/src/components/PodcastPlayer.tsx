@@ -13,7 +13,12 @@ const PodcastPlayer = ({ src, script, className }: PodcastPlayerProps) => {
   const cues = useMemo(() => {
     const dialogue = script?.dialogue;
     if (!Array.isArray(dialogue) || dialogue.length === 0) return undefined;
-    return buildCuesFromPodcastDialogue(dialogue);
+    return buildCuesFromPodcastDialogue(
+      dialogue,
+      5, // segmentSeconds
+      script?.host_voice,
+      script?.guest_voice
+    );
   }, [script]);
 
   return <AudioPlayer src={src} initialCues={cues} showTranscript className={className} />;

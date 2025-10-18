@@ -54,7 +54,17 @@
     "disabled": "無効",
     "copied": "コピーしました！",
     "latest": "最新",
-    "more": "さらに表示"
+    "more": "さらに表示",
+    "fileType": {
+      "document": "ドキュメント",
+      "pdfDocument": "PDFドキュメント",
+      "presentation": "プレゼンテーション",
+      "spreadsheet": "スプレッドシート",
+      "image": "画像",
+      "video": "動画",
+      "audio": "音声",
+      "textDocument": "テキストドキュメント"
+    }
   },
   "profile": {
     "title": "プロフィール",
@@ -272,7 +282,10 @@
       "taskId": "タスクID",
       "copyTaskId": "タスクIDをコピー",
       "configuration": "設定",
-      "languages": "言語"
+      "languages": "言語",
+      "voiceLanguage": "🎤 {language}",
+      "subtitleLanguage": "📝 {language}",
+      "sameLanguage": "🎤📝 {language}"
     },
     "file": {
       "untitled": "無題"

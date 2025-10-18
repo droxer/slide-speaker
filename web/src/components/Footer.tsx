@@ -41,7 +41,7 @@ const Footer = ({ queueUnavailable, redisLatencyMs }: FooterProps) => {
             aria-live="polite"
             title={title}
           >
-            <span className={`dot ${queueUnavailable ? 'down' : 'ok'}`} aria-hidden />
+            <span className={`dot ${queueUnavailable ? 'down' : 'ok'}`} aria-hidden="true" />
             <span className="label">{systemStatusLabel}</span>
           </div>
           <ThemeToggle ariaLabel={t('footer.theme.toggleLabel', undefined, 'Theme toggle')} />

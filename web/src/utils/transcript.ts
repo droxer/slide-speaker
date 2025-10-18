@@ -32,16 +32,26 @@ export const buildCuesFromMarkdown = (markdown: string, segmentSeconds = 5): Tra
 export const buildCuesFromPodcastDialogue = (
   dialogue: Array<{ speaker: string; text: string }>,
   segmentSeconds = 5,
+  hostVoice?: string | null,
+  guestVoice?: string | null,
 ): TranscriptCue[] => {
   if (!Array.isArray(dialogue) || dialogue.length === 0) return [];
 
   return dialogue
     .map((item, index) => {
-      const speaker = item.speaker?.trim() || 'Speaker';
+      let speaker = item.speaker?.trim() || 'Speaker';
       const text = item.text?.trim();
-      
+
+      // Format speaker name with voice information if available
+      const rawSpeaker = speaker.toLowerCase();
+      if (rawSpeaker.startsWith('host')) {
+        speaker = hostVoice ? `${hostVoice} (Host)` : 'Host';
+      } else if (rawSpeaker.startsWith('guest')) {
+        speaker = guestVoice ? `${guestVoice} (Guest)` : 'Guest';
+      }
+
       if (!text) return null;
-      
+
       return {
         start: index * segmentSeconds,
         end: (index + 1) * segmentSeconds,

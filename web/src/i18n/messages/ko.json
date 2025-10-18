@@ -54,7 +54,17 @@
     "disabled": "비활성화됨",
     "copied": "복사되었습니다!",
     "latest": "최신",
-    "more": "더 보기"
+    "more": "더 보기",
+    "fileType": {
+      "document": "문서",
+      "pdfDocument": "PDF 문서",
+      "presentation": "프레젠테이션",
+      "spreadsheet": "스프레드시트",
+      "image": "이미지",
+      "video": "영상",
+      "audio": "오디오",
+      "textDocument": "텍스트 문서"
+    }
   },
   "profile": {
     "title": "프로필",
@@ -272,7 +282,10 @@
       "taskId": "작업 ID",
       "copyTaskId": "작업 ID 복사",
       "configuration": "구성",
-      "languages": "언어"
+      "languages": "언어",
+      "voiceLanguage": "🎤 {language}",
+      "subtitleLanguage": "📝 {language}",
+      "sameLanguage": "🎤📝 {language}"
     },
     "file": {
       "untitled": "제목 없음"
@@ -320,7 +333,7 @@
   },
   "uploading": {
     "title": "프레젠테이션 업로드 중",
-    "status": "AI 변환을 위해 콘텐츠를 준비하는 중입니다...",
+    "status": "AI 변환을 위해 온텐츠를 준비하는 중입니다...",
     "progress": "{progress}% 업로드됨",
     "progressLabel": "업로드 진행률",
     "summaryLabel": "업로드 요약",

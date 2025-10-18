@@ -109,7 +109,11 @@ async def get_final_markdown_transcript_by_task(task_id: str) -> Response:
                     if text:
                         lines.append(f"**{speaker_label}:** {text}")
             md_conv = "\n\n".join(lines).strip() + "\n"
-            return Response(content=md_conv, media_type="text/markdown; charset=utf-8")
+            return Response(
+                content=md_conv,
+                media_type="text/markdown; charset=utf-8",
+                headers={"Cache-Control": "public, max-age=3600, must-revalidate"},
+            )
         candidate_keys = [
             "revise_pdf_transcripts",
             "revise_transcripts",
@@ -169,7 +173,9 @@ async def get_final_markdown_transcript_by_task(task_id: str) -> Response:
                     data_for_md, section_label=label, filename=state.get("filename")
                 )
                 return Response(
-                    content=md_built, media_type="text/markdown; charset=utf-8"
+                    content=md_built,
+                    media_type="text/markdown; charset=utf-8",
+                    headers={"Cache-Control": "public, max-age=3600, must-revalidate"},
                 )
 
     # Storage fallback
@@ -194,7 +200,11 @@ async def get_final_markdown_transcript_by_task(task_id: str) -> Response:
         try:
             if sp.file_exists(key):
                 data = sp.download_bytes(key)
-                return Response(content=data, media_type="text/markdown; charset=utf-8")
+                return Response(
+                    content=data,
+                    media_type="text/markdown; charset=utf-8",
+                    headers={"Cache-Control": "public, max-age=3600, must-revalidate"},
+                )
         except Exception:
             continue
 

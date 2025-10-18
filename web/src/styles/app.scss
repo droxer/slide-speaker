@@ -126,6 +126,7 @@
 // Enhanced File Upload View
 .file-upload-view {
   padding: 2rem 0;
+  contain: layout style;
 }
 
 .file-upload-header {
@@ -145,6 +146,7 @@
   max-width: 480px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  contain: layout style;
 }
 
 .file-info-card:hover {
@@ -191,6 +193,7 @@
 
 .file-upload-progress .progress-fill {
   background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 45%, #93c5fd 100%);
+  will-change: width;
 }
 
 // Task Configuration Section
@@ -201,6 +204,7 @@
   border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  contain: layout style;
 }
 
 .config-header {

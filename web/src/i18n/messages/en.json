@@ -54,7 +54,17 @@
     "disabled": "Disabled",
     "copied": "Copied!",
     "latest": "Latest",
-    "more": "more"
+    "more": "more",
+    "fileType": {
+      "document": "Document",
+      "pdfDocument": "PDF Document",
+      "presentation": "Presentation",
+      "spreadsheet": "Spreadsheet",
+      "image": "Image",
+      "video": "Video",
+      "audio": "Audio",
+      "textDocument": "Text Document"
+    }
   },
   "profile": {
     "title": "Profile",
@@ -272,7 +282,10 @@
       "taskId": "Task ID",
       "copyTaskId": "Copy task ID",
       "configuration": "Configuration",
-      "languages": "Languages"
+      "languages": "Languages",
+      "voiceLanguage": "🎤 {language}",
+      "subtitleLanguage": "📝 {language}",
+      "sameLanguage": "🎤📝 {language}"
     },
     "file": {
       "untitled": "Untitled"

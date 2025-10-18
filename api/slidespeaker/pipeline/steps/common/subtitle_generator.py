@@ -108,12 +108,12 @@ async def generate_subtitles_common(
         logger.info(f"Generated subtitles: {srt_path}, {vtt_path}")
 
         # Upload subtitle files to storage provider
-        subtitle_urls: list[str] = []
         storage_provider = get_storage_provider()
         state_snapshot = await state_manager.get_state(file_id)
-        storage_keys: list[str] = []
-        storage_uris: list[str] = []
-        try:
+        storage_keys: list[str]
+        storage_uris: list[str]
+        subtitle_urls: list[str]
+        try:  # Upload generated subtitles to configured storage
             _, srt_key, srt_uri = output_storage_uri(
                 file_id,
                 state=state_snapshot if isinstance(state_snapshot, dict) else None,
@@ -132,10 +132,24 @@ async def generate_subtitles_common(
             storage_keys = [srt_key, vtt_key]
             storage_uris = [srt_uri, vtt_uri]
             logger.info(f"Uploaded subtitles to storage: {srt_url}, {vtt_url}")
-        except Exception as storage_error:
+        except Exception as storage_error:  # noqa: BLE001 - fail when remote storage is required
             logger.error(f"Failed to upload subtitles to storage: {storage_error}")
-            # Fallback to local paths if storage upload fails
+            if config.storage_provider != "local":
+                await state_manager.update_step_status(
+                    file_id,
+                    state_key,
+                    "failed",
+                    {
+                        "error": "subtitle_upload_failed",
+                        "detail": str(storage_error),
+                        "storage_keys": {"srt": srt_key, "vtt": vtt_key},
+                    },
+                )
+                raise
+            # Fallback to local paths when running with local storage provider
             subtitle_urls = [str(srt_path), str(vtt_path)]
+            storage_keys = []
+            storage_uris = []
 
         # Store both local paths and storage URLs
         storage_data = {

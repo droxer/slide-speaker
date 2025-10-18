@@ -319,6 +319,19 @@
       box-shadow: 0 0 0 8px rgba(59, 130, 246, 0);
     }
   }
+
+  /* Add containment to prevent layout shifts */
+  .task-monitor {
+    contain: layout style paint;
+  }
+
+  .file-group {
+    contain: layout style;
+  }
+
+  .file-task {
+    contain: layout style;
+  }
   
   /* Original simple stat cards for comparison */
   .statistics-summary.simple {

@@ -4,6 +4,7 @@
   text-align: center;
   padding: 1rem 0;
   animation: fadeInUp 0.6s ease-out;
+  contain: layout style paint;
 
   &.redirecting-view {
     display: flex;
@@ -122,6 +123,7 @@
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
   margin: 16px 0 20px;
+  contain: layout style;
 
   .meta-card {
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.9));
@@ -133,6 +135,7 @@
       inset 0 1px 0 rgba(255, 255, 255, 0.6);
     transition: all 0.3s ease;
     backdrop-filter: blur(8px);
+    contain: layout style;
 
     &:hover {
       transform: translateY(-2px);
@@ -161,13 +164,14 @@
     flex-shrink: 0;
   }
 
-  /* Enhanced file icon with polished styling */
+  /* Enhanced file icon with polished styling - simplified for better performance */
   .file-icon-enhanced {
     position: relative;
     overflow: hidden;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     cursor: pointer;
+    contain: layout style paint;
 
     &:hover {
       transform: scale(1.05) translateY(-2px);
@@ -194,11 +198,12 @@
       transform: rotate(45deg);
       transition: all 0.6s ease;
       opacity: 0;
+      will-change: opacity;
     }
 
     &:hover::before {
       opacity: 1;
-      animation: shimmer 1.5s ease-in-out infinite;
+      animation: shimmer-no-shift 1.5s ease-in-out infinite;
     }
 
     &::after {
@@ -240,6 +245,16 @@
     }
     100% {
       transform: translateX(100%) translateY(100%) rotate(45deg);
+    }
+  }
+
+  /* Alternative shimmer that doesn't cause layout shifts */
+  @keyframes shimmer-no-shift {
+    0% {
+      opacity: 0.3;
+    }
+    100% {
+      opacity: 0.6;
     }
   }
 
@@ -390,6 +405,29 @@
   }
 }
 
+/* Removed containment to prevent flickering issues */
+.processing-view {
+  /* contain: layout style paint; */
+}
+
+.processing-meta {
+  /* contain: layout style; */
+}
+
+.meta-card {
+  /* contain: layout style; */
+}
+
+/* Modify animations to use transform only on opacity to prevent layout shifts */
+@keyframes fadeInUpNoShift {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
 .spinner {
   width: 60px;
   height: 60px;
@@ -399,6 +437,7 @@
   animation: spin 1s linear infinite, pulse 2s ease-in-out infinite;
   margin: 0 auto 1.5rem;
   box-shadow: 0 4px 20px rgba(79, 70, 229, 0.3);
+  will-change: transform;
 }
 
 @keyframes spin {
@@ -807,12 +846,20 @@
     height: 100%;
     background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
     animation: shimmer 2s infinite;
+    will-change: transform;
   }
 }
 
 @keyframes shimmer {
   0% { left: -100%; }
   100% { left: 100%; }
+}
+
+/* Alternative shimmer that doesn't cause layout shifts */
+@keyframes shimmer-progress-no-shift {
+  0% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.4; }
 }
 
 .processing-status {
@@ -1043,9 +1090,11 @@
   --progress-step-icon-surface: rgba(99, 102, 241, 0.18);
 
   animation: progressPulse 2.6s ease-in-out infinite;
+  will-change: transform;
 
   .progress-step__icon {
     animation: progressSpin 1.4s linear infinite;
+    will-change: transform;
   }
 }
 

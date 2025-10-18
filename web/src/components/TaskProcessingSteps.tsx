@@ -31,12 +31,12 @@ const TaskProcessingSteps = ({
   const taskType = String(pd.task_type || '').toLowerCase();
 
   // Function to get appropriate file icon based on file extension with enhanced styling
-  const getFileIcon = (filename: string | null) => {
+  const getFileIcon = (filename: string | null, t: (key: string, vars?: Record<string, string | number>, fallback?: string) => string) => {
     if (!filename) return {
       emoji: '📄',
       gradient: 'linear-gradient(135deg, #94a3b8, #cbd5e1)',
       color: '#64748b',
-      name: 'Document'
+      name: t('common.fileType.document', undefined, 'Document')
     };
 
     const lowerFilename = filename.toLowerCase();
@@ -47,7 +47,7 @@ const TaskProcessingSteps = ({
         emoji: '📑',
         gradient: 'linear-gradient(135deg, #ef4444, #dc2626)',
         color: '#dc2626',
-        name: 'PDF Document'
+        name: t('common.fileType.pdfDocument', undefined, 'PDF Document')
       };
     }
 
@@ -57,7 +57,7 @@ const TaskProcessingSteps = ({
         emoji: '📊',
         gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)',
         color: '#2563eb',
-        name: 'Presentation'
+        name: t('common.fileType.presentation', undefined, 'Presentation')
       };
     }
 
@@ -67,7 +67,7 @@ const TaskProcessingSteps = ({
         emoji: '📝',
         gradient: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
         color: '#0284c7',
-        name: 'Document'
+        name: t('common.fileType.document', undefined, 'Document')
       };
     }
 
@@ -77,7 +77,7 @@ const TaskProcessingSteps = ({
         emoji: '📈',
         gradient: 'linear-gradient(135deg, #22c55e, #16a34a)',
         color: '#16a34a',
-        name: 'Spreadsheet'
+        name: t('common.fileType.spreadsheet', undefined, 'Spreadsheet')
       };
     }
 
@@ -89,7 +89,7 @@ const TaskProcessingSteps = ({
         emoji: '🖼️',
         gradient: 'linear-gradient(135deg, #a855f7, #9333ea)',
         color: '#9333ea',
-        name: 'Image'
+        name: t('common.fileType.image', undefined, 'Image')
       };
     }
 
@@ -100,7 +100,7 @@ const TaskProcessingSteps = ({
         emoji: '🎬',
         gradient: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
         color: '#6d28d9',
-        name: 'Video'
+        name: t('common.fileType.video', undefined, 'Video')
       };
     }
 
@@ -111,7 +111,7 @@ const TaskProcessingSteps = ({
         emoji: '🎵',
         gradient: 'linear-gradient(135deg, #f59e0b, #d97706)',
         color: '#d97706',
-        name: 'Audio'
+        name: t('common.fileType.audio', undefined, 'Audio')
       };
     }
 
@@ -121,7 +121,7 @@ const TaskProcessingSteps = ({
         emoji: '📄',
         gradient: 'linear-gradient(135deg, #6b7280, #4b5563)',
         color: '#4b5563',
-        name: 'Text Document'
+        name: t('common.fileType.textDocument', undefined, 'Text Document')
       };
     }
 
@@ -130,11 +130,11 @@ const TaskProcessingSteps = ({
       emoji: '📄',
       gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
       color: '#7c3aed',
-      name: 'Document'
+      name: t('common.fileType.document', undefined, 'Document')
     };
   };
 
-  const fileIcon = getFileIcon(fileName);
+  const fileIcon = getFileIcon(fileName, t);
   const clampedProgress = Number.isFinite(progress)
     ? Math.max(0, Math.min(100, Math.round(progress)))
     : 0;
@@ -215,7 +215,7 @@ const TaskProcessingSteps = ({
                 {t('processing.meta.configuration', undefined, 'Configuration')}
               </div>
               <div className="meta-subtitle">
-                {taskType === 'video' ? '🎬 Video' : taskType === 'podcast' ? '🎧 Podcast' : '🎬🎧 Both'}
+                {taskType === 'video' ? '🎬 ' + t(`task.detail.type.${taskType}`) : taskType === 'podcast' ? '🎧 ' + t(`task.detail.type.${taskType}`) : '🎬🎧 ' + t('task.detail.type.both')}
               </div>
             </div>
             <div className="meta-config-badges">
@@ -234,8 +234,8 @@ const TaskProcessingSteps = ({
               </div>
               <div className="meta-subtitle">
                 {voiceLanguage !== subtitleLanguage
-                  ? `🎤 ${voiceLanguage} • 📝 ${subtitleLanguage}`
-                  : `🎤📝 ${voiceLanguage}`
+                  ? `${t('processing.meta.voiceLanguage', { language: voiceLanguage })} • ${t('processing.meta.subtitleLanguage', { language: subtitleLanguage })}`
+                  : t('processing.meta.sameLanguage', { language: voiceLanguage })
                 }
               </div>
             </div>
@@ -298,7 +298,7 @@ const TaskProcessingSteps = ({
                 role="listitem"
                 className={`progress-step progress-step--${statusVariant}`}
               >
-                <span className="progress-step__icon" aria-hidden>
+                <span className="progress-step__icon" aria-hidden="true">
                   {STEP_STATUS_ICONS[statusVariant]}
                 </span>
                 <div className="progress-step__body">

@@ -2,6 +2,7 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { showErrorToast } from '@/utils/toast';
+import { useI18n } from '@/i18n/hooks';
 
 interface Props {
   children: ReactNode;
@@ -42,19 +43,44 @@ class ErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) {
         return this.props.fallback;
       }
-      
+
       return (
-        <div className="error-boundary">
-          <h2>{this.props.somethingWentWrong || 'Something went wrong.'}</h2>
-          <button onClick={() => this.setState({ hasError: false })}>
-            {this.props.tryAgain || 'Try again?'}
-          </button>
+        <div className="error-boundary" role="alert">
+          <div className="error-boundary-content">
+            <h2 className="error-boundary-title">
+              {this.props.somethingWentWrong || 'Something went wrong.'}
+            </h2>
+            <p className="error-boundary-message">
+              {this.props.errorMessage || 'An unexpected error occurred. Please try again.'}
+            </p>
+            <button
+              className="error-boundary-button"
+              onClick={() => this.setState({ hasError: false })}
+            >
+              {this.props.tryAgain || 'Try again?'}
+            </button>
+          </div>
         </div>
       );
     }
 
     return this.props.children;
   }
+}
+
+// Wrapper component to provide i18n support
+export function ErrorBoundaryWithI18n({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
+
+  return (
+    <ErrorBoundary
+      somethingWentWrong={t('errorBoundary.somethingWentWrong', undefined, 'Something went wrong.')}
+      errorMessage={t('errorBoundary.unexpectedError', undefined, 'An unexpected error occurred. Please try again.')}
+      tryAgain={t('errorBoundary.tryAgain', undefined, 'Try again?')}
+    >
+      {children}
+    </ErrorBoundary>
+  );
 }
 
 export default ErrorBoundary;

@@ -113,7 +113,7 @@ const FileUploadingView = ({
             <div className="uploading-summary__chips" aria-label={t('uploading.outputsLabel', undefined, 'Outputs')}>
               {outputs.map(({ key, label, icon }) => (
                 <span key={key} className="uploading-summary__chip">
-                  {icon && <span className="uploading-summary__chip-icon" aria-hidden>{icon}</span>}
+                  {icon && <span className="uploading-summary__chip-icon" aria-hidden="true">{icon}</span>}
                   <span className="uploading-summary__chip-text">{label}</span>
                 </span>
               ))}

@@ -12,6 +12,7 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
+  contain: layout style paint;
 
   &::before {
     content: '';
@@ -76,6 +77,13 @@
   100% { transform: translateX(120%); }
 }
 
+/* Alternative shimmer that doesn't cause layout shifts */
+@keyframes ai-aurora-no-shift {
+  0% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+  100% { opacity: 0.3; }
+}
+
 .view-toggle.ai-toggle .toggle-btn.active::before {
   content: "";
   position: absolute;
@@ -117,6 +125,7 @@
   z-index: 1;
   white-space: nowrap;
   overflow: hidden;
+  contain: layout style paint;
 
   &:hover {
     color: rgba(255, 255, 255, 0.9);

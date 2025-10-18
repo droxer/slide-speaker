@@ -5,6 +5,7 @@ This module provides API endpoints for downloading and streaming generated
 subtitle files in both SRT and VTT formats.
 """
 
+import os
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -13,10 +14,15 @@ from fastapi.responses import FileResponse
 from slidespeaker.auth import require_authenticated_user
 from slidespeaker.configs.config import config, get_storage_provider
 from slidespeaker.configs.locales import locale_utils
+from slidespeaker.core.state_manager import state_manager
 from slidespeaker.storage import StorageProvider
-from slidespeaker.storage.paths import object_key_from_uri, output_object_key
+from slidespeaker.storage.paths import (
+    object_key_from_uri,
+    output_object_key,
+    resolve_output_base_id,
+)
 
-from .download_helpers import build_headers, check_file_exists, file_id_from_task
+from .download_helpers import build_headers, file_id_from_task
 
 router = APIRouter(
     prefix="/api",
@@ -66,6 +72,122 @@ async def _get_subtitle_language(
     return file_id, locale_utils.get_locale_code("english")
 
 
+def _unique_strings(values: list[str | None]) -> list[str]:
+    """Deduplicate string values while preserving order."""
+    return [
+        value
+        for value in dict.fromkeys(values)
+        if isinstance(value, str) and value.strip()
+    ]
+
+
+def _matches_locale(path: str, locale_code: str, ext: str) -> bool:
+    """Check if a path ends with a locale-specific suffix."""
+    lower_path = path.lower()
+    ext_lower = f".{ext.lower()}"
+    if not lower_path.endswith(ext_lower):
+        return False
+    code = locale_code.lower()
+    return lower_path.endswith(f"_{code}{ext_lower}") or lower_path.endswith(
+        f"-{code}{ext_lower}"
+    )
+
+
+def _collect_candidate_storage_keys(
+    task_id: str,
+    file_id: str,
+    locale_code: str,
+    ext: str,
+    state: dict[str, Any] | None,
+) -> list[str]:
+    """Collect potential storage keys for a subtitle asset."""
+    base_ids = [task_id, file_id]
+    if state:
+        tid = state.get("task_id")
+        if isinstance(tid, str):
+            base_ids.append(tid)
+        try:
+            resolved = resolve_output_base_id(file_id, state=state)
+            base_ids.append(resolved)
+        except Exception:
+            pass
+
+    keys: list[str | None] = []
+    for base in _unique_strings(base_ids):
+        keys.append(output_object_key(base, "subtitles", f"{locale_code}.{ext}"))
+
+    keys.append(f"{task_id}_{locale_code}.{ext}")
+
+    if state:
+        steps = state.get("steps") or {}
+        step = (
+            steps.get("generate_subtitles") or steps.get("generate_pdf_subtitles") or {}
+        )
+        data = step.get("data")
+        if isinstance(data, dict):
+            for key in data.get("storage_keys") or []:
+                keys.append(key if isinstance(key, str) else None)
+            for uri in data.get("storage_uris") or []:
+                if isinstance(uri, str):
+                    keys.append(object_key_from_uri(uri))
+        artifacts = state.get("artifacts")
+        if isinstance(artifacts, dict):
+            subtitles_artifacts = artifacts.get("subtitles")
+            if isinstance(subtitles_artifacts, dict):
+                entry = subtitles_artifacts.get(locale_code)
+                if isinstance(entry, dict):
+                    keys.append(entry.get("storage_key"))
+                    keys.append(object_key_from_uri(entry.get("storage_uri")))
+
+    return _unique_strings(keys)  # type: ignore[arg-type]
+
+
+def _collect_candidate_local_paths(
+    state: dict[str, Any] | None, locale_code: str, ext: str
+) -> list[str]:
+    """Collect local fallback paths for subtitles from state."""
+    paths: list[str | None] = []
+    if state:
+        steps = state.get("steps") or {}
+        step = (
+            steps.get("generate_subtitles") or steps.get("generate_pdf_subtitles") or {}
+        )
+        data = step.get("data")
+        if isinstance(data, dict):
+            for path in data.get("subtitle_files") or []:
+                paths.append(path if isinstance(path, str) else None)
+        artifacts = state.get("artifacts")
+        if isinstance(artifacts, dict):
+            subtitles_artifacts = artifacts.get("subtitles")
+            if isinstance(subtitles_artifacts, dict):
+                entry = subtitles_artifacts.get(locale_code)
+                if isinstance(entry, dict):
+                    paths.append(entry.get("local_path"))
+    filtered = [
+        path
+        for path in paths
+        if isinstance(path, str)
+        and path.strip()
+        and path.lower().endswith(f".{ext.lower()}")
+    ]
+    return _unique_strings(filtered)  # type: ignore[arg-type]
+
+
+def _select_local_path(
+    candidates: list[str],
+    locale_code: str,
+    ext: str,
+) -> str | None:
+    """Select the best matching local subtitle path."""
+    for path in candidates:
+        if _matches_locale(path, locale_code, ext) and os.path.exists(path):
+            return path
+    for path in candidates:
+        if os.path.exists(path):
+            return path
+    return None
+
+
 @router.get("/tasks/{task_id}/subtitles/srt")
 async def get_srt_subtitles_by_task(
     task_id: str, request: Request, language: str | None = None
@@ -78,89 +200,47 @@ async def get_srt_subtitles_by_task(
         file_id = await file_id_from_task(task_id)
 
     sp: StorageProvider = get_storage_provider()
+    try:
+        state = await state_manager.get_state(file_id)
+    except Exception:
+        state = None
 
-    candidate_keys = [
-        output_object_key(task_id, "subtitles", f"{locale_code}.srt"),
-        output_object_key(file_id, "subtitles", f"{locale_code}.srt"),
-        f"{task_id}_{locale_code}.srt",
-    ]
-    object_key = next((k for k in candidate_keys if check_file_exists(k)), None)
-    if object_key:
-        subtitle_content = sp.download_bytes(object_key)
-        return Response(
-            content=subtitle_content,
-            media_type="text/plain",
-            headers=build_headers(
-                request,
-                content_type="text/plain",
-                disposition=f"attachment; filename=presentation_{task_id}_{locale_code}.srt",
-            ),
-        )
-
-    # Fallback: local state paths if upload missing
-    from slidespeaker.core.state_manager import state_manager
-
-    st2 = await state_manager.get_state(file_id)
-    if st2 and "steps" in st2:
-        data_block = None
-        if st2["steps"].get("generate_subtitles"):
-            data_block = st2["steps"]["generate_subtitles"].get("data")
-        elif st2["steps"].get("generate_pdf_subtitles"):
-            data_block = st2["steps"]["generate_pdf_subtitles"].get("data")
-        data = data_block or {}
-        files = data.get("subtitle_files") or []
-        import os
-
-        candidate = next((p for p in files if p.endswith(f"_{locale_code}.srt")), None)
-        if not candidate:
-            candidate = next((p for p in files if p.lower().endswith(".srt")), None)
-        if candidate and os.path.exists(candidate):
-            return FileResponse(
-                candidate,
+    candidate_keys = _collect_candidate_storage_keys(
+        task_id, file_id, locale_code, "srt", state
+    )
+    for key in candidate_keys:
+        try:
+            subtitle_content = sp.download_bytes(key)
+            return Response(
+                content=subtitle_content,
                 media_type="text/plain",
-                filename=f"presentation_{task_id}_{locale_code}.srt",
                 headers=build_headers(
                     request,
                     content_type="text/plain",
-                    disposition=f"inline; filename=presentation_{task_id}_{locale_code}.srt",
+                    disposition=f"attachment; filename=presentation_{task_id}_{locale_code}.srt",
+                    cache_control="public, max-age=3600, must-revalidate",
                 ),
             )
-        # Check artifacts map for stored URIs/keys
-        artifacts = st2.get("artifacts") if isinstance(st2, dict) else None
-        if isinstance(artifacts, dict):
-            subtitles_artifacts = artifacts.get("subtitles")
-            if isinstance(subtitles_artifacts, dict):
-                entry = subtitles_artifacts.get(locale_code)
-                if isinstance(entry, dict):
-                    storage_key = entry.get("storage_key")
-                    storage_uri = entry.get("storage_uri")
-                    local_path = entry.get("local_path")
-                    key = storage_key or object_key_from_uri(storage_uri)
-                    if key:
-                        try:
-                            subtitle_content = sp.download_bytes(key)
-                            return Response(
-                                content=subtitle_content,
-                                media_type="text/plain",
-                                headers=build_headers(
-                                    request,
-                                    content_type="text/plain",
-                                    disposition=f"inline; filename=presentation_{task_id}_{locale_code}.srt",
-                                ),
-                            )
-                        except Exception:
-                            pass
-                    if local_path and os.path.exists(local_path):
-                        return FileResponse(
-                            local_path,
-                            media_type="text/plain",
-                            filename=f"presentation_{task_id}_{locale_code}.srt",
-                            headers=build_headers(
-                                request,
-                                content_type="text/plain",
-                                disposition=f"inline; filename=presentation_{task_id}_{locale_code}.srt",
-                            ),
-                        )
+        except FileNotFoundError:
+            continue
+        except Exception:
+            continue
+
+    # Fallback: local state paths if upload missing
+    local_candidates = _collect_candidate_local_paths(state, locale_code, "srt")
+    selected = _select_local_path(local_candidates, locale_code, "srt")
+    if selected:
+        return FileResponse(
+            selected,
+            media_type="text/plain",
+            filename=f"presentation_{task_id}_{locale_code}.srt",
+            headers=build_headers(
+                request,
+                content_type="text/plain",
+                disposition=f"inline; filename=presentation_{task_id}_{locale_code}.srt",
+                cache_control="public, max-age=3600, must-revalidate",
+            ),
+        )
     raise HTTPException(status_code=404, detail="SRT subtitles not found")
 
 
@@ -176,21 +256,38 @@ async def download_srt_subtitles_by_task(
     if not file_id_check:
         file_id_check = file_id
 
-    # Resolve object_key (task-id naming only)
-    object_key = next(
-        (
-            k
-            for k in [
-                output_object_key(task_id, "subtitles", f"{locale_code}.srt"),
-                output_object_key(file_id_check, "subtitles", f"{locale_code}.srt"),
-                f"{task_id}_{locale_code}.srt",
-            ]
-            if check_file_exists(k)
-        ),
-        None,
-    )
     sp: StorageProvider = get_storage_provider()
+    try:
+        state = await state_manager.get_state(file_id_check)
+    except Exception:
+        state = None
+
+    candidate_keys = _collect_candidate_storage_keys(
+        task_id, file_id_check, locale_code, "srt", state
+    )
+    object_key: str | None = None
+    for key in candidate_keys:
+        try:
+            if sp.file_exists(key):
+                object_key = key
+                break
+        except Exception:
+            continue
+
     if not object_key:
+        local_candidates = _collect_candidate_local_paths(state, locale_code, "srt")
+        selected = _select_local_path(local_candidates, locale_code, "srt")
+        if selected:
+            return FileResponse(
+                selected,
+                media_type="text/plain",
+                filename=f"presentation_{task_id}_{locale_code}.srt",
+                headers=build_headers(
+                    request,
+                    content_type="text/plain",
+                    disposition=f"attachment; filename=presentation_{task_id}_{locale_code}.srt",
+                ),
+            )
         raise HTTPException(status_code=404, detail="SRT subtitles not found")
 
     if config.storage_provider == "local":
@@ -206,17 +303,25 @@ async def download_srt_subtitles_by_task(
             ),
         )
 
-    url = sp.get_file_url(
-        object_key,
-        expires_in=600,
-        content_disposition=f"attachment; filename=presentation_{task_id}_{locale_code}.srt",
-        content_type="text/plain",
-    )
+    # For OSS storage, avoid setting content_type to prevent header override errors
+    get_file_url_kwargs = {
+        "object_key": object_key,
+        "expires_in": 600,
+        "content_disposition": f"attachment; filename=presentation_{task_id}_{locale_code}.srt",
+    }
+
+    # Only set content_type for non-OSS providers
+    if config.storage_provider != "oss":
+        get_file_url_kwargs["content_type"] = "text/plain"
+
+    url = sp.get_file_url(**get_file_url_kwargs)
     headers = {"Location": url}
     origin = request.headers.get("origin") or request.headers.get("Origin")
     if origin:
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
+    else:
+        headers["Access-Control-Allow-Origin"] = "*"
     return Response(status_code=307, headers=headers)
 
 
@@ -232,96 +337,52 @@ async def get_vtt_subtitles_by_task(
         file_id = await file_id_from_task(task_id)
 
     sp: StorageProvider = get_storage_provider()
+    try:
+        state = await state_manager.get_state(file_id)
+    except Exception:
+        state = None
 
-    # Task-id-based filename only
-    candidate_keys = [
-        output_object_key(task_id, "subtitles", f"{locale_code}.vtt"),
-        output_object_key(file_id, "subtitles", f"{locale_code}.vtt"),
-        f"{task_id}_{locale_code}.vtt",
-    ]
-    object_key = next((k for k in candidate_keys if check_file_exists(k)), None)
-    if object_key:
-        subtitle_content = sp.download_bytes(object_key)
-        return Response(
-            content=subtitle_content,
-            media_type="text/vtt",
-            headers=build_headers(
-                request,
-                content_type="text/vtt",
-                disposition=f"inline; filename=presentation_{task_id}_{locale_code}.vtt",
-            ),
-        )
-
-    # Fallback: local state paths if upload missing
-    from slidespeaker.core.state_manager import state_manager
-
-    st2 = await state_manager.get_state(file_id)
-    if st2 and "steps" in st2:
-        step = (
-            st2["steps"].get("generate_subtitles")
-            or st2["steps"].get("generate_pdf_subtitles")
-            or {}
-        )
-        data = step.get("data") or {}
-        files = data.get("subtitle_files") or []
-        import os
-
-        candidate = next((p for p in files if p.endswith(f"_{locale_code}.vtt")), None)
-        if not candidate:
-            candidate = next((p for p in files if p.lower().endswith(".vtt")), None)
-        if candidate and os.path.exists(candidate):
-            return FileResponse(
-                candidate,
+    candidate_keys = _collect_candidate_storage_keys(
+        task_id, file_id, locale_code, "vtt", state
+    )
+    for key in candidate_keys:
+        try:
+            subtitle_content = sp.download_bytes(key)
+            return Response(
+                content=subtitle_content,
                 media_type="text/vtt",
-                filename=f"presentation_{task_id}_{locale_code}.vtt",
                 headers=build_headers(
                     request,
                     content_type="text/vtt",
                     disposition=f"inline; filename=presentation_{task_id}_{locale_code}.vtt",
+                    cache_control="public, max-age=3600, must-revalidate",
                 ),
             )
-        # Check artifacts map
-        artifacts = st2.get("artifacts") if isinstance(st2, dict) else None
-        if isinstance(artifacts, dict):
-            subtitles_artifacts = artifacts.get("subtitles")
-            if isinstance(subtitles_artifacts, dict):
-                entry = subtitles_artifacts.get(locale_code)
-                if isinstance(entry, dict):
-                    storage_key = entry.get("storage_key")
-                    storage_uri = entry.get("storage_uri")
-                    local_path = entry.get("local_path")
-                    key = storage_key or object_key_from_uri(storage_uri)
-                    if key:
-                        try:
-                            subtitle_content = sp.download_bytes(key)
-                            return Response(
-                                content=subtitle_content,
-                                media_type="text/vtt",
-                                headers=build_headers(
-                                    request,
-                                    content_type="text/vtt",
-                                    disposition=f"inline; filename=presentation_{task_id}_{locale_code}.vtt",
-                                ),
-                            )
-                        except Exception:
-                            pass
-                    if local_path and os.path.exists(local_path):
-                        return FileResponse(
-                            local_path,
-                            media_type="text/vtt",
-                            filename=f"presentation_{task_id}_{locale_code}.vtt",
-                            headers=build_headers(
-                                request,
-                                content_type="text/vtt",
-                                disposition=f"inline; filename=presentation_{task_id}_{locale_code}.vtt",
-                            ),
-                        )
+        except FileNotFoundError:
+            continue
+        except Exception:
+            continue
+
+    local_candidates = _collect_candidate_local_paths(state, locale_code, "vtt")
+    selected = _select_local_path(local_candidates, locale_code, "vtt")
+    if selected:
+        return FileResponse(
+            selected,
+            media_type="text/vtt",
+            filename=f"presentation_{task_id}_{locale_code}.vtt",
+            headers=build_headers(
+                request,
+                content_type="text/vtt",
+                disposition=f"inline; filename=presentation_{task_id}_{locale_code}.vtt",
+                cache_control="public, max-age=3600, must-revalidate",
+            ),
+        )
     raise HTTPException(status_code=404, detail="VTT subtitles not found")
 
 
 @router.get("/tasks/{task_id}/subtitles/vtt/download")
 async def download_vtt_subtitles_by_task(
-    task_id: str, language: str | None = None
+    task_id: str, request: Request, language: str | None = None
 ) -> Any:
     """Download VTT with attachment disposition (task-based)."""
     file_id = await file_id_from_task(task_id)
@@ -331,21 +392,37 @@ async def download_vtt_subtitles_by_task(
     if not file_id_check:
         file_id_check = file_id
 
-    # Resolve object_key (task-id naming only)
-    object_key = next(
-        (
-            k
-            for k in [
-                output_object_key(task_id, "subtitles", f"{locale_code}.vtt"),
-                output_object_key(file_id_check, "subtitles", f"{locale_code}.vtt"),
-                f"{task_id}_{locale_code}.vtt",
-            ]
-            if check_file_exists(k)
-        ),
-        None,
-    )
     sp: StorageProvider = get_storage_provider()
+    try:
+        state = await state_manager.get_state(file_id_check)
+    except Exception:
+        state = None
+
+    candidate_keys = _collect_candidate_storage_keys(
+        task_id, file_id_check, locale_code, "vtt", state
+    )
+    object_key: str | None = None
+    for key in candidate_keys:
+        try:
+            if sp.file_exists(key):
+                object_key = key
+                break
+        except Exception:
+            continue
+
     if not object_key:
+        local_candidates = _collect_candidate_local_paths(state, locale_code, "vtt")
+        selected = _select_local_path(local_candidates, locale_code, "vtt")
+        if selected:
+            return FileResponse(
+                selected,
+                media_type="text/vtt",
+                filename=f"presentation_{task_id}_{locale_code}.vtt",
+                headers={
+                    "Content-Disposition": f"attachment; filename=presentation_{task_id}_{locale_code}.vtt",
+                    "Access-Control-Allow-Origin": "*",
+                },
+            )
         raise HTTPException(status_code=404, detail="VTT subtitles not found")
 
     if config.storage_provider == "local":
@@ -360,15 +437,26 @@ async def download_vtt_subtitles_by_task(
             },
         )
 
-    url = sp.get_file_url(
-        object_key,
-        expires_in=600,
-        content_disposition=f"attachment; filename=presentation_{task_id}_{locale_code}.vtt",
-        content_type="text/vtt",
-    )
-    return Response(
-        status_code=307, headers={"Location": url, "Access-Control-Allow-Origin": "*"}
-    )
+    # For OSS storage, avoid setting content_type to prevent header override errors
+    get_file_url_kwargs = {
+        "object_key": object_key,
+        "expires_in": 600,
+        "content_disposition": f"attachment; filename=presentation_{task_id}_{locale_code}.vtt",
+    }
+
+    # Only set content_type for non-OSS providers
+    if config.storage_provider != "oss":
+        get_file_url_kwargs["content_type"] = "text/vtt"
+
+    url = sp.get_file_url(**get_file_url_kwargs)
+    headers = {"Location": url}
+    origin = request.headers.get("origin") or request.headers.get("Origin")
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    else:
+        headers["Access-Control-Allow-Origin"] = "*"
+    return Response(status_code=307, headers=headers)
 
 
 @router.options("/tasks/{task_id}/subtitles/vtt")

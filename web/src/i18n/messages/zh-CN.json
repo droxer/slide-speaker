@@ -54,7 +54,17 @@
     "disabled": "已停用",
     "copied": "已复制！",
     "latest": "最新",
-    "more": "更多"
+    "more": "更多",
+    "fileType": {
+      "document": "文档",
+      "pdfDocument": "PDF 文档",
+      "presentation": "演示文稿",
+      "spreadsheet": "电子表格",
+      "image": "图片",
+      "video": "视频",
+      "audio": "音频",
+      "textDocument": "文本文档"
+    }
   },
   "profile": {
     "title": "个人资料",
@@ -271,7 +281,14 @@
     "meta": {
       "aria": "任务详情",
       "locating": "（定位中…）",
-      "locatingHint": "来源文件 {id}"
+      "locatingHint": "来源文件 {id}",
+      "taskId": "任务 ID",
+      "copyTaskId": "复制任务 ID",
+      "configuration": "配置",
+      "languages": "语言",
+      "voiceLanguage": "🎤 {language}",
+      "subtitleLanguage": "📝 {language}",
+      "sameLanguage": "🎤📝 {language}"
     },
     "file": {
       "untitled": "未命名"

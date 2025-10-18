@@ -173,9 +173,19 @@ async def generate_audio_common(
                 }
                 state["artifacts"] = artifacts
                 await state_manager.save_state(file_id, state)
-    except Exception as e:
-        # Non-fatal; streaming fallback in downloads will still work
+    except Exception as e:  # noqa: BLE001 - escalate when remote storage is required
         logger.error(f"Failed to create/upload final audio: {e}")
+        if config.storage_provider != "local":
+            await state_manager.update_step_status(
+                file_id,
+                state_key,
+                "failed",
+                {
+                    "error": "final_audio_upload_failed",
+                    "detail": str(e),
+                },
+            )
+            raise
 
 
 async def get_pdf_transcripts(file_id: str) -> list[dict[str, Any]]:

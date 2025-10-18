@@ -12,6 +12,23 @@
   --task-audio-backdrop: blur(4px);
 }
 
+/* Podcast speaker highlighting */
+.podcast-speaker {
+  font-weight: 700;
+  color: #4f46e5; /* brand color for speakers */
+  margin-right: 4px;
+}
+
+.podcast-content {
+  color: #0f172a; /* text primary */
+}
+
+/* Highlight active podcast speaker */
+.audio-transcript-row.active .podcast-speaker {
+  color: #3730a3; /* darker brand color for active speaker */
+  text-decoration: underline;
+}
+
 .task-detail-page {
   display: flex;
   justify-content: center;
@@ -130,6 +147,7 @@
   font-weight: 600;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
+  will-change: transform;
 }
 
 .task-detail-card__btn:disabled {
@@ -153,6 +171,7 @@
   border-radius: 1.25rem;
   padding: clamp(1.25rem, 3vw, 1.75rem);
   box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.1);
+  contain: layout style;
 }
 
 .task-detail-card__section--subtle {
@@ -250,6 +269,7 @@
   border-radius: inherit;
   background: linear-gradient(90deg, #6366f1, #22d3ee);
   transition: width 0.3s ease;
+  will-change: width;
 }
 
 .task-detail-card__steps {
@@ -326,10 +346,10 @@
   border: 1px solid var(--task-audio-border);
   display: flex;
   flex-direction: column;
-  backdrop-filter: var(--task-audio-backdrop);
   border-radius: 1rem;
   overflow: hidden;
   color: var(--task-audio-control-text);
+  contain: layout style;
 }
 
 .task-detail-card__audio .audio-player__native {

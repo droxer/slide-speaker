@@ -6,10 +6,12 @@ podcast files as well as fetching the dialogue used for audio generation.
 """
 
 import json
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
+from loguru import logger
 
 from slidespeaker.auth import extract_user_id, require_authenticated_user
 from slidespeaker.configs.config import config, get_storage_provider
@@ -44,36 +46,101 @@ router = APIRouter(
 async def get_podcast_by_task(task_id: str, request: Request) -> Any:
     """Serve podcast file for a task."""
     sp: StorageProvider = get_storage_provider()
-    file_id = await file_id_from_task(task_id)
+    file_id: str | None = None
 
-    # Prefer task-id.mp3 (new scheme), then fallback to legacy *_podcast.mp3
-    candidate_keys = [
+    try:
+        file_id = await file_id_from_task(task_id)
+    except HTTPException as exc:
+        # Gracefully handle missing metadata; fall back to task-scoped checks
+        if exc.status_code not in (400, 403, 404):
+            raise
+    if not file_id:
+        try:
+            mapped = await state_manager.get_file_id_by_task(task_id)
+            if mapped:
+                file_id = mapped
+        except Exception:
+            pass
+
+    # Prefer the path recorded in state (compose step) when available.
+    try:
+        state = await state_manager.get_state(file_id) if file_id else None
+        if not state:
+            state = await state_manager.get_state_by_task(task_id)
+        step_data = (
+            (state or {}).get("steps", {}).get("compose_podcast", {}).get("data", {})
+        )
+        candidate_path = step_data.get("podcast_file")
+        if isinstance(candidate_path, str):
+            candidate = Path(candidate_path)
+            if candidate.exists():
+                logger.info(
+                    "Serving podcast from state path {} for task {}",
+                    candidate,
+                    task_id,
+                )
+                return FileResponse(
+                    str(candidate),
+                    media_type="audio/mpeg",
+                    filename=f"podcast_{task_id}.mp3",
+                    headers=build_headers(
+                        request,
+                        content_type="audio/mpeg",
+                        disposition=f"inline; filename=podcast_{task_id}.mp3",
+                        cache_control="public, max-age=3600",
+                    ),
+                )
+    except Exception as state_exc:
+        logger.debug(
+            "Unable to serve podcast via state path for task %s: %s",
+            task_id,
+            state_exc,
+        )
+
+    # Prefer task-id-first naming and only fall back to file-id when available
+    candidate_keys: list[str] = [
         output_object_key(task_id, "podcast", "final.mp3"),
-        output_object_key(file_id, "podcast", "final.mp3"),
         f"{task_id}.mp3",
-        f"{file_id}.mp3",
         f"{task_id}_podcast.mp3",
-        f"{file_id}_podcast.mp3",
     ]
+    if file_id:
+        candidate_keys.insert(1, output_object_key(file_id, "podcast", "final.mp3"))
+        candidate_keys.extend([f"{file_id}.mp3", f"{file_id}_podcast.mp3"])
+
+    logger.info(
+        "Podcast lookup for task {} (file_id={}): {}",
+        task_id,
+        file_id,
+        candidate_keys,
+    )
 
     # Try candidates without relying on provider-specific exists checks
     for object_key in candidate_keys:
         try:
+            # Serve directly from local filesystem when artifact exists,
+            # regardless of the configured storage provider. This protects
+            # against cases where cloud uploads lag behind local writes.
+            actual = config.output_dir / object_key
+            if actual.exists():
+                logger.info(
+                    "Serving local podcast file {} (storage_provider={})",
+                    actual,
+                    config.storage_provider,
+                )
+                return FileResponse(
+                    str(actual),
+                    media_type="audio/mpeg",
+                    filename=f"podcast_{task_id}.mp3",
+                    headers=build_headers(
+                        request,
+                        content_type="audio/mpeg",
+                        disposition=f"inline; filename=podcast_{task_id}.mp3",
+                        cache_control="public, max-age=3600",
+                    ),
+                )
+
             if config.storage_provider == "local":
-                actual = config.output_dir / object_key
-                if actual.exists():
-                    return FileResponse(
-                        str(actual),
-                        media_type="audio/mpeg",
-                        filename=f"podcast_{task_id}.mp3",
-                        headers=build_headers(
-                            request,
-                            content_type="audio/mpeg",
-                            disposition=f"inline; filename=podcast_{task_id}.mp3",
-                            cache_control="public, max-age=3600",
-                        ),
-                    )
-                # Try next key
+                # Already checked local path above; nothing else to do.
                 continue
 
             # Cloud
@@ -83,12 +150,18 @@ async def get_podcast_by_task(task_id: str, request: Request) -> Any:
                     object_key, "audio/mpeg", range_header
                 )
 
-            url = sp.get_file_url(
-                object_key,
-                expires_in=300,
-                content_disposition=f"inline; filename=podcast_{task_id}.mp3",
-                content_type="audio/mpeg",
-            )
+            # For OSS storage, avoid setting content_type to prevent header override errors
+            get_file_url_kwargs = {
+                "object_key": object_key,
+                "expires_in": 300,
+                "content_disposition": f"inline; filename=podcast_{task_id}.mp3",
+            }
+
+            # Only set content_type for non-OSS providers
+            if config.storage_provider != "oss":
+                get_file_url_kwargs["content_type"] = "audio/mpeg"
+
+            url = sp.get_file_url(**get_file_url_kwargs)
             headers = build_cors_headers()
             headers["Location"] = url
             return Response(
@@ -111,35 +184,79 @@ async def download_podcast_by_task(task_id: str, request: Request) -> Any:
     """Download podcast file for a task."""
     sp: StorageProvider = get_storage_provider()
 
+    file_id: str | None = None
+    try:
+        file_id = await file_id_from_task(task_id)
+    except HTTPException as exc:
+        if exc.status_code not in (400, 403, 404):
+            raise
+    if not file_id:
+        try:
+            mapped = await state_manager.get_file_id_by_task(task_id)
+            if mapped:
+                file_id = mapped
+        except Exception:
+            pass
+
+    # Prefer state-recorded artifact when available.
+    try:
+        state = await state_manager.get_state(file_id) if file_id else None
+        if not state:
+            state = await state_manager.get_state_by_task(task_id)
+        step_data = (
+            (state or {}).get("steps", {}).get("compose_podcast", {}).get("data", {})
+        )
+        candidate_path = step_data.get("podcast_file")
+        if isinstance(candidate_path, str):
+            candidate = Path(candidate_path)
+            if candidate.exists():
+                logger.info(
+                    "Serving podcast download from state path {} for task {}",
+                    candidate,
+                    task_id,
+                )
+                return FileResponse(
+                    str(candidate),
+                    media_type="audio/mpeg",
+                    filename=f"podcast_{task_id}.mp3",
+                    headers=build_headers(
+                        request,
+                        content_type="audio/mpeg",
+                        disposition=f"attachment; filename=podcast_{task_id}.mp3",
+                        cache_control="public, max-age=3600, must-revalidate",
+                    ),
+                )
+    except Exception as state_exc:
+        logger.debug(
+            "Unable to serve podcast download via state path for task %s: %s",
+            task_id,
+            state_exc,
+        )
+
     # Prefer task-id.mp3, then file-id.mp3, then legacy *_podcast.mp3 variants
-    priorities: list[str] = [
+    candidate_keys: list[str] = [
         output_object_key(task_id, "podcast", "final.mp3"),
-        "",  # structured file-id placeholder
         f"{task_id}.mp3",
         f"{task_id}_podcast.mp3",
-        "",  # legacy file-id placeholder
-        "",  # legacy podcast placeholder
     ]
-    object_key = None
+    if file_id:
+        candidate_keys.insert(1, output_object_key(file_id, "podcast", "final.mp3"))
+        candidate_keys.extend([f"{file_id}.mp3", f"{file_id}_podcast.mp3"])
 
-    # Check task-id-first
-    structured_key = priorities[0]
-    if structured_key and check_file_exists(structured_key):
-        object_key = structured_key
+    logger.info(
+        "Podcast download lookup for task {} (file_id={}): {}",
+        task_id,
+        file_id,
+        candidate_keys,
+    )
+
+    object_key = next((k for k in candidate_keys if check_file_exists(k)), None)
     if object_key is None:
-        file_id = await file_id_from_task(task_id)
-        priorities[1] = output_object_key(file_id, "podcast", "final.mp3")
-        priorities[4] = f"{file_id}.mp3"
-        priorities[5] = f"{file_id}_podcast.mp3"
-        for k in priorities[1:]:
-            if k and check_file_exists(k):
-                object_key = k
-                break
-    if object_key is None:
+        logger.warning("Podcast file not found for task {}", task_id)
         raise HTTPException(status_code=404, detail="Podcast not found")
 
-    if config.storage_provider == "local":
-        actual = config.output_dir / object_key
+    actual = config.output_dir / object_key
+    if actual.exists():
         return FileResponse(
             str(actual),
             media_type="audio/mpeg",
@@ -148,15 +265,32 @@ async def download_podcast_by_task(task_id: str, request: Request) -> Any:
                 request,
                 content_type="audio/mpeg",
                 disposition=f"attachment; filename=podcast_{task_id}.mp3",
+                cache_control="public, max-age=3600, must-revalidate",
             ),
         )
+    else:
+        logger.debug(
+            "Podcast download local fallback missing: {} (storage_provider={})",
+            actual,
+            config.storage_provider,
+        )
+        # No local artifact, fall through to cloud handling
+    if config.storage_provider == "local":
+        # No artifact found locally; already exhausted candidates
+        raise HTTPException(status_code=404, detail="Podcast not found")
 
-    url = sp.get_file_url(
-        object_key,
-        expires_in=600,
-        content_disposition=f"attachment; filename=podcast_{task_id}.mp3",
-        content_type="audio/mpeg",
-    )
+    # For OSS storage, avoid setting content_type to prevent header override errors
+    get_file_url_kwargs = {
+        "object_key": object_key,
+        "expires_in": 600,
+        "content_disposition": f"attachment; filename=podcast_{task_id}.mp3",
+    }
+
+    # Only set content_type for non-OSS providers
+    if config.storage_provider != "oss":
+        get_file_url_kwargs["content_type"] = "audio/mpeg"
+
+    url = sp.get_file_url(**get_file_url_kwargs)
     headers = build_cors_headers()
     headers["Location"] = url
     return Response(status_code=307, headers=headers)
