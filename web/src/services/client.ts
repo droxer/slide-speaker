@@ -22,9 +22,14 @@ export interface TaskListResponse {
 }
 
 export const getTasks = async (params?: Record<string, string | number>): Promise<TaskListResponse> => {
-  const qs = params
-    ? '?' + new URLSearchParams(Object.entries(params).map(([k, v]) => [k, String(v)])).toString()
-    : '';
+  // Default parameters for better pagination
+  const defaultParams = {
+    limit: '20',
+    offset: '0',
+    ...params
+  };
+
+  const qs = '?' + new URLSearchParams(Object.entries(defaultParams).map(([k, v]) => [k, String(v)])).toString();
   const res = await api.get(`/api/tasks${qs}`);
   return res.data as TaskListResponse;
 };

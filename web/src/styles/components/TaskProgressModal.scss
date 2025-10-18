@@ -4,9 +4,10 @@
   background: rgba(15, 23, 42, 0.58);
   backdrop-filter: blur(4px);
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
-  padding: 1.5rem;
+  padding: 2.5rem 1.5rem;
+  overflow-y: auto;
   z-index: 1050;
 
   &__content {
@@ -15,7 +16,7 @@
     box-shadow:
       0 20px 60px rgba(15, 23, 42, 0.25),
       0 2px 12px rgba(15, 23, 42, 0.12);
-    width: min(960px, 96vw);
+    width: min(760px, 92vw);
     max-height: 92vh;
     display: flex;
     flex-direction: column;
@@ -33,11 +34,17 @@
 
   &__title {
     display: inline-flex;
-    align-items: center;
-    gap: 0.75rem;
+    align-items: baseline;
+    gap: 0.5rem;
     font-size: 1rem;
     font-weight: 600;
     color: #1e293b;
+  }
+
+  &__subtitle {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: #64748b;
   }
 
   &__close {
@@ -70,13 +77,11 @@
 
 @media (max-width: 720px) {
   .processing-modal {
-    align-items: flex-end;
-    padding: 0.75rem;
+    padding: 1.5rem 0.75rem;
 
     &__content {
-      width: 100%;
-      border-bottom-left-radius: 0;
-      border-bottom-right-radius: 0;
+      width: min(560px, 95vw);
+      border-radius: 18px;
       max-height: 95vh;
     }
 

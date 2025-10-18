@@ -1,6 +1,6 @@
 import {locales, type Locale} from '@/i18n/config';
 
-export const SUPPORTED_LANGUAGES = ['english', 'simplified_chinese', 'traditional_chinese'] as const;
+export const SUPPORTED_LANGUAGES = ['english', 'simplified_chinese', 'traditional_chinese', 'japanese', 'korean', 'thai'] as const;
 export type SupportedLanguage = typeof SUPPORTED_LANGUAGES[number];
 
 export const DEFAULT_LANGUAGE: SupportedLanguage = 'english';
@@ -9,12 +9,18 @@ export const LANGUAGE_TO_LOCALE: Record<SupportedLanguage, Locale> = {
   english: 'en',
   simplified_chinese: 'zh-CN',
   traditional_chinese: 'zh-TW',
+  japanese: 'ja',
+  korean: 'ko',
+  thai: 'th',
 };
 
 const LOCALE_TO_LANGUAGE: Record<Locale, SupportedLanguage> = {
   en: 'english',
   'zh-CN': 'simplified_chinese',
   'zh-TW': 'traditional_chinese',
+  ja: 'japanese',
+  ko: 'korean',
+  th: 'thai',
 };
 
 const LANGUAGE_ALIASES: Record<string, SupportedLanguage> = {
@@ -38,6 +44,24 @@ const LANGUAGE_ALIASES: Record<string, SupportedLanguage> = {
   'zh-tw': 'traditional_chinese',
   'zh_tw': 'traditional_chinese',
   'zh-hant': 'traditional_chinese',
+  
+  // Japanese
+  japanese: 'japanese',
+  ja: 'japanese',
+  'ja-jp': 'japanese',
+  'ja_jp': 'japanese',
+  
+  // Korean
+  korean: 'korean',
+  ko: 'korean',
+  'ko-kr': 'korean',
+  'ko_kr': 'korean',
+  
+  // Thai
+  thai: 'thai',
+  th: 'thai',
+  'th-th': 'thai',
+  'th_th': 'thai',
 };
 
 const LOCALE_ALIASES: Record<string, Locale> = {
@@ -51,6 +75,15 @@ const LOCALE_ALIASES: Record<string, Locale> = {
   'zh-tw': 'zh-TW',
   'zh_tw': 'zh-TW',
   'zh-hant': 'zh-TW',
+  'ja': 'ja',
+  'ja-jp': 'ja',
+  'ja_jp': 'ja',
+  'ko': 'ko',
+  'ko-kr': 'ko',
+  'ko_kr': 'ko',
+  'th': 'th',
+  'th-th': 'th',
+  'th_th': 'th',
 };
 
 const SUPPORTED_LOCALES = new Set<Locale>(locales);

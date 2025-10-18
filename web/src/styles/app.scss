@@ -126,6 +126,7 @@
 // Enhanced File Upload View
 .file-upload-view {
   padding: 2rem 0;
+  contain: layout style;
 }
 
 .file-upload-header {
@@ -145,6 +146,7 @@
   max-width: 480px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  contain: layout style;
 }
 
 .file-info-card:hover {
@@ -191,6 +193,7 @@
 
 .file-upload-progress .progress-fill {
   background: linear-gradient(90deg, #3b82f6 0%, #60a5fa 45%, #93c5fd 100%);
+  will-change: width;
 }
 
 // Task Configuration Section
@@ -201,6 +204,7 @@
   border: 1px solid rgba(226, 232, 240, 0.8);
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  contain: layout style;
 }
 
 .config-header {
@@ -282,73 +286,4 @@
 
 .config-card.output-config {
   border-left: 3px solid #6366f1;
-}
-
-// Enhanced File vs Task Visual Separation
-.processing-meta .meta-card {
-  display: flex;
-  flex-direction: column;
-  background: rgba(248, 250, 252, 0.95);
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  border-radius: 12px;
-  padding: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.processing-meta .meta-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
-  border-color: rgba(203, 213, 225, 0.9);
-}
-
-.processing-meta .meta-card.file {
-  border-left: 4px solid #3b82f6;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05), rgba(248, 250, 252, 0.95));
-}
-
-.processing-meta .meta-card.task {
-  border-left: 4px solid #6366f1;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(248, 250, 252, 0.95));
-}
-
-.processing-meta .meta-card-header {
-  display: flex;
-  align-items: center;
-  margin-bottom: 8px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
-}
-
-.processing-meta .meta-card-title {
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #475569;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.processing-meta .meta-card-content {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-// Task meta card: icon + code on same row with no overlap
-.processing-meta .meta-card.task {
-  justify-content: flex-start;
-  column-gap: 8px;
-}
-
-.processing-meta .meta-card.task .meta-title {
-  flex: 0 0 auto;
-  margin-right: 2px;
-}
-
-.processing-meta .meta-card.task .meta-actions {
-  flex: 1 1 auto;
-}
-
-.processing-meta .meta-card.task .meta-code {
-  flex: 1 1 auto;
 }

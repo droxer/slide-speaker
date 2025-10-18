@@ -83,11 +83,26 @@ async def compose_podcast_step(file_id: str) -> None:
 
     # Upload to storage (using same base_id as local file)
     url = None
+    sp = get_storage_provider()
     try:
-        sp = get_storage_provider()
         url = sp.upload_file(str(podcast_path), storage_key, "audio/mpeg")
-    except Exception as e:
-        logger.warning(f"Podcast upload failed: {e}")
+    except Exception as e:  # noqa: BLE001 - propagate non-local failures
+        logger.error(f"Podcast upload failed: {e}")
+        if config.storage_provider != "local":
+            await state_manager.update_step_status(
+                file_id,
+                "compose_podcast",
+                "failed",
+                {
+                    "error": "podcast_upload_failed",
+                    "detail": str(e),
+                    "storage_key": storage_key,
+                },
+            )
+            raise
+        logger.warning(
+            "Continuing with local podcast artifact because storage provider is local."
+        )
 
     await state_manager.update_step_status(
         file_id,

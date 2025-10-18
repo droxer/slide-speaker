@@ -191,3 +191,52 @@
     display: none;
   }
 }
+
+/* Layout Shift Prevention Utilities */
+.no-layout-shift {
+  contain: layout style paint;
+}
+
+.no-layout-shift-animate {
+  /* Use only opacity animations to prevent layout shifts */
+  animation-name: fadeIn;
+  animation-duration: 0.3s;
+  animation-timing-function: ease-out;
+}
+
+/* Prevent CLS (Cumulative Layout Shift) for dynamic content */
+.cls-prevent {
+  /* Reserve space for dynamic content */
+  min-height: 20px;
+  /* Prevent size changes */
+  contain: layout style;
+}
+
+/* Smooth height transitions without causing layout shifts */
+.smooth-height {
+  transition: height 0.3s ease-out;
+  overflow: hidden;
+}
+
+/* Utility to prevent transform-based animations that cause layout shifts */
+.no-transform-shift {
+  /* Use opacity only for animations */
+  transition: opacity 0.3s ease-out;
+}
+
+/* Animation utilities that don't cause layout shifts */
+@keyframes fadeInOnly {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes shimmer-progress-no-shift {
+  0% { opacity: 0.4; }
+  50% { opacity: 0.8; }
+  100% { opacity: 0.4; }
+}
+
+/* Utility class for shimmer animations that don't cause layout shifts */
+.shimmer-no-shift {
+  animation: shimmer-progress-no-shift 2s ease-in-out infinite;
+}

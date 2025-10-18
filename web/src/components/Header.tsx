@@ -1,8 +1,10 @@
-import React, {useEffect, useMemo, useRef, useState} from 'react';
-import LoginButton from './LoginButton';
+import React, {useEffect, useMemo, useRef, useState, lazy, Suspense} from 'react';
 import {useSession, signIn, signOut} from 'next-auth/react';
 import {useRouter} from 'next/navigation';
 import {useI18n} from '@/i18n/hooks';
+
+// Lazy load non-critical components
+const LoginButton = lazy(() => import('./LoginButton'));
 
 export type AppView = 'studio' | 'creations' | 'profile';
 
@@ -128,7 +130,9 @@ const Header = ({ activeView, onNavigate }: HeaderProps) => {
             </div>
           ) : (
             <div className="auth-buttons">
-              <LoginButton onClick={() => signIn('google')} label={t('header.login')} />
+              <Suspense fallback={<div className="login-button-loading">Loading...</div>}>
+                <LoginButton onClick={() => signIn('google')} label={t('header.login')} />
+              </Suspense>
               <button type="button" className="credentials-login-button" onClick={handleCredentialsLogin}>
                 {t('auth.usePassword', undefined, 'Use email & password')}
               </button>

@@ -2,9 +2,14 @@
 
 import React from 'react';
 import { useI18n } from '@/i18n/hooks';
-import { STEP_STATUS_ICONS, StepStatusVariant, normalizeStepStatus } from '@/utils/stepLabels';
+import {
+  STEP_STATUS_ICONS,
+  StepStatusVariant,
+  normalizeStepStatus,
+} from '@/utils/stepLabels';
 import { getTaskStatusLabel } from '@/utils/taskStatus';
 import { sortSteps } from '@/utils/stepOrdering';
+import { resolveTaskType } from '@/utils/taskType';
 
 type TaskProcessingStepsProps = {
   taskId: string | null;
@@ -13,7 +18,17 @@ type TaskProcessingStepsProps = {
   progress: number;
   onStop: () => void;
   processingDetails: any;
-  formatStepNameWithLanguages: (step: string, vl: string, sl?: string) => string;
+  formatStepNameWithLanguages: (
+    step: string,
+    vl: string,
+    sl?: string,
+  ) => string;
+};
+
+const RESOLUTION_LABELS: Record<string, string> = {
+  sd: 'runTask.resolution.sd',
+  hd: 'runTask.resolution.hd',
+  fullhd: 'runTask.resolution.fullhd',
 };
 
 const TaskProcessingSteps = ({
@@ -28,219 +43,198 @@ const TaskProcessingSteps = ({
   const { t } = useI18n();
   const pd = processingDetails || {};
   const steps = (pd.steps || {}) as Record<string, any>;
-  const taskType = String(pd.task_type || '').toLowerCase();
 
-  // Function to get appropriate file icon based on file extension with enhanced styling
-  const getFileIcon = (filename: string | null) => {
-    if (!filename) return {
-      emoji: '📄',
-      gradient: 'linear-gradient(135deg, #94a3b8, #cbd5e1)',
-      color: '#64748b',
-      name: 'Document'
-    };
+  const typeInfo = resolveTaskType(
+    { task_type: pd.task_type, kwargs: (pd as any)?.kwargs || {} } as any,
+    pd as any,
+  );
+  const taskTypeKey = typeInfo.key || 'unknown';
+  const taskTypeLabel = t(
+    `task.list.type.${taskTypeKey}`,
+    undefined,
+    typeInfo.fallbackLabel,
+  );
 
-    const lowerFilename = filename.toLowerCase();
+  const voiceLanguage = String(pd.voice_language || 'english');
+  const subtitleLanguage = String(pd.subtitle_language || voiceLanguage);
+  const transcriptLanguage =
+    pd.transcript_language ??
+    (pd as any)?.kwargs?.transcript_language ??
+    pd.podcast_transcript_language ??
+    null;
 
-    // PDF files - Professional red gradient
-    if (lowerFilename.endsWith('.pdf')) {
-      return {
-        emoji: '📑',
-        gradient: 'linear-gradient(135deg, #ef4444, #dc2626)',
-        color: '#dc2626',
-        name: 'PDF Document'
-      };
-    }
+  const voiceDisplay = t(
+    `language.display.${voiceLanguage.toLowerCase()}`,
+    undefined,
+    voiceLanguage,
+  );
+  const subtitleDisplay = t(
+    `language.display.${subtitleLanguage.toLowerCase()}`,
+    undefined,
+    subtitleLanguage,
+  );
+  const transcriptDisplay = transcriptLanguage
+    ? t(
+        `language.display.${String(transcriptLanguage).toLowerCase()}`,
+        undefined,
+        String(transcriptLanguage),
+      )
+    : null;
 
-    // PowerPoint files - Professional blue gradient
-    if (lowerFilename.endsWith('.ppt') || lowerFilename.endsWith('.pptx')) {
-      return {
-        emoji: '📊',
-        gradient: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-        color: '#2563eb',
-        name: 'Presentation'
-      };
-    }
+  const resolutionKey = String(pd.video_resolution || '').toLowerCase();
+  const resolutionLabel = RESOLUTION_LABELS[resolutionKey]
+    ? t(
+        RESOLUTION_LABELS[resolutionKey],
+        undefined,
+        String(pd.video_resolution || '').toUpperCase(),
+      )
+    : null;
 
-    // Word files - Professional blue gradient
-    if (lowerFilename.endsWith('.doc') || lowerFilename.endsWith('.docx')) {
-      return {
-        emoji: '📝',
-        gradient: 'linear-gradient(135deg, #0ea5e9, #0284c7)',
-        color: '#0284c7',
-        name: 'Document'
-      };
-    }
+  const featureLabels: string[] = [];
+  if (pd.generate_avatar === true) {
+    featureLabels.push(
+      t('processing.meta.featuresList.avatar', undefined, 'Avatar'),
+    );
+  }
 
-    // Excel files - Professional green gradient
-    if (lowerFilename.endsWith('.xls') || lowerFilename.endsWith('.xlsx')) {
-      return {
-        emoji: '📈',
-        gradient: 'linear-gradient(135deg, #22c55e, #16a34a)',
-        color: '#16a34a',
-        name: 'Spreadsheet'
-      };
-    }
+  const taskIdShort = taskId
+    ? `${taskId.slice(0, 8)}…${taskId.slice(-4)}`
+    : null;
+  const uploadIdShort = uploadId
+    ? `${uploadId.slice(0, 6)}…${uploadId.slice(-4)}`
+    : null;
 
-    // Image files - Vibrant purple gradient
-    if (lowerFilename.endsWith('.jpg') || lowerFilename.endsWith('.jpeg') ||
-        lowerFilename.endsWith('.png') || lowerFilename.endsWith('.gif') ||
-        lowerFilename.endsWith('.bmp') || lowerFilename.endsWith('.svg')) {
-      return {
-        emoji: '🖼️',
-        gradient: 'linear-gradient(135deg, #a855f7, #9333ea)',
-        color: '#9333ea',
-        name: 'Image'
-      };
-    }
+  const fileHint =
+    !fileName && uploadIdShort
+      ? t(
+          'processing.meta.locatingHint',
+          { id: uploadIdShort },
+          `from file ${uploadIdShort}`,
+        )
+      : undefined;
 
-    // Video files - Cinematic purple gradient
-    if (lowerFilename.endsWith('.mp4') || lowerFilename.endsWith('.avi') ||
-        lowerFilename.endsWith('.mov') || lowerFilename.endsWith('.wmv')) {
-      return {
-        emoji: '🎬',
-        gradient: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
-        color: '#6d28d9',
-        name: 'Video'
-      };
-    }
+  const metaRows = [
+    {
+      key: 'task-id',
+      label: t('processing.meta.taskId', undefined, 'Task ID'),
+      value:
+        taskIdShort ||
+        t('processing.meta.locating', undefined, '(locating…)'),
+      copyValue: taskId ?? undefined,
+    },
+    {
+      key: 'type',
+      label: t('processing.meta.configuration', undefined, 'Configuration'),
+      value: taskTypeLabel,
+    },
+    {
+      key: 'voice-lang',
+      label: t('task.detail.voice', undefined, 'Voice'),
+      value: voiceDisplay,
+    },
+    {
+      key: 'subtitle-lang',
+      label: t('task.detail.subtitles', undefined, 'Subtitles'),
+      value: subtitleDisplay,
+    },
+  ] as Array<{
+    key: string;
+    label: string;
+    value: React.ReactNode;
+    hint?: React.ReactNode;
+    copyValue?: string;
+  }>;
 
-    // Audio files - Musical gradient
-    if (lowerFilename.endsWith('.mp3') || lowerFilename.endsWith('.wav') ||
-        lowerFilename.endsWith('.ogg') || lowerFilename.endsWith('.flac')) {
-      return {
-        emoji: '🎵',
-        gradient: 'linear-gradient(135deg, #f59e0b, #d97706)',
-        color: '#d97706',
-        name: 'Audio'
-      };
-    }
+  if (transcriptDisplay) {
+    metaRows.push({
+      key: 'transcript-lang',
+      label: t('task.detail.transcript', undefined, 'Transcript'),
+      value: transcriptDisplay,
+    });
+  }
 
-    // Text files - Clean gray gradient
-    if (lowerFilename.endsWith('.txt') || lowerFilename.endsWith('.md')) {
-      return {
-        emoji: '📄',
-        gradient: 'linear-gradient(135deg, #6b7280, #4b5563)',
-        color: '#4b5563',
-        name: 'Text Document'
-      };
-    }
+  if (resolutionLabel) {
+    metaRows.push({
+      key: 'resolution',
+      label: t('processing.meta.resolution', undefined, 'Resolution'),
+      value: resolutionLabel,
+    });
+  }
 
-    // Default fallback - Elegant gray gradient
-    return {
-      emoji: '📄',
-      gradient: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
-      color: '#7c3aed',
-      name: 'Document'
-    };
-  };
+  if (featureLabels.length > 0) {
+    metaRows.push({
+      key: 'features',
+      label: t('processing.meta.features', undefined, 'Extras'),
+      value: featureLabels.join(' · '),
+    });
+  }
 
-  const fileIcon = getFileIcon(fileName);
   const clampedProgress = Number.isFinite(progress)
     ? Math.max(0, Math.min(100, Math.round(progress)))
     : 0;
 
-  const shortUploadId = uploadId ? uploadId.slice(0, 8) : '…';
-  const locatingLabel = t('processing.meta.locating', undefined, '(locating…)');
-  const describeStepStatus = (variant: StepStatusVariant) => getTaskStatusLabel(variant, t);
+  const describeStepStatus = (variant: StepStatusVariant) =>
+    getTaskStatusLabel(variant, t);
 
-  // Get task configuration details
-  const voiceLanguage = pd.voice_language || 'english';
-  const subtitleLanguage = pd.subtitle_language || voiceLanguage;
-  const transcriptLanguage = pd.transcript_language || subtitleLanguage;
-  const videoResolution = pd.video_resolution || 'hd';
-  const generateSubtitles = pd.generate_subtitles !== false;
-  const generateAvatar = pd.generate_avatar === true;
+  const handleCopy = (value: string | undefined) => {
+    if (!value) return;
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard.writeText(value).catch(() => {
+        // Silently ignore clipboard failures
+      });
+    }
+  };
 
   return (
     <div className="processing-view">
       <div className="spinner"></div>
       <h3>{t('processing.title')}</h3>
 
-      <div className="processing-meta" role="group" aria-label={t('processing.meta.aria', undefined, 'Task details')}>
-        <div className="meta-card file" title={fileName || uploadId || ''}>
-          <div className="meta-card-header">
-            <div
-              className="meta-icon-large file-icon-enhanced"
-              style={{ background: fileIcon.gradient, color: 'white' }}
-              title={fileIcon.name}
-            >
-              <span className="file-icon-emoji">{fileIcon.emoji}</span>
-            </div>
-            <div className="meta-content">
-              <div className="meta-title-modern">
-                {fileName || t('processing.file.untitled', undefined, 'Untitled')}
-              </div>
-              <div className="meta-subtitle">
-                {fileIcon.name}
-              </div>
-            </div>
-            <div className="meta-badge-modern">
-              {String(fileName || '').toLowerCase().endsWith('.pdf')
-                ? <span className="file-type-badge pdf">PDF</span>
-                : <span className="file-type-badge ppt">PPT</span>}
-            </div>
-          </div>
+      <div
+        className="processing-summary"
+        role="group"
+        aria-label={t('processing.meta.aria', undefined, 'Task details')}
+      >
+        <div className="processing-summary__title">
+          <span className="processing-summary__file">
+            {fileName ||
+              t('processing.file.untitled', undefined, 'Untitled')}
+          </span>
+          <span className={`file-task-type-badge type-${taskTypeKey}`}>
+            {taskTypeLabel}
+          </span>
         </div>
-
-        <div className="meta-card task-modern" title={taskId || uploadId || ''}>
-          <div className="meta-card-header">
-            <div className="meta-icon-large">⚙️</div>
-            <div className="meta-content">
-              <div className="meta-title-modern">
-                {t('processing.meta.taskId', undefined, 'Task ID')}
-              </div>
-              <div className="meta-subtitle">
-                {taskId ? `${taskId.slice(0, 8)}...${taskId.slice(-4)}` : locatingLabel}
-              </div>
-            </div>
-            <div className="meta-actions-modern">
-              {taskId && (
-                <button
-                  className="copy-task-id-btn"
-                  onClick={() => navigator.clipboard.writeText(taskId)}
-                  title={t('processing.meta.copyTaskId', undefined, 'Copy task ID')}
-                >
-                  📋
-                </button>
-              )}
-            </div>
+        {fileHint && (
+          <div className="processing-summary__caption" aria-hidden="true">
+            {fileHint}
           </div>
-        </div>
-
-        <div className="meta-card config" title={t('processing.meta.configuration', undefined, 'Configuration')}>
-          <div className="meta-card-header">
-            <div className="meta-icon-large">🎯</div>
-            <div className="meta-content">
-              <div className="meta-title-modern">
-                {t('processing.meta.configuration', undefined, 'Configuration')}
-              </div>
-              <div className="meta-subtitle">
-                {taskType === 'video' ? '🎬 Video' : taskType === 'podcast' ? '🎧 Podcast' : '🎬🎧 Both'}
-              </div>
+        )}
+        <dl className="processing-summary__list">
+          {metaRows.map(({ key, label, value, hint, copyValue }) => (
+            <div key={key} className="processing-summary__row">
+              <dt>{label}</dt>
+              <dd>
+                <div className="processing-summary__value">
+                  <span>{value}</span>
+                  {copyValue && (
+                    <button
+                      type="button"
+                      className="processing-summary__copy"
+                      onClick={() => handleCopy(copyValue)}
+                    >
+                      {t('actions.copy', undefined, 'Copy')}
+                    </button>
+                  )}
+                </div>
+                {hint && (
+                  <div className="processing-summary__hint" aria-hidden="true">
+                    {hint}
+                  </div>
+                )}
+              </dd>
             </div>
-            <div className="meta-config-badges">
-              {generateAvatar && <span className="config-badge avatar">👤</span>}
-              {generateSubtitles && <span className="config-badge subtitles">📝</span>}
-            </div>
-          </div>
-        </div>
-
-        <div className="meta-card languages" title={t('processing.meta.languages', undefined, 'Languages')}>
-          <div className="meta-card-header">
-            <div className="meta-icon-large">🌍</div>
-            <div className="meta-content">
-              <div className="meta-title-modern">
-                {t('processing.meta.languages', undefined, 'Languages')}
-              </div>
-              <div className="meta-subtitle">
-                {voiceLanguage !== subtitleLanguage
-                  ? `🎤 ${voiceLanguage} • 📝 ${subtitleLanguage}`
-                  : `🎤📝 ${voiceLanguage}`
-                }
-              </div>
-            </div>
-          </div>
-        </div>
+          ))}
+        </dl>
       </div>
 
       <div
@@ -267,21 +261,47 @@ const TaskProcessingSteps = ({
           <div className="progress-fill" style={{ width: `${clampedProgress}%` }} />
         </div>
         <p className="progress-status" aria-live="polite">
-          {t('processing.progressStatus', undefined, 'We are bringing your presentation to life…')}
+          {t(
+            'processing.progressStatus',
+            undefined,
+            'We are bringing your presentation to life…',
+          )}
         </p>
       </div>
 
-      <button type="button" onClick={onStop} className="cancel-btn">{t('processing.stop')}</button>
+      <button type="button" onClick={onStop} className="cancel-btn">
+        {t('processing.stop')}
+      </button>
 
       <div className="steps-container">
         <h4>
-          <span className="steps-title">🌟 {t('processing.stepsHeading', undefined, 'Processing steps')}</span>
+          <span className="steps-title">
+            🌟 {t('processing.stepsHeading', undefined, 'Processing steps')}
+          </span>
           <span className="output-badges">
-            {(["video","both"].includes(taskType)) && (
-              <span className="output-pill video" title={t('processing.preview.videoEnabled', undefined, 'Video generation enabled')}>🎬 {t('task.list.videoLabel')}</span>
+            {['video', 'both'].includes(taskTypeKey) && (
+              <span
+                className="output-pill video"
+                title={t(
+                  'processing.preview.videoEnabled',
+                  undefined,
+                  'Video generation enabled',
+                )}
+              >
+                🎬 {t('task.list.videoLabel')}
+              </span>
             )}
-            {(["podcast","both"].includes(taskType)) && (
-              <span className="output-pill podcast" title={t('processing.preview.podcastEnabled', undefined, 'Podcast generation enabled')}>🎧 {t('task.list.podcastLabel')}</span>
+            {['podcast', 'both'].includes(taskTypeKey) && (
+              <span
+                className="output-pill podcast"
+                title={t(
+                  'processing.preview.podcastEnabled',
+                  undefined,
+                  'Podcast generation enabled',
+                )}
+              >
+                🎧 {t('task.list.podcastLabel')}
+              </span>
             )}
           </span>
         </h4>
@@ -298,7 +318,7 @@ const TaskProcessingSteps = ({
                 role="listitem"
                 className={`progress-step progress-step--${statusVariant}`}
               >
-                <span className="progress-step__icon" aria-hidden>
+                <span className="progress-step__icon" aria-hidden="true">
                   {STEP_STATUS_ICONS[statusVariant]}
                 </span>
                 <div className="progress-step__body">
@@ -323,7 +343,15 @@ const TaskProcessingSteps = ({
                 const sl = String(pd.subtitle_language || vl);
                 return (
                   <div key={index} className="error-item">
-                    <strong>{formatStepNameWithLanguages(String(error.step), vl, sl)}:</strong> {String(error.error)}
+                    <strong>
+                      {formatStepNameWithLanguages(
+                        String(error.step),
+                        vl,
+                        sl,
+                      )}
+                      :
+                    </strong>{' '}
+                    {String(error.error)}
                   </div>
                 );
               })}

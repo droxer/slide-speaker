@@ -1,8 +1,16 @@
 import type {Metadata} from 'next';
 import type {ReactNode} from 'react';
 import {cookies, headers} from 'next/headers';
+import {Open_Sans} from 'next/font/google';
 import {defaultLocale, locales, type Locale} from '@/i18n/config';
 import './globals.scss';
+
+const openSans = Open_Sans({
+  subsets: ['latin'],
+  display: 'swap',
+  weight: ['300', '400', '600', '700'],
+  style: ['normal', 'italic'],
+});
 
 const themeInitScript = `(() => {
   try {
@@ -48,7 +56,7 @@ export default async function RootLayout({children}: Readonly<{children: ReactNo
 
   return (
     <html lang={locale} suppressHydrationWarning>
-      <body suppressHydrationWarning>
+      <body className={openSans.className} suppressHydrationWarning>
         <script dangerouslySetInnerHTML={{__html: themeInitScript}} />
         {children}
       </body>

@@ -1,0 +1,435 @@
+{
+  "header": {
+    "title": "SlideSpeaker AI",
+    "subtitle": "슬라이드를 AI 영상으로 변환",
+    "login": "Google로 로그인",
+    "logout": "로그아웃",
+    "profile": "프로필",
+    "defaultName": "여러분",
+    "welcome": "환영합니다, {name}",
+    "welcomeShort": "안녕하세요, {name}",
+    "view": {
+      "studio": "스튜디오",
+      "creations": "작품"
+    },
+    "menu": {
+      "studio": "스튜디오",
+      "creations": "작품",
+      "logout": "로그아웃"
+    }
+  },
+  "language": {
+    "english": "영어",
+    "simplified": "중국어(간체)",
+    "traditional": "중국어(번체)",
+    "japanese": "일본어",
+    "korean": "한국어",
+    "thai": "태국어",
+    "display": {
+      "english": "영어",
+      "simplified_chinese": "중국어(간체)",
+      "traditional_chinese": "중국어(번체)",
+      "japanese": "일본어",
+      "korean": "한국어",
+      "thai": "태국어",
+      "spanish": "스페인어",
+      "french": "프랑스어",
+      "german": "독일어",
+      "italian": "이탈리아어",
+      "portuguese": "포르투갈어",
+      "russian": "러시아어",
+      "arabic": "아랍어",
+      "hindi": "힌디어"
+    },
+    "switcher": {
+      "label": "인터페이스 언어",
+      "tooltip": "언어 변경"
+    },
+    "unknown": "{code}"
+  },
+  "common": {
+    "unknown": "알 수 없음",
+    "unknownFile": "알 수 없는 파일",
+    "untrackedFile": "추적되지 않은 파일",
+    "disabled": "비활성화됨",
+    "copied": "복사되었습니다!",
+    "latest": "최신",
+    "more": "더 보기",
+    "fileType": {
+      "document": "문서",
+      "pdfDocument": "PDF 문서",
+      "presentation": "프레젠테이션",
+      "spreadsheet": "스프레드시트",
+      "image": "이미지",
+      "video": "영상",
+      "audio": "오디오",
+      "textDocument": "텍스트 문서"
+    }
+  },
+  "profile": {
+    "title": "프로필",
+    "subtitle": "표시 이름과 언어 선호도를 관리하세요.",
+    "nameLabel": "표시 이름",
+    "namePlaceholder": "어떻게 불러드릴까요?",
+    "languageLabel": "선호 언어",
+    "saveButton": "변경 사항 저장",
+    "saving": "저장 중…",
+    "saveSuccess": "프로필이 업데이트되었습니다",
+    "saveError": "프로필을 업데이트할 수 없습니다. 다시 시도하세요."
+  },
+  "task": {
+    "detail": {
+      "breadcrumb": {
+        "task": "작업"
+      },
+      "type": {
+        "video": "영상",
+        "podcast": "팟캐스트",
+        "audio": "오디오",
+        "both": "영상 및 팟캐스트",
+        "unknown": "작업"
+      },
+      "videoPreview": "영상 미리보기",
+      "podcastPreview": "팟캐스트 미리보기",
+      "audioPreview": "오디오 미리보기",
+      "previewTabs": "미리보기 탭 전환",
+      "cancel": "작업 취소",
+      "cancelling": "취소 중…",
+      "currentProgress": "현재 진행 상황",
+      "steps": "단계",
+      "downloads": "다운로드",
+      "loadingDownloads": "다운로드 불러오는 중…",
+      "noDownloads": "사용 가능한 다운로드가 아직 없습니다.",
+      "noDownloadsCancelled": "취소된 작업에는 다운로드가 없습니다.",
+      "created": "생성 시간",
+      "updated": "업데이트",
+      "voice": "음성",
+      "subtitles": "자막",
+      "subtitlesFormats": "VTT / SRT",
+      "transcript": "원고",
+      "metadataAria": "작업 메타데이터"
+    },
+    "status": {
+      "completed": "완료",
+      "processing": "처리 중",
+      "queued": "대기 중",
+      "failed": "실패",
+      "cancelled": "취소됨",
+      "pending": "대기",
+      "skipped": "건너뜀",
+      "upload_only": "업로드 준비 완료"
+    },
+    "cancelled": {
+      "description": "작업이 성공적으로 취소되었습니다."
+    },
+    "list": {
+      "copyId": "작업 ID 복사",
+      "voice": "음성: {language}",
+      "transcript": "원고: {language}",
+      "subtitles": "자막: {language}",
+      "downloads": "다운로드",
+      "videoLabel": "영상",
+      "podcastLabel": "팟캐스트",
+      "audioLabel": "오디오",
+      "transcriptLabel": "원고",
+      "vttLabel": "VTT",
+      "srtLabel": "SRT",
+      "idPrefix": "작업: {id}",
+      "openTaskTitle": "작업 {id} 열기",
+      "queuedMessage": "대기 중 • 시작을 기다리는 중",
+      "createdStamp": "생성: {timestamp}",
+      "completedStamp": "완료: {timestamp}",
+      "statusAria": "상태: {status}",
+      "type": {
+        "video": "영상",
+        "podcast": "팟캐스트",
+        "audio": "오디오",
+        "both": "영상 및 팟캐스트",
+        "unknown": "작업"
+      }
+    },
+    "preview": {
+      "watch": "시청",
+      "listen": "청취",
+      "videoAria": "작업 {taskId}의 영상 미리보기",
+      "audioAria": "오디오 내레이션 미리보기"
+    }
+  },
+  "actions": {
+    "copy": "복사",
+    "openPreview": "미리보기 열기",
+    "open": "열기",
+    "generateVideo": "영상 생성",
+    "generatePodcast": "팟캐스트 생성",
+    "generate": "생성",
+    "generating": "생성 중…",
+    "cancel": "취소",
+    "delete": "삭제",
+    "close": "닫기",
+    "createAnother": "다른 작업 생성"
+  },
+  "auth": {
+    "loginTitle": "로그인",
+    "registerTitle": "계정 만들기",
+    "emailLabel": "이메일",
+    "passwordLabel": "비밀번호",
+    "loading": "잠시만 기다려주세요…",
+    "loginAction": "로그인",
+    "registerAction": "계정 만들기",
+    "separator": "또는",
+    "loginWithGoogle": "Google로 로그인",
+    "switchToRegister": "계정이 없으신가요? 새로 만들기",
+    "switchToLogin": "이미 계정이 있으신가요? 로그인",
+    "usePassword": "이메일과 비밀번호 사용",
+    "messages": {
+      "registerSuccess": "계정이 생성되었습니다. 이제 로그인할 수 있습니다."
+    },
+    "errors": {
+      "invalidCredentials": "이메일 또는 비밀번호가 올바르지 않습니다.",
+      "registerFailed": "등록에 실패했습니다",
+      "generic": "문제가 발생했습니다."
+    }
+  },
+  "notifications": {
+    "videoCopied": "영상 URL이 복사되었습니다!",
+    "audioCopied": "오디오 URL이 복사되었습니다!",
+    "podcastCopied": "팟캐스트 URL이 복사되었습니다!",
+    "transcriptCopied": "원고 URL이 복사되었습니다!",
+    "vttCopied": "VTT URL이 복사되었습니다!",
+    "srtCopied": "SRT URL이 복사되었습니다!"
+  },
+  "filters": {
+    "status": {
+      "all": "모든 상태"
+    }
+  },
+  "runTask": {
+    "adjustHint": "생성 옵션을 조정하고 준비되면 생성 버튼을 눌러 주세요.",
+    "tagSuffix": "작업",
+    "source": "원본",
+    "output": {
+      "video": "영상",
+      "podcast": "팟캐스트",
+      "label": "출력"
+    },
+    "voiceLanguage": "음성 언어",
+    "subtitleLanguage": "자막 언어",
+    "transcriptLanguage": "원고 언어",
+    "videoResolution": "영상 해상도",
+    "sameAsVoice": "음성과 동일",
+    "noFileSelected": "선택한 파일",
+    "resolution": {
+      "sd": "SD (640×480)",
+      "hd": "HD (1280×720)",
+      "fullhd": "풀 HD (1920×1080)"
+    }
+  },
+  "creations": {
+    "health": {
+      "overall": {
+        "okLabel": "모든 시스템 정상",
+        "degradedLabel": "일부 기능만 사용 가능",
+        "downLabel": "시스템 오프라인",
+        "unknownLabel": "상태 알 수 없음",
+        "ok": "정상",
+        "degraded": "저하",
+        "down": "중단",
+        "unknown": "알 수 없음"
+      },
+      "status": "상태",
+      "queue": "큐",
+      "database": "데이터베이스",
+      "queueLatency": "큐 지연: {latency} ms",
+      "databaseLatency": "데이터베이스 지연: {latency} ms",
+      "queueUnavailable": "큐를 사용할 수 없습니다",
+      "databaseUnavailable": "데이터베이스를 사용할 수 없습니다"
+    },
+    "title": "작품",
+    "summary": "{files}개의 파일 · {creations}건의 작품 · {running}건 진행 중",
+    "empty": "작업을 찾을 수 없습니다",
+    "upload": {
+      "placeholder": "업로드가 준비되었습니다. 새 작업을 실행해 시작하세요."
+    },
+    "file": {
+      "idChip": "ID {id}",
+      "taskGroupLabel": "이 업로드의 작업",
+      "taskListTitle": "작업 ({count})",
+      "count": {
+        "one": "{count}건의 작품",
+        "other": "{count}건의 작품"
+      },
+      "collapse": "세부 정보 접기",
+      "expand": "세부 정보 펼치기"
+    },
+    "toast": {
+      "taskCreated": "작업이 생성되었습니다: {id}",
+      "createFailed": "작업 생성에 실패했습니다",
+      "cancelFailed": "작업 취소에 실패했습니다",
+      "deleteFailed": "작업 삭제에 실패했습니다"
+    },
+    "confirm": {
+      "delete": "이 작업과 상태가 영구적으로 삭제됩니다. 계속하시겠습니까?"
+    }
+  },
+  "search": {
+    "placeholder": "작업 검색...",
+    "submit": "검색"
+  },
+  "completed": {
+    "redirecting": "작업 상세로 이동하는 중…"
+  },
+  "processing": {
+    "title": "작품을 제작하는 중입니다",
+    "stop": "중지",
+    "errorsHeading": "발생한 오류",
+    "meta": {
+      "aria": "작업 세부 정보",
+      "locating": "(위치 확인 중…)",
+      "locatingHint": "파일 {id} 기준",
+      "taskId": "작업 ID",
+      "copyTaskId": "작업 ID 복사",
+      "file": "파일",
+      "configuration": "구성",
+      "languages": "언어",
+      "voiceLanguage": "🎤 {language}",
+      "subtitleLanguage": "📝 {language}",
+      "sameLanguage": "🎤📝 {language}",
+      "resolution": "해상도",
+      "features": "추가 기능",
+      "featuresList": {
+        "avatar": "아바타"
+      }
+    },
+    "file": {
+      "untitled": "제목 없음"
+    },
+    "stepsHeading": "처리 단계",
+    "metadataAria": "작업 메타데이터",
+    "progressLabel": "전체 진행률",
+    "progressStatus": "프레젠테이션을 생생하게 만드는 중입니다…",
+    "steps": {
+      "extract_slides": "슬라이드 추출 중",
+      "analyze_slide_images": "콘텐츠 분석 중",
+      "generate_transcripts": "원고 생성 중",
+      "revise_transcripts": "원고 수정 중",
+      "translate_voice_transcripts": "음성 원고 번역 중",
+      "translate_subtitle_transcripts": "자막 원고 번역 중",
+      "generate_subtitle_transcripts": "자막 원고 생성 중",
+      "generate_audio": "오디오 생성 중",
+      "generate_avatar_videos": "아바타 생성 중",
+      "convert_slides_to_images": "슬라이드를 이미지로 변환 중",
+      "generate_subtitles": "자막 생성 중",
+      "compose_video": "영상 합성 중",
+      "segment_pdf_content": "콘텐츠 구간 분할 중",
+      "revise_pdf_transcripts": "원고 수정 중",
+      "generate_pdf_chapter_images": "영상 프레임 생성 중",
+      "generate_pdf_audio": "오디오 생성 중",
+      "generate_pdf_subtitles": "자막 생성 중",
+      "generate_podcast_script": "팟캐스트 스크립트 생성 중",
+      "translate_podcast_script": "팟캐스트 스크립트 번역 중",
+      "generate_podcast_audio": "팟캐스트 오디오 생성 중",
+      "compose_podcast": "팟캐스트 합성 중",
+      "unknown": "초기화 중"
+    },
+    "preview": {
+      "videoEnabled": "영상 생성 사용",
+      "podcastEnabled": "팟캐스트 생성 사용"
+    },
+    "step": {
+      "translatingTranscripts": "원고 번역 중"
+    },
+    "modal": {
+      "title": "처리 세부 정보",
+      "close": "처리 세부 정보 닫기",
+      "openDetails": "처리 세부 정보 보기"
+    }
+  },
+  "uploading": {
+    "title": "프레젠테이션 업로드 중",
+    "status": "AI 변환을 위해 온텐츠를 준비하는 중입니다...",
+    "progress": "{progress}% 업로드됨",
+    "progressLabel": "업로드 진행률",
+    "summaryLabel": "업로드 요약",
+    "modeLabel": "모드",
+    "fileSizeLabel": "파일 크기",
+    "outputsLabel": "출력"
+  },
+  "upload": {
+    "modeToggle": {
+      "aria": "입력 모드"
+    },
+    "mode": {
+      "slides": "슬라이드",
+      "pdf": "PDF",
+      "slidesHeading": "슬라이드 모드:",
+      "slidesDescription": "각 슬라이드를 개별적으로 처리하여 원고, 오디오, 자막을 생성하고 최종 영상을 만듭니다.",
+      "pdfHeading": "PDF 모드:",
+      "pdfDescription": "문서를 챕터로 분할하여 영상(오디오+자막) 또는 2인 진행 팟캐스트(MP3)를 생성합니다."
+    },
+    "pdfOutput": {
+      "aria": "PDF 출력"
+    },
+    "file": {
+      "choosePdf": "PDF 파일 선택",
+      "chooseSlides": "PPTX/PPT 파일 선택",
+      "hintPdf": "PDF는 영상 또는 팟캐스트로 처리됩니다",
+      "hintSlides": "슬라이드는 내레이션 영상으로 처리됩니다",
+      "pdfBadge": "PDF",
+      "pdfDescription": "AI가 PDF를 분석해 내레이션과 자막이 포함된 매력적인 영상 챕터로 변환합니다.",
+      "pptBadge": "PPT",
+      "pptDescription": "AI가 슬라이드를 내레이션이 포함된 영상으로 변환합니다.",
+      "supportedBadge": "지원되는 파일",
+      "supportedDescription": "PDF, PPTX, PPT 파일을 지원합니다"
+    },
+    "summary": {
+      "file": "파일",
+      "size": "크기",
+      "output": "출력",
+      "status": "상태",
+      "uploading": "업로드 중",
+      "type": "유형",
+      "documentType": "문서 유형"
+    },
+    "notice": "AI가 생성한 콘텐츠에는 부정확한 내용이 포함될 수 있습니다. 반드시 확인하세요.",
+    "createPodcast": "팟캐스트 만들기",
+    "createVideo": "영상 만들기"
+  },
+  "footer": {
+    "slogan": "SlideSpeaker AI 제공 • 프레젠테이션을 걸작으로",
+    "queueUnavailable": "시스템 상태: 사용 불가",
+    "queueOk": "시스템 상태: 정상",
+    "queueTooltipUnavailable": "시스템 상태를 확인할 수 없습니다",
+    "queueTooltipOk": "시스템 상태가 정상입니다",
+    "queueTooltipLatency": "시스템 상태 정상 • {latency}ms",
+    "theme": {
+      "toggleLabel": "테마 전환",
+      "auto": "자동",
+      "light": "라이트",
+      "dark": "다크"
+    }
+  },
+  "pagination": {
+    "previous": "이전",
+    "next": "다음",
+    "page": "페이지 {page}"
+  },
+  "modal": {
+    "previewTitle": "미디어 미리보기"
+  },
+  "alerts": {
+    "previewUnavailable": "미리보기는 완료된 작업에서만 사용할 수 있습니다."
+  },
+  "videoPlayer": {
+    "noSupport": "사용 중인 브라우저는 video 태그를 지원하지 않습니다."
+  },
+  "errorBoundary": {
+    "unexpectedError": "예기치 않은 오류가 발생했습니다. 다시 시도하세요.",
+    "somethingWentWrong": "문제가 발생했습니다.",
+    "tryAgain": "다시 시도할까요?"
+  },
+  "errorDisplay": {
+    "processingFailed": "처리에 실패했습니다",
+    "processingError": "영상 생성 중 문제가 발생했습니다. 다른 파일로 다시 시도하세요.",
+    "tryAgain": "다시 시도"
+  }
+}

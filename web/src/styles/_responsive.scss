@@ -138,32 +138,6 @@
   }
 }
 
-/* Processing meta responsive adjustments */
-@media (max-width: 768px) {
-  .processing-meta {
-    grid-template-columns: 1fr;
-  }
-
-  .file-info-card {
-    margin: 0 1rem 2rem;
-    padding: 1.25rem;
-  }
-
-  .upload-section-header {
-    gap: 0.5rem;
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.5rem;
-  }
-
-  .upload-section-icon {
-    font-size: 1.1rem;
-  }
-
-  .upload-section-title {
-    font-size: 0.85rem;
-  }
-}
-
 /* Profile card responsive */
 @media (max-width: 768px) {
   .profile-card {

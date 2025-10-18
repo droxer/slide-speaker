@@ -7,7 +7,7 @@ import type { ProcessingDetails } from './types';
 import { getStepLabel } from '@/utils/stepLabels';
 import { useI18n } from '@/i18n/hooks';
 import { sortSteps } from '@/utils/stepOrdering';
-import { useTaskQuery } from '@/services/queries';
+import { useTaskQuery, prefetchTaskDetail } from '@/services/queries';
 
 type TaskProgressModalProps = {
   open: boolean;
@@ -207,6 +207,14 @@ const TaskProgressModal = ({
 }: TaskProgressModalProps) => {
   const { t } = useI18n();
 
+  // Prefetch related task data when the modal is opened
+  React.useEffect(() => {
+    if (open && task?.task_id) {
+      // Prefetch task details for better performance when user navigates to task detail page
+      prefetchTaskDetail(undefined as any, task.task_id);
+    }
+  }, [open, task?.task_id]);
+
   // Use task query with polling for active tasks
   const shouldPoll = open && task?.task_id &&
     (task.status === 'processing' || task.status === 'queued' || task.status === 'pending');
@@ -217,6 +225,8 @@ const TaskProgressModal = ({
     shouldPoll ? {
       refetchInterval: 3000, // Poll every 3 seconds for active tasks
       staleTime: 2000, // Consider data stale after 2 seconds when polling
+      // Disable polling when page is not visible to enable bfcache
+      refetchIntervalInBackground: false,
     } : undefined
   );
 
@@ -468,14 +478,30 @@ const TaskProgressModal = ({
 
   const modalTitle = t('processing.modal.title', undefined, 'Processing details');
   const closeLabel = t('processing.modal.close', undefined, 'Close processing details');
+  const displayFileName =
+    details?.filename ||
+    task.filename ||
+    task.state?.filename ||
+    task.kwargs?.filename ||
+    t('processing.file.untitled', undefined, 'Untitled');
+  const shortTaskId = task.task_id
+    ? `${task.task_id.slice(0, 6)}…${task.task_id.slice(-4)}`
+    : null;
 
   return (
     <div className="processing-modal" role="dialog" aria-modal="true" aria-labelledby="processing-modal-title" onClick={onClose}>
       <div className="processing-modal__content" role="document" onClick={(event) => event.stopPropagation()}>
         <header className="processing-modal__header">
           <div className="processing-modal__title">
-            <span aria-hidden>⚙️</span>
-            <span id="processing-modal-title">{modalTitle}</span>
+            <span aria-hidden="true">⚙️</span>
+            <span id="processing-modal-title">
+             {displayFileName}
+            </span>
+            {shortTaskId && (
+              <span className="processing-modal__subtitle">
+                {t('processing.meta.taskId', undefined, 'Task ID')}: {shortTaskId}
+              </span>
+            )}
           </div>
           <button
             type="button"

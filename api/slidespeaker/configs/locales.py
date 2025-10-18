@@ -25,6 +25,11 @@ class LocaleUtils:
     }
 
     LOCALE_LANGUAGE_MAP = {v: k for k, v in LANGUAGE_LOCALE_MAP.items()}
+    _LANGUAGE_LOOKUP = {
+        key.lower().replace("_", "-"): value
+        for key, value in LANGUAGE_LOCALE_MAP.items()
+    }
+    _LOCALE_LOOKUP = {key.lower().replace("_", "-"): key for key in LOCALE_LANGUAGE_MAP}
 
     LANGUAGE_DISPLAY_NAMES = {
         "english": "English",
@@ -45,23 +50,46 @@ class LocaleUtils:
 
     @classmethod
     def get_locale_code(cls, language: str) -> str:
-        code = cls.LANGUAGE_LOCALE_MAP.get(language.lower(), "en")
+        if not language:
+            return "en"
+        normalized = language.strip()
+        key = normalized.lower().replace("_", "-")
+        if key in cls._LANGUAGE_LOOKUP:
+            code = cls._LANGUAGE_LOOKUP[key]
+        elif key in cls._LOCALE_LOOKUP:
+            code = cls._LOCALE_LOOKUP[key]
+        else:
+            code = "en"
         logger.debug(f"Converted language '{language}' to locale code '{code}'")
         return code
 
     @classmethod
     def get_language_name(cls, locale_code: str) -> str:
-        language = cls.LOCALE_LANGUAGE_MAP.get(locale_code, "english")
+        if not locale_code:
+            return "english"
+        key = locale_code.strip()
+        lookup = cls.LOCALE_LANGUAGE_MAP.get(key)
+        if lookup:
+            language = lookup
+        else:
+            lowered = key.lower().replace("_", "-")
+            language = cls.LOCALE_LANGUAGE_MAP.get(
+                cls._LOCALE_LOOKUP.get(lowered, ""), "english"
+            )
         logger.debug(f"Converted locale code '{locale_code}' to language '{language}'")
         return language
 
     @classmethod
     def get_display_name(cls, language: str) -> str:
-        return cls.LANGUAGE_DISPLAY_NAMES.get(language.lower(), language.title())
+        canonical = cls.normalize_language(language)
+        return cls.LANGUAGE_DISPLAY_NAMES.get(canonical, canonical.title())
 
     @classmethod
     def validate_language(cls, language: str) -> bool:
-        return language.lower() in cls.LANGUAGE_LOCALE_MAP
+        if not language:
+            return False
+        normalized = language.lower().replace("_", "-")
+        return normalized in cls._LANGUAGE_LOOKUP or normalized in cls._LOCALE_LOOKUP
 
     @classmethod
     def get_supported_languages(cls) -> list[dict[str, str]]:
@@ -80,8 +108,17 @@ class LocaleUtils:
     def normalize_language(cls, language: str | None) -> str:
         if not language:
             return "english"
-        normalized = language.lower().strip()
-        return normalized if normalized in cls.LANGUAGE_LOCALE_MAP else "english"
+        normalized = language.strip()
+        lowered = normalized.lower().replace("_", "-")
+        if lowered in cls._LANGUAGE_LOOKUP:
+            # Map back to canonical language key (with underscores)
+            for key in cls.LANGUAGE_LOCALE_MAP:
+                if key.lower().replace("_", "-") == lowered:
+                    return key
+        if lowered in cls._LOCALE_LOOKUP:
+            locale = cls._LOCALE_LOOKUP[lowered]
+            return cls.LOCALE_LANGUAGE_MAP.get(locale, "english")
+        return "english"
 
 
 locale_utils = LocaleUtils()

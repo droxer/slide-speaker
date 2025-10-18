@@ -169,19 +169,14 @@ class OSSStorage(StorageProvider):
                 ct = "image/jpeg"
 
             # Build response override params when requested
+            # Note: OSS doesn't allow overriding content-type in signed URLs
             params = None
-            if content_disposition or (ct and not key_lower.endswith(".mp4")):
+            if content_disposition:
                 params = {}
-                if content_disposition:
-                    params["response-content-disposition"] = content_disposition
-                elif not key_lower.endswith(".mp4"):
-                    # Default to inline for non-mp4 when not specified
-                    filename = Path(object_key).name
-                    params["response-content-disposition"] = (
-                        f"inline; filename={filename}"
-                    )
-                if ct:
-                    params["response-content-type"] = ct
+                params["response-content-disposition"] = content_disposition
+            # OSS doesn't allow overriding content-type in signed URLs
+            # Content-Type is automatically inferred from file extension
+            # The content_type parameter is ignored for OSS to prevent header override errors
 
             url: str = (
                 self.bucket.sign_url("GET", object_key, expires_in, params=params)

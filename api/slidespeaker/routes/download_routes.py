@@ -7,7 +7,7 @@ and subtitle files. It handles file serving with appropriate content types and h
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from slidespeaker.auth import require_authenticated_user
 from slidespeaker.storage.paths import output_object_key
@@ -30,7 +30,21 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
     """
     from .download_helpers import check_file_exists
 
-    file_id = await file_id_from_task(task_id)
+    file_id: str | None = None
+    try:
+        file_id = await file_id_from_task(task_id)
+    except HTTPException as exc:
+        if exc.status_code not in (400, 403, 404):
+            raise
+    if not file_id:
+        try:
+            from slidespeaker.core.state_manager import state_manager as sm
+
+            mapped = await sm.get_file_id_by_task(task_id)
+            if mapped:
+                file_id = mapped
+        except Exception:
+            pass
     items: list[dict[str, Any]] = []
 
     # Get task information once to avoid duplicate queries
@@ -64,11 +78,11 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
     if task_type != "podcast":
         video_candidates = [
             output_object_key(task_id, "video", "final.mp4"),
-            output_object_key(file_id, "video", "final.mp4"),
             f"{task_id}.mp4",
-            f"{file_id}.mp4",
-            f"{file_id}_final.mp4",
         ]
+        if file_id:
+            video_candidates.insert(1, output_object_key(file_id, "video", "final.mp4"))
+            video_candidates.extend([f"{file_id}.mp4", f"{file_id}_final.mp4"])
         video_exists = any(check_file_exists(k) for k in video_candidates)
     else:
         video_exists = False
@@ -84,10 +98,16 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
 
     # Final audio - only for non-podcast tasks (podcast tasks use separate podcast endpoint)
     if task_type != "podcast":
-        audio_exists = any(
-            check_file_exists(k)
-            for k in final_audio_object_keys(file_id, task_id=task_id)
-        )
+        if file_id:
+            audio_keys = final_audio_object_keys(file_id, task_id=task_id)
+        else:
+            audio_keys = [
+                output_object_key(task_id, "audio", "final.mp3"),
+                f"{task_id}.mp3",
+                f"{task_id}_final_audio.mp3",
+                f"{task_id}_final.mp3",
+            ]
+        audio_exists = any(check_file_exists(k) for k in audio_keys)
         if audio_exists:
             items.append(
                 {
@@ -102,12 +122,12 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
         # Prefer structured outputs, fallback to legacy keys
         podcast_keys = [
             output_object_key(task_id, "podcast", "final.mp3"),
-            output_object_key(file_id, "podcast", "final.mp3"),
             f"{task_id}.mp3",
-            f"{file_id}.mp3",
             f"{task_id}_podcast.mp3",
-            f"{file_id}_podcast.mp3",
         ]
+        if file_id:
+            podcast_keys.insert(1, output_object_key(file_id, "podcast", "final.mp3"))
+            podcast_keys.extend([f"{file_id}.mp3", f"{file_id}_podcast.mp3"])
         podcast_exists = any(check_file_exists(k) for k in podcast_keys)
 
         if podcast_exists:
@@ -130,7 +150,7 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
         preferred_locales.append(locale_utils.get_locale_code(lang))
 
     # Fallback to state if DB lacked languages
-    if not preferred_locales:
+    if not preferred_locales and file_id:
         try:
             from slidespeaker.core.state_manager import state_manager as sm2
 
@@ -177,11 +197,16 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
         subtitle_candidates = [
             output_object_key(task_id, "subtitles", f"{loc}.vtt"),
             output_object_key(task_id, "subtitles", f"{loc}.srt"),
-            output_object_key(file_id, "subtitles", f"{loc}.vtt"),
-            output_object_key(file_id, "subtitles", f"{loc}.srt"),
             f"{task_id}_{loc}.vtt",
             f"{task_id}_{loc}.srt",
         ]
+        if file_id:
+            subtitle_candidates.insert(
+                2, output_object_key(file_id, "subtitles", f"{loc}.vtt")
+            )
+            subtitle_candidates.insert(
+                3, output_object_key(file_id, "subtitles", f"{loc}.srt")
+            )
         if any(check_file_exists(k) for k in subtitle_candidates):
             seen_locales.add(loc)
 

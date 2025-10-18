@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import {useMutation} from '@tanstack/react-query';
 import {useSession} from 'next-auth/react';
 import {useLocale, useTranslations} from 'next-intl';
 import {usePathname, useRouter} from '@/navigation';
@@ -12,12 +11,15 @@ import {
   localeToPreferredLanguage,
   type SupportedLanguage,
 } from '@/utils/localePreferences';
-import {updateCurrentUserProfile} from '@/services/client';
+import {useUpdateUserProfileMutation} from '@/services/queries';
 
 const localeLabels: Record<string, string> = {
   en: 'language.english',
   'zh-CN': 'language.simplified',
   'zh-TW': 'language.traditional',
+  ja: 'language.japanese',
+  ko: 'language.korean',
+  th: 'language.thai',
 };
 
 const LanguageToggle = () => {
@@ -42,25 +44,28 @@ const LanguageToggle = () => {
     return LANGUAGE_TO_LOCALE[preference];
   }, [session?.user?.preferred_language]);
 
-  const mutation = useMutation({
-    mutationFn: (preferredLanguage: SupportedLanguage) =>
-      updateCurrentUserProfile({preferred_language: preferredLanguage}),
-    onSuccess: (_, preferredLanguage) => {
-      pendingLocaleRef.current = null;
-      if (typeof updateSession === 'function') {
-        void updateSession({
-          ...(session ?? {}),
-          user: {
-            ...(session?.user ?? {}),
-            preferred_language: preferredLanguage,
-          },
-        } as any);
-      }
-    },
-    onError: () => {
-      pendingLocaleRef.current = null;
-    },
-  });
+  const mutation = useUpdateUserProfileMutation();
+  const updateProfile = mutation.mutate;
+
+  const handleUpdateProfile = (preferredLanguage: SupportedLanguage) => {
+    updateProfile({preferred_language: preferredLanguage}, {
+      onSuccess: (_, preferredLanguage) => {
+        pendingLocaleRef.current = null;
+        if (typeof updateSession === 'function') {
+          void updateSession({
+            ...(session ?? {}),
+            user: {
+              ...(session?.user ?? {}),
+              preferred_language: preferredLanguage,
+            },
+          } as any);
+        }
+      },
+      onError: () => {
+        pendingLocaleRef.current = null;
+      },
+    });
+  };
 
   React.useEffect(() => {
     if (!preferredLocale) {
@@ -94,7 +99,7 @@ const LanguageToggle = () => {
     router.replace(pathname, {locale: nextLocale});
     if (session?.user) {
       const nextLanguage = localeToPreferredLanguage(nextLocale);
-      mutation.mutate(nextLanguage);
+      handleUpdateProfile(nextLanguage);
     } else {
       pendingLocaleRef.current = null;
     }

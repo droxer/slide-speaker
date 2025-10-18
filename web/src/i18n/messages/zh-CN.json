@@ -54,7 +54,17 @@
     "disabled": "已停用",
     "copied": "已复制！",
     "latest": "最新",
-    "more": "更多"
+    "more": "更多",
+    "fileType": {
+      "document": "文档",
+      "pdfDocument": "PDF 文档",
+      "presentation": "演示文稿",
+      "spreadsheet": "电子表格",
+      "image": "图片",
+      "video": "视频",
+      "audio": "音频",
+      "textDocument": "文本文档"
+    }
   },
   "profile": {
     "title": "个人资料",
@@ -129,7 +139,14 @@
       "queuedMessage": "排队中 • 等待开始",
       "createdStamp": "创建时间：{timestamp}",
       "completedStamp": "完成时间：{timestamp}",
-      "statusAria": "状态：{status}"
+      "statusAria": "状态：{status}",
+      "type": {
+        "video": "视频",
+        "podcast": "播客",
+        "audio": "音频",
+        "both": "视频 + 播客",
+        "unknown": "任务"
+      }
     },
     "preview": {
       "watch": "观看",
@@ -271,7 +288,20 @@
     "meta": {
       "aria": "任务详情",
       "locating": "（定位中…）",
-      "locatingHint": "来源文件 {id}"
+      "locatingHint": "来源文件 {id}",
+      "taskId": "任务 ID",
+      "copyTaskId": "复制任务 ID",
+      "file": "文件",
+      "configuration": "配置",
+      "languages": "语言",
+      "voiceLanguage": "🎤 {language}",
+      "subtitleLanguage": "📝 {language}",
+      "sameLanguage": "🎤📝 {language}",
+      "resolution": "分辨率",
+      "features": "附加功能",
+      "featuresList": {
+        "avatar": "虚拟形象"
+      }
     },
     "file": {
       "untitled": "未命名"

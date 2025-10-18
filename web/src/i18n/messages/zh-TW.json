@@ -54,7 +54,17 @@
     "disabled": "已停用",
     "copied": "已複製！",
     "latest": "最新",
-    "more": "更多"
+    "more": "更多",
+    "fileType": {
+      "document": "文件",
+      "pdfDocument": "PDF 文件",
+      "presentation": "簡報",
+      "spreadsheet": "試算表",
+      "image": "圖片",
+      "video": "影片",
+      "audio": "音訊",
+      "textDocument": "文書檔案"
+    }
   },
   "profile": {
     "title": "個人資料",
@@ -129,7 +139,14 @@
       "queuedMessage": "排程中 • 等待開始",
       "createdStamp": "建立時間：{timestamp}",
       "completedStamp": "完成時間：{timestamp}",
-      "statusAria": "狀態：{status}"
+      "statusAria": "狀態：{status}",
+      "type": {
+        "video": "影片",
+        "podcast": "播客",
+        "audio": "音訊",
+        "both": "影片 + 播客",
+        "unknown": "任務"
+      }
     },
     "preview": {
       "watch": "觀看",
@@ -268,7 +285,20 @@
     "meta": {
       "aria": "任務詳情",
       "locating": "（定位中…）",
-      "locatingHint": "來源檔案 {id}"
+      "locatingHint": "來源檔案 {id}",
+      "taskId": "任務 ID",
+      "copyTaskId": "複製任務 ID",
+      "file": "檔案",
+      "configuration": "配置",
+      "languages": "語言",
+      "voiceLanguage": "🎤 {language}",
+      "subtitleLanguage": "📝 {language}",
+      "sameLanguage": "🎤📝 {language}",
+      "resolution": "解析度",
+      "features": "附加功能",
+      "featuresList": {
+        "avatar": "虛擬人像"
+      }
     },
     "file": {
       "untitled": "未命名"

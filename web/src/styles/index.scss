@@ -1,6 +1,9 @@
 // Core styles and reset
 @use './app.scss';
 
+// Font definitions
+@use './fonts.scss';
+
 // Theme styles
 @use './themes/light-theme.scss';
 @use './themes/dark-theme.scss';
@@ -11,3 +14,7 @@
 @use './components/TaskDashboard.scss';
 @use './components/TaskProgressModal.scss';
 @use './components/TaskProcessingSteps.scss';
+@use './components/LoadingPlaceholder.scss';
+
+// Page styles
+@use './pages/LoadingDemo.scss';

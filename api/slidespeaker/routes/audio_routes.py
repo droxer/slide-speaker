@@ -99,7 +99,7 @@ async def get_final_audio(file_id: str, request: Request) -> Any:
                 headers = build_headers(
                     request,
                     content_type="audio/mpeg",
-                    cache_control="no-cache, no-store, must-revalidate",
+                    cache_control="public, max-age=300, must-revalidate",
                 )
                 headers["Location"] = url
                 return Response(status_code=307, headers=headers)
@@ -191,7 +191,7 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
                                 request,
                                 content_type="audio/mpeg",
                                 content_length=length,
-                                cache_control="no-cache, no-store, must-revalidate",
+                                cache_control="public, max-age=300, must-revalidate",
                             )
                             headers["Content-Range"] = (
                                 f"bytes {start}-{end}/{file_size}"
@@ -230,16 +230,22 @@ async def get_final_audio_by_task(task_id: str, request: Request) -> Any:
                         None,
                         origin=origin,
                     )
-                url = sp.get_file_url(
-                    found_key,
-                    expires_in=300,
-                    content_disposition=f"inline; filename=presentation_{task_id}.mp3",
-                    content_type="audio/mpeg",
-                )
+                # For OSS storage, avoid setting content_type to prevent header override errors
+                get_file_url_kwargs = {
+                    "object_key": found_key,
+                    "expires_in": 300,
+                    "content_disposition": f"inline; filename=presentation_{task_id}.mp3",
+                }
+
+                # Only set content_type for non-OSS providers
+                if config.storage_provider != "oss":
+                    get_file_url_kwargs["content_type"] = "audio/mpeg"
+
+                url = sp.get_file_url(**get_file_url_kwargs)
                 headers = build_headers(
                     request,
                     content_type="audio/mpeg",
-                    cache_control="no-cache, no-store, must-revalidate",
+                    cache_control="public, max-age=300, must-revalidate",
                 )
                 headers["Location"] = url
                 return Response(status_code=307, headers=headers)
@@ -281,12 +287,18 @@ async def download_final_audio_by_task(task_id: str, request: Request) -> Any:
         )
 
     # Cloud: redirect with attachment disposition
-    url = sp.get_file_url(
-        object_key,
-        expires_in=600,
-        content_disposition=f"attachment; filename=presentation_{task_id}.mp3",
-        content_type="audio/mpeg",
-    )
+    # For OSS storage, avoid setting content_type to prevent header override errors
+    get_file_url_kwargs = {
+        "object_key": object_key,
+        "expires_in": 600,
+        "content_disposition": f"attachment; filename=presentation_{task_id}.mp3",
+    }
+
+    # Only set content_type for non-OSS providers
+    if config.storage_provider != "oss":
+        get_file_url_kwargs["content_type"] = "audio/mpeg"
+
+    url = sp.get_file_url(**get_file_url_kwargs)
     headers = {"Location": url}
     origin = request.headers.get("origin") or request.headers.get("Origin")
     if origin:

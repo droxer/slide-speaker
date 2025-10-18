@@ -108,7 +108,7 @@ const TaskCreationModal = ({ open, isPdf, defaults, onClose, onSubmit, filename,
       <div className="run-task-content" onClick={(e) => e.stopPropagation()} role="document">
         <div className="modal-header-bar" data-kind={taskType}>
           <div className="header-left">
-            <span className="header-icon" aria-hidden>{taskType === 'podcast' ? '🎧' : '🎬'}</span>
+            <span className="header-icon" aria-hidden="true">{taskType === 'podcast' ? '🎧' : '🎬'}</span>
             <span>{taskType === 'podcast' ? t('actions.generatePodcast') : t('actions.generateVideo')}</span>
           </div>
           <div className="header-right">

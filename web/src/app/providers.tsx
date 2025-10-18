@@ -8,6 +8,8 @@ import {queryClient} from '@/services/queryClient';
 import {ThemeProvider} from '@/theme/ThemeProvider';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import React from 'react';
+import { ErrorBoundaryWithI18n } from '@/components/ErrorBoundary';
 
 type ProvidersProps = {
   children: ReactNode;
@@ -19,7 +21,11 @@ export function Providers({children, session}: ProvidersProps) {
     <SessionProvider session={session}>
       <ThemeProvider>
         <QueryClientProvider client={queryClient}>
-          {children}
+          <ErrorBoundaryWithI18n>
+            <React.Suspense fallback={<div className="app-loading">Loading application...</div>}>
+              {children}
+            </React.Suspense>
+          </ErrorBoundaryWithI18n>
           <ToastContainer />
         </QueryClientProvider>
       </ThemeProvider>

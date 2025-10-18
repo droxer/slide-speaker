@@ -54,7 +54,17 @@
     "disabled": "Disabled",
     "copied": "Copied!",
     "latest": "Latest",
-    "more": "more"
+    "more": "more",
+    "fileType": {
+      "document": "Document",
+      "pdfDocument": "PDF Document",
+      "presentation": "Presentation",
+      "spreadsheet": "Spreadsheet",
+      "image": "Image",
+      "video": "Video",
+      "audio": "Audio",
+      "textDocument": "Text Document"
+    }
   },
   "profile": {
     "title": "Profile",
@@ -129,7 +139,14 @@
       "queuedMessage": "Queued • Waiting to start",
       "createdStamp": "Created: {timestamp}",
       "completedStamp": "Completed: {timestamp}",
-      "statusAria": "Status: {status}"
+      "statusAria": "Status: {status}",
+      "type": {
+        "video": "Video",
+        "podcast": "Podcast",
+        "audio": "Audio",
+        "both": "Video & Podcast",
+        "unknown": "Task"
+      }
     },
     "preview": {
       "watch": "Watch",
@@ -271,8 +288,17 @@
       "locatingHint": "from file {id}",
       "taskId": "Task ID",
       "copyTaskId": "Copy task ID",
+      "file": "File",
       "configuration": "Configuration",
-      "languages": "Languages"
+      "languages": "Languages",
+      "voiceLanguage": "🎤 {language}",
+      "subtitleLanguage": "📝 {language}",
+      "sameLanguage": "🎤📝 {language}",
+      "resolution": "Resolution",
+      "features": "Extras",
+      "featuresList": {
+        "avatar": "Avatar"
+      }
     },
     "file": {
       "untitled": "Untitled"

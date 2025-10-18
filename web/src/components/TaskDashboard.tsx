@@ -1,19 +1,22 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, useRef, lazy, Suspense } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { cancelRun as apiCancelRun, deleteTask as apiDeleteTask, purgeTask as apiPurgeTask, getHealth } from '../services/client';
 import type { UploadSummary } from '../services/client';
-import { useCancelTaskMutation, useFilesQuery, useRunFileTaskMutation, useSearchTasksQuery, useTaskQuery } from '../services/queries';
+import { useCancelTaskMutation, useFilesQuery, useRunFileTaskMutation, useSearchTasksQuery, useTaskQuery, prefetchTaskDetail, evictOldTaskQueries, evictOldListQueries } from '../services/queries';
 import { Link } from '@/navigation';
-import TaskCreationModal from './TaskCreationModal';
-import TaskProgressModal from './TaskProgressModal';
 import { getGlobalRunDefaults, saveGlobalRunDefaults } from '../utils/defaults';
 import type { Task } from '../types';
 import { useI18n } from '@/i18n/hooks';
 import { getLanguageDisplayName } from '../utils/language';
 import { getTaskStatusClass, getTaskStatusIcon, getTaskStatusLabel, type TaskStatus } from '@/utils/taskStatus';
 import { getFileTypeIcon, getFileTypeCategory, isPdf, isPowerPoint } from '@/utils/fileIcons';
+import { resolveTaskType } from '@/utils/taskType';
+
+// Lazy load non-critical modal components
+const TaskCreationModal = lazy(() => import('./TaskCreationModal'));
+const TaskProgressModal = lazy(() => import('./TaskProgressModal'));
 
 interface TaskDashboardProps { apiBaseUrl: string }
 
@@ -58,9 +61,43 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
   const [hiddenTasks, setHiddenTasks] = useState<Set<string>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [copiedTaskId, setCopiedTaskId] = useState<string | null>(null);
+  const [visibleCount, setVisibleCount] = useState(20); // Initial visible items for virtualization
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Periodically clean up old cache entries
+  useEffect(() => {
+    const interval = setInterval(() => {
+      evictOldTaskQueries(queryClient, 60); // Evict task detail queries older than 60 minutes
+      evictOldListQueries(queryClient, 30); // Evict list queries older than 30 minutes
+    }, 10 * 60 * 1000); // Run every 10 minutes
+
+    return () => clearInterval(interval);
+  }, [queryClient]);
 
   useEffect(() => { const t = setTimeout(() => setDebounced(search.trim()), 350); return () => clearTimeout(t); }, [search]);
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 2600); return () => clearTimeout(t); }, [toast]);
+
+  // Intersection Observer for infinite scrolling
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          // Load more items when user scrolls near the bottom
+          setVisibleCount((prev) => Math.min(prev + 10, 100)); // Cap at 100 items
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const sentinel = containerRef.current.querySelector('.pagination-sentinel');
+    if (sentinel) {
+      observer.observe(sentinel);
+    }
+
+    return () => observer.disconnect();
+  }, []);
 
   const formatFileName = useCallback((name?: string, max = 42): string => {
     if (!name) return t('common.unknownFile', undefined, 'Unknown file');
@@ -86,17 +123,29 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
 
   const filesQuery = useFilesQuery(
     { page, limit: 10, includeTasks: true, q: debounced || undefined },
-    { refetchInterval: (q: any) => {
+    {
+      refetchInterval: (q: any) => {
         const files = (q?.state?.data as any)?.files || [];
         const hasActive = files.some((f: any) => (f.tasks || []).some((t: Task) => t.status === 'processing' || t.status === 'queued'));
         return hasActive ? 15000 : false;
-      }, staleTime: 10000 },
+      },
+      staleTime: 2 * 60 * 1000, // 2 minutes for files data
+      // Disable polling when page is not visible to enable bfcache
+      refetchIntervalInBackground: false,
+    },
   );
   const searchQuery = useSearchTasksQuery(debounced);
   const searching = debounced.length > 0;
 
-  // Health indicator (Redis/DB)
-  const healthQuery = useQuery({ queryKey: ['health'], queryFn: getHealth, refetchInterval: 30000, staleTime: 20000 });
+  // Health indicator (Redis/DB) - with cleanup for bfcache compatibility
+  const healthQuery = useQuery({
+    queryKey: ['health'],
+    queryFn: getHealth,
+    refetchInterval: 30000,
+    staleTime: 20000,
+    // Disable polling when page is not visible to enable bfcache
+    refetchIntervalInBackground: false,
+  });
   const health = (healthQuery.data as any) || {};
   const overall = String(health.status || 'unknown');
   const redisOk = Boolean(health?.redis?.ok);
@@ -154,7 +203,8 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
       const runningCount = searchGroups.reduce((n, g) => n + filterHidden(g.tasks).filter((t) => t.status === 'processing').length, 0);
       return { filesCount, creationsCount, runningCount };
     }
-    const files = ((filesQuery.data as any)?.files || []) as Array<{ tasks?: Task[]; uploadOnly?: boolean }>;
+    const filesData = filesQuery.data as any;
+    const files = (filesData?.files || []) as Array<{ tasks?: Task[]; uploadOnly?: boolean }>;
     let filesCount = 0, creationsCount = 0, runningCount = 0;
     for (const f of files) {
       const tasks = filterHidden((f.tasks || []) as Task[]);
@@ -164,7 +214,7 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
       creationsCount += vis.length;
       runningCount += tasks.filter((t) => t.status === 'processing').length;
     }
-    return { filesCount, creationsCount, runningCount };
+    return { filesCount, creationsCount, runningCount, total: filesData?.total || 0 };
   }, [searching, searchGroups, filesQuery.data, status, hiddenTasks]);
 
   const STATUS_ORDER: TaskStatus[] = ['processing', 'queued', 'completed', 'failed', 'cancelled'];
@@ -309,7 +359,7 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
                 aria-expanded={!isCollapsed}
                 aria-controls={taskListId}
               >
-                <span className="file-header-toggle-icon" aria-hidden>
+                <span className="file-header-toggle-icon" aria-hidden="true">
                   {isCollapsed ? '▸' : '▾'}
                 </span>
                 <span className="file-header-toggle-label">
@@ -371,18 +421,15 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
         console.log('Cancelling task:', taskId);
         const result = await cancelMutation.mutateAsync(taskId);
         console.log('Cancel result:', result);
-        // Also invalidate the specific task query to ensure UI updates
-        await queryClient.invalidateQueries({ queryKey: ['task', taskId] });
-        // Also refetch the files query to ensure the task list updates
-        await queryClient.invalidateQueries({ queryKey: ['files'], exact: false });
-        console.log('Queries invalidated');
+        // The mutation now handles cache updates optimistically
+        console.log('Queries updated');
       }
       catch (error) {
         console.error('Failed to cancel task:', error);
         alert(t('creations.toast.cancelFailed', undefined, 'Failed to cancel task'));
       }
     },
-    [cancelMutation, queryClient, t],
+    [cancelMutation, t],
   );
 
   const onDelete = useCallback(
@@ -425,6 +472,7 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
           if (!old || !Array.isArray(old.tasks)) return old;
           return { ...old, tasks: old.tasks.filter((t: any) => t?.task_id !== taskId) };
         });
+        // Use the new query structure for invalidation
         await queryClient.invalidateQueries({ queryKey: ['tasks'] });
         await queryClient.invalidateQueries({ queryKey: ['files'] });
       } catch (error) {
@@ -435,8 +483,25 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
     [queryClient, t],
   );
 
+  const getTaskTypeInfo = useCallback(
+    (task: Task) => {
+      const { key: sanitized, fallbackLabel } = resolveTaskType(
+        task,
+        task.state as any,
+      );
+      const label = t(
+        `task.list.type.${sanitized}`,
+        undefined,
+        fallbackLabel,
+      );
+      return { typeKey: sanitized, label };
+    },
+    [t],
+  );
+
   const renderTaskItem = useCallback(
     (task: Task) => {
+      const { typeKey, label: typeLabel } = getTaskTypeInfo(task);
       const statusClass = getTaskStatusClass(task.status);
       const icon = getTaskStatusIcon(task.status);
       const label = getTaskStatusLabel(task.status, t);
@@ -525,25 +590,34 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
       }
 
       return (
-        <li key={task.task_id} className={`file-task ${statusClass}`}>
+        <li
+          key={task.task_id}
+          className={`file-task ${statusClass}`}
+          onMouseEnter={() => prefetchTaskDetail(queryClient, task.task_id)}
+        >
           <div className="file-task-header">
-            <Link
-              href={`/tasks/${task.task_id}`}
-              className="file-task-link"
-              title={t('task.list.openTaskTitle', { id: task.task_id }, `Open task ${task.task_id}`)}
-            >
-              <span className="file-task-icon" aria-hidden>
-                {icon}
-              </span>
-              <span
-                className={`file-task-id ${copiedTaskId === task.task_id ? 'copied' : ''}`}
-                onClick={(e) => handleCopyTaskId(task.task_id, e)}
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-                title={copiedTaskId === task.task_id ? t('common.copied', undefined, 'Copied!') : t('task.list.copyId', undefined, 'Copy task ID')}
+            <div className="file-task-heading">
+              <Link
+                href={`/tasks/${task.task_id}`}
+                className="file-task-link"
+                title={t('task.list.openTaskTitle', { id: task.task_id }, `Open task ${task.task_id}`)}
               >
-                {copiedTaskId === task.task_id ? '✓' : short}
+                <span className="file-task-icon" aria-hidden="true">
+                  {icon}
+                </span>
+                <span
+                  className={`file-task-id ${copiedTaskId === task.task_id ? 'copied' : ''}`}
+                  onClick={(e) => handleCopyTaskId(task.task_id, e)}
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                  title={copiedTaskId === task.task_id ? t('common.copied', undefined, 'Copied!') : t('task.list.copyId', undefined, 'Copy task ID')}
+                >
+                  {copiedTaskId === task.task_id ? '✓' : short}
+                </span>
+              </Link>
+              <span className={`file-task-type-badge type-${typeKey}`}>
+                {typeLabel}
               </span>
-            </Link>
+            </div>
             {task.status === 'processing' ? (
               <button
                 type="button"
@@ -607,12 +681,14 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
       formatTimestamp,
       getLanguageName,
       getResolutionName,
+      getTaskTypeInfo,
       onCancel,
       onDelete,
       setProcessingTask,
       t,
       copiedTaskId,
       handleCopyTaskId,
+      queryClient,
     ],
   );
 
@@ -632,9 +708,11 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
       if (!searchGroups.length) {
         return <div className="no-tasks">{t('creations.empty', undefined, 'No tasks found')}</div>;
       }
+      // Apply virtualization for search results
+      const visibleGroups = searchGroups.slice(0, visibleCount);
       return (
         <div className="file-groups">
-          {searchGroups.map((g, idx) =>
+          {visibleGroups.map((g, idx) =>
             renderFileGroup(
               {
                 upload_id: g.upload_id,
@@ -647,6 +725,9 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
               g.upload_id || g.filename || `search-${idx}`,
             ),
           )}
+          {searchGroups.length > visibleCount && (
+            <div className="pagination-sentinel" style={{ height: '20px' }} />
+          )}
         </div>
       );
     }
@@ -656,19 +737,29 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
       return <div className="no-tasks">{t('creations.empty', undefined, 'No tasks found')}</div>;
     }
 
+    // Apply virtualization for regular file list
+    const visibleFiles = files.slice(0, visibleCount);
     return (
       <div className="file-groups">
-        {files.map((f, idx) => renderFileGroup(f, f.upload_id || f.filename || `upload-${idx}`))}
+        {visibleFiles.map((f, idx) => renderFileGroup(f, f.upload_id || f.filename || `upload-${idx}`))}
+        {files.length > visibleCount && (
+          <div className="pagination-sentinel" style={{ height: '20px' }} />
+        )}
       </div>
     );
   };
 
   return (
-    <div className="task-monitor">
+    <div className="task-monitor" ref={containerRef}>
       {toast && <div className={`toast ${toast.type}`} role="status" aria-live="polite">{toast.message}</div>}
       <div className="monitor-header">
         <h2 className="ai-title">{t('creations.title', undefined, 'Creations')}</h2>
-        <div className="monitor-counts" aria-live="polite">{t('creations.summary', { files: counts.filesCount, creations: counts.creationsCount, running: counts.runningCount }, `${counts.filesCount} files · ${counts.creationsCount} creations · ${counts.runningCount} running`)}</div>
+        <div className="monitor-counts" aria-live="polite">
+          {t('creations.summary', { files: counts.filesCount, creations: counts.creationsCount, running: counts.runningCount }, `${counts.filesCount} files · ${counts.creationsCount} creations · ${counts.runningCount} running`)}
+          {counts.total > 0 && (
+            <span> · {counts.total} total</span>
+          )}
+        </div>
         <div className="monitor-controls">
           <form onSubmit={(e)=>{e.preventDefault(); setDebounced(search.trim());}} className="search-form">
             <input type="text" placeholder={t('search.placeholder')} value={search} onChange={(e)=>setSearch(e.target.value)} className="search-input" />
@@ -694,34 +785,38 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
         <button onClick={() => setPage(page + 1)} disabled={searching ? ((((searchQuery.data as any)?.tasks) || []).length < 10) : !((filesQuery.data as any)?.has_more)} className="page-button">{t('pagination.next')}</button>
       </div>
 
-      <TaskCreationModal
-        open={runOpen}
-        isPdf={!!runFile?.isPdf}
-        defaults={runDefaults}
-        filename={runFile?.filename}
-        submitting={runSubmitting}
-        onClose={() => setRunOpen(false)}
-        onSubmit={(payload) => {
-          if (!runFile?.upload_id) return;
-          setRunSubmitting(true);
-          saveGlobalRunDefaults({ voice_language: payload.voice_language, subtitle_language: payload.subtitle_language ?? null, transcript_language: payload.transcript_language ?? null, video_resolution: payload.video_resolution || 'hd' });
-          runFileTask.mutate(
-            { uploadId: runFile.upload_id, payload },
-            { onSuccess: (res: any) => {
-                setRunOpen(false);
-                setToast({ type: 'success', message: t('creations.toast.taskCreated', { id: res?.task_id || '' }, `Task created: ${res?.task_id || ''}`) });
-              },
-              onError: () => setToast({ type: 'error', message: t('creations.toast.createFailed', undefined, 'Failed to create task') }),
-              onSettled: () => setRunSubmitting(false) }
-          );
-        }}
-      />
-      <TaskProgressModal
-        open={Boolean(processingTask)}
-        task={processingModalTask ?? null}
-        onClose={() => setProcessingTask(null)}
-        onCancel={onCancel}
-      />
+      <Suspense fallback={<div className="modal-loading">Loading...</div>}>
+        <TaskCreationModal
+          open={runOpen}
+          isPdf={!!runFile?.isPdf}
+          defaults={runDefaults}
+          filename={runFile?.filename}
+          submitting={runSubmitting}
+          onClose={() => setRunOpen(false)}
+          onSubmit={(payload) => {
+            if (!runFile?.upload_id) return;
+            setRunSubmitting(true);
+            saveGlobalRunDefaults({ voice_language: payload.voice_language, subtitle_language: payload.subtitle_language ?? null, transcript_language: payload.transcript_language ?? null, video_resolution: payload.video_resolution || 'hd' });
+            runFileTask.mutate(
+              { uploadId: runFile.upload_id, payload },
+              { onSuccess: (res: any) => {
+                  setRunOpen(false);
+                  setToast({ type: 'success', message: t('creations.toast.taskCreated', { id: res?.task_id || '' }, `Task created: ${res?.task_id || ''}`) });
+                },
+                onError: () => setToast({ type: 'error', message: t('creations.toast.createFailed', undefined, 'Failed to create task') }),
+                onSettled: () => setRunSubmitting(false) }
+            );
+          }}
+        />
+      </Suspense>
+      <Suspense fallback={<div className="modal-loading">Loading...</div>}>
+        <TaskProgressModal
+          open={Boolean(processingTask)}
+          task={processingModalTask ?? null}
+          onClose={() => setProcessingTask(null)}
+          onCancel={onCancel}
+        />
+      </Suspense>
     </div>
   );
 };

@@ -15,10 +15,30 @@ import {
   type UploadPayload,
 } from '@/services/client';
 import {useQuery, useMutation, useQueryClient} from '@tanstack/react-query';
-import UploadPanel from '@/components/UploadPanel';
-import FileUploadingView from '@/components/FileUploadingView';
-import TaskProcessingSteps from '@/components/TaskProcessingSteps';
-import ErrorDisplay from '@/components/ErrorDisplay';
+import { prefetchTaskDetail } from '@/services/queries';
+import dynamic from 'next/dynamic';
+
+import LoadingPlaceholder from '@/components/LoadingPlaceholder';
+
+const UploadPanel = dynamic(() => import('@/components/UploadPanel'), {
+  ssr: false,
+  loading: () => <LoadingPlaceholder type="card" message="Loading upload panel..." />
+});
+
+const FileUploadingView = dynamic(() => import('@/components/FileUploadingView'), {
+  ssr: false,
+  loading: () => <LoadingPlaceholder type="card" message="Loading upload view..." />
+});
+
+const TaskProcessingSteps = dynamic(() => import('@/components/TaskProcessingSteps'), {
+  ssr: false,
+  loading: () => <LoadingPlaceholder type="card" message="Loading processing steps..." />
+});
+
+const ErrorDisplay = dynamic(() => import('@/components/ErrorDisplay'), {
+  ssr: false,
+  loading: () => <LoadingPlaceholder type="card" message="Loading error display..." />
+});
 import { showErrorToast } from '@/utils/toast';
 import { validateFile, getFileType, formatFileSize as formatFileSizeUtil } from '@/utils/fileValidation';
 import {getStepLabel} from '@/utils/stepLabels';
@@ -330,6 +350,8 @@ export function StudioWorkspace() {
       }
       if (response.task_id) {
         setTaskId(response.task_id);
+        // Prefetch task details for better performance when user navigates to task detail page
+        prefetchTaskDetail(queryClient, response.task_id);
       }
       clearUploadProgressTimer();
       setProgress(100);
@@ -358,6 +380,7 @@ export function StudioWorkspace() {
     videoResolution,
     voiceLanguage,
     t,
+    queryClient,
   ]);
 
   const cancelMutation = useMutation({
@@ -384,13 +407,15 @@ export function StudioWorkspace() {
       setProcessingDetails((prev) =>
         prev ? {...prev, status: 'cancelled', progress: 0} : prev,
       );
+      // Prefetch task details for better performance when user navigates to task detail page
+      prefetchTaskDetail(queryClient, taskId);
     } catch (error) {
       console.error('Failed to cancel task', error);
       showErrorToast(
         t('task.error.cancelFailed', undefined, 'Failed to cancel task. Please try again.'),
       );
     }
-  }, [cancelMutation, taskId, t]);
+  }, [cancelMutation, taskId, t, queryClient]);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
@@ -636,6 +661,8 @@ export function StudioWorkspace() {
     enabled: status === 'processing' && Boolean(taskId),
     refetchInterval: 3000,
     refetchOnWindowFocus: false,
+    // Disable polling when page is not visible to enable bfcache
+    refetchIntervalInBackground: false,
   });
 
   useEffect(() => {
@@ -678,9 +705,11 @@ export function StudioWorkspace() {
   useEffect(() => {
     if (status === 'completed' && taskId && !completionRedirectRef.current) {
       completionRedirectRef.current = true;
+      // Prefetch task details for better performance when user navigates to task detail page
+      prefetchTaskDetail(queryClient, taskId);
       router.push(`/tasks/${taskId}`, {locale});
     }
-  }, [status, taskId, router, locale]);
+  }, [status, taskId, router, locale, queryClient]);
 
   useEffect(() => {
     const hydrateTaskId = async () => {
@@ -797,14 +826,14 @@ export function StudioWorkspace() {
 
           {status === 'completed' && taskId && !completionRedirectRef.current && (
             <div className="processing-view redirecting-view" role="status" aria-live="polite">
-              <div className="spinner" aria-hidden></div>
+              <div className="spinner" aria-hidden="true"></div>
               <h3>{t('completed.redirecting', undefined, 'Opening task details…')}</h3>
             </div>
           )}
 
           {status === 'cancelled' && (
             <div className="processing-view cancelled-view" role="status" aria-live="polite">
-              <div className="status-icon cancelled" aria-hidden>🚫</div>
+              <div className="status-icon cancelled" aria-hidden="true">🚫</div>
               <h3>{t('task.status.cancelled', undefined, 'Task Cancelled')}</h3>
               <p>{t('task.cancelled.description', undefined, 'The task has been successfully cancelled.')}</p>
               <button onClick={resetForm} className="primary-btn">

@@ -11,6 +11,9 @@ const LANGUAGE_TO_LOCALE: Record<string, Locale> = {
   english: 'en',
   simplified_chinese: 'zh-CN',
   traditional_chinese: 'zh-TW',
+  japanese: 'ja',
+  korean: 'ko',
+  thai: 'th',
 };
 
 const normalizeLanguage = (value: string | null | undefined): keyof typeof LANGUAGE_TO_LOCALE => {

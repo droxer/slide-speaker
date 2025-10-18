@@ -161,10 +161,27 @@
   flex: 1 1 auto;
 }
 
+/* Podcast speaker highlighting */
+.podcast-speaker {
+  font-weight: 700;
+  color: #4f46e5; /* brand color for speakers */
+  margin-right: 4px;
+}
+
+.podcast-content {
+  color: #0f172a; /* text primary */
+}
+
 /* Emphasize timestamp for active row */
 .audio-transcript-row.active .audio-transcript-ts {
   background: #c7d2fe; /* brand-tinted badge */
   color: #1e3a8a;
+}
+
+/* Highlight active podcast speaker */
+.audio-transcript-row.active .podcast-speaker {
+  color: #3730a3; /* darker brand color for active speaker */
+  text-decoration: underline;
 }
 
 /* Ensure audio players and transcripts fill available width in Completed/Modal views */
@@ -269,14 +286,14 @@
     line-height: 1.6;
     padding: 16px 24px;
     border-radius: 8px;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     font-weight: 600;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9);
   }
   &::cue(v) {
     background: rgba(0, 0, 0, 0.95);
     color: #ffffff;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-weight: 500;
   }
 
