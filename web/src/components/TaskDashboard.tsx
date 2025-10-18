@@ -12,6 +12,7 @@ import { useI18n } from '@/i18n/hooks';
 import { getLanguageDisplayName } from '../utils/language';
 import { getTaskStatusClass, getTaskStatusIcon, getTaskStatusLabel, type TaskStatus } from '@/utils/taskStatus';
 import { getFileTypeIcon, getFileTypeCategory, isPdf, isPowerPoint } from '@/utils/fileIcons';
+import { resolveTaskType } from '@/utils/taskType';
 
 // Lazy load non-critical modal components
 const TaskCreationModal = lazy(() => import('./TaskCreationModal'));
@@ -482,8 +483,25 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
     [queryClient, t],
   );
 
+  const getTaskTypeInfo = useCallback(
+    (task: Task) => {
+      const { key: sanitized, fallbackLabel } = resolveTaskType(
+        task,
+        task.state as any,
+      );
+      const label = t(
+        `task.list.type.${sanitized}`,
+        undefined,
+        fallbackLabel,
+      );
+      return { typeKey: sanitized, label };
+    },
+    [t],
+  );
+
   const renderTaskItem = useCallback(
     (task: Task) => {
+      const { typeKey, label: typeLabel } = getTaskTypeInfo(task);
       const statusClass = getTaskStatusClass(task.status);
       const icon = getTaskStatusIcon(task.status);
       const label = getTaskStatusLabel(task.status, t);
@@ -578,23 +596,28 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
           onMouseEnter={() => prefetchTaskDetail(queryClient, task.task_id)}
         >
           <div className="file-task-header">
-            <Link
-              href={`/tasks/${task.task_id}`}
-              className="file-task-link"
-              title={t('task.list.openTaskTitle', { id: task.task_id }, `Open task ${task.task_id}`)}
-            >
-              <span className="file-task-icon" aria-hidden="true">
-                {icon}
-              </span>
-              <span
-                className={`file-task-id ${copiedTaskId === task.task_id ? 'copied' : ''}`}
-                onClick={(e) => handleCopyTaskId(task.task_id, e)}
-                style={{ cursor: 'pointer', userSelect: 'none' }}
-                title={copiedTaskId === task.task_id ? t('common.copied', undefined, 'Copied!') : t('task.list.copyId', undefined, 'Copy task ID')}
+            <div className="file-task-heading">
+              <Link
+                href={`/tasks/${task.task_id}`}
+                className="file-task-link"
+                title={t('task.list.openTaskTitle', { id: task.task_id }, `Open task ${task.task_id}`)}
               >
-                {copiedTaskId === task.task_id ? '✓' : short}
+                <span className="file-task-icon" aria-hidden="true">
+                  {icon}
+                </span>
+                <span
+                  className={`file-task-id ${copiedTaskId === task.task_id ? 'copied' : ''}`}
+                  onClick={(e) => handleCopyTaskId(task.task_id, e)}
+                  style={{ cursor: 'pointer', userSelect: 'none' }}
+                  title={copiedTaskId === task.task_id ? t('common.copied', undefined, 'Copied!') : t('task.list.copyId', undefined, 'Copy task ID')}
+                >
+                  {copiedTaskId === task.task_id ? '✓' : short}
+                </span>
+              </Link>
+              <span className={`file-task-type-badge type-${typeKey}`}>
+                {typeLabel}
               </span>
-            </Link>
+            </div>
             {task.status === 'processing' ? (
               <button
                 type="button"
@@ -658,6 +681,7 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
       formatTimestamp,
       getLanguageName,
       getResolutionName,
+      getTaskTypeInfo,
       onCancel,
       onDelete,
       setProcessingTask,

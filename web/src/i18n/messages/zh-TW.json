@@ -139,7 +139,14 @@
       "queuedMessage": "排程中 • 等待開始",
       "createdStamp": "建立時間：{timestamp}",
       "completedStamp": "完成時間：{timestamp}",
-      "statusAria": "狀態：{status}"
+      "statusAria": "狀態：{status}",
+      "type": {
+        "video": "影片",
+        "podcast": "播客",
+        "audio": "音訊",
+        "both": "影片 + 播客",
+        "unknown": "任務"
+      }
     },
     "preview": {
       "watch": "觀看",
@@ -281,11 +288,17 @@
       "locatingHint": "來源檔案 {id}",
       "taskId": "任務 ID",
       "copyTaskId": "複製任務 ID",
+      "file": "檔案",
       "configuration": "配置",
       "languages": "語言",
       "voiceLanguage": "🎤 {language}",
       "subtitleLanguage": "📝 {language}",
-      "sameLanguage": "🎤📝 {language}"
+      "sameLanguage": "🎤📝 {language}",
+      "resolution": "解析度",
+      "features": "附加功能",
+      "featuresList": {
+        "avatar": "虛擬人像"
+      }
     },
     "file": {
       "untitled": "未命名"

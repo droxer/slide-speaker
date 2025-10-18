@@ -1496,6 +1496,13 @@
     gap: 10px;
   }
 
+  .file-task-heading {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
   .file-task-link {
     display: inline-flex;
     align-items: center;
@@ -1538,6 +1545,45 @@
   .file-task-status.status-completed { border-color: #4ade80; background: #dcfce7; color: #166534; }
   .file-task-status.status-failed { border-color: #fca5a5; background: #fee2e2; color: #b91c1c; }
   .file-task-status.status-cancelled { border-color: #cbd5f5; background: #e2e8f0; color: #475569; }
+
+  .file-task-type-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    background: rgba(241, 245, 249, 0.85);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.25px;
+    white-space: nowrap;
+    color: #0f172a;
+  }
+  .file-task-type-badge.type-video {
+    background: #dbeafe;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+  }
+  .file-task-type-badge.type-podcast {
+    background: #ede9fe;
+    border-color: #c4b5fd;
+    color: #6b21a8;
+  }
+  .file-task-type-badge.type-both {
+    background: #ccfbf1;
+    border-color: #5eead4;
+    color: #0f766e;
+  }
+  .file-task-type-badge.type-audio {
+    background: #fef3c7;
+    border-color: #facc15;
+    color: #b45309;
+  }
+  .file-task-type-badge.type-unknown {
+    background: rgba(226, 232, 240, 0.6);
+    border-color: rgba(148, 163, 184, 0.45);
+    color: #475569;
+  }
 
   .file-task-meta {
     display: flex;

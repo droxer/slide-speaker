@@ -139,7 +139,14 @@
       "queuedMessage": "待機中 • 開始を待っています",
       "createdStamp": "作成: {timestamp}",
       "completedStamp": "完了: {timestamp}",
-      "statusAria": "ステータス: {status}"
+      "statusAria": "ステータス: {status}",
+      "type": {
+        "video": "動画",
+        "podcast": "ポッドキャスト",
+        "audio": "音声",
+        "both": "動画とポッドキャスト",
+        "unknown": "タスク"
+      }
     },
     "preview": {
       "watch": "視聴",
@@ -281,11 +288,17 @@
       "locatingHint": "ファイル {id} より",
       "taskId": "タスクID",
       "copyTaskId": "タスクIDをコピー",
+      "file": "ファイル",
       "configuration": "設定",
       "languages": "言語",
       "voiceLanguage": "🎤 {language}",
       "subtitleLanguage": "📝 {language}",
-      "sameLanguage": "🎤📝 {language}"
+      "sameLanguage": "🎤📝 {language}",
+      "resolution": "解像度",
+      "features": "追加機能",
+      "featuresList": {
+        "avatar": "アバター"
+      }
     },
     "file": {
       "untitled": "無題"

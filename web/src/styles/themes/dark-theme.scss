@@ -1583,21 +1583,22 @@ body.dark-theme .processing-transcript {
   }
 }
 
-body.dark-theme .processing-meta .meta-card {
+body.dark-theme .processing-summary__row {
   background: var(--dark-surface-alt) !important;
   border-color: var(--dark-border) !important;
+}
 
-  .meta-text {
-    color: var(--dark-text) !important;
-  }
+body.dark-theme .processing-summary__value {
+  color: var(--dark-text) !important;
+}
 
-  .meta-label {
-    color: var(--dark-text-muted) !important;
-  }
+body.dark-theme .processing-summary__hint {
+  color: var(--dark-text-muted) !important;
+}
 
-  .meta-code {
-    color: var(--dark-text-muted) !important;
-  }
+body.dark-theme .processing-summary__copy {
+  color: var(--dark-text) !important;
+  border-color: var(--dark-border) !important;
 }
 
 body.dark-theme .processing-status {

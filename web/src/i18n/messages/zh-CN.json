@@ -139,7 +139,14 @@
       "queuedMessage": "排队中 • 等待开始",
       "createdStamp": "创建时间：{timestamp}",
       "completedStamp": "完成时间：{timestamp}",
-      "statusAria": "状态：{status}"
+      "statusAria": "状态：{status}",
+      "type": {
+        "video": "视频",
+        "podcast": "播客",
+        "audio": "音频",
+        "both": "视频 + 播客",
+        "unknown": "任务"
+      }
     },
     "preview": {
       "watch": "观看",
@@ -284,11 +291,17 @@
       "locatingHint": "来源文件 {id}",
       "taskId": "任务 ID",
       "copyTaskId": "复制任务 ID",
+      "file": "文件",
       "configuration": "配置",
       "languages": "语言",
       "voiceLanguage": "🎤 {language}",
       "subtitleLanguage": "📝 {language}",
-      "sameLanguage": "🎤📝 {language}"
+      "sameLanguage": "🎤📝 {language}",
+      "resolution": "分辨率",
+      "features": "附加功能",
+      "featuresList": {
+        "avatar": "虚拟形象"
+      }
     },
     "file": {
       "untitled": "未命名"

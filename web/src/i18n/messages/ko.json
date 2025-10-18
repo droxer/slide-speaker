@@ -139,7 +139,14 @@
       "queuedMessage": "대기 중 • 시작을 기다리는 중",
       "createdStamp": "생성: {timestamp}",
       "completedStamp": "완료: {timestamp}",
-      "statusAria": "상태: {status}"
+      "statusAria": "상태: {status}",
+      "type": {
+        "video": "영상",
+        "podcast": "팟캐스트",
+        "audio": "오디오",
+        "both": "영상 및 팟캐스트",
+        "unknown": "작업"
+      }
     },
     "preview": {
       "watch": "시청",
@@ -281,11 +288,17 @@
       "locatingHint": "파일 {id} 기준",
       "taskId": "작업 ID",
       "copyTaskId": "작업 ID 복사",
+      "file": "파일",
       "configuration": "구성",
       "languages": "언어",
       "voiceLanguage": "🎤 {language}",
       "subtitleLanguage": "📝 {language}",
-      "sameLanguage": "🎤📝 {language}"
+      "sameLanguage": "🎤📝 {language}",
+      "resolution": "해상도",
+      "features": "추가 기능",
+      "featuresList": {
+        "avatar": "아바타"
+      }
     },
     "file": {
       "untitled": "제목 없음"

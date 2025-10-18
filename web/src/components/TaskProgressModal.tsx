@@ -478,6 +478,15 @@ const TaskProgressModal = ({
 
   const modalTitle = t('processing.modal.title', undefined, 'Processing details');
   const closeLabel = t('processing.modal.close', undefined, 'Close processing details');
+  const displayFileName =
+    details?.filename ||
+    task.filename ||
+    task.state?.filename ||
+    task.kwargs?.filename ||
+    t('processing.file.untitled', undefined, 'Untitled');
+  const shortTaskId = task.task_id
+    ? `${task.task_id.slice(0, 6)}…${task.task_id.slice(-4)}`
+    : null;
 
   return (
     <div className="processing-modal" role="dialog" aria-modal="true" aria-labelledby="processing-modal-title" onClick={onClose}>
@@ -485,7 +494,14 @@ const TaskProgressModal = ({
         <header className="processing-modal__header">
           <div className="processing-modal__title">
             <span aria-hidden="true">⚙️</span>
-            <span id="processing-modal-title">{modalTitle}</span>
+            <span id="processing-modal-title">
+             {displayFileName}
+            </span>
+            {shortTaskId && (
+              <span className="processing-modal__subtitle">
+                {t('processing.meta.taskId', undefined, 'Task ID')}: {shortTaskId}
+              </span>
+            )}
           </div>
           <button
             type="button"
