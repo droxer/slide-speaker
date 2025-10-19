@@ -30,8 +30,15 @@ const getInitialMode = (): ThemeMode => {
   return 'auto';
 };
 
-const getPreferredTheme = () =>
-  window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+const getPreferredTheme = () => {
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const prefersHighContrast = window.matchMedia && window.matchMedia('(prefers-contrast: more)').matches;
+
+  if (prefersHighContrast) {
+    return prefersDark ? 'high-contrast-dark' : 'high-contrast-light';
+  }
+  return prefersDark ? 'dark' : 'light';
+};
 
 const getPreferredHighContrast = () => {
   if (typeof window === 'undefined') return false;
@@ -42,9 +49,14 @@ const getPreferredHighContrast = () => {
 export function ThemeProvider({children}: {children: React.ReactNode}) {
   const initialMode = isBrowser ? getInitialMode() : 'auto';
   const [mode, setMode] = useState<ThemeMode>(initialMode);
-  const [theme, setThemeState] = useState<'light' | 'dark' | 'high-contrast-light' | 'high-contrast-dark'>(() =>
-    !isBrowser ? 'light' : initialMode === 'auto' ? getPreferredTheme() : (initialMode === 'high-contrast-light' || initialMode === 'high-contrast-dark' ? initialMode as 'high-contrast-light' | 'high-contrast-dark' : initialMode as 'light' | 'dark'),
-  );
+  const [theme, setThemeState] = useState<'light' | 'dark' | 'high-contrast-light' | 'high-contrast-dark'>(() => {
+    if (!isBrowser) return 'light';
+    if (initialMode === 'auto') return getPreferredTheme();
+    if (initialMode === 'high-contrast-light' || initialMode === 'high-contrast-dark') {
+      return initialMode as 'high-contrast-light' | 'high-contrast-dark';
+    }
+    return initialMode as 'light' | 'dark';
+  });
 
   useEffect(() => {
     if (!isBrowser) return;
@@ -54,8 +66,10 @@ export function ThemeProvider({children}: {children: React.ReactNode}) {
         setMode(stored as ThemeMode);
         if (stored === 'auto') {
           setThemeState(getPreferredTheme());
+        } else if (stored === 'high-contrast-light' || stored === 'high-contrast-dark') {
+          setThemeState(stored as 'high-contrast-light' | 'high-contrast-dark');
         } else {
-          setThemeState(stored as 'light' | 'dark' | 'high-contrast-light' | 'high-contrast-dark');
+          setThemeState(stored as 'light' | 'dark');
         }
       }
     } catch {
@@ -75,16 +89,46 @@ export function ThemeProvider({children}: {children: React.ReactNode}) {
   useEffect(() => {
     if (!isBrowser) return;
     const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const contrastMedia = window.matchMedia('(prefers-contrast: more)');
     if (mode !== 'auto') return;
+
     const listener = (event: MediaQueryListEvent) => {
-      setThemeState(event.matches ? 'dark' : 'light');
+      const prefersDark = event.matches;
+      const prefersHighContrast = contrastMedia.matches;
+
+      if (prefersHighContrast) {
+        setThemeState(prefersDark ? 'high-contrast-dark' : 'high-contrast-light');
+      } else {
+        setThemeState(prefersDark ? 'dark' : 'light');
+      }
     };
+
+    const contrastListener = (event: MediaQueryListEvent) => {
+      const prefersHighContrast = event.matches;
+      const prefersDark = media.matches;
+
+      if (prefersHighContrast) {
+        setThemeState(prefersDark ? 'high-contrast-dark' : 'high-contrast-light');
+      } else {
+        setThemeState(prefersDark ? 'dark' : 'light');
+      }
+    };
+
     if (media.addEventListener) {
       media.addEventListener('change', listener);
-      return () => media.removeEventListener('change', listener);
+      contrastMedia.addEventListener('change', contrastListener);
+      return () => {
+        media.removeEventListener('change', listener);
+        contrastMedia.removeEventListener('change', contrastListener);
+      };
     }
+
     media.addListener(listener);
-    return () => media.removeListener(listener);
+    contrastMedia.addListener(contrastListener);
+    return () => {
+      media.removeListener(listener);
+      contrastMedia.removeListener(contrastListener);
+    };
   }, [mode]);
 
   useEffect(() => {
