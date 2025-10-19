@@ -15,6 +15,11 @@ The project follows a modern microservices architecture with a Python FastAPI ba
 - Task monitoring and management
 - Real-time progress tracking
 - Watermark integration
+- WCAG 2.1 AA compliance with enhanced accessibility features
+- High contrast themes for both light and dark modes
+- Support for additional languages: Thai, Korean, and Japanese
+- Optimized task creation page and improved processing display
+- Enhanced web performance for better user experience
 
 ## Technology Stack
 
@@ -79,8 +84,9 @@ slide-speaker/
 │   ├── Makefile         # Development commands
 │   ├── package.json     # Node.js dependencies
 │   └── tsconfig.json    # TypeScript configuration
-├── docs/                # Documentation
-└── README.md            # Project overview and quick start
+├── docs/                           # Documentation
+├── high-contrast-themes-improvements.md  # Details about accessibility enhancements
+└── README.md                       # Project overview and quick start
 ```
 
 ## Development Environment Setup
@@ -175,6 +181,8 @@ The frontend is built with React and follows a component-based architecture:
    - UploadPanel: File upload interface
    - TaskProcessingSteps: Real-time processing visualization
    - Reusable media players (VideoPlayer, AudioPlayer, PodcastPlayer)
+   - Enhanced task creation page with improved usability
+   - Optimized task processing display for better user experience
 
 2. **Services** (`src/services/`)
    - API client for backend communication
@@ -189,6 +197,8 @@ The frontend is built with React and follows a component-based architecture:
    - SCSS modules for component styling
    - Theme support (Ultra-Flat, Subtle-Material, Classic)
    - Responsive design
+   - High contrast themes for both light and dark modes
+   - WCAG 2.1 AA compliance features
 
 ## Configuration
 
@@ -238,18 +248,21 @@ See `api/.env.example` for a complete list of configuration options.
 - SCSS files for styling with matching component names
 - Use React Query for data fetching
 - Keep functions small and well-typed
+- Internationalization support with locales: English, Chinese (Simplified/Traditional), Thai, Korean, and Japanese
 
-### Logging Best Practices
+### Performance and Optimization
 
-To reduce excessive logging output while maintaining visibility into important events:
+1. Implement web performance optimizations for enhanced user experience
+2. Optimize task processing algorithms for faster execution
+3. Reduce excessive logging output while maintaining visibility into important events:
 
-1. Use `logger.debug` for detailed information that's useful for troubleshooting but not needed in normal operation
-2. Use `logger.info` for important events that indicate progress or significant state changes
-3. Use `logger.warning` for recoverable issues that might need attention
-4. Use `logger.error` for unrecoverable errors that affect functionality
-5. Avoid logging sensitive information like API keys or user data
-6. Reduce the frequency of periodic status updates (e.g., from every 5 seconds to every 15-30 seconds)
-7. Remove redundant logging statements that provide the same information
+   - Use `logger.debug` for detailed information that's useful for troubleshooting but not needed in normal operation
+   - Use `logger.info` for important events that indicate progress or significant state changes
+   - Use `logger.warning` for recoverable issues that might need attention
+   - Use `logger.error` for unrecoverable errors that affect functionality
+   - Avoid logging sensitive information like API keys or user data
+   - Reduce the frequency of periodic status updates (e.g., from every 5 seconds to every 15-30 seconds)
+   - Remove redundant logging statements that provide the same information
 
 ### Testing
 - Backend: Use pytest for tests in `api/tests/`

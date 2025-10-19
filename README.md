@@ -19,6 +19,11 @@ SlideSpeaker is under active development. Expect rapid iteration, breaking chang
 - Responsive light, dark, and auto themes with per-user preferences
 - Global language switcher with localized UI labels and stored preferences
 - Hybrid authentication powered by NextAuth (Google OAuth + email/password) backed by FastAPI endpoints
+- WCAG 2.1 AA compliance with enhanced accessibility features
+- High contrast themes for both light and dark modes
+- Support for additional languages: Thai, Korean, and Japanese
+- Optimized task creation page and improved processing display
+- Enhanced web performance for better user experience
 
 ## 🚀 Quick Start
 
@@ -45,6 +50,19 @@ cd web
 pnpm install                 # Install dependencies (prefer pnpm)
 pnpm start                   # Start development server (port 3000)
 ```
+
+## ♿ Accessibility
+
+SlideSpeaker is committed to providing an inclusive experience for all users:
+- WCAG 2.1 AA compliance for web accessibility standards
+- High contrast themes available for both light and dark modes
+- Enhanced focus indicators for keyboard navigation
+- Screen reader friendly interface
+- Support for multiple languages to serve a diverse user base
+
+Visit:
+- `http://localhost:3000` - Web UI
+- `http://localhost:8000/docs` - API documentation
 
 Visit:
 - `http://localhost:3000` - Web UI
@@ -91,6 +109,7 @@ SlideSpeaker supports multiple storage backends:
 - [Installation Guide](docs/installation.md) - Detailed setup instructions
 - [API Documentation](docs/api.md) - Complete API reference
 - [Configuration](api/.env.example) - Environment variables reference
+- [High Contrast Themes Improvements](high-contrast-themes-improvements.md) - Details about accessibility enhancements
 
 ## 📄 License
 
