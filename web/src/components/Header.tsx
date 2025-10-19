@@ -84,7 +84,7 @@ const Header = ({ activeView, onNavigate }: HeaderProps) => {
   };
 
   return (
-    <header className="app-header">
+    <header className="app-header" role="banner">
       <div className="header-content">
         <div className="header-left">
           {status === 'loading' ? (

@@ -1,4 +1,8 @@
 {
+  "accessibility": {
+    "skipToMain": "Skip to main content",
+    "skipToNavigation": "Skip to navigation"
+  },
   "header": {
     "title": "SlideSpeaker AI",
     "subtitle": "Transform slides into AI-powered videos",
@@ -405,7 +409,8 @@
       "toggleLabel": "Theme toggle",
       "auto": "Auto",
       "light": "Light",
-      "dark": "Dark"
+      "dark": "Dark",
+      "highContrast": "High Contrast"
     }
   },
   "pagination": {

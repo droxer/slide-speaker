@@ -1,4 +1,8 @@
 {
+  "accessibility": {
+    "skipToMain": "跳转到主要内容",
+    "skipToNavigation": "跳转到导航"
+  },
   "header": {
     "title": "幻灯演说 AI",
     "subtitle": "将幻灯片转化为 AI 驱动的视频",
@@ -408,7 +412,8 @@
       "toggleLabel": "主题切换",
       "auto": "跟随系统",
       "light": "浅色",
-      "dark": "深色"
+      "dark": "深色",
+      "highContrast": "高对比度"
     }
   },
   "pagination": {

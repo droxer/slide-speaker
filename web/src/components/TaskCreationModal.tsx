@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { getLanguageDisplayName } from '../utils/language';
 import { useI18n } from '@/i18n/hooks';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 type RunTaskPayload = {
   task_type: 'video' | 'podcast';
@@ -47,6 +48,9 @@ const TaskCreationModal = ({ open, isPdf, defaults, onClose, onSubmit, filename,
   const [subLang, setSubLang] = useState<string | null>((defaults.subtitle_language as any) ?? null);
   const [transcriptLang, setTranscriptLang] = useState<string | null>((defaults.transcript_language as any) ?? null);
   const [resolution, setResolution] = useState<string>(defaults.video_resolution || 'hd');
+
+  // Use focus trap for the modal
+  const modalRef = useFocusTrap(open);
 
   useEffect(() => {
     if (!open) return;
@@ -105,7 +109,7 @@ const TaskCreationModal = ({ open, isPdf, defaults, onClose, onSubmit, filename,
 
   return (
     <div className="run-task-modal" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="run-task-content" onClick={(e) => e.stopPropagation()} role="document">
+      <div ref={modalRef} className="run-task-content" onClick={(e) => e.stopPropagation()} role="document">
         <div className="modal-header-bar" data-kind={taskType}>
           <div className="header-left">
             <span className="header-icon" aria-hidden="true">{taskType === 'podcast' ? '🎧' : '🎬'}</span>

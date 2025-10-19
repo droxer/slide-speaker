@@ -1,0 +1,39 @@
+/* Skip Links for Accessibility */
+.skip-links {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  z-index: 1000;
+  width: 100%;
+  text-align: center;
+  transition: top 0.3s ease;
+}
+
+.skip-links:focus-within {
+  top: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  padding: 10px 15px;
+  text-decoration: none;
+  font-weight: bold;
+  border-radius: 0 0 4px 4px;
+}
+
+.skip-link:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  left: auto;
+  top: auto;
+  z-index: 1000;
+}

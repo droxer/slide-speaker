@@ -9,6 +9,7 @@ import {useQueryClient} from '@tanstack/react-query';
 import dynamic from 'next/dynamic';
 
 import LoadingPlaceholder from '@/components/LoadingPlaceholder';
+import SkipLinks from '@/components/SkipLinks';
 
 const Header = dynamic(() => import('@/components/Header'), {
   ssr: false,
@@ -51,8 +52,13 @@ export function AppShell({activeView, onNavigate, initialHealth = null, children
 
   return (
     <div className="App">
-      <Header activeView={activeView} onNavigate={onNavigate} />
-      <main className="main-content">{children}</main>
+      <SkipLinks />
+      <nav id="navigation" role="navigation">
+        <Header activeView={activeView} onNavigate={onNavigate} />
+      </nav>
+      <main id="main-content" className="main-content" role="main">
+        {children}
+      </main>
       <Footer queueUnavailable={queueUnavailable} redisLatencyMs={redisLatencyMs} />
     </div>
   );

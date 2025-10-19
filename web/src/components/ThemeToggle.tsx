@@ -60,6 +60,18 @@ const ThemeToggle = ({className = '', ariaLabel}: ThemeToggleProps) => {
       >
         <span className="toggle-text">{t('footer.theme.dark')}</span>
       </button>
+      <button
+        type="button"
+        onClick={() => setTheme('high-contrast')}
+        className={`toggle-btn ${hydrated && mode === 'high-contrast' ? 'active' : ''}`}
+        title={t('footer.theme.highContrast', undefined, 'High Contrast')}
+        role="tab"
+        aria-selected={hydrated ? mode === 'high-contrast' : undefined}
+        aria-controls="high-contrast-theme-panel"
+        suppressHydrationWarning
+      >
+        <span className="toggle-text">{t('footer.theme.highContrast', undefined, 'High Contrast')}</span>
+      </button>
     </div>
   );
 };

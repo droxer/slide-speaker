@@ -1,0 +1,130 @@
+/* High Contrast Mode Styles */
+.high-contrast {
+  /* Increase overall contrast */
+  filter: contrast(1.2);
+
+  /* Enhanced focus indicators */
+  *:focus {
+    outline: 3px solid #000 !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Enhanced link styles */
+  a {
+    color: #000 !important;
+    text-decoration: underline !important;
+    font-weight: bold !important;
+
+    &:hover,
+    &:focus {
+      background-color: #000 !important;
+      color: #fff !important;
+    }
+  }
+
+  /* Enhanced button styles */
+  button,
+  .btn,
+  .primary-btn,
+  .secondary-btn {
+    border: 2px solid #000 !important;
+    background-color: #fff !important;
+    color: #000 !important;
+    font-weight: bold !important;
+
+    &:hover,
+    &:focus {
+      background-color: #000 !important;
+      color: #fff !important;
+    }
+
+    &:disabled {
+      border-color: #666 !important;
+      color: #666 !important;
+      background-color: #ccc !important;
+    }
+  }
+
+  /* Enhanced form elements */
+  input,
+  select,
+  textarea {
+    border: 2px solid #000 !important;
+    background-color: #fff !important;
+    color: #000 !important;
+
+    &:focus {
+      border-color: #000 !important;
+      box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.3) !important;
+    }
+  }
+
+  /* Enhanced status indicators */
+  .status-completed {
+    background-color: #006400 !important;
+    color: #fff !important;
+    border: 2px solid #000 !important;
+  }
+
+  .status-processing {
+    background-color: #00008b !important;
+    color: #fff !important;
+    border: 2px solid #000 !important;
+  }
+
+  .status-queued {
+    background-color: #8b008b !important;
+    color: #fff !important;
+    border: 2px solid #000 !important;
+  }
+
+  .status-failed {
+    background-color: #8b0000 !important;
+    color: #fff !important;
+    border: 2px solid #000 !important;
+  }
+
+  /* Enhanced task ID display */
+  .file-task-id {
+    background-color: #000 !important;
+    color: #fff !important;
+    border: 2px solid #000 !important;
+    font-weight: bold !important;
+  }
+
+  /* Enhanced skip links */
+  .skip-link {
+    background: #000 !important;
+    color: #fff !important;
+    border: 2px solid #fff !important;
+    padding: 12px 18px !important;
+    font-weight: bold !important;
+
+    &:focus {
+      position: static !important;
+      width: auto !important;
+      height: auto !important;
+      overflow: visible !important;
+      left: auto !important;
+      top: auto !important;
+      z-index: 1000 !important;
+    }
+  }
+
+  /* Enhanced modal dialogs */
+  .processing-modal__content,
+  .run-task-content {
+    border: 3px solid #000 !important;
+    box-shadow: 0 0 0 3px #fff, 0 0 0 6px #000 !important;
+  }
+
+  /* Enhanced progress indicators */
+  .progress-bar {
+    border: 2px solid #000 !important;
+    background-color: #fff !important;
+  }
+
+  .progress-fill {
+    background-color: #000 !important;
+  }
+}

@@ -1,4 +1,8 @@
 {
+  "accessibility": {
+    "skipToMain": "メインコンテンツにスキップ",
+    "skipToNavigation": "ナビゲーションにスキップ"
+  },
   "header": {
     "title": "SlideSpeaker AI",
     "subtitle": "スライドをAI動画に変換",
@@ -405,7 +409,8 @@
       "toggleLabel": "テーマの切り替え",
       "auto": "自動",
       "light": "ライト",
-      "dark": "ダーク"
+      "dark": "ダーク",
+      "highContrast": "ハイコントラスト"
     }
   },
   "pagination": {

@@ -1,4 +1,8 @@
 {
+  "accessibility": {
+    "skipToMain": "ข้ามไปยังเนื้อหาหลัก",
+    "skipToNavigation": "ข้ามไปยังการนำทาง"
+  },
   "header": {
     "title": "SlideSpeaker AI",
     "subtitle": "แปลงสไลด์เป็นวิดีโอด้วยปัญญาประดิษฐ์",
@@ -405,7 +409,8 @@
       "toggleLabel": "สลับธีม",
       "auto": "อัตโนมัติ",
       "light": "สว่าง",
-      "dark": "มืด"
+      "dark": "มืด",
+      "highContrast": "ความเปรียบต่างสูง"
     }
   },
   "pagination": {

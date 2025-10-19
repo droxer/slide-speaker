@@ -2,11 +2,11 @@
 
 import React, {createContext, useCallback, useContext, useEffect, useMemo, useState} from 'react';
 
-type ThemeMode = 'light' | 'dark' | 'auto';
+type ThemeMode = 'light' | 'dark' | 'auto' | 'high-contrast';
 
 type ThemeContextValue = {
   mode: ThemeMode;
-  theme: 'light' | 'dark';
+  theme: 'light' | 'dark' | 'high-contrast';
   setTheme: (mode: ThemeMode) => void;
   toggleTheme: () => void;
 };
@@ -33,23 +33,29 @@ const getInitialMode = (): ThemeMode => {
 const getPreferredTheme = () =>
   window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 
+const getPreferredHighContrast = () => {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia && window.matchMedia('(prefers-contrast: more)').matches;
+};
+
+
 export function ThemeProvider({children}: {children: React.ReactNode}) {
   const initialMode = isBrowser ? getInitialMode() : 'auto';
   const [mode, setMode] = useState<ThemeMode>(initialMode);
-  const [theme, setThemeState] = useState<'light' | 'dark'>(() =>
-    !isBrowser ? 'light' : initialMode === 'auto' ? getPreferredTheme() : (initialMode as 'light' | 'dark'),
+  const [theme, setThemeState] = useState<'light' | 'dark' | 'high-contrast'>(() =>
+    !isBrowser ? 'light' : initialMode === 'auto' ? getPreferredTheme() : (initialMode === 'high-contrast' ? 'high-contrast' : initialMode as 'light' | 'dark'),
   );
 
   useEffect(() => {
     if (!isBrowser) return;
     try {
       const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-      if (stored === 'dark' || stored === 'light' || stored === 'auto') {
+      if (stored === 'dark' || stored === 'light' || stored === 'auto' || stored === 'high-contrast') {
         setMode(stored);
         if (stored === 'auto') {
           setThemeState(getPreferredTheme());
         } else {
-          setThemeState(stored);
+          setThemeState(stored as 'light' | 'dark' | 'high-contrast');
         }
       }
     } catch {
@@ -85,7 +91,8 @@ export function ThemeProvider({children}: {children: React.ReactNode}) {
     if (typeof document === 'undefined') return;
     const body = document.body;
     body.classList.toggle('dark-theme', theme === 'dark');
-    body.classList.toggle('light-theme', theme !== 'dark');
+    body.classList.toggle('light-theme', theme === 'light');
+    body.classList.toggle('high-contrast', theme === 'high-contrast');
   }, [theme]);
 
   useEffect(() => {
@@ -104,7 +111,10 @@ export function ThemeProvider({children}: {children: React.ReactNode}) {
   const toggleTheme = useCallback(() => {
     setMode((prev) => {
       if (prev === 'auto') {
-        return theme === 'dark' ? 'light' : 'dark';
+        return theme === 'dark' ? 'light' : theme === 'light' ? 'dark' : 'light';
+      }
+      if (prev === 'high-contrast') {
+        return 'light';
       }
       return prev === 'dark' ? 'light' : 'dark';
     });

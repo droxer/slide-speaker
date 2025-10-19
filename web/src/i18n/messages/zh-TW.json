@@ -1,4 +1,8 @@
 {
+  "accessibility": {
+    "skipToMain": "跳至主要內容",
+    "skipToNavigation": "跳至導覽"
+  },
   "header": {
     "title": "簡報演說 AI",
     "subtitle": "將簡報轉化為 AI 驅動的影片",
@@ -405,7 +409,8 @@
       "toggleLabel": "主題切換",
       "auto": "自動",
       "light": "淺色",
-      "dark": "深色"
+      "dark": "深色",
+      "highContrast": "高對比"
     }
   },
   "pagination": {

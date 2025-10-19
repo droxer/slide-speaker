@@ -1,4 +1,8 @@
 {
+  "accessibility": {
+    "skipToMain": "주요 콘텐츠로 건너뛰기",
+    "skipToNavigation": "탐색으로 건너뛰기"
+  },
   "header": {
     "title": "SlideSpeaker AI",
     "subtitle": "슬라이드를 AI 영상으로 변환",
@@ -405,7 +409,8 @@
       "toggleLabel": "테마 전환",
       "auto": "자동",
       "light": "라이트",
-      "dark": "다크"
+      "dark": "다크",
+      "highContrast": "고대비"
     }
   },
   "pagination": {
