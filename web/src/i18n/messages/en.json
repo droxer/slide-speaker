@@ -410,7 +410,8 @@
       "auto": "Auto",
       "light": "Light",
       "dark": "Dark",
-      "highContrast": "High Contrast"
+      "highContrast": "High Contrast",
+      "highContrastDark": "HC Dark"
     }
   },
   "pagination": {

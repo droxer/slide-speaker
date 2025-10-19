@@ -410,7 +410,8 @@
       "auto": "自動",
       "light": "淺色",
       "dark": "深色",
-      "highContrast": "高對比"
+      "highContrast": "高對比",
+      "highContrastDark": "高對比暗色"
     }
   },
   "pagination": {
