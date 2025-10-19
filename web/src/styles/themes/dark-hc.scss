@@ -1,0 +1,472 @@
+/* High Contrast Dark Theme Styles - Improved Alignment with Regular Dark Theme */
+.theme-dark-hc {
+  /* Increase overall contrast while maintaining design language */
+  filter: contrast(1.15) saturate(1.1);
+
+  /* Enhanced focus indicators for WCAG 2.1 compliance */
+  *:focus {
+    outline: 3px solid #fff !important;
+    outline-offset: 2px !important;
+  }
+
+  /* Enhanced link styles - maintaining consistent hover effects */
+  a {
+    color: #fff !important;
+    text-decoration: underline !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease !important;
+
+    &:hover,
+    &:focus {
+      background-color: #fff !important;
+      color: #000 !important;
+      border-radius: 4px !important;
+    }
+  }
+
+  /* Enhanced button styles - aligned with regular dark theme design */
+  button,
+  .btn,
+  .primary-btn,
+  .secondary-btn {
+    border: 2px solid #fff !important;
+    background-color: #000 !important;
+    color: #fff !important;
+    font-weight: 600 !important;
+    padding: 1rem 1.75rem !important;
+    border-radius: 8px !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    width: 100% !important;
+    margin-bottom: 1rem !important;
+    position: relative !important;
+    overflow: hidden !important;
+    outline: none !important;
+
+    &:hover,
+    &:focus {
+      background-color: #fff !important;
+      color: #000 !important;
+      transform: translateY(-2px) !important;
+      box-shadow: 0 6px 16px rgba(255, 255, 255, 0.3) !important;
+    }
+
+    &:active {
+      transform: translateY(-1px) scale(0.98) !important;
+      box-shadow: 0 2px 8px rgba(255, 255, 255, 0.3) !important;
+    }
+
+    &:disabled {
+      border-color: #999 !important;
+      color: #999 !important;
+      background-color: #333 !important;
+      opacity: 0.7 !important;
+      cursor: not-allowed !important;
+      transform: none !important;
+      box-shadow: 0 2px 8px rgba(255, 255, 255, 0.2) !important;
+    }
+  }
+
+  /* Primary button specific styles */
+  .primary-btn {
+    background: #fff !important;
+    color: #000 !important;
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.25) !important;
+
+    &:hover:not(:disabled) {
+      background: #ddd !important;
+      transform: translateY(-2px) !important;
+      box-shadow: 0 6px 16px rgba(255, 255, 255, 0.35) !important;
+    }
+
+    &:disabled {
+      background: #333 !important;
+      cursor: not-allowed !important;
+      transform: none !important;
+      box-shadow: 0 2px 8px rgba(255, 255, 255, 0.2) !important;
+    }
+
+    &:focus {
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4) !important;
+    }
+  }
+
+  /* Secondary button specific styles */
+  .secondary-btn {
+    background: #000 !important;
+    color: #fff !important;
+    border: 2px solid #fff !important;
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.1) !important;
+
+    &:hover {
+      background: #222 !important;
+      transform: translateY(-2px) !important;
+      box-shadow: 0 6px 16px rgba(255, 255, 255, 0.15) !important;
+    }
+
+    &:focus {
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.2) !important;
+    }
+  }
+
+  /* Enhanced form elements - aligned with regular theme */
+  input,
+  select,
+  textarea {
+    border: 2px solid #fff !important;
+    background-color: #000 !important;
+    color: #fff !important;
+    padding: 0.75rem 1rem !important;
+    border-radius: 8px !important;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    font-size: 1rem !important;
+    font-weight: 400 !important;
+
+    &:focus {
+      border-color: #fff !important;
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.3) !important;
+      outline: none !important;
+    }
+
+    &:disabled {
+      background-color: #222 !important;
+      color: #999 !important;
+      cursor: not-allowed !important;
+    }
+  }
+
+  /* Enhanced status indicators - consistent with regular theme colors */
+  .status-completed {
+    background-color: #00ff00 !important;
+    color: #000 !important;
+    border: 2px solid #fff !important;
+    font-weight: 600 !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 8px !important;
+  }
+
+  .status-processing {
+    background-color: #4169e1 !important;
+    color: #fff !important;
+    border: 2px solid #fff !important;
+    font-weight: 600 !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 8px !important;
+  }
+
+  .status-queued {
+    background-color: #da70d6 !important;
+    color: #000 !important;
+    border: 2px solid #fff !important;
+    font-weight: 600 !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 8px !important;
+  }
+
+  .status-failed {
+    background-color: #ff4500 !important;
+    color: #000 !important;
+    border: 2px solid #fff !important;
+    font-weight: 600 !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 8px !important;
+  }
+
+  .status-cancelled {
+    background-color: #a9a9a9 !important;
+    color: #000 !important;
+    border: 2px solid #fff !important;
+    font-weight: 600 !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 8px !important;
+  }
+
+  .status-pending {
+    background-color: #1e90ff !important;
+    color: #000 !important;
+    border: 2px solid #fff !important;
+    font-weight: 600 !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 8px !important;
+  }
+
+  /* Enhanced task ID display */
+  .file-task-id {
+    background-color: #fff !important;
+    color: #000 !important;
+    border: 2px solid #fff !important;
+    font-weight: 600 !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 8px !important;
+    font-size: 0.9rem !important;
+  }
+
+  /* Enhanced skip links */
+  .skip-link {
+    background: #fff !important;
+    color: #000 !important;
+    border: 2px solid #000 !important;
+    padding: 0.75rem 1.25rem !important;
+    font-weight: 600 !important;
+    border-radius: 8px !important;
+    margin: 0.25rem !important;
+    transition: all 0.2s ease !important;
+    text-decoration: none !important;
+
+    &:focus {
+      position: static !important;
+      width: auto !important;
+      height: auto !important;
+      overflow: visible !important;
+      left: auto !important;
+      top: auto !important;
+      z-index: 1000 !important;
+      transform: translateY(-2px) !important;
+      box-shadow: 0 4px 8px rgba(255, 255, 255, 0.3) !important;
+    }
+  }
+
+  /* Enhanced modal dialogs */
+  .processing-modal__content,
+  .run-task-content {
+    border: 3px solid #fff !important;
+    box-shadow: 0 0 0 3px #000, 0 0 0 6px #fff !important;
+    border-radius: 12px !important;
+    background: #000 !important;
+    color: #fff !important;
+  }
+
+  /* Enhanced progress indicators */
+  .progress-bar {
+    border: 2px solid #fff !important;
+    background-color: #000 !important;
+    border-radius: 8px !important;
+    overflow: hidden !important;
+    height: 12px !important;
+  }
+
+  .progress-fill {
+    background-color: #fff !important;
+    height: 100% !important;
+    transition: width 0.3s ease !important;
+  }
+
+  /* Enhanced cards and containers */
+  .content-card,
+  .card-container,
+  .task-card,
+  .file-group,
+  .file-group-header {
+    border: 2px solid #fff !important;
+    background-color: #000 !important;
+    color: #fff !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15) !important;
+    padding: 1.5rem !important;
+    margin-bottom: 1rem !important;
+  }
+
+  /* Enhanced headers */
+  .app-header,
+  .modal-header-bar {
+    border-bottom: 2px solid #fff !important;
+    background-color: #000 !important;
+    color: #fff !important;
+    padding: 2rem 1rem !important;
+  }
+
+  /* Enhanced footers */
+  .app-footer {
+    border-top: 2px solid #fff !important;
+    background-color: #000 !important;
+    color: #fff !important;
+  }
+
+  /* Enhanced text elements */
+  h1, h2, h3, h4, h5, h6 {
+    color: #fff !important;
+    font-weight: 700 !important;
+  }
+
+  p, span, div {
+    color: #fff !important;
+  }
+
+  /* Enhanced navigation elements */
+  .view-toggle,
+  .theme-toggle {
+    border: 2px solid #fff !important;
+    background-color: #000 !important;
+    border-radius: 8px !important;
+    display: inline-flex !important;
+    padding: 0.25rem !important;
+  }
+
+  .toggle-btn {
+    border: 1px solid #fff !important;
+    background-color: #000 !important;
+    color: #fff !important;
+    font-weight: 600 !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 6px !important;
+    transition: all 0.2s ease !important;
+    cursor: pointer !important;
+    margin: 0 0.125rem !important;
+
+    &.active {
+      background-color: #fff !important;
+      color: #000 !important;
+    }
+
+    &:hover:not(.active) {
+      background-color: #222 !important;
+      transform: translateY(-1px) !important;
+    }
+  }
+
+  /* Enhanced dropdowns and menus */
+  .user-menu,
+  .react-select__menu {
+    border: 2px solid #fff !important;
+    background-color: #000 !important;
+    box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2) !important;
+    border-radius: 8px !important;
+  }
+
+  /* Enhanced chips and badges */
+  .chip,
+  .badge,
+  .file-type-badge {
+    border: 2px solid #fff !important;
+    background-color: #000 !important;
+    color: #fff !important;
+    font-weight: 600 !important;
+    padding: 0.25rem 0.75rem !important;
+    border-radius: 999px !important;
+    font-size: 0.85rem !important;
+  }
+
+  /* Enhanced pagination */
+  .page-button {
+    border: 2px solid #fff !important;
+    background-color: #000 !important;
+    color: #fff !important;
+    font-weight: 600 !important;
+    padding: 0.5rem 1rem !important;
+    border-radius: 8px !important;
+    transition: all 0.3s ease !important;
+    cursor: pointer !important;
+    margin: 0 0.25rem !important;
+
+    &:hover:not(:disabled) {
+      background-color: #fff !important;
+      color: #000 !important;
+      transform: translateY(-2px) !important;
+    }
+
+    &:disabled {
+      border-color: #999 !important;
+      color: #999 !important;
+      background-color: #333 !important;
+      opacity: 0.7 !important;
+      cursor: not-allowed !important;
+    }
+  }
+
+  /* Enhanced scrollbars */
+  ::-webkit-scrollbar {
+    width: 12px !important;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: #000 !important;
+    border: 1px solid #fff !important;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #fff !important;
+    border: 1px solid #000 !important;
+    border-radius: 6px !important;
+  }
+
+  /* Enhanced modals */
+  .processing-modal,
+  .run-task-modal {
+    background-color: rgba(0, 0, 0, 0.95) !important;
+  }
+
+  /* Enhanced form labels */
+  label {
+    color: #fff !important;
+    font-weight: 600 !important;
+    margin-bottom: 0.5rem !important;
+    display: block !important;
+  }
+
+  /* Enhanced error messages */
+  .error-message {
+    color: #ff4500 !important;
+    font-weight: 600 !important;
+    border: 2px solid #ff4500 !important;
+    background-color: #1a0000 !important;
+    padding: 1rem 1.25rem !important;
+    border-radius: 8px !important;
+    margin: 1rem 0 !important;
+  }
+
+  /* Enhanced success messages */
+  .success-message {
+    color: #00ff00 !important;
+    font-weight: 600 !important;
+    border: 2px solid #00ff00 !important;
+    background-color: #001a00 !important;
+    padding: 1rem 1.25rem !important;
+    border-radius: 8px !important;
+    margin: 1rem 0 !important;
+  }
+
+  /* Enhanced language switcher */
+  .language-switcher__select {
+    border: 2px solid #fff !important;
+    background-color: #000 !important;
+    color: #fff !important;
+    padding: 0.5rem 2rem 0.5rem 1rem !important;
+    border-radius: 999px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+
+    &:hover {
+      background-color: #222 !important;
+    }
+
+    &:focus {
+      outline: 3px solid #fff !important;
+      outline-offset: 2px !important;
+    }
+  }
+
+  /* Enhanced user menu trigger */
+  .user-menu-trigger {
+    border: 2px solid #fff !important;
+    background-color: #000 !important;
+    color: #fff !important;
+    padding: 0.55rem 0.9rem !important;
+    border-radius: 999px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 0.75rem !important;
+
+    &:hover,
+    &:focus {
+      background-color: #222 !important;
+      transform: translateY(-1px) !important;
+      box-shadow: 0 4px 12px rgba(255, 255, 255, 0.15) !important;
+    }
+
+    &:focus {
+      outline: 3px solid #fff !important;
+      outline-offset: 2px !important;
+    }
+  }
+}

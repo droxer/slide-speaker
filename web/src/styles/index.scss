@@ -7,8 +7,8 @@
 // Theme styles
 @use './themes/light-theme.scss';
 @use './themes/dark-theme.scss';
-@use './themes/high-contrast/light.scss';
-@use './themes/high-contrast/dark.scss';
+@use './themes/light-hc.scss';
+@use './themes/dark-hc.scss';
 
 // Accessibility styles
 @use './accessibility.scss';

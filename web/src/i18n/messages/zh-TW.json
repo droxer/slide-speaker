@@ -76,6 +76,7 @@
     "nameLabel": "顯示名稱",
     "namePlaceholder": "我們應該如何稱呼你？",
     "languageLabel": "偏好語言",
+    "themeLabel": "偏好主題",
     "saveButton": "儲存變更",
     "saving": "正在儲存…",
     "saveSuccess": "資料已更新",
@@ -410,8 +411,8 @@
       "auto": "自動",
       "light": "淺色",
       "dark": "深色",
-      "highContrast": "高對比",
-      "highContrastDark": "高對比暗色"
+      "highContrastLight": "高對比淺色",
+      "highContrastDark": "高對比深色"
     }
   },
   "pagination": {

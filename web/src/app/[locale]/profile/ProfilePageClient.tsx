@@ -18,6 +18,7 @@ import {
   normalizeSupportedLanguage,
   type SupportedLanguage,
 } from '@/utils/localePreferences';
+import {useTheme} from '@/theme/ThemeProvider';
 
 type ProfilePageClientProps = {
   profile: UserProfile;
@@ -29,36 +30,44 @@ export default function ProfilePageClient({profile, initialHealth = null}: Profi
   const router = useRouter();
   const locale = useLocale() as Locale;
   const {data: session, update: updateSession} = useSession();
+  const {mode: currentTheme, setTheme: setGlobalTheme} = useTheme();
   const initialName = profile.name ?? '';
   const initialLanguage = normalizeSupportedLanguage(profile.preferred_language);
+  const initialTheme = profile.preferred_theme ?? 'auto';
 
   const [baseline, setBaseline] = React.useState({
     name: initialName,
     language: initialLanguage,
+    theme: initialTheme,
   });
   const [name, setName] = React.useState(initialName);
   const [language, setLanguage] = React.useState<SupportedLanguage>(initialLanguage);
+  const [theme, setTheme] = React.useState<string>(initialTheme);
   const [message, setMessage] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     const nextName = profile.name ?? '';
     const nextLanguage = normalizeSupportedLanguage(profile.preferred_language);
+    const nextTheme = profile.preferred_theme ?? 'auto';
     setName(nextName);
     setLanguage(nextLanguage);
-    setBaseline({name: nextName, language: nextLanguage});
-  }, [profile.id, profile.name, profile.preferred_language]);
+    setTheme(nextTheme);
+    setBaseline({name: nextName, language: nextLanguage, theme: nextTheme});
+  }, [profile.id, profile.name, profile.preferred_language, profile.preferred_theme]);
 
   const mutation = useMutation({
-    mutationFn: (payload: {name?: string | null; preferred_language?: string | null}) =>
+    mutationFn: (payload: {name?: string | null; preferred_language?: string | null; preferred_theme?: string | null}) =>
       updateCurrentUserProfile(payload),
     onSuccess: (data) => {
       const updated = data.user;
       const updatedName = updated.name ?? '';
       const updatedLanguage = normalizeSupportedLanguage(updated.preferred_language);
+      const updatedTheme = updated.preferred_theme ?? 'auto';
       setName(updatedName);
       setLanguage(updatedLanguage);
-      setBaseline({name: updatedName, language: updatedLanguage});
+      setTheme(updatedTheme);
+      setBaseline({name: updatedName, language: updatedLanguage, theme: updatedTheme});
       setMessage(t('profile.saveSuccess', undefined, 'Profile updated'));
       setError(null);
       if (typeof updateSession === 'function') {
@@ -68,8 +77,13 @@ export default function ProfilePageClient({profile, initialHealth = null}: Profi
             ...(session?.user ?? {}),
             name: updatedName.length > 0 ? updatedName : session?.user?.name ?? '',
             preferred_language: updatedLanguage,
+            preferred_theme: updatedTheme,
           },
         } as any);
+      }
+      // Update the global theme if it has changed
+      if (updatedTheme !== currentTheme) {
+        setGlobalTheme(updatedTheme as any);
       }
       const targetLocale = LANGUAGE_TO_LOCALE[updatedLanguage];
       if (targetLocale !== locale) {
@@ -86,7 +100,9 @@ export default function ProfilePageClient({profile, initialHealth = null}: Profi
 
   const normalizedName = name.trim();
   const hasChanges =
-    normalizedName !== (baseline.name ?? '').trim() || language !== baseline.language;
+    normalizedName !== (baseline.name ?? '').trim() ||
+    language !== baseline.language ||
+    theme !== baseline.theme;
 
   const languageOptions = React.useMemo(() => {
     return SUPPORTED_LANGUAGES.map((code) => ({
@@ -102,6 +118,7 @@ export default function ProfilePageClient({profile, initialHealth = null}: Profi
     mutation.mutate({
       name: normalizedName.length > 0 ? normalizedName : null,
       preferred_language: language,
+      preferred_theme: theme,
     });
   };
 
@@ -146,6 +163,19 @@ export default function ProfilePageClient({profile, initialHealth = null}: Profi
                   {option.label}
                 </option>
               ))}
+            </select>
+
+            <label htmlFor="profile-theme">{t('profile.themeLabel', undefined, 'Preferred theme')}</label>
+            <select
+              id="profile-theme"
+              value={theme}
+              onChange={(event) => setTheme(event.target.value)}
+            >
+              <option value="auto">{t('footer.theme.auto', undefined, 'Auto')}</option>
+              <option value="light">{t('footer.theme.light', undefined, 'Light')}</option>
+              <option value="dark">{t('footer.theme.dark', undefined, 'Dark')}</option>
+              <option value="light-hc">{t('footer.theme.highContrastLight', undefined, 'High Contrast Light')}</option>
+              <option value="dark-hc">{t('footer.theme.highContrastDark', undefined, 'High Contrast Dark')}</option>
             </select>
 
             <div className="profile-actions">

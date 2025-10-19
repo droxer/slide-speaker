@@ -76,6 +76,7 @@
     "nameLabel": "표시 이름",
     "namePlaceholder": "어떻게 불러드릴까요?",
     "languageLabel": "선호 언어",
+    "themeLabel": "선호 테마",
     "saveButton": "변경 사항 저장",
     "saving": "저장 중…",
     "saveSuccess": "프로필이 업데이트되었습니다",
@@ -410,7 +411,8 @@
       "auto": "자동",
       "light": "라이트",
       "dark": "다크",
-      "highContrast": "고대비"
+      "highContrastLight": "고대비 라이트",
+      "highContrastDark": "고대비 다크"
     }
   },
   "pagination": {

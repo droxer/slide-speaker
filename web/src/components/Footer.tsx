@@ -1,6 +1,5 @@
 import React from 'react';
 import { useI18n } from '@/i18n/hooks';
-import ThemeToggle from '@/components/ThemeToggle';
 
 type FooterProps = {
   queueUnavailable: boolean;
@@ -10,10 +9,10 @@ type FooterProps = {
 const Footer = ({ queueUnavailable, redisLatencyMs }: FooterProps) => {
   const { t } = useI18n();
   const systemStatusLabel = queueUnavailable ? t('footer.queueUnavailable') : t('footer.queueOk');
-  
+
   // For hydration compatibility, we need to ensure the same initial title is rendered
   // on both server and client - we'll use a stable value initially and update after mount
-  const [title, setTitle] = React.useState(() => 
+  const [title, setTitle] = React.useState(() =>
     queueUnavailable
       ? t('footer.queueTooltipUnavailable')
       : t('footer.queueTooltipOk')
@@ -26,7 +25,7 @@ const Footer = ({ queueUnavailable, redisLatencyMs }: FooterProps) => {
       : redisLatencyMs != null
         ? t('footer.queueTooltipLatency', { latency: redisLatencyMs }, `System status OK • ${redisLatencyMs}ms`)
         : t('footer.queueTooltipOk');
-    
+
     setTitle(newTitle);
   }, [queueUnavailable, redisLatencyMs, t]);
 
@@ -44,7 +43,6 @@ const Footer = ({ queueUnavailable, redisLatencyMs }: FooterProps) => {
             <span className={`dot ${queueUnavailable ? 'down' : 'ok'}`} aria-hidden="true" />
             <span className="label">{systemStatusLabel}</span>
           </div>
-          <ThemeToggle ariaLabel={t('footer.theme.toggleLabel', undefined, 'Theme toggle')} />
         </div>
       </div>
     </footer>

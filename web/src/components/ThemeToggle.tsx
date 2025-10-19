@@ -62,24 +62,24 @@ const ThemeToggle = ({className = '', ariaLabel}: ThemeToggleProps) => {
       </button>
       <button
         type="button"
-        onClick={() => setTheme('high-contrast-light')}
-        className={`toggle-btn ${hydrated && mode === 'high-contrast-light' ? 'active' : ''}`}
+        onClick={() => setTheme('light-hc')}
+        className={`toggle-btn ${hydrated && mode === 'light-hc' ? 'active' : ''}`}
         title={t('footer.theme.highContrast', undefined, 'High Contrast (Light)')}
         role="tab"
-        aria-selected={hydrated ? mode === 'high-contrast-light' : undefined}
-        aria-controls="high-contrast-light-theme-panel"
+        aria-selected={hydrated ? mode === 'light-hc' : undefined}
+        aria-controls="light-hc-theme-panel"
         suppressHydrationWarning
       >
         <span className="toggle-text">{t('footer.theme.highContrast', undefined, 'High Contrast')}</span>
       </button>
       <button
         type="button"
-        onClick={() => setTheme('high-contrast-dark')}
-        className={`toggle-btn ${hydrated && mode === 'high-contrast-dark' ? 'active' : ''}`}
+        onClick={() => setTheme('dark-hc')}
+        className={`toggle-btn ${hydrated && mode === 'dark-hc' ? 'active' : ''}`}
         title={t('footer.theme.highContrastDark', undefined, 'High Contrast (Dark)')}
         role="tab"
-        aria-selected={hydrated ? mode === 'high-contrast-dark' : undefined}
-        aria-controls="high-contrast-dark-theme-panel"
+        aria-selected={hydrated ? mode === 'dark-hc' : undefined}
+        aria-controls="dark-hc-theme-panel"
         suppressHydrationWarning
       >
         <span className="toggle-text">{t('footer.theme.highContrastDark', undefined, 'HC Dark')}</span>

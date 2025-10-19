@@ -76,6 +76,7 @@
     "nameLabel": "ชื่อที่แสดง",
     "namePlaceholder": "เราจะเรียกท่านว่าอย่างไรดี?",
     "languageLabel": "ภาษาที่ต้องการ",
+    "themeLabel": "ธีมที่ต้องการ",
     "saveButton": "บันทึกการเปลี่ยนแปลง",
     "saving": "กำลังบันทึก…",
     "saveSuccess": "อัปเดตโปรไฟล์แล้ว",
@@ -410,7 +411,8 @@
       "auto": "อัตโนมัติ",
       "light": "สว่าง",
       "dark": "มืด",
-      "highContrast": "ความเปรียบต่างสูง"
+      "highContrastLight": "แสงสว่างความเปรียบต่างสูง",
+      "highContrastDark": "ความมืดความเปรียบต่างสูง"
     }
   },
   "pagination": {

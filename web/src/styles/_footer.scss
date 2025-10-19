@@ -35,7 +35,6 @@ body.light-theme .app-footer {
 .footer-right {
   display: flex;
   align-items: center;
-  gap: 12px;
 }
 
 /* Health indicator (queue status) */
@@ -69,24 +68,6 @@ body.light-theme .app-footer {
   opacity: 0.9;
 }
 
-/* Ensure footer theme switcher is visible and sized well */
-.theme-toggle {
-  margin-left: 12px;
-}
-
-@media (max-width: 768px) {
-  .theme-toggle {
-    width: 100%;
-    margin-left: 0;
-    margin-top: 6px;
-  }
-  .theme-toggle .toggle-btn {
-    flex: 1 1 0;
-    justify-content: center;
-    padding: 12px;
-    font-size: 0.95rem;
-  }
-}
 
 @media (max-width: 768px) {
   .footer-content {

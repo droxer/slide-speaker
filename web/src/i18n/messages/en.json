@@ -76,6 +76,7 @@
     "nameLabel": "Display name",
     "namePlaceholder": "How should we address you?",
     "languageLabel": "Preferred language",
+    "themeLabel": "Preferred theme",
     "saveButton": "Save changes",
     "saving": "Saving…",
     "saveSuccess": "Profile updated",
@@ -410,8 +411,8 @@
       "auto": "Auto",
       "light": "Light",
       "dark": "Dark",
-      "highContrast": "High Contrast",
-      "highContrastDark": "HC Dark"
+      "highContrastLight": "High Contrast Light",
+      "highContrastDark": "High Contrast Dark"
     }
   },
   "pagination": {

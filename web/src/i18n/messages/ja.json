@@ -76,6 +76,7 @@
     "nameLabel": "表示名",
     "namePlaceholder": "どのようにお呼びすればよいですか？",
     "languageLabel": "希望言語",
+    "themeLabel": "希望テーマ",
     "saveButton": "変更を保存",
     "saving": "保存中…",
     "saveSuccess": "プロフィールを更新しました",
@@ -410,7 +411,8 @@
       "auto": "自動",
       "light": "ライト",
       "dark": "ダーク",
-      "highContrast": "ハイコントラスト"
+      "highContrastLight": "ハイコントラスト ライト",
+      "highContrastDark": "ハイコントラスト ダーク"
     }
   },
   "pagination": {
