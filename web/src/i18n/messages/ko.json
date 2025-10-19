@@ -1,4 +1,8 @@
 {
+  "accessibility": {
+    "skipToMain": "주요 콘텐츠로 건너뛰기",
+    "skipToNavigation": "탐색으로 건너뛰기"
+  },
   "header": {
     "title": "SlideSpeaker AI",
     "subtitle": "슬라이드를 AI 영상으로 변환",
@@ -72,6 +76,7 @@
     "nameLabel": "표시 이름",
     "namePlaceholder": "어떻게 불러드릴까요?",
     "languageLabel": "선호 언어",
+    "themeLabel": "선호 테마",
     "saveButton": "변경 사항 저장",
     "saving": "저장 중…",
     "saveSuccess": "프로필이 업데이트되었습니다",
@@ -405,7 +410,9 @@
       "toggleLabel": "테마 전환",
       "auto": "자동",
       "light": "라이트",
-      "dark": "다크"
+      "dark": "다크",
+      "highContrastLight": "고대비 라이트",
+      "highContrastDark": "고대비 다크"
     }
   },
   "pagination": {

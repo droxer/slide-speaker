@@ -2,11 +2,11 @@
 
 import React, {createContext, useCallback, useContext, useEffect, useMemo, useState} from 'react';
 
-type ThemeMode = 'light' | 'dark' | 'auto';
+type ThemeMode = 'light' | 'dark' | 'auto' | 'light-hc' | 'dark-hc';
 
 type ThemeContextValue = {
   mode: ThemeMode;
-  theme: 'light' | 'dark';
+  theme: 'light' | 'dark' | 'light-hc' | 'dark-hc';
   setTheme: (mode: ThemeMode) => void;
   toggleTheme: () => void;
 };
@@ -21,8 +21,15 @@ const getInitialMode = (): ThemeMode => {
   if (!isBrowser) return 'auto';
   try {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-    if (stored === 'dark' || stored === 'light' || stored === 'auto') {
-      return stored;
+    if (stored === 'dark' || stored === 'light' || stored === 'auto' || stored === 'light-hc' || stored === 'dark-hc') {
+      return stored as ThemeMode;
+    }
+    // Handle legacy theme names for backward compatibility
+    if (stored === 'high-contrast-light') {
+      return 'light-hc';
+    }
+    if (stored === 'high-contrast-dark') {
+      return 'dark-hc';
     }
   } catch {
     /* ignore */
@@ -30,27 +37,77 @@ const getInitialMode = (): ThemeMode => {
   return 'auto';
 };
 
-const getPreferredTheme = () =>
-  window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+const getPreferredTheme = (): 'light' | 'dark' | 'light-hc' | 'dark-hc' => {
+  if (typeof window === 'undefined') return 'light';
 
-export function ThemeProvider({children}: {children: React.ReactNode}) {
-  const initialMode = isBrowser ? getInitialMode() : 'auto';
-  const [mode, setMode] = useState<ThemeMode>(initialMode);
-  const [theme, setThemeState] = useState<'light' | 'dark'>(() =>
-    !isBrowser ? 'light' : initialMode === 'auto' ? getPreferredTheme() : (initialMode as 'light' | 'dark'),
-  );
+  const darkMedia = window.matchMedia('(prefers-color-scheme: dark)');
+  const contrastMedia = window.matchMedia('(prefers-contrast: more)');
+
+  const prefersDark = darkMedia.matches;
+  const prefersHighContrast = contrastMedia.matches;
+
+  if (prefersHighContrast) {
+    return prefersDark ? 'dark-hc' : 'light-hc';
+  }
+  return prefersDark ? 'dark' : 'light';
+};
+
+const getPreferredHighContrast = () => {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia && window.matchMedia('(prefers-contrast: more)').matches;
+};
+
+
+export function ThemeProvider({children, initialTheme}: {children: React.ReactNode; initialTheme?: string | null}) {
+  const initialMode = isBrowser ? (initialTheme ?? getInitialMode()) : 'auto';
+  const validatedInitialMode = (initialMode === 'light' || initialMode === 'dark' || initialMode === 'auto' || initialMode === 'light-hc' || initialMode === 'dark-hc')
+    ? initialMode
+    : getInitialMode();
+  const [mode, setMode] = useState<ThemeMode>(validatedInitialMode);
+  const [theme, setThemeState] = useState<'light' | 'dark' | 'light-hc' | 'dark-hc'>(() => {
+    if (!isBrowser) return 'light';
+    if (validatedInitialMode === 'auto') return getPreferredTheme();
+    if (validatedInitialMode === 'light-hc' || validatedInitialMode === 'dark-hc') {
+      return validatedInitialMode;
+    }
+    if (validatedInitialMode === 'light' || validatedInitialMode === 'dark') {
+      return validatedInitialMode;
+    }
+    // Handle legacy theme names for backward compatibility
+    if (validatedInitialMode === 'high-contrast-light') {
+      return 'light-hc';
+    }
+    if (validatedInitialMode === 'high-contrast-dark') {
+      return 'dark-hc';
+    }
+    return 'light'; // fallback
+  });
 
   useEffect(() => {
     if (!isBrowser) return;
     try {
       const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
-      if (stored === 'dark' || stored === 'light' || stored === 'auto') {
-        setMode(stored);
-        if (stored === 'auto') {
-          setThemeState(getPreferredTheme());
-        } else {
-          setThemeState(stored);
-        }
+      let storedMode: ThemeMode = 'auto';
+
+      if (stored === 'dark' || stored === 'light' || stored === 'auto' || stored === 'light-hc' || stored === 'dark-hc') {
+        storedMode = stored as ThemeMode;
+      } else if (stored === 'high-contrast-light') {
+        // Handle legacy theme names for backward compatibility
+        storedMode = 'light-hc';
+      } else if (stored === 'high-contrast-dark') {
+        // Handle legacy theme names for backward compatibility
+        storedMode = 'dark-hc';
+      } else {
+        storedMode = 'auto';
+      }
+
+      setMode(storedMode);
+      if (storedMode === 'auto') {
+        setThemeState(getPreferredTheme());
+      } else if (storedMode === 'light-hc' || storedMode === 'dark-hc') {
+        setThemeState(storedMode);
+      } else if (storedMode === 'light' || storedMode === 'dark') {
+        setThemeState(storedMode);
       }
     } catch {
       /* ignore */
@@ -68,24 +125,59 @@ export function ThemeProvider({children}: {children: React.ReactNode}) {
 
   useEffect(() => {
     if (!isBrowser) return;
-    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const darkMedia = window.matchMedia('(prefers-color-scheme: dark)');
+    const contrastMedia = window.matchMedia('(prefers-contrast: more)');
     if (mode !== 'auto') return;
-    const listener = (event: MediaQueryListEvent) => {
-      setThemeState(event.matches ? 'dark' : 'light');
+
+    const updateTheme = () => {
+      const prefersDark = darkMedia.matches;
+      const prefersHighContrast = contrastMedia.matches;
+
+      if (prefersHighContrast) {
+        setThemeState(prefersDark ? 'dark-hc' : 'light-hc');
+      } else {
+        setThemeState(prefersDark ? 'dark' : 'light');
+      }
     };
-    if (media.addEventListener) {
-      media.addEventListener('change', listener);
-      return () => media.removeEventListener('change', listener);
+
+    // Update theme immediately when auto mode is selected
+    updateTheme();
+
+    // Set up listeners for changes
+    const darkListener = (event: MediaQueryListEvent) => {
+      updateTheme();
+    };
+
+    const contrastListener = (event: MediaQueryListEvent) => {
+      updateTheme();
+    };
+
+    // Use modern event listener API if available
+    if (darkMedia.addEventListener) {
+      darkMedia.addEventListener('change', darkListener);
+      contrastMedia.addEventListener('change', contrastListener);
+      return () => {
+        darkMedia.removeEventListener('change', darkListener);
+        contrastMedia.removeEventListener('change', contrastListener);
+      };
     }
-    media.addListener(listener);
-    return () => media.removeListener(listener);
+
+    // Fallback to older API
+    darkMedia.addListener(darkListener);
+    contrastMedia.addListener(contrastListener);
+    return () => {
+      darkMedia.removeListener(darkListener);
+      contrastMedia.removeListener(contrastListener);
+    };
   }, [mode]);
 
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const body = document.body;
-    body.classList.toggle('dark-theme', theme === 'dark');
-    body.classList.toggle('light-theme', theme !== 'dark');
+    body.classList.toggle('theme-light', theme === 'light');
+    body.classList.toggle('theme-dark', theme === 'dark');
+    body.classList.toggle('theme-light-hc', theme === 'light-hc');
+    body.classList.toggle('theme-dark-hc', theme === 'dark-hc');
   }, [theme]);
 
   useEffect(() => {
@@ -104,9 +196,18 @@ export function ThemeProvider({children}: {children: React.ReactNode}) {
   const toggleTheme = useCallback(() => {
     setMode((prev) => {
       if (prev === 'auto') {
-        return theme === 'dark' ? 'light' : 'dark';
+        return theme === 'dark' ? 'light' : theme === 'light' ? 'dark' : 'light';
       }
-      return prev === 'dark' ? 'light' : 'dark';
+      if (prev === 'light-hc' || prev === 'dark-hc') {
+        return 'light';
+      }
+      if (prev === 'light') {
+        return 'dark';
+      }
+      if (prev === 'dark') {
+        return 'light';
+      }
+      return 'light'; // fallback
     });
   }, [theme]);
 

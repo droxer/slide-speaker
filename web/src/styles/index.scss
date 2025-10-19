@@ -7,6 +7,11 @@
 // Theme styles
 @use './themes/light-theme.scss';
 @use './themes/dark-theme.scss';
+@use './themes/light-hc.scss';
+@use './themes/dark-hc.scss';
+
+// Accessibility styles
+@use './accessibility.scss';
 
 // Component styles
 @use './components/GoogleLoginButton.scss';

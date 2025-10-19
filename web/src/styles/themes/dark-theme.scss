@@ -1,6 +1,6 @@
-/* Dark theme overrides applied when <body> has class `dark-theme` */
+/* Dark theme overrides applied when <body> has class `theme-dark` */
 
-body.dark-theme {
+body.theme-dark {
   --dark-surface: rgba(15, 23, 42, 0.92);
   --dark-surface-alt: rgba(30, 41, 59, 0.88);
   --dark-border: rgba(148, 163, 184, 0.35);

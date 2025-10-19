@@ -5,11 +5,11 @@ import {SessionProvider} from 'next-auth/react';
 import type {ReactNode} from 'react';
 import type {Session} from 'next-auth';
 import {queryClient} from '@/services/queryClient';
-import {ThemeProvider} from '@/theme/ThemeProvider';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import React from 'react';
 import { ErrorBoundaryWithI18n } from '@/components/ErrorBoundary';
+import { ThemeProviderWrapper } from './ThemeProviderWrapper';
 
 type ProvidersProps = {
   children: ReactNode;
@@ -19,7 +19,7 @@ type ProvidersProps = {
 export function Providers({children, session}: ProvidersProps) {
   return (
     <SessionProvider session={session}>
-      <ThemeProvider>
+      <ThemeProviderWrapper>
         <QueryClientProvider client={queryClient}>
           <ErrorBoundaryWithI18n>
             <React.Suspense fallback={<div className="app-loading">Loading application...</div>}>
@@ -28,7 +28,7 @@ export function Providers({children, session}: ProvidersProps) {
           </ErrorBoundaryWithI18n>
           <ToastContainer />
         </QueryClientProvider>
-      </ThemeProvider>
+      </ThemeProviderWrapper>
     </SessionProvider>
   );
 }

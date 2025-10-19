@@ -1,4 +1,8 @@
 {
+  "accessibility": {
+    "skipToMain": "跳转到主要内容",
+    "skipToNavigation": "跳转到导航"
+  },
   "header": {
     "title": "幻灯演说 AI",
     "subtitle": "将幻灯片转化为 AI 驱动的视频",
@@ -72,6 +76,7 @@
     "nameLabel": "显示名称",
     "namePlaceholder": "我们应该如何称呼你？",
     "languageLabel": "偏好语言",
+    "themeLabel": "偏好主题",
     "saveButton": "保存更改",
     "saving": "正在保存…",
     "saveSuccess": "资料已更新",
@@ -408,7 +413,9 @@
       "toggleLabel": "主题切换",
       "auto": "跟随系统",
       "light": "浅色",
-      "dark": "深色"
+      "dark": "深色",
+      "highContrastLight": "高对比度浅色",
+      "highContrastDark": "高对比度深色"
     }
   },
   "pagination": {

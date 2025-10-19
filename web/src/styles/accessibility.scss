@@ -1,0 +1,341 @@
+/* Enhanced Accessibility Styles for WCAG 2.1 Compliance */
+
+/* Skip Links for Accessibility */
+.skip-links {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  z-index: 1000;
+  width: 100%;
+  text-align: center;
+  transition: top 0.3s ease;
+}
+
+.skip-links:focus-within {
+  top: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: -10000px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  padding: 10px 15px;
+  text-decoration: none;
+  font-weight: bold;
+  border-radius: 0 0 4px 4px;
+  border: 2px solid #fff;
+}
+
+.skip-link:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  left: auto;
+  top: auto;
+  z-index: 1000;
+  outline: 3px solid #000;
+  outline-offset: 2px;
+}
+
+/* High Contrast Skip Links for High Contrast Themes */
+.theme-light-hc .skip-link {
+  background: #000;
+  color: #fff;
+  border: 2px solid #fff;
+}
+
+.theme-dark-hc .skip-link {
+  background: #fff;
+  color: #000;
+  border: 2px solid #000;
+}
+
+/* Focus Visible Polyfill - Enhanced focus indicators */
+.js-focus-visible :focus:not(.focus-visible) {
+  outline: none;
+}
+
+.js-focus-visible .focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Enhanced focus styles for WCAG 2.1 compliance */
+*:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* High contrast focus indicators for high contrast themes */
+.theme-light-hc *:focus,
+.theme-dark-hc *:focus {
+  outline: 3px solid currentColor !important;
+  outline-offset: 2px !important;
+}
+
+/* Screen Reader Only - Hide content visually but keep it available to screen readers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Screen Reader Only Focusable - Allows element to be focusable when navigated to via keyboard */
+.sr-only-focusable:not(:focus) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Reduced Motion - Respect user's motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High Contrast Mode Support */
+@media (prefers-contrast: high) {
+  /* Increase contrast for all elements */
+  * {
+    border-width: 2px !important;
+  }
+
+  /* Ensure text has sufficient contrast */
+  p, span, div, h1, h2, h3, h4, h5, h6, li, dt, dd {
+    color: #000 !important;
+  }
+
+  .theme-dark p,
+  .theme-dark span,
+  .theme-dark div,
+  .theme-dark h1,
+  .theme-dark h2,
+  .theme-dark h3,
+  .theme-dark h4,
+  .theme-dark h5,
+  .theme-dark h6,
+  .theme-dark li,
+  .theme-dark dt,
+  .theme-dark dd {
+    color: #fff !important;
+  }
+}
+
+/* Increased Text Size Support */
+@media (min-width: 1200px) and (min-height: 900px) {
+  .large-text {
+    font-size: 1.2em;
+  }
+}
+
+/* ARIA Landmark Regions */
+[role="banner"] {
+  outline: none;
+}
+
+[role="main"] {
+  outline: none;
+}
+
+[role="navigation"] {
+  outline: none;
+}
+
+[role="contentinfo"] {
+  outline: none;
+}
+
+[role="complementary"] {
+  outline: none;
+}
+
+[role="search"] {
+  outline: none;
+}
+
+/* Form Accessibility */
+input[aria-invalid="true"] {
+  border-color: #ef4444;
+}
+
+input[aria-invalid="true"]:focus {
+  outline-color: #ef4444;
+}
+
+/* Error message association */
+.error-message {
+  color: #ef4444;
+  font-weight: bold;
+}
+
+/* Success message association */
+.success-message {
+  color: #22c55e;
+  font-weight: bold;
+}
+
+/* Label association for form elements */
+label {
+  cursor: pointer;
+}
+
+/* Ensure interactive elements are keyboard accessible */
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+a[role="button"] {
+  cursor: pointer;
+}
+
+/* Focusable elements that should be in tab order */
+[tabindex]:not([tabindex="-1"]) {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+[tabindex]:not([tabindex="-1"]):focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Hidden elements that should remain accessible to screen readers */
+[aria-hidden="true"] {
+  display: none;
+}
+
+/* Ensure links are distinguishable */
+a {
+  text-decoration: underline;
+}
+
+a:hover,
+a:focus {
+  text-decoration: none;
+}
+
+/* High contrast links for high contrast themes */
+.theme-light-hc a,
+.theme-dark-hc a {
+  text-decoration: underline !important;
+  font-weight: bold !important;
+}
+
+/* Ensure buttons have sufficient contrast */
+button,
+.btn,
+.primary-btn,
+.secondary-btn {
+  border: 1px solid transparent;
+}
+
+/* Focus visible enhancements */
+.focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Ensure form controls are accessible */
+input,
+select,
+textarea {
+  border: 1px solid #cbd5e1;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #3b82f6;
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* High contrast form controls */
+.theme-light-hc input,
+.theme-light-hc select,
+.theme-light-hc textarea,
+.theme-dark-hc input,
+.theme-dark-hc select,
+.theme-dark-hc textarea {
+  border: 2px solid currentColor !important;
+}
+
+/* Ensure images have alt text */
+img[alt] {
+  /* Images with alt text are accessible */
+}
+
+img:not([alt]) {
+  /* Images without alt text should be avoided */
+  border: 2px solid #ef4444;
+}
+
+/* ARIA live regions */
+[aria-live="polite"] {
+  /* Announce updates when the user is idle */
+}
+
+[aria-live="assertive"] {
+  /* Announce updates immediately */
+}
+
+/* Ensure proper heading structure */
+h1, h2, h3, h4, h5, h6 {
+  outline: none;
+}
+
+/* Skip link container for better keyboard navigation */
+.skip-link-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 9999;
+  text-align: center;
+}
+
+/* Focus trap for modals */
+.focus-trap {
+  outline: none;
+}
+
+/* Ensure proper contrast for all text */
+.text-high-contrast {
+  color: #000;
+  background-color: #fff;
+}
+
+.dark-theme .text-high-contrast {
+  color: #fff;
+  background-color: #000;
+}
+
+/* High contrast theme specific overrides */
+.theme-light-hc .text-high-contrast,
+.theme-dark-hc .text-high-contrast {
+  color: inherit !important;
+  background-color: inherit !important;
+}

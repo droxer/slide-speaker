@@ -292,7 +292,8 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
       group.uploadCreatedAt ??
       group.upload?.created_at ??
       null;
-    const statusPills = STATUS_ORDER.filter((state) => statusCounts[state]).map((state) => (
+    // Only show status pills for in-progress tasks (processing and queued)
+    const statusPills = STATUS_ORDER.filter((state) => statusCounts[state] && (state === 'processing' || state === 'queued')).map((state) => (
       <span
         key={state}
         className={`file-status-pill status-${state}${activeStatus === state ? ' is-active' : ''}`}
@@ -611,26 +612,29 @@ const TaskDashboard = ({ apiBaseUrl }: TaskDashboardProps) => {
                   style={{ cursor: 'pointer', userSelect: 'none' }}
                   title={copiedTaskId === task.task_id ? t('common.copied', undefined, 'Copied!') : t('task.list.copyId', undefined, 'Copy task ID')}
                 >
-                  {copiedTaskId === task.task_id ? '✓' : short}
+                  {copiedTaskId === task.task_id ? '✓' : task.task_id}
                 </span>
               </Link>
               <span className={`file-task-type-badge type-${typeKey}`}>
                 {typeLabel}
               </span>
             </div>
-            {task.status === 'processing' ? (
-              <button
-                type="button"
-                className={`file-task-status ${statusClass}`}
-                onClick={() => setProcessingTask(task)}
-                title={t('processing.modal.openDetails', undefined, 'View processing details')}
-              >
-                {label}
-              </button>
-            ) : (
-              <span className={`file-task-status ${statusClass}`}>
-                {label}
-              </span>
+            {/* Only show status badge for in-progress tasks (processing or queued) */}
+            {(task.status === 'processing' || task.status === 'queued') && (
+              task.status === 'processing' ? (
+                <button
+                  type="button"
+                  className={`file-task-status ${statusClass}`}
+                  onClick={() => setProcessingTask(task)}
+                  title={t('processing.modal.openDetails', undefined, 'View processing details')}
+                >
+                  {label}
+                </button>
+              ) : (
+                <span className={`file-task-status ${statusClass}`}>
+                  {label}
+                </span>
+              )
             )}
           </div>
           {(generationParamsChips.length > 0 || datetimeChips.length > 0) && (

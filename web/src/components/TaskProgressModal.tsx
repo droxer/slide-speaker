@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import TaskProcessingSteps from './TaskProcessingSteps';
 import type { Task } from '@/types';
 import type { ProcessingDetails } from './types';
@@ -8,6 +8,7 @@ import { getStepLabel } from '@/utils/stepLabels';
 import { useI18n } from '@/i18n/hooks';
 import { sortSteps } from '@/utils/stepOrdering';
 import { useTaskQuery, prefetchTaskDetail } from '@/services/queries';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 type TaskProgressModalProps = {
   open: boolean;
@@ -468,6 +469,9 @@ const TaskProgressModal = ({
     return computed;
   }, [effectiveTask]);
 
+  // Use focus trap for the modal
+  const modalRef = useFocusTrap(open && !!task);
+
   if (!open || !task) return null;
   // Note: we intentionally don't check for !details here as it might be computed later
 
@@ -490,7 +494,12 @@ const TaskProgressModal = ({
 
   return (
     <div className="processing-modal" role="dialog" aria-modal="true" aria-labelledby="processing-modal-title" onClick={onClose}>
-      <div className="processing-modal__content" role="document" onClick={(event) => event.stopPropagation()}>
+      <div
+        ref={modalRef}
+        className="processing-modal__content"
+        role="document"
+        onClick={(event) => event.stopPropagation()}
+      >
         <header className="processing-modal__header">
           <div className="processing-modal__title">
             <span aria-hidden="true">⚙️</span>

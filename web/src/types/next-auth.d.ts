@@ -9,6 +9,7 @@ declare module 'next-auth' {
       name?: string | null;
       image?: string | null;
       preferred_language?: string | null;
+      preferred_theme?: string | null;
     };
   }
 
@@ -18,6 +19,7 @@ declare module 'next-auth' {
     name?: string | null;
     image?: string | null;
     preferred_language?: string | null;
+    preferred_theme?: string | null;
   }
 
   interface JWT {
@@ -27,6 +29,7 @@ declare module 'next-auth' {
       name?: string | null;
       image?: string | null;
       preferred_language?: string | null;
+      preferred_theme?: string | null;
     };
   }
 
@@ -41,6 +44,7 @@ declare module 'next-auth/jwt' {
       name?: string | null;
       image?: string | null;
       preferred_language?: string | null;
+      preferred_theme?: string | null;
     };
   }
 }

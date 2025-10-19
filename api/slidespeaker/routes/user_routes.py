@@ -25,6 +25,7 @@ class ProfileResponse(BaseModel):
 class UpdateProfilePayload(BaseModel):
     name: str | None = Field(default=None, max_length=255)
     preferred_language: str | None = Field(default=None, max_length=64)
+    preferred_theme: str | None = Field(default=None, max_length=32)
 
 
 async def _resolve_current_user(decoded_token: dict[str, object]) -> dict[str, object]:
@@ -91,10 +92,21 @@ async def update_profile(
     else:
         effective_name = None
 
+    # Handle theme preference
+    current_theme = user.get("preferred_theme")
+    effective_theme: str | None
+    if payload.preferred_theme is not None:
+        effective_theme = payload.preferred_theme
+    elif isinstance(current_theme, str):
+        effective_theme = current_theme
+    else:
+        effective_theme = None
+
     updated = await update_user_profile(
         user_id,
         name=effective_name,
         preferred_language=normalized_lang,
+        preferred_theme=effective_theme,
     )
 
     if not updated:

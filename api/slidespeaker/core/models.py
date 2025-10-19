@@ -68,6 +68,7 @@ class User(Base):
     picture: Mapped[str | None] = mapped_column(Text, nullable=True)
     password_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
     preferred_language: Mapped[str] = mapped_column(String(64), default="english")
+    preferred_theme: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=False), default=datetime.now
     )

@@ -182,7 +182,7 @@ export const getCurrentUserProfile = async (): Promise<ProfileResponse> => {
 };
 
 export const updateCurrentUserProfile = async (
-  payload: {name?: string | null; preferred_language?: string | null},
+  payload: {name?: string | null; preferred_language?: string | null; preferred_theme?: string | null},
 ): Promise<ProfileResponse> => {
   const res = await api.patch<ProfileResponse>('/api/users/me', payload);
   return res.data;

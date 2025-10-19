@@ -1,4 +1,8 @@
 {
+  "accessibility": {
+    "skipToMain": "メインコンテンツにスキップ",
+    "skipToNavigation": "ナビゲーションにスキップ"
+  },
   "header": {
     "title": "SlideSpeaker AI",
     "subtitle": "スライドをAI動画に変換",
@@ -72,6 +76,7 @@
     "nameLabel": "表示名",
     "namePlaceholder": "どのようにお呼びすればよいですか？",
     "languageLabel": "希望言語",
+    "themeLabel": "希望テーマ",
     "saveButton": "変更を保存",
     "saving": "保存中…",
     "saveSuccess": "プロフィールを更新しました",
@@ -405,7 +410,9 @@
       "toggleLabel": "テーマの切り替え",
       "auto": "自動",
       "light": "ライト",
-      "dark": "ダーク"
+      "dark": "ダーク",
+      "highContrastLight": "ハイコントラスト ライト",
+      "highContrastDark": "ハイコントラスト ダーク"
     }
   },
   "pagination": {

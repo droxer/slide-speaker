@@ -1529,6 +1529,35 @@
     font-size: 14px;
   }
 
+  .file-task-id {
+    display: inline-flex;
+    align-items: center;
+    font-weight: 700;
+    font-size: 14px;
+    color: #1e3a8a;
+    background: #dbeafe;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid #93c5fd;
+    transition: all 0.2s ease;
+    font-family: 'SF Mono', Monaco, Menlo, Consolas, 'Courier New', monospace;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    white-space: nowrap;
+  }
+
+  .file-task-id:hover {
+    background: #bfdbfe;
+    border-color: #3b82f6;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .file-task-id.copied {
+    background: #86efac;
+    border-color: #4ade80;
+    color: #166534;
+  }
+
   .file-task-status {
     display: inline-flex;
     align-items: center;
