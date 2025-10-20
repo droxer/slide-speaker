@@ -174,10 +174,17 @@ export function ThemeProvider({children, initialTheme}: {children: React.ReactNo
   useEffect(() => {
     if (typeof document === 'undefined') return;
     const body = document.body;
-    body.classList.toggle('theme-light', theme === 'light');
-    body.classList.toggle('theme-dark', theme === 'dark');
-    body.classList.toggle('theme-light-hc', theme === 'light-hc');
-    body.classList.toggle('theme-dark-hc', theme === 'dark-hc');
+    const isLight = theme === 'light';
+    const isDark = theme === 'dark';
+    const isLightHighContrast = theme === 'light-hc';
+    const isDarkHighContrast = theme === 'dark-hc';
+
+    body.classList.toggle('theme-light', isLight);
+    body.classList.toggle('theme-dark', isDark);
+    body.classList.toggle('theme-light-hc', isLightHighContrast);
+    body.classList.toggle('theme-dark-hc', isDarkHighContrast);
+    body.classList.toggle('light-theme', isLight || isLightHighContrast);
+    body.classList.toggle('dark-theme', isDark || isDarkHighContrast);
   }, [theme]);
 
   useEffect(() => {

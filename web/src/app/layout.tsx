@@ -17,13 +17,37 @@ const themeInitScript = `(() => {
     const storageKey = 'slidespeaker_ui_theme';
     const stored = window.localStorage.getItem(storageKey);
     const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const theme = stored === 'dark' || stored === 'light' ? stored : (prefersDark ? 'dark' : 'light');
-    document.body.classList.toggle('dark-theme', theme === 'dark');
-    document.body.classList.toggle('light-theme', theme !== 'dark');
+    const prefersHighContrast = window.matchMedia && window.matchMedia('(prefers-contrast: more)').matches;
+
+    let themeClass = 'theme-light';
+    if (stored === 'dark' || stored === 'light' || stored === 'light-hc' || stored === 'dark-hc') {
+      if (stored === 'dark') themeClass = 'theme-dark';
+      else if (stored === 'light-hc') themeClass = 'theme-light-hc';
+      else if (stored === 'dark-hc') themeClass = 'theme-dark-hc';
+      else themeClass = 'theme-light'; // light
+    } else if (prefersHighContrast) {
+      themeClass = prefersDark ? 'theme-dark-hc' : 'theme-light-hc';
+    } else {
+      themeClass = prefersDark ? 'theme-dark' : 'theme-light';
+    }
+
+    const legacyClass = themeClass.includes('dark') ? 'dark-theme' : 'light-theme';
+    document.body.classList.add(themeClass);
+    document.body.classList.add(legacyClass);
   } catch (error) {
     const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-    document.body.classList.toggle('dark-theme', prefersDark);
-    document.body.classList.toggle('light-theme', !prefersDark);
+    const prefersHighContrast = window.matchMedia && window.matchMedia('(prefers-contrast: more)').matches;
+
+    let themeClass = 'theme-light';
+    if (prefersHighContrast) {
+      themeClass = prefersDark ? 'theme-dark-hc' : 'theme-light-hc';
+    } else {
+      themeClass = prefersDark ? 'theme-dark' : 'theme-light';
+    }
+
+    const legacyClass = themeClass.includes('dark') ? 'dark-theme' : 'light-theme';
+    document.body.classList.add(themeClass);
+    document.body.classList.add(legacyClass);
   }
 })();`;
 
