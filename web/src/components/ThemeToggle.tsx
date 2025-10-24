@@ -39,7 +39,7 @@ const ThemeToggle = ({className = '', ariaLabel}: ThemeToggleProps) => {
       <button
         type="button"
         onClick={() => setTheme('light')}
-        className={`toggle-btn ${hydrated && mode === 'light' && theme === 'light' ? 'active' : ''}`}
+        className={`toggle-btn ${hydrated && mode === 'light' ? 'active' : ''}`}
         title={t('footer.theme.light', undefined, 'Light')}
         role="tab"
         aria-selected={hydrated ? mode === 'light' : undefined}
@@ -51,7 +51,7 @@ const ThemeToggle = ({className = '', ariaLabel}: ThemeToggleProps) => {
       <button
         type="button"
         onClick={() => setTheme('dark')}
-        className={`toggle-btn ${hydrated && mode === 'dark' && theme === 'dark' ? 'active' : ''}`}
+        className={`toggle-btn ${hydrated && mode === 'dark' ? 'active' : ''}`}
         title={t('footer.theme.dark', undefined, 'Dark')}
         role="tab"
         aria-selected={hydrated ? mode === 'dark' : undefined}

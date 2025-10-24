@@ -1,18 +1,13 @@
-import { dirname } from "node:path";
-import { fileURLToPath } from "node:url";
-
-import { FlatCompat } from "@eslint/eslintrc";
-import globals from "globals";
+import eslintPluginNext from '@next/eslint-plugin-next'
+import tseslint from "typescript-eslint";
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-});
+const tsconfigRootDir = resolve(__dirname);
 
 export default [
-  ...compat.extends("next/core-web-vitals", "next/typescript"),
   {
     ignores: [
       "**/node_modules/**",
@@ -23,18 +18,26 @@ export default [
       "coverage/**",
       "jest.config.js",
     ],
-    languageOptions: {
-      ecmaVersion: "latest",
-      sourceType: "module",
-      globals: {
-        ...globals.browser,
-        ...globals.node,
-      },
-    },
   },
   {
-    files: ["**/*.{ts,tsx,cts,mts}"],
+    files: ["**/*.{ts,tsx}"],
+    languageOptions: {
+      parser: tseslint.parser,
+      parserOptions: {
+        project: './tsconfig.json',
+        tsconfigRootDir,
+        ecmaFeatures: {
+          jsx: true,
+        },
+      },
+    },
+    plugins: {
+      '@next/next': eslintPluginNext,
+      '@typescript-eslint': tseslint.plugin,
+    },
     rules: {
+      ...eslintPluginNext.configs.recommended.rules,
+      ...eslintPluginNext.configs['core-web-vitals'].rules,
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-unused-expressions": "off",
