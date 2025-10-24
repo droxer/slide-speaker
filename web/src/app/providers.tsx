@@ -10,6 +10,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import React from 'react';
 import { ErrorBoundaryWithI18n } from '@/components/ErrorBoundary';
 import { ThemeProviderWrapper } from './ThemeProviderWrapper';
+import { StoreProvider } from '@/stores/StoreProvider';
 
 type ProvidersProps = {
   children: ReactNode;
@@ -20,14 +21,16 @@ export function Providers({children, session}: ProvidersProps) {
   return (
     <SessionProvider session={session}>
       <ThemeProviderWrapper>
-        <QueryClientProvider client={queryClient}>
-          <ErrorBoundaryWithI18n>
-            <React.Suspense fallback={<div className="app-loading">Loading application...</div>}>
-              {children}
-            </React.Suspense>
-          </ErrorBoundaryWithI18n>
-          <ToastContainer />
-        </QueryClientProvider>
+        <StoreProvider>
+          <QueryClientProvider client={queryClient}>
+            <ErrorBoundaryWithI18n>
+              <React.Suspense fallback={<div className="app-loading">Loading application...</div>}>
+                {children}
+              </React.Suspense>
+            </ErrorBoundaryWithI18n>
+            <ToastContainer />
+          </QueryClientProvider>
+        </StoreProvider>
       </ThemeProviderWrapper>
     </SessionProvider>
   );

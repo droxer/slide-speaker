@@ -21,7 +21,7 @@ type UploadPanelProps = {
   setVideoResolution: (v: string) => void;
   uploading: boolean;
   onCreate: () => void;
-  getFileTypeHint: (filename: string) => JSX.Element;
+  getFileTypeHint: (filename: string) => React.JSX.Element;
 };
 
 const LANGS = [

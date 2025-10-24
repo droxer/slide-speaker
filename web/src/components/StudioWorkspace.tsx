@@ -736,7 +736,7 @@ export function StudioWorkspace() {
     hydrateTaskId();
   }, [uploadId, status, taskId]);
 
-  const getFileTypeHint = useCallback((filename: string): JSX.Element => {
+  const getFileTypeHint = useCallback((filename: string): React.JSX.Element => {
     const ext = filename.toLowerCase().split('.').pop();
 
     if (ext === 'pdf') {
