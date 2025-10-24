@@ -56,6 +56,7 @@ make check           # Lint + TS
   - Styles: src/styles/ (index.scss, app.scss, TaskMonitor.scss, dark-theme.scss)
   - Hooks: src/hooks/ (custom React hooks)
   - Utils: src/utils/ (utility functions)
+  - Stores: src/stores/ (Zustand state management)
 
 ## Core Concepts
 - task_type: What we are generating. Allowed: video | podcast | both. Drives whether video, podcast, or both artifacts are produced.
@@ -98,6 +99,7 @@ make check           # Lint + TS
   - UploadPanel: upload box; "AUDIO LANGUAGE" and "Subtitles Language" labels; hide upload UI during upload/processing; Create button only when idle/ready.
   - TaskProcessingSteps: task meta in two equal-width cards; correct badges; small preview where applicable.
   - TaskMonitor: task list + TaskCard per task. Preview modal closes on ESC and is sized larger for audio/podcast.
+- State Management: Uses Zustand for local state management. Theme, UI, and task states are managed through centralized stores in src/stores/.
 - UX rules (see AGENTS.md for full spec):
   - Downloads order: Video, Audio, Transcript, VTT, SRT.
   - Use task‑based URLs only: /api/tasks/{task_id}/...
@@ -155,17 +157,18 @@ OSS_REGION=...
 - Web (TS/React): ESLint + tsconfig; components in src/components/ with PascalCase and matching .scss; keep functions small and typed.
 - LLM: Use helpers in slidespeaker/llm (chat_completion, image_generate, tts_speech_stream); do not instantiate OpenAI clients directly.
 - Scope: Keep patches tight; do not alter project structure/Make targets unless asked.
+- State Management: Use Zustand for local state management with centralized stores in src/stores/.
 
 ## Frontend UX Rules (Task Monitor & Redirect)
 - Downloads order: Video, Audio, Transcript, VTT, SRT.
-- “More” toggle at end of task details expands/collapses full download block (link‑style UI acceptable or native details/summary).
+- "More" toggle at end of task details expands/collapses full download block (link‑style UI acceptable or native details/summary).
 - Task‑based URLs only; never emit file‑based URLs in new UI.
 - Subtitle styling/rendering unified between preview modal and task detail tabs.
-- Remove file ID chip; keep header “Task: {task_id}”; task‑id label is focusable and copyable (Enter).
+- Remove file ID chip; keep header "Task: {task_id}"; task‑id label is focusable and copyable (Enter).
 - Post-completion flow: show the redirect spinner copy (`completed.redirecting`) and push to `/[locale]/tasks/{id}`.
 - Default font: Google Open Sans across the app.
 - Status pills (Completed/Processing/Queued/Failed/Cancelled) follow theme colors with hover/focus.
-- Processing Task Meta: two equal‑width cards; file icon/name don’t overlap; file‑type badge vertically centered.
+- Processing Task Meta: two equal‑width cards; file icon/name don't overlap; file‑type badge vertically centered.
 
 ## Testing & Verification (mirror of AGENTS.md)
 - API: Tests are now implemented using pytest. Run tests with `cd api && python -m pytest tests/`. Place any new tests under api/tests/ as test_*.py.
@@ -199,6 +202,7 @@ OSS_REGION=...
 - Metrics endpoints: api/slidespeaker/routes/metrics_routes.py
 - Upload handling: api/slidespeaker/routes/upload_routes.py
 - Frontend monitor: web/src/components/TaskMonitor.tsx
+- State Management: web/src/stores/ (Zustand stores)
 
 ## New API Endpoints
 - Metrics:
@@ -216,16 +220,40 @@ OSS_REGION=...
 - Consider extracting shared locale maps/utilities to keep UI and API aligned.
 
 ## Troubleshooting Notes
-- If you see duplicate type errors like “Identifier 'Cue' has already been declared”, ensure shared types live once at the component scope (use TranscriptList types) and remove duplicates.
-- If subtitles don’t render, verify VTT fetch via services/queries useVttQuery and that components receive vttUrl or parsed cues. Ensure unified styling via styles/.
-- If styles don’t apply, check that index.tsx imports `src/styles/index.scss` and App.tsx imports `src/styles/app.scss` and the dark theme overrides (`dark-theme.scss`). Task monitor styles live in `src/styles/TaskMonitor.scss`.
+- If you see duplicate type errors like "Identifier 'Cue' has already been declared", ensure shared types live once at the component scope (use TranscriptList types) and remove duplicates.
+- If subtitles don't render, verify VTT fetch via services/queries useVttQuery and that components receive vttUrl or parsed cues. Ensure unified styling via styles/.
+- If styles don't apply, check that index.tsx imports `src/styles/index.scss` and App.tsx imports `src/styles/app.scss` and the dark theme overrides (`dark-theme.scss`). Task monitor styles live in `src/styles/TaskMonitor.scss`.
 - If too many /api/tasks calls occur, ensure React Query keys are consistent and refetchInterval only runs when active tasks are on the current page.
+- If theme changes don't apply, verify that StoreProvider is included in the provider hierarchy in src/app/providers.tsx.
 
 ## Recent Backend/Frontend Alignments
 - Enforced source_type across upload/worker/coordinator with hard errors on invalid input.
 - Podcast transcript language persists in subtitle_language; translation step appears when languages differ.
-- Centralized audio generation language logic under slidespeaker/audio/generator.py; removed “Transition:” labels.
+- Centralized audio generation language logic under slidespeaker/audio/generator.py; removed "Transition:" labels.
 - Frontend uses reusable Audio/Video/Podcast players and TranscriptList to unify subtitles/transcripts across preview and completed views.
+- Implemented Zustand for state management with centralized stores in src/stores/.
+- Fixed theme application issues by ensuring StoreProvider is properly included in the provider hierarchy.
+
+## Recent Changes (October 2025)
+### State Management
+- Integrated Zustand for frontend state management
+- Created centralized stores in src/stores/ for UI, theme, and task state
+- Replaced React Context with Zustand stores for better performance and simpler API
+
+### Theme System
+- Fixed theme application issues by ensuring StoreProvider is properly included in the provider hierarchy
+- Enhanced theme store logic to properly update both mode and theme states
+- Improved high contrast theme support for both light and dark modes
+
+### Development Tools
+- Fixed ESLint configuration to properly handle TypeScript and JSX parsing
+- Resolved circular reference issues in ESLint configuration
+- Updated TypeScript configuration for better type checking
+
+### Component Structure
+- Added StoreProvider to the application provider hierarchy in src/app/providers.tsx
+- Enhanced theme toggle functionality with proper active state management
+- Improved state synchronization between UI components and theme system
 
 -- do NOT git commit
 -- do NOT check the node_modules and .venv

@@ -20,6 +20,7 @@ The project follows a modern microservices architecture with a Python FastAPI ba
 - Support for additional languages: Thai, Korean, and Japanese
 - Optimized task creation page and improved processing display
 - Enhanced web performance for better user experience
+- Zustand state management for improved frontend performance
 
 ## Technology Stack
 
@@ -28,7 +29,7 @@ The project follows a modern microservices architecture with a Python FastAPI ba
 - **Framework**: FastAPI
 - **Task Queue**: Redis
 - **Database**: PostgreSQL (optional)
-- **AI Services**: 
+- **AI Services**:
   - OpenAI (GPT models for script generation, TTS, vision)
   - ElevenLabs (Alternative TTS)
   - HeyGen (AI avatar generation)
@@ -39,7 +40,7 @@ The project follows a modern microservices architecture with a Python FastAPI ba
 - **Language**: TypeScript
 - **Framework**: React 18
 - **Build Tool**: React Scripts
-- **State Management**: React Query (TanStack Query)
+- **State Management**: Zustand (local state) + React Query (server state)
 - **Styling**: Sass/SCSS
 - **Package Manager**: pnpm (preferred) or npm
 
@@ -76,6 +77,7 @@ slide-speaker/
 │   ├── src/             # Source code
 │   │   ├── components/  # React components
 │   │   ├── services/    # API client services
+│   │   ├── stores/      # Zustand state management stores
 │   │   ├── styles/      # SCSS stylesheets
 │   │   ├── types/       # TypeScript type definitions
 │   │   ├── utils/       # Utility functions
@@ -188,10 +190,10 @@ The frontend is built with React and follows a component-based architecture:
    - API client for backend communication
    - React Query hooks for data fetching and caching
 
-3. **State Management**
+3. **State Management** (`src/stores/`)
+   - Zustand stores for local state management
+   - UI state, theme state, and task state management
    - React Query for server state
-   - React Context for UI state
-   - LocalStorage for task persistence
 
 4. **Styling**
    - SCSS modules for component styling
@@ -247,6 +249,7 @@ See `api/.env.example` for a complete list of configuration options.
 - Components in `src/components/` with PascalCase naming
 - SCSS files for styling with matching component names
 - Use React Query for data fetching
+- Use Zustand for local state management
 - Keep functions small and well-typed
 - Internationalization support with locales: English, Chinese (Simplified/Traditional), Thai, Korean, and Japanese
 
@@ -302,6 +305,7 @@ See `api/.env.example` for a complete list of configuration options.
 - Task monitor: `web/src/components/TaskMonitor.tsx`
 - API client: `web/src/services/client.ts`
 - React Query hooks: `web/src/services/queries.ts`
+- Zustand stores: `web/src/stores/`
 
 ## Accessing the Application
 
@@ -320,3 +324,25 @@ For production deployments, SlideSpeaker uses a distributed architecture:
 - Reverse proxy (nginx) for serving static assets
 
 This architecture allows for horizontal scaling of processing workers based on demand.
+
+## Recent Changes (October 2025)
+
+### State Management
+- Integrated Zustand for frontend state management
+- Created centralized stores in `web/src/stores/` for UI, theme, and task state
+- Replaced React Context with Zustand stores for better performance and simpler API
+
+### Theme System
+- Fixed theme application issues by ensuring StoreProvider is properly included in the provider hierarchy
+- Enhanced theme store logic to properly update both mode and theme states
+- Improved high contrast theme support for both light and dark modes
+
+### Development Tools
+- Fixed ESLint configuration to properly handle TypeScript and JSX parsing
+- Resolved circular reference issues in ESLint configuration
+- Updated TypeScript configuration for better type checking
+
+### Component Structure
+- Added StoreProvider to the application provider hierarchy in `web/src/app/providers.tsx`
+- Enhanced theme toggle functionality with proper active state management
+- Improved state synchronization between UI components and theme system

@@ -24,6 +24,8 @@ SlideSpeaker is under active development. Expect rapid iteration, breaking chang
 - Support for additional languages: Thai, Korean, and Japanese
 - Optimized task creation page and improved processing display
 - Enhanced web performance for better user experience
+- Modern state management with Zustand for improved frontend performance
+- Enhanced theme system with proper high contrast support
 
 ## 🚀 Quick Start
 
@@ -48,7 +50,13 @@ Use `--help` on any subcommand to see additional options (`show`, `set-password`
 ```bash
 cd web
 pnpm install                 # Install dependencies (prefer pnpm)
-pnpm start                   # Start development server (port 3000)
+pnpm dev                     # Start development server (port 3000)
+```
+
+### Background Processing
+```bash
+cd api
+make master-worker          # Start master process that spawns workers
 ```
 
 ## ♿ Accessibility
@@ -59,10 +67,6 @@ SlideSpeaker is committed to providing an inclusive experience for all users:
 - Enhanced focus indicators for keyboard navigation
 - Screen reader friendly interface
 - Support for multiple languages to serve a diverse user base
-
-Visit:
-- `http://localhost:3000` - Web UI
-- `http://localhost:8000/docs` - API documentation
 
 Visit:
 - `http://localhost:3000` - Web UI
@@ -107,7 +111,14 @@ SlideSpeaker supports multiple storage backends:
 ## 📚 Documentation
 
 - [Installation Guide](docs/installation.md) - Detailed setup instructions
-- [API Documentation](docs/api.md) - Complete API reference
+- [API Installation Guide](docs/api-installation.md) - Backend-specific installation and configuration
+- [Frontend Technical Stack](docs/frontend-tech-stack.md) - React/TypeScript architecture
+- [Backend Technical Stack](docs/backend-tech-stack.md) - Python/FastAPI architecture
+- [API Documentation](http://localhost:8000/docs) - Auto-generated API docs (when running)
+- [API Reference](docs/api.md) - Complete API reference and endpoints
+- [Pipeline Overview](docs/pipeline-overview.md) - High-level processing pipeline architecture
+- [Step Definitions](docs/step-definitions.md) - Detailed breakdown of processing steps
+- [Data Flow](docs/dataflow.md) - Data flow and state management
 - [Configuration](api/.env.example) - Environment variables reference
 - [High Contrast Themes Improvements](high-contrast-themes-improvements.md) - Details about accessibility enhancements
 

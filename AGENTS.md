@@ -38,6 +38,7 @@ This guide helps contributors work productively across the FastAPI backend and t
 - App Router: locale-aware routes live under `web/src/app/[locale]/`. Shared client entry points sit in `web/src/app/*PageClient.tsx`. Use the non-locale directories only for server components that seed data before delegating to the client versions.
 - Internationalization: `web/src/i18n/` holds `config.ts`, message catalogs, and hooks. Navigation helpers live in `web/src/navigation.ts`. Middleware (`web/middleware.ts`) wires next-intl locale detection.
 - UI components: `web/src/components/` (match `.scss` files). `LanguageToggle` handles locale changes inside detail views. Download surfaces live in `DownloadLinks`.
+- State Management: `web/src/stores/` holds Zustand stores for local state management.
 - Docs: `docs/`; Top-level: `README.md`, `CLAUDE.md`, `QWEN.md`.
 
 ### Build, Test, and Development
@@ -49,6 +50,7 @@ This guide helps contributors work productively across the FastAPI backend and t
 - TS/React: follow ESLint + `tsconfig.json`. Components `PascalCase` in `web/src/components/` with matching `.scss`.
 - I18n: inside React components or hooks call `useI18n()` from `web/src/i18n/hooks`. Provide a sensible fallback string (third argument) for any `t()` call that might miss a translation.
 - Use `slidespeaker/llm` helpers for OpenAI/voice/vision instead of creating clients directly.
+- State Management: Use Zustand for local state management with centralized stores in `web/src/stores/`.
 
 ### Internationalization Workflow
 - Locales currently ship with `en`, `zh-CN`, `zh-TW`. Add new keys to every catalog in `web/src/i18n/messages/`.
@@ -75,3 +77,26 @@ This guide helps contributors work productively across the FastAPI backend and t
 - Creations trash actions cancel active tasks and purge completed ones; update cached lists so cards disappear immediately before awaiting server confirmation.
 - Prefer task-based endpoints (e.g., `/api/tasks/{task_id}/video|audio|transcripts/markdown|subtitles/{vtt|srt}`) from the frontend.
 - Generated assets should use task-id filenames where possible.
+- State Management: Uses Zustand for local state management with centralized stores in `web/src/stores/`.
+- Theme System: Theme application requires StoreProvider to be included in the provider hierarchy in `web/src/app/providers.tsx`.
+
+## Recent Changes (October 2025)
+### State Management
+- Integrated Zustand for frontend state management
+- Created centralized stores in `web/src/stores/` for UI, theme, and task state
+- Replaced React Context with Zustand stores for better performance and simpler API
+
+### Theme System
+- Fixed theme application issues by ensuring StoreProvider is properly included in the provider hierarchy
+- Enhanced theme store logic to properly update both mode and theme states
+- Improved high contrast theme support for both light and dark modes
+
+### Development Tools
+- Fixed ESLint configuration to properly handle TypeScript and JSX parsing
+- Resolved circular reference issues in ESLint configuration
+- Updated TypeScript configuration for better type checking
+
+### Component Structure
+- Added StoreProvider to the application provider hierarchy in `web/src/app/providers.tsx`
+- Enhanced theme toggle functionality with proper active state management
+- Improved state synchronization between UI components and theme system
