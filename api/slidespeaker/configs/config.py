@@ -137,6 +137,17 @@ class Config:
             "GOOGLE_REDIRECT_URI", "http://localhost:3000/auth/callback"
         )
 
+        # CORS settings
+        self.cors_origins = self._parse_cors_origins(
+            os.getenv("CORS_ORIGINS", "http://localhost:3000")
+        )
+
+    def _parse_cors_origins(self, origins_str: str) -> list[str]:
+        """Parse CORS origins from a comma-separated string."""
+        if not origins_str:
+            return ["http://localhost:3000"]
+        return [origin.strip() for origin in origins_str.split(",") if origin.strip()]
+
     @property
     def output_dir(self) -> Path:
         if self._output_dir is None:
