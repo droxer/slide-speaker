@@ -135,7 +135,7 @@ export const TranscriptList = ({ cues, activeIdx, onSeek, showTimestamps = true 
           aria-current={idx === activeIdx ? 'true' : undefined}
         >
           {showTimestamps && (
-            <span className="audio-transcript-ts" aria-hidden="true">[{formatTS(c.start)}]</span>
+            <span className="audio-transcript-ts">[{formatTS(c.start)} - {formatTS(c.end)}]</span>
           )}
           <span className="audio-transcript-text">
             {String(c.text)

@@ -200,6 +200,41 @@ body.theme-light-hc {
     border: 2px solid #000 !important;
   }
 
+  /* Audio transcript adjustments */
+  .audio-transcript {
+    border: 2px solid #000 !important;
+    background: #fff !important;
+  }
+
+  .audio-transcript-row {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .audio-transcript-row.active {
+    background: #000 !important;
+    color: #fff !important;
+  }
+
+  .audio-transcript-row.active .audio-transcript-text,
+  .audio-transcript-row.active .podcast-speaker,
+  .audio-transcript-row.active .podcast-content {
+    color: #fff !important;
+  }
+
+  .audio-transcript-ts {
+    background: #fff !important;
+    color: #000 !important;
+    border: 2px solid #000 !important;
+    box-shadow: none !important;
+  }
+
+  .audio-transcript-row.active .audio-transcript-ts {
+    background: #000 !important;
+    color: #fff !important;
+    border-color: #fff !important;
+  }
+
   .task-detail-card__video,
   .task-detail-card__audio {
     border: 2px solid #000 !important;

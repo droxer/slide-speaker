@@ -151,10 +151,12 @@
   flex: 0 0 auto;
   padding: 2px 6px;
   border-radius: 6px;
-  background: #e2e8f0; /* neutral badge */
-  color: #1f2937;
+  background: rgba(79, 70, 229, 0.14);
+  color: #3730a3;
+  border: 1px solid rgba(129, 140, 248, 0.35);
   font-weight: 600;
   letter-spacing: 0.2px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .audio-transcript-text {
@@ -174,8 +176,10 @@
 
 /* Emphasize timestamp for active row */
 .audio-transcript-row.active .audio-transcript-ts {
-  background: #c7d2fe; /* brand-tinted badge */
-  color: #1e3a8a;
+  background: rgba(79, 70, 229, 0.22);
+  color: #312e81;
+  border-color: rgba(79, 70, 229, 0.45);
+  box-shadow: 0 1px 4px rgba(79, 70, 229, 0.1);
 }
 
 /* Highlight active podcast speaker */
