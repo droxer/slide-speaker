@@ -200,6 +200,41 @@ body.theme-dark-hc {
     }
   }
 
+  /* Audio transcript adjustments */
+  .audio-transcript {
+    border: 2px solid rgba(226, 232, 240, 0.75) !important;
+    background: rgba(15, 23, 42, 0.92) !important;
+  }
+
+  .audio-transcript-row {
+    background: transparent !important;
+    color: var(--hc-text-primary) !important;
+  }
+
+  .audio-transcript-row.active {
+    background: rgba(248, 250, 252, 0.18) !important;
+    color: #0f172a !important;
+  }
+
+  .audio-transcript-row.active .audio-transcript-text,
+  .audio-transcript-row.active .podcast-speaker,
+  .audio-transcript-row.active .podcast-content {
+    color: #0f172a !important;
+  }
+
+  .audio-transcript-ts {
+    background: rgba(148, 163, 184, 0.2) !important;
+    color: #f8fafc !important;
+    border: 2px solid rgba(226, 232, 240, 0.85) !important;
+    box-shadow: none !important;
+  }
+
+  .audio-transcript-row.active .audio-transcript-ts {
+    background: #f8fafc !important;
+    color: #0f172a !important;
+    border-color: #0f172a !important;
+  }
+
   /* Enhanced form elements */
   input,
   textarea,
