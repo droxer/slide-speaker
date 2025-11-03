@@ -3,37 +3,19 @@ repos:
     hooks:
       - id: api-lint
         name: api-lint
-        entry: bash -c 'cd api && make lint'
+        entry: bash -c 'make lint'
         language: system
         always_run: true
         pass_filenames: false
       - id: api-format
         name: api-format
-        entry: bash -c 'cd api && make format'
+        entry: bash -c 'make format'
         language: system
         always_run: true
         pass_filenames: false
       - id: api-typecheck
         name: api-typecheck
-        entry: bash -c 'cd api && make typecheck'
-        language: system
-        always_run: true
-        pass_filenames: false
-      - id: web-lint
-        name: web-lint
-        entry: bash -c 'cd web && make lint'
-        language: system
-        always_run: true
-        pass_filenames: false
-      - id: web-format
-        name: web-format
-        entry: bash -c 'cd web && make lint-fix'
-        language: system
-        always_run: true
-        pass_filenames: false
-      - id: web-typecheck
-        name: web-typecheck
-        entry: bash -c 'cd web && make typecheck'
+        entry: bash -c 'make typecheck'
         language: system
         always_run: true
         pass_filenames: false

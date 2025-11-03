@@ -33,15 +33,12 @@ yarn-error.log*
 # Build outputs
 api/build/
 api/dist/
-web/build/
-web/dist/
-web/.next/
 
 # Upload and output directories
 api/uploads/
 api/output/
-web/uploads/
-web/output/
+uploads/
+output/
 
 # Database
 *.db
@@ -93,3 +90,6 @@ api/.venv/
 .venv
 venv/
 *.egg-info
+
+# Other common files to ignore
+.server.log

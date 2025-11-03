@@ -1,102 +1,34 @@
-# Agent Handbook
+# Repository Guidelines
 
-## Workflow Expectations
-- Treat this playbook as the shared source of truth for every assistant working in this repository.
-- Use the plan tool for multi-step work; skip it only for the simplest ~25% of tasks. Plans must contain 4–6 short steps and never just a single step.
-- Update the plan after you finish a step so exactly one item remains `in_progress`.
-- Read carefully before editing; keep patches scoped to the user request and preserve existing user work.
+## Project Structure & Module Organization
+- `slidespeaker/` holds the application code, grouped by domain (e.g., `audio/`, `document/`, `llm/`, `routes/`, `storage/`). Use existing package boundaries when adding features.
+- `server.py` bootstraps the FastAPI app; `master_worker.py` manages background workers; `cli.py` exposes maintenance utilities.
+- `tests/` mirrors the package layout. Place new tests alongside the module under test.
+- `alembic/` and `migrations/` track database schema changes; `scripts/` contains operational helpers; `docs/` stores higher-level reference material.
 
-## Command & Editing Rules
-- Run commands through `shell` with `["bash","-lc", ...]`, always setting `workdir`; avoid `cd` chaining unless a tool requires it.
-- Prefer `rg`/`rg --files` for searches and list operations; read files in ≤250-line chunks to stay responsive.
-- Use `apply_patch` for hand-written edits to a single file; skip it for generated outputs or bulk replacements.
-- Keep edits ASCII unless a file already uses other characters, and add brief comments only when the code genuinely needs clarification.
-- Never revert unrelated changes or run destructive commands (`git reset --hard`, `git checkout --`) without explicit user direction.
+## Build, Test, and Development Commands
+- `make install` / `make install_dev` sync dependencies via `uv sync` (add `--extra=oss`/`aws` as needed).
+- `make api` runs the FastAPI development server with auto-reload; `make start` launches the production variant.
+- `make worker` starts the master worker loop; `make cli` surfaces CLI options for batch jobs.
+- `make lint`, `make format`, and `make check` run Ruff (formatter + linter) and the strict mypy gate.
+- `make test` executes the pytest suite; `make test-cov` adds coverage details.
 
-## Validation
-- Run meaningful checks (`make check`, `make lint`, `make typecheck`, targeted tests) whenever the change warrants it, and note any limits if you cannot execute them.
-- Add or adjust tests when verification is needed; remove temporary tooling before finishing.
-- Call out manual verification steps for flows like task routing or trash logic whenever you touch those areas.
+## Coding Style & Naming Conventions
+- Python code follows Ruff rules (line length 120, double-quoted strings, space indentation). Run `make format` before opening a PR.
+- Keep modules and functions snake_case, classes PascalCase, and constants UPPER_SNAKE_CASE. Mirror existing package naming when adding submodules.
+- Mypy runs in strict mode; annotate new functions, dataclasses, and async entry points. Prefer explicit return types for FastAPI route handlers and background tasks.
 
-## Sandbox & Approvals
-- Default sandbox: workspace-write filesystem, restricted network, approval policy `on-request`.
-- Request elevated runs with `with_escalated_permissions=true` and a one-sentence justification when you need network access, out-of-scope writes, or other restricted actions.
-- Avoid potentially destructive commands unless the user explicitly directs you; follow the approval path if a command fails due to sandboxing.
+## Testing Guidelines
+- Pytest with `pytest-asyncio` powers the async tests. Name files `test_*.py`, classes `Test*`, and functions `test_*` to honour `pyproject.toml`.
+- Exercise both successful and failure paths for background jobs, storage integrations, and API routes. Use `tests/fixtures` patterns for reusable setup.
+- Target `make test-cov` before merging; expand coverage for new modules to keep the report green.
 
-## Response Style
-- Stay concise and friendly; lead with the change explanation, follow with context, and report which tests ran or were skipped.
-- Reference files with inline code paths like `web/src/App.tsx:42`; do not paste large file dumps.
-- Offer next steps only when they naturally follow (tests, builds, commits); otherwise close the loop cleanly.
+## Commit & Pull Request Guidelines
+- Follow the existing short, typed messages (`feat:`, `refactor:`, `fix:`, `chore:`). Use imperative mood and keep the subject under ~72 characters.
+- Each commit should remain logically scoped (API change, migration, chore). Update migrations and fixtures in the same commit as the code they support.
+- Pull requests must describe intent, outline testing performed, and link related issues. Attach logs or API samples when changing service endpoints or worker flows.
+- Request review once `make check` and `make test` pass locally; flag breaking changes or ops steps (Alembic upgrades, storage backfills) in the PR.
 
-## Repository Guidelines
-This guide helps contributors work productively across the FastAPI backend and the React web app. Keep changes focused, follow the conventions below, and prefer existing patterns.
-
-### Project Structure & Modules
-- Backend: `api/` (FastAPI + workers). Entrypoints: `api/server.py`, `api/master_worker.py`, `api/worker.py`.
-- Core modules: `api/slidespeaker/{core,configs,routes,pipeline,processing,services,llm,storage}/`.
-- Frontend: `web/` (Next.js + React + TypeScript). Main client surface: `web/src/App.tsx`; creation monitor: `web/src/components/TaskMonitor.tsx`.
-- App Router: locale-aware routes live under `web/src/app/[locale]/`. Shared client entry points sit in `web/src/app/*PageClient.tsx`. Use the non-locale directories only for server components that seed data before delegating to the client versions.
-- Internationalization: `web/src/i18n/` holds `config.ts`, message catalogs, and hooks. Navigation helpers live in `web/src/navigation.ts`. Middleware (`web/middleware.ts`) wires next-intl locale detection.
-- UI components: `web/src/components/` (match `.scss` files). `LanguageToggle` handles locale changes inside detail views. Download surfaces live in `DownloadLinks`.
-- State Management: `web/src/stores/` holds Zustand stores for local state management.
-- Docs: `docs/`; Top-level: `README.md`, `CLAUDE.md`, `QWEN.md`.
-
-### Build, Test, and Development
-- API (`cd api`): `make install` (deps via uv), `make dev` (reload), `make start` (prod), `make lint`/`make format` (Ruff), `make typecheck`/`make check` (mypy + all), `make master-worker` (spawn workers).
-- Web (`cd web`): `make install` (pnpm preferred, npm fallback), `make dev` (Next dev server), `make build` (production), `make lint`/`make lint-fix` (ESLint), `make typecheck`/`make check` (TS + all).
-
-### Coding Style & Naming
-- Python: 4 spaces, Ruff 120-col, full type hints. Names: functions/modules `snake_case`, classes `PascalCase`, constants `UPPER_SNAKE_CASE`.
-- TS/React: follow ESLint + `tsconfig.json`. Components `PascalCase` in `web/src/components/` with matching `.scss`.
-- I18n: inside React components or hooks call `useI18n()` from `web/src/i18n/hooks`. Provide a sensible fallback string (third argument) for any `t()` call that might miss a translation.
-- Use `slidespeaker/llm` helpers for OpenAI/voice/vision instead of creating clients directly.
-- State Management: Use Zustand for local state management with centralized stores in `web/src/stores/`.
-
-### Internationalization Workflow
-- Locales currently ship with `en`, `zh-CN`, `zh-TW`. Add new keys to every catalog in `web/src/i18n/messages/`.
-- Shared navigation helpers (`web/src/navigation.ts`) and middleware rely on `defaultLocale` from `config.ts`; update both when introducing locales.
-- Surface locale controls via `LanguageToggle` where users need to swap languages.
-
-### Testing Guidelines
-- API: No formal tests yet; run `make check`. If adding tests, place under `api/tests/` as `test_*.py`.
-- Web: Jest + React Testing Library via `npm test` (or `pnpm test`). Keep tests near code: `*.test.tsx|ts`.
-- Manual verification: when touching Creations trash logic or task routing, confirm the task disappears immediately and redirects land on `/[locale]/tasks/{id}` without relying on the removed Completed view.
-
-### Commit & Pull Requests
-- Commits: Short, imperative subject; scope where useful (e.g., `api: fix retry backoff`). Group related changes only.
-- PRs: Clear description, linked issues, reproduction steps. Include screenshots for UI changes. Note breaking changes and migration steps.
-
-### Security & Configuration
-- Secrets live in `api/.env` (see `api/.env.example`). Never commit secrets. Required: `OPENAI_API_KEY`; optional: `OPENAI_BASE_URL`, timeouts/retries.
-- Storage: set `STORAGE_PROVIDER` (`local|s3|oss`) and keys. Local mounts `/files` for direct serving.
-- Engines: Python ≥ 3.12 (uv), Node ≥ 20.
-
-### Architecture Notes
-- Upload flow no longer stores transient state in `localStorage`; rely on React Query cache and component state.
-- Completed processing skips the old Completed view; we show a short spinner then navigate straight to the task detail page. Keep redirects in sync with `/[locale]/tasks/[taskId]/page.tsx`.
-- Creations trash actions cancel active tasks and purge completed ones; update cached lists so cards disappear immediately before awaiting server confirmation.
-- Prefer task-based endpoints (e.g., `/api/tasks/{task_id}/video|audio|transcripts/markdown|subtitles/{vtt|srt}`) from the frontend.
-- Generated assets should use task-id filenames where possible.
-- State Management: Uses Zustand for local state management with centralized stores in `web/src/stores/`.
-- Theme System: Theme application requires StoreProvider to be included in the provider hierarchy in `web/src/app/providers.tsx`.
-
-## Recent Changes (October 2025)
-### State Management
-- Integrated Zustand for frontend state management
-- Created centralized stores in `web/src/stores/` for UI, theme, and task state
-- Replaced React Context with Zustand stores for better performance and simpler API
-
-### Theme System
-- Fixed theme application issues by ensuring StoreProvider is properly included in the provider hierarchy
-- Enhanced theme store logic to properly update both mode and theme states
-- Improved high contrast theme support for both light and dark modes
-
-### Development Tools
-- Fixed ESLint configuration to properly handle TypeScript and JSX parsing
-- Resolved circular reference issues in ESLint configuration
-- Updated TypeScript configuration for better type checking
-
-### Component Structure
-- Added StoreProvider to the application provider hierarchy in `web/src/app/providers.tsx`
-- Enhanced theme toggle functionality with proper active state management
-- Improved state synchronization between UI components and theme system
+## Environment & Configuration Tips
+- Store secrets in `.env` files referenced by `slidespeaker/configs`; never commit credentials. Document new keys in `README.md` or `docs/`.
+- Use Alembic (`make db-migrate[-named]`) for schema changes and `scripts/storage_backfill` for data rewrites; coordinate with the ops team before running destructive commands.

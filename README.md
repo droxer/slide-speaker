@@ -1,8 +1,8 @@
-# SlideSpeaker
+# SlideSpeaker API
 
 Turn slides/PDFs into narrated videos — transcripts, TTS, subtitles, and optional avatars.
 
-SlideSpeaker is an AI-powered platform that transforms your presentations into engaging video content. Whether you have PowerPoint slides or PDF documents, SlideSpeaker can automatically generate narrated videos with optional AI avatars, synchronized subtitles, and professional-quality audio.
+This repository now contains the FastAPI backend that powers SlideSpeaker. It exposes the task orchestration pipeline, handles transcription/TTS jobs, and serves generated media back to clients. The React/Next.js frontend has been moved into its own repository (`slide-speaker-web/`), ready to be published as a separate git project.
 
 ## ⚠️ Project Status
 
@@ -27,9 +27,7 @@ SlideSpeaker is under active development. Expect rapid iteration, breaking chang
 - Modern state management with Zustand for improved frontend performance
 - Enhanced theme system with proper high contrast support
 
-## 🚀 Quick Start
-
-### Backend (API)
+## 🚀 Quick Start (API)
 ```bash
 cd api
 uv sync                      # Install base dependencies
@@ -38,7 +36,13 @@ cp .env.example .env         # Create config file
 make dev                     # Start development server (port 8000)
 ```
 
-#### User Management CLI
+### Background Workers
+```bash
+cd api
+make master-worker          # Start master process that spawns workers
+```
+
+### User Management CLI
 ```bash
 cd api
 python scripts/user_cli.py list
@@ -46,18 +50,9 @@ python scripts/user_cli.py create --email you@example.com --password secret --na
 ```
 Use `--help` on any subcommand to see additional options (`show`, `set-password`, `delete`).
 
-### Frontend (Web UI)
-```bash
-cd web
-pnpm install                 # Install dependencies (prefer pnpm)
-pnpm dev                     # Start development server (port 3000)
-```
+## 🌐 Frontend (Separate Repo)
 
-### Background Processing
-```bash
-cd api
-make master-worker          # Start master process that spawns workers
-```
+The Next.js/React UI now lives in `slide-speaker-web/` (generated beside this repository). Move it to its own git project and follow the instructions in `slide-speaker-web/README.md` to continue frontend development.
 
 ## ♿ Accessibility
 
@@ -69,7 +64,6 @@ SlideSpeaker is committed to providing an inclusive experience for all users:
 - Support for multiple languages to serve a diverse user base
 
 Visit:
-- `http://localhost:3000` - Web UI
 - `http://localhost:8000/docs` - API documentation
 
 ## 🛠️ Configuration
@@ -112,7 +106,6 @@ SlideSpeaker supports multiple storage backends:
 
 - [Installation Guide](docs/installation.md) - Detailed setup instructions
 - [API Installation Guide](docs/api-installation.md) - Backend-specific installation and configuration
-- [Frontend Technical Stack](docs/frontend-tech-stack.md) - React/TypeScript architecture
 - [Backend Technical Stack](docs/backend-tech-stack.md) - Python/FastAPI architecture
 - [API Documentation](http://localhost:8000/docs) - Auto-generated API docs (when running)
 - [API Reference](docs/api.md) - Complete API reference and endpoints
@@ -121,6 +114,7 @@ SlideSpeaker supports multiple storage backends:
 - [Data Flow](docs/dataflow.md) - Data flow and state management
 - [Configuration](api/.env.example) - Environment variables reference
 - [High Contrast Themes Improvements](high-contrast-themes-improvements.md) - Details about accessibility enhancements
+- [Claude Code Guide](.claude/CLAUDE.md) - Guidance for AI coding assistants working with this repository
 
 ## 📄 License
 
