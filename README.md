@@ -114,6 +114,7 @@ SlideSpeaker supports multiple storage backends:
 - [Data Flow](docs/dataflow.md) - Data flow and state management
 - [Configuration](api/.env.example) - Environment variables reference
 - [High Contrast Themes Improvements](high-contrast-themes-improvements.md) - Details about accessibility enhancements
+- [Claude Code Guide](.claude/CLAUDE.md) - Guidance for AI coding assistants working with this repository
 
 ## 📄 License
 

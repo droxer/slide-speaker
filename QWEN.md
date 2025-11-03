@@ -20,7 +20,8 @@ The project follows a modern microservices architecture with a Python FastAPI ba
 - Support for additional languages: Thai, Korean, and Japanese
 - Optimized task creation page and improved processing display
 - Enhanced web performance for better user experience
-- Zustand state management for improved frontend performance
+- Podcast-ready audio exports for sharing beyond video platforms
+- Modern state management with Zustand for improved frontend performance
 
 ## Technology Stack
 
@@ -55,21 +56,30 @@ The project follows a modern microservices architecture with a Python FastAPI ba
 slide-speaker/
 ├── api/                 # Backend FastAPI application
 │   ├── slidespeaker/    # Core application modules
+│   │   ├── audio/       # Audio processing components
+│   │   ├── auth/        # Authentication services
 │   │   ├── configs/     # Configuration and environment management
 │   │   ├── core/        # Task queue and state management
-│   │   ├── routes/      # API endpoints
-│   │   ├── pipeline/    # Processing pipeline coordinators
-│   │   ├── processing/  # Media processing components
-│   │   ├── services/    # External service integrations
+│   │   ├── document/    # Document processing components
+│   │   ├── image/       # Image processing components
+│   │   ├── jobs/        # Background jobs
 │   │   ├── llm/         # Centralized LLM client helpers
+│   │   ├── pipeline/    # Processing pipeline coordinators
+│   │   ├── repository/  # Database repository layer
+│   │   ├── routes/      # API endpoints
+│   │   ├── schemas/     # Pydantic data schemas
 │   │   ├── storage/     # Unified storage interface
-│   │   └── repository/  # Database repository layer
+│   │   ├── subtitle/    # Subtitle processing
+│   │   ├── transcript/  # Transcript processing
+│   │   ├── translation/ # Translation services
+│   │   └── video/       # Video processing components
 │   ├── tests/           # Backend tests
 │   ├── uploads/         # Temporary file storage
 │   ├── output/          # Generated media output
 │   ├── server.py        # Main API server entrypoint
 │   ├── worker.py        # Task worker process
 │   ├── master_worker.py # Master process for managing workers
+│   ├── cli.py           # Command-line interface
 │   ├── Makefile         # Development commands
 │   ├── pyproject.toml   # Python dependencies
 │   └── .env.example     # Environment configuration example
@@ -123,14 +133,17 @@ pnpm start                   # Start development server (port 3000)
 
 ### Backend (API Directory)
 - `make install` - Install dependencies via uv
-- `make dev` - Start development server with auto-reload
-- `make start` - Start production server
+- `make api` - Start development server with auto-reload
+- `make start` - Start production server  
+- `make worker` - Start worker process
 - `make master-worker` - Start master process that spawns workers
 - `make lint` - Run Ruff linter
 - `make format` - Run Ruff formatter
 - `make typecheck` - Run mypy type checker
 - `make check` - Run both linting and type checking
 - `make test` - Run unit tests
+- `make clean` - Clean temporary files
+- `make cli` - Show CLI tool help
 
 ### Frontend (Web Directory)
 - `make install` - Install dependencies (prefers pnpm)
@@ -157,6 +170,7 @@ The backend follows a modular architecture with clear separation of concerns:
 3. **Pipeline Layer** (`slidespeaker/pipeline/`)
    - Processing coordinators for PDF vs slides
    - Task orchestration logic
+   - Podcast-specific pipelines
 
 4. **Processing Layer** (`slidespeaker/processing/`)
    - Audio, video, subtitle, and image processing
@@ -213,6 +227,8 @@ Key configuration options include:
 - `STORAGE_PROVIDER` - Storage backend (local, s3, oss)
 - `AWS_*` - AWS S3 configuration
 - `OSS_*` - Aliyun OSS configuration
+- `WATERMARK_*` - Watermark settings
+- `FFMPEG_*` - FFmpeg configuration for video processing
 
 See `api/.env.example` for a complete list of configuration options.
 
@@ -231,6 +247,11 @@ See `api/.env.example` for a complete list of configuration options.
 5. **Storage**: Generated assets stored in configured backend
 6. **Completion**: Task marked as completed, results available via API
 
+The processing pipeline has different flows for different input types:
+- **PDF to Video**: Segment content → Generate transcripts → Create images → Generate audio → Compose video
+- **PDF to Podcast**: Segment content → Generate conversation script → Create audio → Compose podcast
+- **Slides to Video**: Extract slides → Convert to images → Analyze content → Generate transcripts → Create audio → Compose video
+
 ## Development Guidelines
 
 ### Backend (Python)
@@ -243,6 +264,8 @@ See `api/.env.example` for a complete list of configuration options.
   - Constants: `UPPER_SNAKE_CASE`
 - Use centralized LLM helpers in `slidespeaker/llm/` instead of direct API calls
 - Minimize excessive logging - use `logger.debug` for detailed information and `logger.info` only for important events
+- Follow the state management pattern in `slidespeaker/core/state_manager.py` for tracking task progress
+- Use the pipeline coordinator pattern (`slidespeaker/pipeline/coordinator.py`) for orchestrating processing steps
 
 ### Frontend (TypeScript/React)
 - ESLint and TypeScript for code quality
@@ -299,6 +322,8 @@ See `api/.env.example` for a complete list of configuration options.
 - Master worker: `api/master_worker.py`
 - Task queue: `api/slidespeaker/core/task_queue.py`
 - State manager: `api/slidespeaker/core/state_manager.py`
+- Pipeline coordinator: `api/slidespeaker/pipeline/coordinator.py`
+- LLM helpers: `api/slidespeaker/llm/`
 
 ### Frontend
 - Main application: `web/src/App.tsx`
@@ -328,21 +353,25 @@ This architecture allows for horizontal scaling of processing workers based on d
 ## Recent Changes (October 2025)
 
 ### State Management
-- Integrated Zustand for frontend state management
-- Created centralized stores in `web/src/stores/` for UI, theme, and task state
-- Replaced React Context with Zustand stores for better performance and simpler API
+- Integrated Redis-based state manager for tracking task progress
+- Created task-first state system with proper binding between tasks and files
+- Replaced direct file-based state tracking with task-aliased system
+
+### Podcast Generation
+- Added PDF-to-Podcast pipeline with 2-person conversation scripts
+- Implemented multi-voice audio generation for host/guest dialogue
+- Added translation support for podcast scripts
 
 ### Theme System
-- Fixed theme application issues by ensuring StoreProvider is properly included in the provider hierarchy
 - Enhanced theme store logic to properly update both mode and theme states
 - Improved high contrast theme support for both light and dark modes
 
 ### Development Tools
+- Updated configuration to use uv for dependency management
 - Fixed ESLint configuration to properly handle TypeScript and JSX parsing
 - Resolved circular reference issues in ESLint configuration
 - Updated TypeScript configuration for better type checking
 
 ### Component Structure
-- Added StoreProvider to the application provider hierarchy in `web/src/app/providers.tsx`
 - Enhanced theme toggle functionality with proper active state management
 - Improved state synchronization between UI components and theme system
