@@ -37,6 +37,8 @@ api/dist/
 # Upload and output directories
 api/uploads/
 api/output/
+uploads/
+output/
 
 # Database
 *.db
@@ -88,3 +90,6 @@ api/.venv/
 .venv
 venv/
 *.egg-info
+
+# Other common files to ignore
+.server.log
