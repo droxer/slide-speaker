@@ -1,0 +1,118 @@
+"""
+ElevenLabs TTS Service Implementation
+
+This module provides an implementation of the TTS interface using ElevenLabs' text-to-speech API.
+It supports multiple voices and high-quality speech synthesis through the ElevenLabs platform.
+"""
+
+from pathlib import Path
+
+import httpx
+from loguru import logger
+
+from slidespeaker.configs.config import config
+
+from .tts_interface import TTSInterface
+
+
+class ElevenLabsTTSService(TTSInterface):
+    """ElevenLabs TTS implementation"""
+
+    def __init__(self) -> None:
+        """Initialize the ElevenLabs TTS service with API configuration"""
+        self.api_key = config.elevenlabs_api_key
+        self.base_url = "https://api.elevenlabs.io/v1"
+        self.default_voice_id = (
+            config.elevenlabs_voice_id or "21m00Tcm4TlvDq8ikWAM"
+        )  # Default voice
+
+    async def generate_speech(
+        self,
+        text: str,
+        output_path: Path,
+        language: str = "english",
+        voice: str | None = None,
+    ) -> None:
+        """Generate speech using ElevenLabs TTS"""
+        if not text or not text.strip():
+            raise ValueError("Text is empty or contains only whitespace")
+
+        if not self.api_key:
+            raise ValueError("ElevenLabs API key not configured")
+
+        # Use provided voice or default
+        voice_id = voice or self.default_voice_id
+
+        url = f"{self.base_url}/text-to-speech/{voice_id}"
+        headers = {
+            "Accept": "audio/mpeg",
+            "Content-Type": "application/json",
+            "xi-api-key": self.api_key,
+        }
+
+        data = {
+            "text": text.strip(),
+            "model_id": "eleven_monolingual_v1",
+            "voice_settings": {
+                "stability": 0.5,
+                "similarity_boost": 0.5,
+            },
+        }
+
+        try:
+            async with (
+                httpx.AsyncClient(timeout=30) as client,
+                client.stream("POST", url, headers=headers, json=data) as response,
+            ):
+                response.raise_for_status()
+
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                with output_path.open("wb") as f:
+                    async for chunk in response.aiter_bytes(chunk_size=1024):
+                        if chunk:
+                            f.write(chunk)
+
+            logger.info(f"Generated ElevenLabs TTS: {output_path}")
+
+        except httpx.HTTPError as e:
+            logger.error(f"ElevenLabs TTS API error: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"ElevenLabs TTS error: {e}")
+            raise
+
+    def is_available(self) -> bool:
+        """Check if ElevenLabs TTS is available"""
+        return bool(self.api_key)
+
+    def get_supported_voices(self, language: str = "english") -> list[str]:
+        """Get supported ElevenLabs voices (simplified for interface)"""
+        # In a real implementation, this would fetch from ElevenLabs API
+        # For now, return some common voice IDs
+        voices = {
+            "english": [
+                "21m00Tcm4TlvDq8ikWAM",  # Rachel
+                "AZnzlk1XvdvUeBnXmlld",  # Domi
+                "EXAVITQu4vr4xnSDxMaL",  # Bella
+                "ErXwobaYiN019PkySvjV",  # Antoni
+                "MF3mGyEYCl7XYWbV9V6O",  # Elli
+            ],
+            "chinese": [
+                "g5CIjZEefAph4nQFvHAz",  # Chinese Female
+                "CYw3kZ02Hs0563khs1Fj",  # Chinese Male
+            ],
+            "simplified_chinese": [
+                "g5CIjZEefAph4nQFvHAz",  # Chinese Female
+                "CYw3kZ02Hs0563khs1Fj",  # Chinese Male
+            ],
+            "traditional_chinese": [
+                "g5CIjZEefAph4nQFvHAz",  # Chinese Female
+                "CYw3kZ02Hs0563khs1Fj",  # Chinese Male
+            ],
+            "japanese": [
+                "pFZP5JQG7iQjIQuC4Bku",  # Japanese Female
+                "VR6AewLTigWG4xSOukaG",  # Japanese Male
+            ],
+        }
+
+        return voices.get(language, [self.default_voice_id])
