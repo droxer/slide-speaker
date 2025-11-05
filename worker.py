@@ -21,6 +21,7 @@ load_dotenv()
 sys.path.insert(0, str(Path(__file__).parent))
 
 from slidespeaker.configs.config import config, get_env  # noqa: E402
+from slidespeaker.configs.db import db_enabled  # noqa: E402
 from slidespeaker.configs.logging_config import setup_logging  # noqa: E402
 
 log_file = config.log_file
@@ -149,6 +150,16 @@ async def process_task(task_id: str) -> str:
         generate_podcast = kwargs.get("generate_podcast", False)
         generate_video = kwargs.get("generate_video", True)
 
+        def _clean_voice(value: Any) -> str | None:
+            if isinstance(value, str):
+                trimmed = value.strip()
+                return trimmed or None
+            return None
+
+        voice_id = _clean_voice(kwargs.get("voice_id"))
+        podcast_host_voice = _clean_voice(kwargs.get("podcast_host_voice"))
+        podcast_guest_voice = _clean_voice(kwargs.get("podcast_guest_voice"))
+
         # Override generate_podcast and generate_video only when task_type is explicitly provided
         # - "podcast": podcast only
         # - "both": podcast + video
@@ -164,6 +175,12 @@ async def process_task(task_id: str) -> str:
             else:  # treat any other explicit value as "video"
                 generate_podcast = False
                 generate_video = True
+
+        if not generate_video:
+            voice_id = None
+        if not generate_podcast:
+            podcast_host_voice = None
+            podcast_guest_voice = None
 
         # Validate required parameters
         missing_params = []
@@ -199,6 +216,9 @@ async def process_task(task_id: str) -> str:
             generate_subtitles=generate_subtitles,
             generate_podcast=generate_podcast,
             generate_video=generate_video,
+            voice_id=voice_id,
+            podcast_host_voice=podcast_host_voice,
+            podcast_guest_voice=podcast_guest_voice,
             task_id=task_id,
         )
 
@@ -229,7 +249,7 @@ async def process_task(task_id: str) -> str:
             monitor_task.cancel()
 
 
-async def process_file_purge_task(task_id: str, task: dict[str, Any]) -> bool:
+async def process_file_purge_task(task_id: str, task: dict[str, Any]) -> str:
     """Process a file purge task"""
     try:
         logger.info(f"Processing file purge task {task_id}")
@@ -245,7 +265,7 @@ async def process_file_purge_task(task_id: str, task: dict[str, Any]) -> bool:
             error_msg = "Missing file_id for file purge task"
             logger.error(error_msg)
             await task_queue.update_task_status(task_id, "failed", error=error_msg)
-            return False
+            return "failed"
 
         # Import and use file purger
         from slidespeaker.jobs.file_purger import file_purger
@@ -268,12 +288,28 @@ async def process_file_purge_task(task_id: str, task: dict[str, Any]) -> bool:
         logger.info(
             f"File purge task {task_id} completed successfully for file_id: {file_id}"
         )
-        return True
+
+        if db_enabled:
+            try:
+                from slidespeaker.repository.task import delete_task as db_delete_task
+
+                await db_delete_task(task_id)
+                logger.info(
+                    "File purge task %s removed from database post-completion", task_id
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to delete file purge task %s from database: %s",
+                    task_id,
+                    exc,
+                )
+
+        return "completed"
 
     except Exception as e:
         logger.error(f"File purge task {task_id} failed: {e}")
         await task_queue.update_task_status(task_id, "failed", error=str(e))
-        return False
+        return "failed"
 
 
 async def main() -> None:

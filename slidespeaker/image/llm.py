@@ -1,9 +1,6 @@
-"""LLM-based image generation module for SlideSpeaker.
+"""LLM-based image generation module for SlideSpeaker."""
 
-Generates presentation-style images using OpenAI only.
-Supports detailed slide images without text based on title/description/key points.
-"""
-
+import base64
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -67,16 +64,11 @@ SIMPLE_BACKGROUND_PROMPTS = {
 
 
 class LLMImageGenerator:
-    """Generator for presentation-style images using OpenAI only"""
+    """Generator for presentation-style images using the configured provider."""
 
     def __init__(self) -> None:
         """Initialize the image generator with configured provider"""
-        self.provider = "openai"
-        api_key = config.openai_api_key
-        if not api_key:
-            raise ValueError(
-                "OPENAI_API_KEY environment variable is required for OpenAI images"
-            )
+        self.image_model = config.image_generation_model
 
     async def generate_slide_image(
         self,
@@ -133,18 +125,21 @@ Requirements:
 
             logger.info(f"Generating slide image with prompt: {prompt[:100]}...")
 
-            image_model = config.openai_image_model
             urls = await run_in_threadpool(
-                image_generate, prompt=prompt, model=image_model, size="1792x1024", n=1
+                image_generate,
+                prompt=prompt,
+                model=self.image_model,
+                size="1792x1024",
+                n=1,
             )
             if not urls:
-                raise ValueError("No image returned from OpenAI image API")
+                raise ValueError("No image returned from configured image provider")
             await self._download_image(urls[0], output_path)
             logger.info(f"Slide image generated successfully: {output_path}")
             return True
 
         except Exception as e:
-            logger.error(f"DALL-E slide image generation error: {e}")
+            logger.error(f"Slide image generation error: {e}")
             raise
 
     # Qwen image generation removed
@@ -152,6 +147,15 @@ Requirements:
     async def _download_image(self, image_url: str, output_path: Path) -> None:
         """Download image from URL and save to output path."""
         try:
+            if image_url.startswith("data:"):
+                header, _, payload = image_url.partition(",")
+                if ";base64" not in header or not payload:
+                    raise ValueError("Unsupported data URI for generated image")
+                data = base64.b64decode(payload)
+                output_path.parent.mkdir(parents=True, exist_ok=True)
+                output_path.write_bytes(data)
+                return
+
             async with httpx.AsyncClient(timeout=30) as client:
                 response = await client.get(image_url)
                 response.raise_for_status()

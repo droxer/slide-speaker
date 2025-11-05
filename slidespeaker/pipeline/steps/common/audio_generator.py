@@ -53,9 +53,22 @@ async def generate_audio_common(
     # Determine default language from state (voice_language), fallback to English
     state = await state_manager.get_state(file_id)
     default_language = "english"
+    voice_override: str | None = None
     if state and isinstance(state, dict):
         default_language = str(state.get("voice_language", default_language))
+        candidate_voice = state.get("voice_id")
+        if not isinstance(candidate_voice, str) or not candidate_voice.strip():
+            task_config = state.get("task_config")
+            if isinstance(task_config, dict):
+                candidate_voice = task_config.get("voice_id")  # type: ignore[assignment]
+        if (
+            not isinstance(candidate_voice, str) or not candidate_voice.strip()
+        ) and isinstance(state.get("task_kwargs"), dict):
+            candidate_voice = state["task_kwargs"].get("voice_id")  # type: ignore[assignment]
+        if isinstance(candidate_voice, str) and candidate_voice.strip():
+            voice_override = candidate_voice.strip()
 
+    voice_cache: dict[str, list[str]] = {}
     for i, transcript_data in enumerate(transcripts):
         # Additional null check for individual transcript data
         if transcript_data and isinstance(transcript_data, dict):
@@ -67,8 +80,11 @@ async def generate_audio_common(
                     file_prefix = "chapter" if is_pdf else "slide"
 
                     # Get appropriate voice for the language
-                    voices = audio_generator.get_supported_voices(language)
-                    voice = voices[0] if voices else None
+                    voices = voice_cache.get(language)
+                    if voices is None:
+                        voices = audio_generator.get_supported_voices(language)
+                        voice_cache[language] = voices
+                    voice = voice_override or (voices[0] if voices else None)
 
                     # Generate audio
                     logger.info(

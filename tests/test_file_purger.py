@@ -7,13 +7,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from slidespeaker.jobs.file_purger import FilePurger
+from slidespeaker.storage.paths import OUTPUTS_PREFIX
 
 
 class TestFilePurger:
     """Test cases for the FilePurger class."""
 
     @pytest.fixture
-    def file_purger(self):
+    def file_purger(self, tmp_path):
         """Create a FilePurger instance with mocked dependencies."""
         with (
             patch("slidespeaker.storage.StorageConfig"),
@@ -22,7 +23,7 @@ class TestFilePurger:
         ):
             purger = FilePurger()
             purger.storage_provider = MagicMock()
-            purger.output_dir = MagicMock()
+            purger.output_dir = tmp_path
             return purger
 
     @pytest.mark.asyncio
@@ -58,22 +59,27 @@ class TestFilePurger:
     async def test_purge_task_files_local_storage_success(self, file_purger):
         """Test that purge_task_files successfully purges files in local storage."""
         # Mock state manager to return a valid state
-        mock_state = {"file_path": "/test/path/file.pdf"}
+        outputs_dir = file_purger.output_dir / OUTPUTS_PREFIX / "test_file_id"
+        outputs_dir.mkdir(parents=True, exist_ok=True)
+        local_file = file_purger.output_dir / "uploads" / "test_file_id.pdf"
+        local_file.parent.mkdir(parents=True, exist_ok=True)
+        local_file.touch()
+
+        mock_state = {"file_path": str(local_file)}
 
         with (
             patch("slidespeaker.jobs.file_purger.state_manager") as mock_state_manager,
             patch("slidespeaker.jobs.file_purger.config") as mock_config,
-            patch("slidespeaker.jobs.file_purger.shutil") as mock_shutil,
         ):
             mock_state_manager.get_state = AsyncMock(return_value=mock_state)
             mock_config.storage_provider = "local"
-            file_purger.output_dir = MagicMock()
 
             # Call the method
             await file_purger.purge_task_files("test_file_id")
 
-            # Verify shutil.rmtree was called
-            mock_shutil.rmtree.assert_called_once()
+            # Verify local artifacts were removed
+            assert not local_file.exists()
+            assert not outputs_dir.exists()
 
     @pytest.mark.asyncio
     async def test_purge_task_files_no_state(self, file_purger):

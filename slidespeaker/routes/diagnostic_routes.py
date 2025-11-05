@@ -53,24 +53,40 @@ async def get_config_diagnostic() -> dict[str, object]:
         },
         "models": {
             "script": {
-                "openai": getattr(config, "openai_script_model", None),
+                "provider": config.script_provider,
+                "model": config.script_model,
+                "raw": getattr(config, "script_model_name", None),
             },
             "translation": {
-                "openai": getattr(config, "openai_translation_model", None),
+                "provider": config.translation_provider,
+                "model": config.translation_model,
+                "raw": getattr(config, "translation_model_name", None),
             },
             "review": {
-                "openai": getattr(config, "openai_reviewer_model", None),
+                "provider": config.review_provider,
+                "model": config.review_model,
+                "raw": getattr(config, "review_model_name", None),
             },
             "vision": {
-                "openai": getattr(config, "openai_vision_model", None),
+                "provider": config.vision_provider,
+                "model": config.vision_model,
+                "raw": getattr(config, "vision_model_name", None),
             },
             "image": {
-                "openai": getattr(config, "openai_image_model", None),
+                "provider": getattr(config, "image_provider", "openai"),
+                "model": getattr(config, "image_generation_model", None),
+                "raw": getattr(config, "image_model_name", None),
             },
             "pdf_analyzer": {
-                "openai": getattr(config, "openai_pdf_analyzer_model", None),
+                "provider": getattr(config, "pdf_analyzer_provider", "openai"),
+                "model": getattr(config, "pdf_analyzer_model", None),
+                "raw": getattr(config, "pdf_analyzer_model_name", None),
             },
             "tts": {
+                "provider": config.tts_service,
+                "model": getattr(config, "tts_model", None),
+                "raw": getattr(config, "tts_model_name", None),
+                "voice": getattr(config, "tts_voice", None),
                 "openai": {
                     "model": getattr(config, "openai_tts_model", None),
                     "voice": getattr(config, "openai_tts_voice", None),

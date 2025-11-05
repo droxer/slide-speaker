@@ -65,6 +65,20 @@ async def generate_subtitles_common(
 
     # Get audio files for timing
     audio_files_data = await get_audio_files_func(file_id)
+    if not audio_files_data:
+        try:
+            audio_dir = config.output_dir / file_id / "audio"
+            if audio_dir.exists():
+                fallback_audio = sorted(str(p) for p in audio_dir.glob("*.mp3"))
+                if fallback_audio:
+                    audio_files_data = fallback_audio
+        except Exception:
+            pass
+    logger.debug(
+        "Subtitle generation audio sources (file_id=%s): %s",
+        file_id,
+        audio_files_data,
+    )
 
     # Generate subtitle files
     try:
@@ -96,7 +110,7 @@ async def generate_subtitles_common(
             audio_paths = [
                 Path(str(f)).expanduser()
                 for f in audio_files_data
-                if isinstance(f, (str, Path)) and str(f).strip()
+                if isinstance(f, str | Path) and str(f).strip()
             ]
             srt_path, vtt_path = subtitle_generator.generate_subtitles(
                 scripts=transcripts_data,

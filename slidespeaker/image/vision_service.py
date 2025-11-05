@@ -97,7 +97,7 @@ Additional Context from Slide Text Extraction:
 Use this extracted text to enhance your analysis and ensure consistency between visual and textual content."""
 
             # Use shared chat_completion helper; do not depend on self.client
-            model_name = config.vision_model
+            model_name = config.vision_analyzer_model
             analysis_text = chat_completion(
                 model=model_name,
                 messages=[

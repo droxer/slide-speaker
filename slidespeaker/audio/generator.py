@@ -35,7 +35,9 @@ class AudioGenerator:
 
     def __init__(self) -> None:
         try:
-            self.tts_service: TTSInterface | None = TTSFactory.create_service()
+            self.tts_service: TTSInterface | None = TTSFactory.create_service(
+                config.tts_model
+            )
         except Exception as e:
             print(f"Warning: Could not initialize TTS service: {e}")
             self.tts_service = None

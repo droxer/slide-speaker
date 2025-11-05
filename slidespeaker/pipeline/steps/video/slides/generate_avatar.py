@@ -73,6 +73,19 @@ async def generate_avatar_step(file_id: str) -> None:
 
     avatar_videos = []
     failed_slides = []
+    voice_override: str | None = None
+    if state and isinstance(state, dict):
+        candidate_voice = state.get("voice_id")
+        if not isinstance(candidate_voice, str) or not candidate_voice.strip():
+            task_config = state.get("task_config")
+            if isinstance(task_config, dict):
+                candidate_voice = task_config.get("voice_id")  # type: ignore[assignment]
+        if (
+            not isinstance(candidate_voice, str) or not candidate_voice.strip()
+        ) and isinstance(state.get("task_kwargs"), dict):
+            candidate_voice = state["task_kwargs"].get("voice_id")  # type: ignore[assignment]
+        if isinstance(candidate_voice, str) and candidate_voice.strip():
+            voice_override = candidate_voice.strip()
 
     for i, script_data in enumerate(scripts):
         # Check for task cancellation periodically
@@ -96,9 +109,14 @@ async def generate_avatar_step(file_id: str) -> None:
                 # Create avatar service using factory
                 avatar_service = AvatarFactory.create_service()
 
+                kwargs = {}
+                if voice_override:
+                    kwargs["voice_id"] = voice_override
+
                 await avatar_service.generate_avatar_video(
                     script_data["script"],
                     video_path,
+                    **kwargs,
                 )
 
                 # Keep avatar videos local - only final files should be uploaded to cloud storage

@@ -38,6 +38,9 @@ async def accept_task(
     generate_subtitles: bool = True,
     generate_podcast: bool = False,
     generate_video: bool = True,
+    voice_id: str | None = None,
+    podcast_host_voice: str | None = None,
+    podcast_guest_voice: str | None = None,
     task_id: str | None = None,
 ) -> None:
     """
@@ -83,6 +86,9 @@ async def accept_task(
         generate_subtitles=generate_subtitles,
         generate_video=generate_video,
         generate_podcast=generate_podcast,
+        voice_id=voice_id,
+        podcast_host_voice=podcast_host_voice,
+        podcast_guest_voice=podcast_guest_voice,
         task_id=task_id,
     )
 
@@ -198,6 +204,9 @@ async def _ensure_initial_state(
     generate_subtitles: bool,
     generate_video: bool,
     generate_podcast: bool,
+    voice_id: str | None,
+    podcast_host_voice: str | None,
+    podcast_guest_voice: str | None,
     task_id: str | None,
 ) -> None:
     state = await state_manager.get_state(file_id)
@@ -215,6 +224,9 @@ async def _ensure_initial_state(
             generate_subtitles,
             generate_video,
             generate_podcast,
+            voice_id=voice_id,
+            podcast_host_voice=podcast_host_voice,
+            podcast_guest_voice=podcast_guest_voice,
         )
         state = await state_manager.get_state(file_id)
 
@@ -229,6 +241,78 @@ async def _ensure_initial_state(
             state["podcast_transcript_language"] = transcript_language
         if task_id:
             state["task_id"] = task_id
+
+        task_kwargs = (
+            state.get("task_kwargs")
+            if isinstance(state.get("task_kwargs"), dict)
+            else {}
+        )
+        task_config = (
+            state.get("task_config")
+            if isinstance(state.get("task_config"), dict)
+            else {}
+        )
+
+        task_kwargs = dict(task_kwargs)
+        task_config = dict(task_config)
+
+        task_kwargs.update(
+            {
+                "voice_language": voice_language,
+                "subtitle_language": subtitle_language,
+                "transcript_language": transcript_language,
+                "video_resolution": state.get("video_resolution", "hd"),
+                "generate_avatar": generate_avatar,
+                "generate_subtitles": generate_subtitles,
+                "generate_video": generate_video,
+                "generate_podcast": generate_podcast,
+            }
+        )
+        task_config.update(task_kwargs)
+
+        if isinstance(voice_id, str) and voice_id.strip():
+            trimmed_voice = voice_id.strip()
+            state["voice_id"] = trimmed_voice
+            task_kwargs["voice_id"] = trimmed_voice
+            task_config["voice_id"] = trimmed_voice
+        elif not generate_video:
+            state.pop("voice_id", None)
+            task_kwargs.pop("voice_id", None)
+            task_config.pop("voice_id", None)
+
+        if isinstance(podcast_host_voice, str) and podcast_host_voice.strip():
+            trimmed_host = podcast_host_voice.strip()
+            state["podcast_host_voice"] = trimmed_host
+            task_kwargs["podcast_host_voice"] = trimmed_host
+            task_config["podcast_host_voice"] = trimmed_host
+        elif not generate_podcast:
+            state.pop("podcast_host_voice", None)
+            task_kwargs.pop("podcast_host_voice", None)
+            task_config.pop("podcast_host_voice", None)
+
+        if isinstance(podcast_guest_voice, str) and podcast_guest_voice.strip():
+            trimmed_guest = podcast_guest_voice.strip()
+            state["podcast_guest_voice"] = trimmed_guest
+            task_kwargs["podcast_guest_voice"] = trimmed_guest
+            task_config["podcast_guest_voice"] = trimmed_guest
+        elif not generate_podcast:
+            state.pop("podcast_guest_voice", None)
+            task_kwargs.pop("podcast_guest_voice", None)
+            task_config.pop("podcast_guest_voice", None)
+
+        steps = state.get("steps")
+        if isinstance(steps, dict):
+            if generate_podcast:
+                steps.setdefault(
+                    "generate_podcast_subtitles",
+                    {"status": "pending", "data": None},
+                )
+            else:
+                steps.pop("generate_podcast_subtitles", None)
+
+        state["task_kwargs"] = task_kwargs
+        state["task_config"] = task_config
+
         await state_manager.save_state(file_id, state)
 
 

@@ -56,87 +56,63 @@ class Config:
         self.openai_base_url = os.getenv("OPENAI_BASE_URL") or os.getenv(
             "OPENAI_API_BASE"
         )
-        # LLM provider (pluggable; default openai)
-        self.llm_provider = os.getenv("LLM_PROVIDER", "openai").lower()
         # OpenAI request tuning
         self.openai_timeout = float(os.getenv("OPENAI_TIMEOUT", "60"))
         self.openai_retries = int(os.getenv("OPENAI_RETRIES", "3"))
         self.openai_backoff = float(os.getenv("OPENAI_BACKOFF", "0.5"))
         self.openai_model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 
-        # Vision providers/models (clamped to OpenAI)
-        self.vision_provider = "openai"
+        # Google Gemini configuration
+        self.google_gemini_api_key = os.getenv("GOOGLE_GEMINI_API_KEY")
+        self.google_gemini_model = (
+            os.getenv("GOOGLE_GEMINI_MODEL") or "gemini-1.5-flash"
+        )
+
+        self.google_gemini_timeout = float(os.getenv("GOOGLE_GEMINI_TIMEOUT", "60"))
+        self.google_gemini_retries = int(os.getenv("GOOGLE_GEMINI_RETRIES", "3"))
+        self.google_gemini_backoff = float(os.getenv("GOOGLE_GEMINI_BACKOFF", "0.5"))
+        self.google_gemini_endpoint = (
+            os.getenv("GOOGLE_GEMINI_ENDPOINT")
+            or "https://generativelanguage.googleapis.com/v1beta"
+        )
+        self.google_gemini_vision_model = os.getenv(
+            "GOOGLE_GEMINI_VISION_MODEL", self.google_gemini_model
+        )
+        self.google_image_model = os.getenv(
+            "GOOGLE_IMAGE_MODEL", "imagen-4.0-generate-001"
+        )
+        self.google_tts_voice = os.getenv("GOOGLE_TTS_VOICE", "polyglot-1")
+
+        # Vision providers/models (clamped to OpenAI by default)
         self.openai_vision_model = os.getenv(
             "OPENAI_VISION_MODEL", os.getenv("VISION_MODEL", "gpt-4o-mini")
         )
-        self.vision_model = self.openai_vision_model
-
-        # Reviewer (OpenAI only)
-        self.review_provider = "openai"
-        self.openai_reviewer_model = os.getenv(
-            "OPENAI_REVIEW_MODEL", os.getenv("SCRIPT_REVIEWER_MODEL", "gpt-4o-mini")
-        )
-        self.script_reviewer_model = self.openai_reviewer_model
-
-        # Script generation (OpenAI only)
-        self.script_provider = "openai"
-        self.openai_script_model = os.getenv(
-            "OPENAI_SCRIPT_MODEL", os.getenv("SCRIPT_GENERATOR_MODEL", "gpt-4o-mini")
-        )
-        self.script_generator_model = self.openai_script_model
-
-        # PDF analyzer (OpenAI only)
-        self.pdf_analyzer_provider = "openai"
-        self.openai_pdf_analyzer_model = os.getenv(
-            "OPENAI_PDF_ANALYZER_MODEL", "gpt-4o-mini"
-        )
-        self.pdf_analyzer_model = self.openai_pdf_analyzer_model
-
-        # Translation (OpenAI only)
-        self.translation_provider = "openai"
-        self.openai_translation_model = os.getenv(
-            "OPENAI_TRANSLATION_MODEL", "gpt-4o-mini"
-        )
-        self.translation_model = self.openai_translation_model
-
-        # TTS (clamp to supported set)
-        self.tts_service = os.getenv("TTS_SERVICE", "openai").lower()
-        if self.tts_service not in {"openai", "elevenlabs"}:
-            self.tts_service = "openai"
-        self.openai_tts_model = os.getenv("OPENAI_TTS_MODEL", "tts-1")
-        self.openai_tts_voice = os.getenv("OPENAI_TTS_VOICE", "alloy")
-        self.elevenlabs_api_key = os.getenv("ELEVENLABS_API_KEY")
-        self.elevenlabs_voice_id = os.getenv("ELEVENLABS_VOICE_ID")
-
-        # Images
-        self.avatar_service = os.getenv("AVATAR_SERVICE", "heygen").lower()
-        self.heygen_api_key = os.getenv("HEYGEN_API_KEY")
-        self.image_provider = "openai"
         self.openai_image_model = os.getenv(
             "OPENAI_IMAGE_MODEL", os.getenv("IMAGE_GENERATION_MODEL", "gpt-image-1")
         )
-        self.image_generation_model = self.openai_image_model
-        self.slide_image_provider = os.getenv("SLIDE_IMAGE_PROVIDER", "PIL")
+        self.openai_tts_model = os.getenv("OPENAI_TTS_MODEL", "tts-1")
+        self.openai_tts_voice = os.getenv("OPENAI_TTS_VOICE", "alloy")
 
-        # Storage
-        self.storage_provider = os.getenv("STORAGE_PROVIDER", "local")
-        self.storage_config = self._get_storage_config()
-        self.proxy_cloud_media = (
-            os.getenv("PROXY_CLOUD_MEDIA", "false").lower() == "true"
-        )
+        self.script_generate_model = os.getenv("SCRIPT_GENERATION_MODEL")
+        self.script_review_model = os.getenv("SCRIPT_REVIEW_MODEL")
+        self.translation_model = os.getenv("TRANSLATION_MODEL")
+        self.pdf_analyzer_model = os.getenv("PDF_ANALYZER_MODEL")
+        self.vision_analyzer_model = os.getenv("VISION_ANALYZER_MODEL")
+        self.image_generation_model = os.getenv("IMAGE_GENERATION_MODEL")
+        self.tts_model = os.getenv("TTS_MODEL")
+        self.tts_voice = os.getenv("TTS_VOICE")
 
-        # Pipeline feature flags
+        # Feature flags
         self.enable_visual_analysis = (
             os.getenv("ENABLE_VISUAL_ANALYSIS", "true").lower() == "true"
         )
 
-        # Google OAuth settings
-        self.google_client_id = os.getenv("GOOGLE_CLIENT_ID")
-        self.google_client_secret = os.getenv("GOOGLE_CLIENT_SECRET")
-        self.google_redirect_uri = os.getenv(
-            "GOOGLE_REDIRECT_URI", "http://localhost:3000/auth/callback"
-        )
+        self.slide_image_provider = os.getenv("SLIDE_IMAGE_PROVIDER", "pil")
 
+        self.storage_provider = os.getenv("STORAGE_PROVIDER", "oss")
+        self.proxy_cloud_media = (
+            os.getenv("PROXY_CLOUD_MEDIA", "false").lower() == "true"
+        )
         # CORS settings
         self.cors_origins = self._parse_cors_origins(
             os.getenv("CORS_ORIGINS", "http://localhost:3000")
@@ -195,10 +171,15 @@ class Config:
         else:
             raise ValueError(f"Unsupported storage provider: {self.storage_provider}")
 
+    @property
+    def storage_config(self) -> dict[str, Any]:
+        """Return resolved storage configuration for the active provider."""
+        return self._get_storage_config()
+
     def get_storage_provider(self) -> StorageProvider:
         try:
             storage_config = StorageConfig(
-                provider=self.storage_provider, **self.storage_config
+                provider=self.storage_provider, **self._get_storage_config()
             )
             return create_storage_provider(storage_config)
         except ImportError:

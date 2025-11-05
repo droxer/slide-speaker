@@ -282,7 +282,7 @@ class FilePurger:
                     self._maybe_add_local_path(value, storage_keys, local_paths, seen)
                 else:
                     self._collect_from_obj(value, storage_keys, local_paths, seen=seen)
-        elif isinstance(obj, (list, tuple, set)):
+        elif isinstance(obj, list | tuple | set):
             for item in obj:
                 self._collect_from_obj(item, storage_keys, local_paths, seen=seen)
 
@@ -293,7 +293,7 @@ class FilePurger:
         local_paths: set[str],
         seen: set[int],
     ) -> None:
-        if isinstance(value, (list, tuple, set)):
+        if isinstance(value, list | tuple | set):
             for item in value:
                 self._maybe_add_storage_key(item, storage_keys, local_paths, seen)
             return
@@ -313,7 +313,7 @@ class FilePurger:
         local_paths: set[str],
         seen: set[int],
     ) -> None:
-        if isinstance(value, (list, tuple, set)):
+        if isinstance(value, list | tuple | set):
             for item in value:
                 self._maybe_add_local_path(item, storage_keys, local_paths, seen)
             return

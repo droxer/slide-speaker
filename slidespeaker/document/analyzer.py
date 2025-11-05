@@ -235,9 +235,6 @@ class PDFAnalyzer:
         """Initialize the PDF analyzer with configured provider"""
         # Use OpenAI exclusively for PDF analysis in this module
         self.model: str = config.pdf_analyzer_model
-        if not config.openai_api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is required")
-        self.model = config.pdf_analyzer_model
         self.transcript_generator = TranscriptGenerator()
 
     async def analyze_and_segment(

@@ -5,6 +5,8 @@ This module provides API endpoints for retrieving detailed progress information
 about presentation processing tasks, including current step, status, and errors.
 """
 
+from __future__ import annotations
+
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -12,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from slidespeaker.auth import extract_user_id, require_authenticated_user
 from slidespeaker.core.progress_utils import compute_step_percentage
 from slidespeaker.core.state_manager import state_manager
+from slidespeaker.core.task_state import DEFAULT_STEP_ORDER, TaskState
 
 router = APIRouter(
     prefix="/api",
@@ -32,24 +35,34 @@ def _progress_from_state(state: dict[str, Any] | None) -> dict[str, Any]:
             "current_step": "unknown",
             "steps": {},
         }
-    progress_percentage = compute_step_percentage(state)
+    task_state = TaskState.from_mapping(state)
+    progress_percentage = compute_step_percentage(task_state)
+    ordered_steps = task_state.ordered_steps(
+        DEFAULT_STEP_ORDER, normalize_status_flag=True
+    )
+    errors_payload = [entry.as_dict() for entry in task_state.errors]
+
     return {
-        "status": state.get("status", "unknown"),
+        "status": task_state.status or "unknown",
         "progress": progress_percentage,
-        "current_step": state.get("current_step", "unknown"),
-        "steps": state.get("steps", {}) or {},
-        "errors": state.get("errors", []),
-        "filename": state.get("filename"),
-        "file_ext": state.get("file_ext"),
-        "source_type": state.get("source_type") or state.get("source"),
-        "voice_language": state.get("voice_language"),
-        "subtitle_language": state.get(
-            "subtitle_language", state.get("voice_language")
-        ),
-        "generate_podcast": state.get("generate_podcast", False),
-        "generate_video": state.get("generate_video", True),
-        "created_at": state.get("created_at"),
-        "updated_at": state.get("updated_at"),
+        "current_step": task_state.current_step or "unknown",
+        "steps": ordered_steps,
+        "errors": errors_payload,
+        "filename": task_state.filename,
+        "file_ext": task_state.file_ext,
+        "source_type": task_state.source_type,
+        "voice_language": task_state.voice_language,
+        "subtitle_language": task_state.effective_subtitle_language,
+        "generate_podcast": task_state.generate_podcast,
+        "generate_video": task_state.generate_video,
+        "created_at": task_state.created_at,
+        "updated_at": task_state.updated_at,
+        "voice_id": task_state.voice_id,
+        "podcast_host_voice": task_state.podcast_host_voice,
+        "podcast_guest_voice": task_state.podcast_guest_voice,
+        "task_config": task_state.task_config,
+        "task_kwargs": task_state.task_kwargs,
+        "settings": task_state.settings,
     }
 
 

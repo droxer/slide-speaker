@@ -89,6 +89,7 @@ def _serialize_task(row: TaskRow) -> dict[str, Any]:
         "id": row.id,
         "task_id": row.id,
         "upload_id": row.upload_id,  # Internal model and API response now use upload_id for consistency
+        "file_id": row.upload_id,
         "task_type": row.task_type,
         "status": row.status,
         "kwargs": kwargs,
@@ -345,15 +346,16 @@ async def list_tasks(
     from sqlalchemy import func, select, text
     from sqlalchemy.orm import joinedload
 
-    # Generate cache key for this query
-    cache_key = _generate_cache_key(
-        "list_tasks", limit=limit, offset=offset, status=status, user_id=user_id
-    )
+    use_cache = _cache_enabled and user_id is None
 
-    # Try to get from cache first
-    cached_result = await _get_from_cache(cache_key)
-    if cached_result is not None:
-        return cached_result
+    cache_key = None
+    if use_cache:
+        cache_key = _generate_cache_key(
+            "list_tasks", limit=limit, offset=offset, status=status, user_id=user_id
+        )
+        cached_result = await _get_from_cache(cache_key)
+        if cached_result is not None:
+            return cached_result
 
     async with get_session() as s:
         # Use more efficient query with proper indexing
@@ -381,7 +383,8 @@ async def list_tasks(
         result = {"tasks": tasks, "total": int(total or 0)}
 
         # Cache the result for 5 minutes
-        await _set_in_cache(cache_key, result, ttl=300)
+        if use_cache and cache_key is not None:
+            await _set_in_cache(cache_key, result, ttl=300)
         return result
 
 

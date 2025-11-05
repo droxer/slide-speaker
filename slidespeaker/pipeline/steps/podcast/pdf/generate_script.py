@@ -86,7 +86,7 @@ async def generate_podcast_script_step(file_id: str, language: str = "english") 
         # Always generate the podcast script in English first
         user_prompt = _build_user_prompt(chapters, "english")
         content = chat_completion(
-            model=config.openai_script_model,
+            model=config.script_generate_model,
             messages=[
                 {"role": "system", "content": PODCAST_SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},

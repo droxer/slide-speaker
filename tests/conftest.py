@@ -12,6 +12,11 @@ from fastapi.testclient import TestClient
 # Add the api directory to the path so we can import the app
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+os.environ.setdefault("GOOGLE_GEMINI_TIMEOUT", "60")
+os.environ.setdefault("GOOGLE_GEMINI_RETRIES", "3")
+os.environ.setdefault("GOOGLE_GEMINI_BACKOFF", "0.5")
+os.environ.setdefault("STORAGE_PROVIDER", "local")
+
 from server import app
 
 

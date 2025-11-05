@@ -54,6 +54,8 @@ class ImageGenerator:
                 output_path=image_path,
                 style=style,
             )
+            image_paths.append(image_path)
+            logger.info(f"Generated slide image for chapter {i + 1}: {image_path}")
         return image_paths
 
 

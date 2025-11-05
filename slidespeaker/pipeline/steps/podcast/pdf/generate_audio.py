@@ -70,28 +70,109 @@ async def generate_podcast_audio_step(file_id: str, language: str = "english") -
     work_dir = config.output_dir / file_id / "podcast"
     work_dir.mkdir(parents=True, exist_ok=True)
 
+    def _clean_voice(value: object) -> str | None:
+        if isinstance(value, str):
+            trimmed = value.strip()
+            return trimmed or None
+        return None
+
+    preferred_host = _clean_voice(st.get("podcast_host_voice") if st else None)
+    preferred_guest = _clean_voice(st.get("podcast_guest_voice") if st else None)
+    if (not preferred_host or not preferred_guest) and st:
+        task_config = st.get("task_config")
+        if isinstance(task_config, dict):
+            if not preferred_host:
+                preferred_host = _clean_voice(task_config.get("podcast_host_voice"))
+            if not preferred_guest:
+                preferred_guest = _clean_voice(task_config.get("podcast_guest_voice"))
+        task_kwargs = st.get("task_kwargs")
+        if isinstance(task_kwargs, dict):
+            if not preferred_host:
+                preferred_host = _clean_voice(task_kwargs.get("podcast_host_voice"))
+            if not preferred_guest:
+                preferred_guest = _clean_voice(task_kwargs.get("podcast_guest_voice"))
+
     # Select two voices for host/guest
     try:
         voices = ag.get_supported_voices(language) or []
-        host_voice = voices[0] if len(voices) > 0 else "alloy"
-        guest_voice = voices[1] if len(voices) > 1 else "onyx"
     except Exception:
-        host_voice, guest_voice = "alloy", "onyx"
+        voices = []
+    host_voice = preferred_host or (voices[0] if len(voices) > 0 else "alloy")
+    guest_voice = preferred_guest or (
+        voices[1] if len(voices) > 1 else ("onyx" if host_voice != "onyx" else "alloy")
+    )
+
+    if host_voice == guest_voice and voices:
+        for candidate in voices:
+            if candidate != host_voice:
+                guest_voice = candidate
+                break
+
     logger.info(f"Selected voices for podcast: host={host_voice}, guest={guest_voice}")
 
     segment_paths: list[str] = []
+    segment_metadata: list[dict[str, object]] = []
+    timed_dialogue: list[dict[str, object]] = []
+    cumulative_start = 0.0
+
+    def _duration_fallback(content: str) -> float:
+        # Approximate speech rate (around 150 words per minute).
+        words = max(len(content.split()), 1)
+        approx = words / 2.5
+        return max(approx, 2.0)
+
     for idx, line in enumerate(dialogue, start=1):
-        speaker = (line.get("speaker") or "Host").lower()
+        raw_speaker = (line.get("speaker") or "Host").strip()
         text = (line.get("text") or "").strip()
         if not text:
             continue
-        voice = host_voice if speaker.startswith("host") else guest_voice
+
+        normalized = raw_speaker.lower()
+        speaker_label = (
+            "Host"
+            if normalized.startswith("host")
+            else (
+                "Guest" if normalized.startswith("guest") else raw_speaker or "Speaker"
+            )
+        )
+        voice = host_voice if normalized.startswith("host") else guest_voice
         out_path = work_dir / f"segment_{idx:03d}.mp3"
         ok = await ag.generate_audio(
             text, str(out_path), language=language, voice=voice
         )
-        if ok:
-            segment_paths.append(str(out_path))
+        if not ok:
+            continue
+
+        duration = float(ag._get_audio_duration(out_path))  # noqa: SLF001 - internal helper
+        if duration <= 0:
+            duration = _duration_fallback(text)
+
+        start_time = cumulative_start
+        end_time = start_time + duration
+        cumulative_start = end_time
+
+        segment_paths.append(str(out_path))
+        segment_metadata.append(
+            {
+                "segment_file": str(out_path),
+                "voice": voice,
+                "speaker": speaker_label,
+                "start": start_time,
+                "end": end_time,
+                "duration": duration,
+            }
+        )
+        timed_dialogue.append(
+            {
+                "speaker": speaker_label,
+                "text": text,
+                "voice": voice,
+                "start": start_time,
+                "end": end_time,
+                "duration": duration,
+                "segment_file": str(out_path),
+            }
+        )
 
     # Do NOT upload per-segment MP3s for PDF podcasts; only final composed MP3 is stored
     uploaded_urls: list[str] = []
@@ -102,10 +183,12 @@ async def generate_podcast_audio_step(file_id: str, language: str = "english") -
         "completed",
         {
             "segments": segment_paths,
+            "segment_metadata": segment_metadata,
             "storage_urls": uploaded_urls,
             "host_voice": host_voice,
             "guest_voice": guest_voice,
-            "dialogue": dialogue,
+            "dialogue": timed_dialogue,
             "dialogue_language": language,
+            "total_duration": cumulative_start,
         },
     )

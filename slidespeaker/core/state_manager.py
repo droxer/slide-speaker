@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from slidespeaker.configs.config import config
+from slidespeaker.core.task_state import TaskErrorEntry, TaskState
 
 
 class RedisStateManager:
@@ -53,8 +54,11 @@ class RedisStateManager:
         # PDF-specific steps
         steps = {
             "segment_pdf_content": {"status": "pending", "data": None},
-            "revise_pdf_transcripts": {"status": "pending", "data": None},
         }
+
+        # Only include revise_pdf_transcripts for video processing, not for podcast-only
+        if generate_video:
+            steps["revise_pdf_transcripts"] = {"status": "pending", "data": None}
 
         # Video path (optional)
         if generate_video:
@@ -93,6 +97,7 @@ class RedisStateManager:
             steps.update(
                 {
                     "generate_podcast_audio": {"status": "pending", "data": None},
+                    "generate_podcast_subtitles": {"status": "pending", "data": None},
                     "compose_podcast": {"status": "pending", "data": None},
                 }
             )
@@ -192,6 +197,10 @@ class RedisStateManager:
         generate_subtitles: bool = True,
         generate_video: bool = True,
         generate_podcast: bool = False,
+        voice_id: str | None = None,
+        podcast_host_voice: str | None = None,
+        podcast_guest_voice: str | None = None,
+        task_kwargs: dict[str, Any] | None = None,
         task_id: str | None = None,
         source_type: str | None = None,
         user_id: str | None = None,
@@ -251,6 +260,38 @@ class RedisStateManager:
             state["task_id"] = task_id
         if user_id:
             state["user_id"] = user_id
+        if isinstance(voice_id, str) and voice_id.strip():
+            state["voice_id"] = voice_id.strip()
+        if isinstance(podcast_host_voice, str) and podcast_host_voice.strip():
+            state["podcast_host_voice"] = podcast_host_voice.strip()
+        if isinstance(podcast_guest_voice, str) and podcast_guest_voice.strip():
+            state["podcast_guest_voice"] = podcast_guest_voice.strip()
+
+        safe_task_kwargs: dict[str, Any] = {
+            "voice_language": voice_language,
+            "subtitle_language": subtitle_language,
+            "transcript_language": transcript_language,
+            "video_resolution": video_resolution,
+            "generate_avatar": generate_avatar,
+            "generate_subtitles": generate_subtitles,
+            "generate_video": generate_video,
+            "generate_podcast": generate_podcast,
+        }
+        if isinstance(voice_id, str) and voice_id.strip():
+            safe_task_kwargs["voice_id"] = voice_id.strip()
+        if isinstance(podcast_host_voice, str) and podcast_host_voice.strip():
+            safe_task_kwargs["podcast_host_voice"] = podcast_host_voice.strip()
+        if isinstance(podcast_guest_voice, str) and podcast_guest_voice.strip():
+            safe_task_kwargs["podcast_guest_voice"] = podcast_guest_voice.strip()
+        if isinstance(task_kwargs, dict):
+            for key in ("voice_id", "podcast_host_voice", "podcast_guest_voice"):
+                val = task_kwargs.get(key)
+                if isinstance(val, str) and val.strip():
+                    safe_task_kwargs[key] = val.strip()
+
+        state["task_kwargs"] = safe_task_kwargs.copy()
+        state["task_config"] = safe_task_kwargs.copy()
+
         # If task-scoped, store task-first and bind mappings; otherwise store by file-id
         if task_id:
             try:
@@ -266,9 +307,9 @@ class RedisStateManager:
                 await self._save_state(file_id, state)
         else:
             await self._save_state(file_id, state)
-        return state
+        return TaskState.from_mapping(state)
 
-    async def get_state(self, file_id: str) -> dict[str, Any] | None:
+    async def get_state(self, file_id: str) -> TaskState | None:
         """Get current state for a file processing task"""
         # Prefer task-based alias if we have a mapping
         try:
@@ -277,14 +318,14 @@ class RedisStateManager:
                 tkey = self._get_task_key(cast(str, task_id))
                 tjson = await self.redis_client.get(tkey)
                 if tjson:
-                    return cast(dict[str, Any], json.loads(tjson))
+                    return TaskState.from_mapping(json.loads(tjson))
         except Exception:
             pass
         # Fall back to file-id state
         key = self._get_key(file_id)
         state_json = await self.redis_client.get(key)
         if state_json:
-            return cast(dict[str, Any], json.loads(state_json))
+            return TaskState.from_mapping(json.loads(state_json))
         return None
 
     async def update_step_status_by_task(
@@ -304,11 +345,64 @@ class RedisStateManager:
             st["task_id"] = task_id
             # Save under task alias (and mirror to file-id if available)
             await self.redis_client.set(
-                self._get_task_key(task_id), json.dumps(st), ex=86400
+                self._get_task_key(task_id), json.dumps(st.to_dict()), ex=86400
             )
             fid = st.get("file_id")
             if isinstance(fid, str) and fid:
                 await self._save_state(fid, st)
+
+    async def reset_steps_from_task(
+        self, task_id: str, start_step: str
+    ) -> TaskState | None:
+        """Reset a task's state so processing can resume from a specific step."""
+        st = await self.get_state_by_task(task_id)
+        if not st:
+            return None
+
+        steps = st.get("steps")
+        if not isinstance(steps, dict) or start_step not in steps:
+            return None
+
+        steps_to_reset: list[str] = []
+        encountered = False
+        for name in steps:
+            if name == start_step:
+                encountered = True
+            if encountered:
+                steps_to_reset.append(name)
+
+        if not steps_to_reset:
+            return None
+
+        for name in steps_to_reset:
+            step_state = steps.get(name)
+            if not isinstance(step_state, dict):
+                continue
+            if step_state.get("status") == "skipped":
+                # Skip steps remain skipped
+                continue
+            step_state["status"] = "pending"
+            if "data" in step_state:
+                step_state["data"] = None
+
+        existing_errors = st.get("errors")
+        if isinstance(existing_errors, list):
+            st["errors"] = [
+                err for err in existing_errors if err.get("step") not in steps_to_reset
+            ]
+
+        st["status"] = "processing"
+        st["current_step"] = start_step
+        st["updated_at"] = datetime.now().isoformat()
+
+        await self.redis_client.set(
+            self._get_task_key(task_id), json.dumps(st.to_dict()), ex=86400
+        )
+        fid = st.get("file_id")
+        if isinstance(fid, str) and fid:
+            await self._save_state(fid, st)
+
+        return st
 
     async def mark_completed_by_task(self, task_id: str) -> None:
         st = await self.get_state_by_task(task_id)
@@ -317,7 +411,7 @@ class RedisStateManager:
         st["status"] = "completed"
         st["updated_at"] = datetime.now().isoformat()
         await self.redis_client.set(
-            self._get_task_key(task_id), json.dumps(st), ex=86400
+            self._get_task_key(task_id), json.dumps(st.to_dict()), ex=86400
         )
         fid = st.get("file_id")
         if isinstance(fid, str) and fid:
@@ -330,7 +424,7 @@ class RedisStateManager:
         st["status"] = "failed"
         st["updated_at"] = datetime.now().isoformat()
         await self.redis_client.set(
-            self._get_task_key(task_id), json.dumps(st), ex=86400
+            self._get_task_key(task_id), json.dumps(st.to_dict()), ex=86400
         )
         fid = st.get("file_id")
         if isinstance(fid, str) and fid:
@@ -350,13 +444,28 @@ class RedisStateManager:
             if step_data.get("status") in ("processing", "in_progress", "pending"):
                 step_data["status"] = "cancelled"
         await self.redis_client.set(
-            self._get_task_key(task_id), json.dumps(st), ex=86400
+            self._get_task_key(task_id), json.dumps(st.to_dict()), ex=86400
         )
         fid = st.get("file_id")
         if isinstance(fid, str) and fid:
             await self._save_state(fid, st)
 
-    async def get_state_by_task(self, task_id: str) -> dict[str, Any] | None:
+    async def set_status_by_task(self, task_id: str, status: str) -> bool:
+        """Set the top-level status for a task-managed state entry."""
+        st = await self.get_state_by_task(task_id)
+        if not st:
+            return False
+        st["status"] = status
+        st["updated_at"] = datetime.now().isoformat()
+        await self.redis_client.set(
+            self._get_task_key(task_id), json.dumps(st.to_dict()), ex=86400
+        )
+        fid = st.get("file_id")
+        if isinstance(fid, str) and fid:
+            await self._save_state(fid, st)
+        return True
+
+    async def get_state_by_task(self, task_id: str) -> TaskState | None:
         """Get state using a task_id alias.
 
         Looks up a direct task-state key, then resolves to file_id via mapping.
@@ -365,12 +474,20 @@ class RedisStateManager:
         tkey = self._get_task_key(task_id)
         state_json = await self.redis_client.get(tkey)
         if state_json:
-            return cast(dict[str, Any], json.loads(state_json))
+            return TaskState.from_mapping(json.loads(state_json))
         # Resolve mapping to file_id
         fid = await self.redis_client.get(self._get_task2file_key(task_id))
         if fid:
             return await self.get_state(cast(str, fid))
         return None
+
+    async def get_task_state(self, file_id: str) -> TaskState | None:
+        """Return a structured TaskState for the provided file identifier."""
+        return await self.get_state(file_id)
+
+    async def get_task_state_by_task(self, task_id: str) -> TaskState | None:
+        """Return a structured TaskState for the provided task identifier."""
+        return await self.get_state_by_task(task_id)
 
     async def get_file_id_by_task(self, task_id: str) -> str | None:
         """Return file_id if we have a mapping for this task_id."""
@@ -403,7 +520,7 @@ class RedisStateManager:
         if st is not None:
             st["task_id"] = task_id
             await self.redis_client.set(
-                self._get_task_key(task_id), json.dumps(st), ex=86400
+                self._get_task_key(task_id), json.dumps(st.to_dict()), ex=86400
             )
         # Proactively delete legacy file-id state key; task alias is the source of truth
         with suppress(Exception):
@@ -448,7 +565,9 @@ class RedisStateManager:
         task_id = state.get("task_id")
         if isinstance(task_id, str) and task_id:
             await self.redis_client.set(
-                self._get_task_key(task_id), json.dumps(state), ex=86400
+                self._get_task_key(task_id),
+                json.dumps(state.to_dict()),
+                ex=86400,
             )
         else:
             await self._save_state(file_id, state)
@@ -457,9 +576,17 @@ class RedisStateManager:
         """Add error to state for a specific processing step"""
         state = await self.get_state(file_id)
         if state:
-            state["errors"].append(
-                {"step": step, "error": error, "timestamp": datetime.now().isoformat()}
+            errors_list = list(state.get("errors", []))
+            errors_list.append(
+                TaskErrorEntry.from_mapping(
+                    {
+                        "step": step,
+                        "error": error,
+                        "timestamp": datetime.now().isoformat(),
+                    }
+                )
             )
+            state["errors"] = errors_list
             state["updated_at"] = datetime.now().isoformat()
             await self._save_state(file_id, state)
 
@@ -473,7 +600,9 @@ class RedisStateManager:
         task_id = state.get("task_id")
         if isinstance(task_id, str) and task_id:
             await self.redis_client.set(
-                self._get_task_key(task_id), json.dumps(state), ex=86400
+                self._get_task_key(task_id),
+                json.dumps(state.to_dict()),
+                ex=86400,
             )
         else:
             await self._save_state(file_id, state)
@@ -488,7 +617,9 @@ class RedisStateManager:
         task_id = state.get("task_id")
         if isinstance(task_id, str) and task_id:
             await self.redis_client.set(
-                self._get_task_key(task_id), json.dumps(state), ex=86400
+                self._get_task_key(task_id),
+                json.dumps(state.to_dict()),
+                ex=86400,
             )
         else:
             await self._save_state(file_id, state)
@@ -510,19 +641,24 @@ class RedisStateManager:
         task_id = state.get("task_id")
         if isinstance(task_id, str) and task_id:
             await self.redis_client.set(
-                self._get_task_key(task_id), json.dumps(state), ex=86400
+                self._get_task_key(task_id),
+                json.dumps(state.to_dict()),
+                ex=86400,
             )
         else:
             await self._save_state(file_id, state)
 
-    async def _save_state(self, file_id: str, state: dict[str, Any]) -> None:
+    async def _save_state(
+        self, file_id: str, state: dict[str, Any] | TaskState
+    ) -> None:
         """Save state to Redis with 24-hour expiration"""
         key = self._get_key(file_id)
+        payload = state.to_dict() if isinstance(state, TaskState) else state
         # If state carries a task_id, prefer task-alias as the sole source of truth
-        task_id = state.get("task_id") if isinstance(state, dict) else None
+        task_id = payload.get("task_id") if isinstance(payload, dict) else None
         if isinstance(task_id, str) and task_id:
             await self.redis_client.set(
-                self._get_task_key(task_id), json.dumps(state), ex=86400
+                self._get_task_key(task_id), json.dumps(payload), ex=86400
             )
             # Proactively remove legacy file-id state to avoid cross-run bleed-through
             with suppress(Exception):
@@ -530,12 +666,16 @@ class RedisStateManager:
         else:
             # Legacy path: no task_id available; write by file-id
             await self.redis_client.set(
-                key, json.dumps(state), ex=86400
+                key, json.dumps(payload), ex=86400
             )  # 24h expiration
 
     # Public wrapper to avoid external modules calling the private method directly
-    async def save_state(self, file_id: str, state: dict[str, Any]) -> None:
+    async def save_state(self, file_id: str, state: dict[str, Any] | TaskState) -> None:
         await self._save_state(file_id, state)
+
+    async def save_task_state(self, file_id: str, task_state: TaskState) -> None:
+        """Persist a TaskState instance."""
+        await self._save_state(file_id, task_state)
 
 
 # Global state manager instance

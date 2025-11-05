@@ -6,6 +6,7 @@ It handles task submission, status tracking, and distributed processing coordina
 
 import json
 import uuid
+from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
@@ -93,6 +94,9 @@ class RedisTaskQueue:
                 generate_subtitles = kwargs.get("generate_subtitles", True)
                 generate_video = kwargs.get("generate_video", True)
                 generate_podcast = kwargs.get("generate_podcast", False)
+                voice_id = kwargs.get("voice_id")
+                podcast_host_voice = kwargs.get("podcast_host_voice")
+                podcast_guest_voice = kwargs.get("podcast_guest_voice")
 
                 if file_id and file_path and file_ext:
                     # Create initial state (task-first; mirrors to task alias and mappings)
@@ -109,6 +113,10 @@ class RedisTaskQueue:
                         generate_subtitles,
                         generate_video,
                         generate_podcast,
+                        voice_id=voice_id,
+                        podcast_host_voice=podcast_host_voice,
+                        podcast_guest_voice=podcast_guest_voice,
+                        task_kwargs=kwargs,
                         task_id=task_id,
                         source_type=source_type,
                         user_id=user_id,
@@ -193,6 +201,57 @@ class RedisTaskQueue:
             logger.error(f"Error getting next task: {e}")
 
         return task_id
+
+    async def clear_cancellation_flag(self, task_id: str) -> None:
+        """Remove any cancellation markers for a task."""
+        cancellation_key = f"{self.task_prefix}:{task_id}:cancelled"
+        try:
+            await self.redis_client.delete(cancellation_key)
+        except Exception as err:
+            logger.debug(f"Failed to clear cancellation flag for {task_id}: {err}")
+
+    async def enqueue_existing_task(self, task_id: str) -> bool:
+        """Requeue an existing task for processing."""
+        task = await self.get_task(task_id)
+        if not task:
+            logger.warning("Cannot enqueue missing task %s", task_id)
+            return False
+
+        current_status = task.get("status")
+        if current_status not in {"failed", "cancelled", "completed", "queued"}:
+            logger.warning(
+                "Task %s in unexpected status %s cannot be re-queued",
+                task_id,
+                current_status,
+            )
+            return False
+
+        task["status"] = "queued"
+        task["error"] = None
+        task["updated_at"] = datetime.now().isoformat()
+
+        task_key = self._get_task_key(task_id)
+
+        # Remove any lingering queue entries before re-adding
+        try:
+            await self.redis_client.lrem(self.queue_key, 0, task_id)  # type: ignore
+        except Exception as err:
+            logger.debug(f"Failed to prune existing queue entries for {task_id}: {err}")
+
+        await self.redis_client.rpush(self.queue_key, task_id)  # type: ignore
+        await self.redis_client.set(task_key, json.dumps(task))
+        await self.clear_cancellation_flag(task_id)
+
+        if db_enabled:
+            try:
+                await update_task(task_id, status="queued", error=None)
+            except Exception as db_err:
+                logger.warning(
+                    "Failed to persist requeue status for %s: %s", task_id, db_err
+                )
+
+        logger.info("Task %s re-queued for processing", task_id)
+        return True
 
     async def complete_task_processing(self, task_id: str) -> bool:
         """Mark task as complete - no processing queue cleanup needed"""

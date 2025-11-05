@@ -119,6 +119,12 @@ async def run_file(
     voice_language = locale_utils.normalize_language(
         payload.get("voice_language") or "english"
     )
+    raw_voice_id = payload.get("voice_id")
+    voice_id = (
+        raw_voice_id.strip()
+        if isinstance(raw_voice_id, str) and raw_voice_id.strip()
+        else None
+    )
     subtitle_language = payload.get("subtitle_language")
     transcript_language = payload.get("transcript_language")
     if subtitle_language is not None:
@@ -126,6 +132,45 @@ async def run_file(
     if transcript_language is not None:
         transcript_language = locale_utils.normalize_language(transcript_language)
     video_resolution = str(payload.get("video_resolution") or "hd")
+    raw_host_voice = payload.get("podcast_host_voice")
+    podcast_host_voice = (
+        raw_host_voice.strip()
+        if isinstance(raw_host_voice, str) and raw_host_voice.strip()
+        else None
+    )
+    raw_guest_voice = payload.get("podcast_guest_voice")
+    podcast_guest_voice = (
+        raw_guest_voice.strip()
+        if isinstance(raw_guest_voice, str) and raw_guest_voice.strip()
+        else None
+    )
+
+    # Fallback to previous selections when not provided
+    if st and isinstance(st, dict):
+        if voice_id is None:
+            stored_voice = st.get("voice_id") or (
+                (st.get("task_config") or {}).get("voice_id")
+                if isinstance(st.get("task_config"), dict)
+                else None
+            )
+            if isinstance(stored_voice, str) and stored_voice.strip():
+                voice_id = stored_voice.strip()
+        if podcast_host_voice is None:
+            stored_host = st.get("podcast_host_voice") or (
+                (st.get("task_config") or {}).get("podcast_host_voice")
+                if isinstance(st.get("task_config"), dict)
+                else None
+            )
+            if isinstance(stored_host, str) and stored_host.strip():
+                podcast_host_voice = stored_host.strip()
+        if podcast_guest_voice is None:
+            stored_guest = st.get("podcast_guest_voice") or (
+                (st.get("task_config") or {}).get("podcast_guest_voice")
+                if isinstance(st.get("task_config"), dict)
+                else None
+            )
+            if isinstance(stored_guest, str) and stored_guest.strip():
+                podcast_guest_voice = stored_guest.strip()
 
     # Enforce permissible combinations
     if file_ext.lower() != ".pdf" and task_type == "podcast":
@@ -137,12 +182,26 @@ async def run_file(
     generate_video = task_type in ("video", "both")
     generate_podcast = task_type in ("podcast", "both")
 
+    if not generate_video:
+        voice_id = None
+    if not generate_podcast:
+        podcast_host_voice = None
+        podcast_guest_voice = None
+
     upload_source_type = upload_record.get("source_type") if upload_record else None
     source_type = (
         upload_source_type
         if upload_source_type
         else ("pdf" if file_ext.lower() == ".pdf" else "slides")
     )
+    if source_type == "audio":
+        if not generate_podcast:
+            raise HTTPException(
+                status_code=400,
+                detail="Audio uploads require podcast generation",
+            )
+        generate_video = bool(payload.get("generate_video", False))
+        voice_id = None
     checksum = upload_record.get("checksum") if upload_record else None
     size_bytes = upload_record.get("size_bytes") if upload_record else None
     if size_bytes is None:
@@ -154,6 +213,9 @@ async def run_file(
 
     # Submit new task
     try:
+        voice_for_task = voice_id if generate_video else None
+        host_voice_for_task = podcast_host_voice if generate_podcast else None
+        guest_voice_for_task = podcast_guest_voice if generate_podcast else None
         new_task_id = await task_queue.submit_task(
             task_type,
             user_id=user_id,
@@ -175,6 +237,9 @@ async def run_file(
             generate_subtitles=True,
             generate_podcast=generate_podcast,
             generate_video=generate_video,
+            voice_id=voice_for_task,
+            podcast_host_voice=host_voice_for_task,
+            podcast_guest_voice=guest_voice_for_task,
         )
         return {"task_id": new_task_id, "file_id": file_id}
     except Exception as e:

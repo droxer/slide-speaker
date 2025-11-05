@@ -11,6 +11,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from loguru import logger
+from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -41,6 +42,10 @@ router = APIRouter(
     tags=["tasks"],
     dependencies=[Depends(require_authenticated_user)],
 )
+
+
+class TaskRetryRequest(BaseModel):
+    step: str | None = None
 
 
 @router.get("/tasks/{task_id}/status")
@@ -108,6 +113,109 @@ async def cancel_task(
         raise HTTPException(
             status_code=500, detail=f"Failed to cancel task: {str(e)}"
         ) from e
+
+
+@router.post("/tasks/{task_id}/retry")
+@limiter.limit("10/minute")
+@monitor_endpoint
+async def retry_task_endpoint(
+    request: Request,
+    task_id: str,
+    payload: TaskRetryRequest,
+    current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
+) -> dict[str, Any]:
+    """Retry a failed task from a specific step."""
+    user_id = extract_user_id(current_user)
+    if not user_id:
+        raise HTTPException(status_code=403, detail="user session missing id")
+
+    row = await db_get_task(task_id)
+    if not row or row.get("user_id") != user_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    state = await state_manager.get_state_by_task(task_id)
+    if not state:
+        file_id = (
+            row.get("file_id")
+            or row.get("upload_id")
+            or (row.get("kwargs") or {}).get("file_id")
+        )
+        if isinstance(file_id, str) and file_id:
+            # Fallback to file-scoped state when task alias is missing
+            state = await state_manager.get_state(file_id)
+            if state:
+                # Re-bind for future lookups; ignore failures so we can continue gracefully
+                with suppress(Exception):
+                    await state_manager.bind_task(file_id, task_id)
+    if not state:
+        raise HTTPException(status_code=400, detail="Task state unavailable for retry")
+
+    if state.get("status") != "failed":
+        raise HTTPException(
+            status_code=400, detail="Retry is only allowed for failed tasks"
+        )
+
+    steps = state.get("steps") or {}
+    if not isinstance(steps, dict) or len(steps) == 0:
+        raise HTTPException(
+            status_code=400, detail="Task does not contain resumable steps"
+        )
+
+    requested_step = (payload.step or "").strip() if payload.step else None
+    resume_step: str | None = None
+
+    if requested_step and requested_step in steps:
+        resume_step = requested_step
+    else:
+        errors = state.get("errors") or []
+        if isinstance(errors, list):
+            for entry in reversed(errors):
+                step_name = entry.get("step")
+                if isinstance(step_name, str) and step_name in steps:
+                    resume_step = step_name
+                    break
+        if not resume_step:
+            for step_name, step_state in steps.items():
+                if (
+                    isinstance(step_state, dict)
+                    and step_state.get("status") == "failed"
+                ):
+                    resume_step = step_name
+                    break
+
+    if not resume_step:
+        current_step = state.get("current_step")
+        if isinstance(current_step, str) and current_step in steps:
+            resume_step = current_step
+
+    if not resume_step:
+        first_step = next(iter(steps.keys()), None)
+        if isinstance(first_step, str) and first_step:
+            resume_step = first_step
+
+    if not resume_step:
+        raise HTTPException(
+            status_code=400,
+            detail="Unable to determine a step to resume from for this task",
+        )
+
+    reset_state = await state_manager.reset_steps_from_task(task_id, resume_step)
+    if not reset_state:
+        raise HTTPException(
+            status_code=400, detail="Failed to reset task steps for retry"
+        )
+
+    enqueued = await task_queue.enqueue_existing_task(task_id)
+    if not enqueued:
+        raise HTTPException(
+            status_code=400, detail="Task could not be enqueued for retry"
+        )
+
+    return {
+        "message": "Task retry queued",
+        "step": resume_step,
+        "status": reset_state.get("status", "processing"),
+    }
 
 
 @router.delete("/tasks/{task_id}/delete")

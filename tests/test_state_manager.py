@@ -34,6 +34,8 @@ class TestRedisStateManager:
             state_manager.redis_client.set = AsyncMock()
             state_manager.redis_client.sadd = AsyncMock()
             state_manager.redis_client.expire = AsyncMock()
+            state_manager.redis_client.get = AsyncMock(return_value=None)
+            state_manager.redis_client.delete = AsyncMock()
 
             # Call the method
             result = await state_manager.create_state(
@@ -49,6 +51,10 @@ class TestRedisStateManager:
                 True,  # generate_subtitles
                 True,  # generate_video
                 False,  # generate_podcast
+                None,  # voice_id
+                None,  # podcast_host_voice
+                None,  # podcast_guest_voice
+                None,  # task_kwargs
                 "test_task_id",  # task_id
             )
 
@@ -56,6 +62,10 @@ class TestRedisStateManager:
             assert result is not None
             assert result["file_id"] == "test_file_id"
             assert result["task_id"] == "test_task_id"
+            assert "task_kwargs" in result and isinstance(result["task_kwargs"], dict)
+            assert result["task_kwargs"].get("voice_language") == "english"
+            assert "task_config" in result and isinstance(result["task_config"], dict)
+            assert "voice_id" not in result
 
             # Verify Redis set was called
             state_manager.redis_client.set.assert_called()
