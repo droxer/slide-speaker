@@ -599,6 +599,16 @@ async def get_task_details(
         or filtered_kwargs.get("file_ext", "")
     )
 
+    # Only provide download URLs if the task is completed and files likely exist
+    downloads = {}
+    if status == "completed":
+        downloads = {
+            "video_url": f"/api/video/{file_id}",
+            "audio_url": f"/api/audio/{file_id}",
+            "subtitle_url": f"/api/subtitles/{file_id}",
+            "transcript_url": f"/api/download-transcript/{file_id}",
+        }
+
     return {
         "task_id": row.get("id"),
         "status": status,
@@ -613,12 +623,7 @@ async def get_task_details(
         "generate_podcast": filtered_kwargs.get("generate_podcast", False),
         "generate_video": filtered_kwargs.get("generate_video", True),
         "completion_percentage": completion_percentage,
-        "downloads": {
-            "video_url": f"/api/video/{file_id}",
-            "audio_url": f"/api/audio/{file_id}",
-            "subtitle_url": f"/api/subtitles/{file_id}",
-            "transcript_url": f"/api/download-transcript/{file_id}",
-        },
+        "downloads": downloads,
     }
 
 
