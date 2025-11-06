@@ -1,9 +1,9 @@
 """
 Transcript generation module for SlideSpeaker.
 
-Generates AI-powered presentation transcripts per slide using OpenAI. Combines
-extracted slide content and visual analysis prompts to produce natural, engaging
-transcripts suitable for AI avatar presentation.
+Generates AI-powered presentation transcripts per slide using the configured
+LLM provider. Combines extracted slide content and visual analysis prompts to
+produce natural, engaging transcripts suitable for AI avatar presentation.
 """
 
 from typing import Any
@@ -51,17 +51,11 @@ DEFAULT_TRANSCRIPTS = {
 
 
 class TranscriptGenerator:
-    """Generator for AI-powered presentation transcripts (OpenAI only)"""
+    """Generator for AI-powered presentation transcripts."""
 
     def __init__(self) -> None:
-        """Initialize OpenAI client from configuration."""
-        # Force OpenAI usage; Qwen support removed for transcript generation
-        self.provider = "openai"
-        self.model: str = config.openai_script_model
-        if not config.openai_api_key:
-            logger.error(
-                "OPENAI_API_KEY not set; OpenAI transcript generation will fallback"
-            )
+        """Initialize transcript generator with configured provider/model."""
+        self.model = config.script_generate_model or config.openai_model
 
     async def generate_transcript(
         self,

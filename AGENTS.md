@@ -4,7 +4,7 @@
 - `slidespeaker/` holds the application code, grouped by domain (e.g., `audio/`, `document/`, `llm/`, `routes/`, `storage/`). Use existing package boundaries when adding features.
 - `server.py` bootstraps the FastAPI app; `master_worker.py` manages background workers; `cli.py` exposes maintenance utilities.
 - `tests/` mirrors the package layout. Place new tests alongside the module under test.
-- `alembic/` and `migrations/` track database schema changes; `scripts/` contains operational helpers; `docs/` stores higher-level reference material.
+- `alembic/` and `migrations/` track database schema changes; `scripts/` contains operational helpers; `docs/` stores higher-level reference material (organized in subdirectories: `getting-started/`, `api/`, `architecture/`).
 
 ## Build, Test, and Development Commands
 - `make install` / `make install_dev` sync dependencies via `uv sync` (add `--extra=oss`/`aws` as needed).
@@ -17,6 +17,14 @@
 - Python code follows Ruff rules (line length 120, double-quoted strings, space indentation). Run `make format` before opening a PR.
 - Keep modules and functions snake_case, classes PascalCase, and constants UPPER_SNAKE_CASE. Mirror existing package naming when adding submodules.
 - Mypy runs in strict mode; annotate new functions, dataclasses, and async entry points. Prefer explicit return types for FastAPI route handlers and background tasks.
+
+## Documentation Structure
+- Documentation has been reorganized into logical subdirectories:
+  - `docs/getting-started/` - Installation and setup guides
+  - `docs/api/` - API documentation (overview and reference)
+  - `docs/architecture/` - System architecture and data flow docs
+- Update the appropriate subdirectory when adding new documentation
+- Update the main `docs/README.md` to reflect any new documentation files
 
 ## Testing Guidelines
 - Pytest with `pytest-asyncio` powers the async tests. Name files `test_*.py`, classes `Test*`, and functions `test_*` to honour `pyproject.toml`.

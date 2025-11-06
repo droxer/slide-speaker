@@ -4,32 +4,17 @@ Welcome to the SlideSpeaker documentation. This directory contains comprehensive
 
 ## Table of Contents
 
-### Technical Architecture
-- [Frontend Technical Stack](frontend-tech-stack.md) - Detailed overview of the React/TypeScript frontend architecture
-- [Backend Technical Stack](backend-tech-stack.md) - Comprehensive guide to the Python/FastAPI backend system
-
 ### Getting Started
-- [Installation Guide](installation.md) - Prerequisites and setup instructions
-- [API Installation Guide](api-installation.md) - Backend-specific installation and configuration
+- [Installation Guide](getting-started/installation.md) - Prerequisites and setup instructions
 
-### System Architecture
-- [API Documentation](api.md) - Complete API reference and endpoints
-- [Pipeline Overview](pipeline-overview.md) - High-level processing pipeline architecture
-- [Step Definitions](step-definitions.md) - Detailed breakdown of processing steps
-- [Data Flow](dataflow.md) - Data flow and state management
+### API Documentation
+- [API Overview](api/api-overview.md) - High-level overview of the API architecture
+- [API Reference](api/api-reference.md) - Complete API reference and endpoints
 
-### System Components
-
-#### API Documentation
-The backend API is documented through OpenAPI/Swagger:
-- **Local Development**: http://localhost:8000/docs
-- **Production**: https://your-domain.com/api/docs
-
-#### Core Concepts
-- Task Processing Pipeline
-- State Management
-- Storage Abstraction
-- Internationalization
+### Architecture
+- [Pipeline Overview](architecture/pipeline-overview.md) - High-level processing pipeline architecture
+- [Step Definitions](architecture/step-definitions.md) - Detailed breakdown of processing steps
+- [Data Flow](architecture/dataflow.md) - Data flow and state management
 
 ## Architecture Overview
 
@@ -71,6 +56,12 @@ SlideSpeaker follows a modern microservices architecture with clear separation o
 4. Use the unified storage interface for file operations
 5. Maintain API documentation with OpenAPI annotations
 6. Implement rate limiting for public endpoints
+
+## API Documentation
+
+The backend API is documented through OpenAPI/Swagger:
+- **Local Development**: http://localhost:8000/docs
+- **Production**: https://your-domain.com/api/docs
 
 ## Deployment
 

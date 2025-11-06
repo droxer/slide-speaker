@@ -27,10 +27,15 @@ async def list_tts_voices(
         provider: Optional provider override (openai|elevenlabs). Defaults to config.
     """
     try:
-        service_name = (provider or config.tts_service).lower()
-        service = TTSFactory.create_service(service_name)
+        service = TTSFactory.create_service(config.tts_model)
         voices = service.get_supported_voices(language)
-        return {"provider": service_name, "language": language, "voices": voices}
+        # Extract model name instead of returning the service instance
+        model_name = (
+            config.tts_model.split("/")[0]
+            if "/" in config.tts_model
+            else config.tts_model
+        )
+        return {"model": model_name, "voices": voices}
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"TTS voices unavailable: {e}"
@@ -101,8 +106,8 @@ async def llm_models() -> dict[str, object]:
 
     return {
         "script": {
-            "provider": "openai",
-            "model": config.openai_script_model,
+            "provider": config.script_provider,
+            "model": config.script_model,
         },
         "translation": {
             "provider": config.translation_provider,

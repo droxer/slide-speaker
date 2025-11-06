@@ -43,6 +43,8 @@ router = APIRouter(
 
 UPLOAD_DIR = config.uploads_dir
 UploadFileType = UploadFile | StarletteUploadFile
+# Tuple of upload types for runtime isinstance checks
+UPLOAD_FILE_RUNTIME_TYPES = (UploadFile, StarletteUploadFile)
 
 
 def _coerce_bool(value: Any, default: bool) -> bool:
@@ -98,7 +100,7 @@ async def _parse_upload_payload(request: Request) -> dict[str, Any]:
         file_bytes: bytes | None = None
         filename: str | None = None
 
-        if isinstance(upload, UploadFileType):
+        if isinstance(upload, UPLOAD_FILE_RUNTIME_TYPES):
             content_length = request.headers.get("content-length")
             if content_length is not None:
                 try:
@@ -208,6 +210,11 @@ async def _parse_upload_payload(request: Request) -> dict[str, Any]:
             "generate_video": _coerce_bool(form.get("generate_video"), True),
             "task_type": _coerce_optional_str(form.get("task_type")),
             "source_type": _coerce_optional_str(form.get("source_type")),
+            "voice_id": _coerce_optional_str(form.get("voice_id")),
+            "podcast_host_voice": _coerce_optional_str(form.get("podcast_host_voice")),
+            "podcast_guest_voice": _coerce_optional_str(
+                form.get("podcast_guest_voice")
+            ),
         }
         return payload
 
@@ -252,6 +259,9 @@ async def _parse_upload_payload(request: Request) -> dict[str, Any]:
         "generate_video": _coerce_bool(body.get("generate_video"), True),
         "task_type": _coerce_optional_str(body.get("task_type")),
         "source_type": _coerce_optional_str(body.get("source_type")),
+        "voice_id": _coerce_optional_str(body.get("voice_id")),
+        "podcast_host_voice": _coerce_optional_str(body.get("podcast_host_voice")),
+        "podcast_guest_voice": _coerce_optional_str(body.get("podcast_guest_voice")),
     }
 
 
@@ -304,6 +314,9 @@ async def upload_file(
         generate_subtitles = payload.get("generate_subtitles", True)
         generate_podcast = payload.get("generate_podcast", False)
         generate_video = payload.get("generate_video", True)
+        voice_id = _coerce_optional_str(payload.get("voice_id"))
+        podcast_host_voice = _coerce_optional_str(payload.get("podcast_host_voice"))
+        podcast_guest_voice = _coerce_optional_str(payload.get("podcast_guest_voice"))
 
         file_ext = Path(filename).suffix.lower()
         # Determine source_type from request or by extension and validate
@@ -344,10 +357,17 @@ async def upload_file(
                 )
             # Ensure we do not accidentally trigger video generation for audio-only uploads
             generate_video = bool(payload.get("generate_video", False))
+            voice_id = None
         elif file_ext not in [".pdf", ".pptx", ".ppt"]:
             raise HTTPException(
                 status_code=400, detail="Only PDF and PowerPoint files are supported"
             )
+
+        if not generate_video:
+            voice_id = None
+        if not generate_podcast:
+            podcast_host_voice = None
+            podcast_guest_voice = None
 
         # Validate languages
         if not locale_utils.validate_language(voice_language):
@@ -451,6 +471,10 @@ async def upload_file(
             generate_podcast = False
             generate_video = True
 
+        voice_for_task = voice_id if generate_video else None
+        host_voice_for_task = podcast_host_voice if generate_podcast else None
+        guest_voice_for_task = podcast_guest_voice if generate_podcast else None
+
         # Submit task to Redis task queue (state management is handled internally)
         task_id = await task_queue.submit_task(
             task_type,
@@ -473,6 +497,9 @@ async def upload_file(
             generate_subtitles=generate_subtitles,
             generate_podcast=generate_podcast,
             generate_video=generate_video,
+            voice_id=voice_for_task,
+            podcast_host_voice=host_voice_for_task,
+            podcast_guest_voice=guest_voice_for_task,
         )
 
         logger.info(

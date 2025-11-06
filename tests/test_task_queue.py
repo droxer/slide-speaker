@@ -285,3 +285,81 @@ class TestRedisTaskQueue:
 
         # Verify the result
         assert result is False
+
+    @pytest.mark.asyncio
+    async def test_clear_cancellation_flag(self, task_queue):
+        """clear_cancellation_flag should remove the cancellation key."""
+        task_queue.redis_client.delete = AsyncMock()
+
+        await task_queue.clear_cancellation_flag("task-123")
+
+        task_queue.redis_client.delete.assert_called_once_with(
+            "ss:task:task-123:cancelled"
+        )
+
+    @pytest.mark.asyncio
+    async def test_enqueue_existing_task_success(self, task_queue):
+        """enqueue_existing_task requeues eligible tasks."""
+        task_queue.get_task = AsyncMock(
+            return_value={
+                "status": "failed",
+                "error": "boom",
+                "task_id": "task-123",
+            }
+        )
+        task_queue.redis_client.lrem = AsyncMock(return_value=1)
+        task_queue.redis_client.rpush = AsyncMock()
+        task_queue.redis_client.set = AsyncMock()
+        task_queue.clear_cancellation_flag = AsyncMock()
+        with patch("slidespeaker.core.task_queue.db_enabled", False):
+            result = await task_queue.enqueue_existing_task("task-123")
+
+        assert result is True
+        task_queue.redis_client.rpush.assert_called_once_with(
+            task_queue.queue_key, "task-123"
+        )
+        task_queue.clear_cancellation_flag.assert_called_once_with("task-123")
+
+    @pytest.mark.asyncio
+    async def test_enqueue_existing_task_missing(self, task_queue):
+        """enqueue_existing_task returns False when task is absent."""
+        task_queue.get_task = AsyncMock(return_value=None)
+
+        result = await task_queue.enqueue_existing_task("missing-task")
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_enqueue_existing_task_invalid_status(self, task_queue):
+        """enqueue_existing_task declines tasks in unexpected statuses."""
+        task_queue.get_task = AsyncMock(
+            return_value={
+                "status": "processing",
+                "task_id": "task-123",
+            }
+        )
+
+        result = await task_queue.enqueue_existing_task("task-123")
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_complete_task_processing(self, task_queue):
+        """complete_task_processing should acknowledge completion."""
+        result = await task_queue.complete_task_processing("task-123")
+
+        assert result is True
+
+    @pytest.mark.asyncio
+    async def test_get_task_status(self, task_queue):
+        """get_task_status returns the stored status value."""
+        task_queue.get_task = AsyncMock(
+            return_value={
+                "task_id": "task-123",
+                "status": "queued",
+            }
+        )
+
+        status = await task_queue.get_task_status("task-123")
+
+        assert status == "queued"

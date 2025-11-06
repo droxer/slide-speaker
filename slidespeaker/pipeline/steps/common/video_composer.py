@@ -72,7 +72,7 @@ async def compose_video(
         state = await state_manager.get_state(file_id)
         _, storage_key, storage_uri = output_storage_uri(
             file_id,
-            state=state if isinstance(state, dict) else None,
+            state=state.to_dict() if state else None,
             segments=("video", "final.mp4"),
         )
 
@@ -95,13 +95,47 @@ async def compose_video(
         srt_files = [f for f in subtitle_files if f.suffix.lower() == ".srt"]
 
         logger.info(
-            f"Composing video with {len(audio_files)} audio files, "
-            f"{len(srt_files)} subtitle files, and {len(slide_images)} slide images"
+            "Composing video with audio={}, subtitles={}, slide_images={} (state)",
+            len(audio_files),
+            len(srt_files),
+            len(slide_images),
+        )
+
+        # Resolve slide image paths and ensure they exist
+        resolved_slide_images: list[Path] = []
+        for img_path in slide_images:
+            path = Path(img_path)
+            if not path.is_absolute():
+                path = (config.output_dir / file_id) / path
+            if path.exists():
+                resolved_slide_images.append(path)
+
+        if not resolved_slide_images:
+            logger.warning(
+                "No slide images resolved from state for file {}; scanning {}",
+                file_id,
+                config.output_dir / file_id / "images",
+            )
+            images_dir = config.output_dir / file_id / "images"
+            if images_dir.exists():
+                resolved_slide_images = sorted(images_dir.glob("*.png"))
+                if resolved_slide_images:
+                    logger.info(
+                        "Found {} slide images in fallback directory {}",
+                        len(resolved_slide_images),
+                        images_dir,
+                    )
+
+        if not resolved_slide_images:
+            raise ValueError("No slide images provided")
+
+        logger.info(
+            "Resolved {} slide images for video composition", len(resolved_slide_images)
         )
 
         # Compose the video
         await composer.compose_video(
-            slide_images=[Path(img) for img in slide_images],
+            slide_images=resolved_slide_images,
             avatar_videos=[],  # TODO: Add avatar video support
             audio_files=[Path(audio) for audio in audio_files],
             output_path=final_video_path,
@@ -128,7 +162,7 @@ async def compose_video(
             file_id, state_key, "completed", video_data
         )
 
-        if state and isinstance(state, dict):
+        if state:
             artifacts = dict(state.get("artifacts") or {})
             artifacts["final_video"] = {
                 "local_path": str(final_video_path),

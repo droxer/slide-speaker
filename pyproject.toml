@@ -34,6 +34,7 @@ dependencies = [
     "python-jose[cryptography]>=3.3.0",
     "slowapi>=0.1.9",
     "elevenlabs>=2.21.0",
+    "google-genai>=1.48.0",
 ]
 
 [project.optional-dependencies]
@@ -67,3 +68,8 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "strict"
+
+[dependency-groups]
+dev = [
+    "rich>=14.2.0",
+]

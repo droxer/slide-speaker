@@ -33,6 +33,15 @@ class UploadPayload(BaseModel):
         default=False, description="Whether to generate podcast"
     )
     generate_video: bool = Field(default=True, description="Whether to generate video")
+    voice_id: str | None = Field(
+        default=None, description="Specific TTS voice identifier for narration"
+    )
+    podcast_host_voice: str | None = Field(
+        default=None, description="Voice identifier for the podcast host"
+    )
+    podcast_guest_voice: str | None = Field(
+        default=None, description="Voice identifier for the podcast guest"
+    )
     task_type: Literal["video", "podcast", "both"] | None = Field(
         None, description="Type of task to generate"
     )
@@ -146,6 +155,15 @@ class MultipartUploadPayload(BaseModel):
         default=False, description="Whether to generate podcast"
     )
     generate_video: bool = Field(default=True, description="Whether to generate video")
+    voice_id: str | None = Field(
+        default=None, description="Specific TTS voice identifier for narration"
+    )
+    podcast_host_voice: str | None = Field(
+        default=None, description="Voice identifier for the podcast host"
+    )
+    podcast_guest_voice: str | None = Field(
+        default=None, description="Voice identifier for the podcast guest"
+    )
     task_type: Literal["video", "podcast", "both"] | None = Field(
         None, description="Type of task to generate"
     )

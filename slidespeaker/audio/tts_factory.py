@@ -7,8 +7,6 @@ instances. It supports multiple TTS providers (OpenAI, ElevenLabs) and handles
 service availability checking and configuration validation.
 """
 
-from slidespeaker.configs.config import config
-
 from .elevenlabs_tts import ElevenLabsTTSService
 from .openai_tts import OpenAITTSService
 from .tts_interface import TTSInterface
@@ -23,12 +21,12 @@ class TTSFactory:
     }
 
     @classmethod
-    def create_service(cls, service_name: str | None = None) -> TTSInterface:
+    def create_service(cls, model_spec: str | None = None) -> TTSInterface:
         """
         Create a TTS service instance based on configuration
 
         Args:
-            service_name: Optional service name override, defaults to env var
+            model_spec: Optional model specification, defaults to config.tts_model
 
         Returns:
             TTSInterface implementation instance
@@ -36,25 +34,17 @@ class TTSFactory:
         Raises:
             ValueError: If service name is invalid or service is not available
         """
-        if service_name is None:
-            service_name = config.tts_service
+        provider_part, _, _ = model_spec.partition("/")
 
-        if service_name not in cls._services:
+        provider_part = provider_part.lower()
+
+        if provider_part not in cls._services:
             raise ValueError(
-                f"Unknown TTS service: {service_name}. "
+                f"Unknown TTS service: {provider_part}. "
                 f"Available services: {list(cls._services.keys())}"
             )
 
-        service_class = cls._services[service_name]
-        service_instance = service_class()
-
-        if not service_instance.is_available():
-            raise ValueError(
-                f"TTS service '{service_name}' is not properly configured. "
-                f"Please check your environment variables."
-            )
-
-        return service_instance
+        return cls._services[provider_part]()
 
     @classmethod
     def get_available_services(cls) -> dict[str, type[TTSInterface]]:

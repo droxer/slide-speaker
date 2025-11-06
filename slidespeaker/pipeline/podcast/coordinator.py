@@ -25,6 +25,7 @@ from ..steps.podcast.pdf import (
     compose_podcast_step,
     generate_podcast_audio_step,
     generate_podcast_script_step,
+    generate_podcast_subtitles_step,
     translate_podcast_script_step,
 )
 from ..steps.video.pdf import segment_content_step as pdf_segment_content_step
@@ -50,15 +51,18 @@ def _podcast_steps(
     if target != "english":
         steps.append("translate_podcast_script")
         logger.info(f"Added translate_podcast_script step for target={target}")
-    steps.extend(["generate_podcast_audio", "compose_podcast"])
+    steps.extend(
+        ["generate_podcast_audio", "generate_podcast_subtitles", "compose_podcast"]
+    )
     return steps
 
 
 def _podcast_step_name(step: str) -> str:
     base = {
-        "generate_podcast_script": "Generating 2-person podcast script",
+        "generate_podcast_script": "Generating podcast script (two speakers)",
         "translate_podcast_script": "Translating podcast script",
-        "generate_podcast_audio": "Generating podcast audio (multi-voice)",
+        "generate_podcast_audio": "Generating podcast audio",
+        "generate_podcast_subtitles": "Creating podcast subtitles",
         "compose_podcast": "Composing final podcast (MP3)",
     }
     return base.get(step, step)
@@ -95,6 +99,7 @@ def extract_podcast_dialogue_from_state(
     # Prefer dialogue captured during audio generation
     audio_dialogue: list[dict[str, Any]] | None = None
     audio_dialogue_language: str | None = None
+    total_duration: float | None = None
     source = "generate_podcast_audio"
     try:
         ga = steps.get("generate_podcast_audio") or {}
@@ -104,18 +109,34 @@ def extract_podcast_dialogue_from_state(
             host_voice = ga_data.get("host_voice")
             guest_voice = ga_data.get("guest_voice")
             dlg = ga_data.get("dialogue")
+            if (
+                (not isinstance(dlg, list) or not dlg)
+                and isinstance(ga_data.get("segment_metadata"), list)
+                and ga_data["segment_metadata"]
+            ):
+                dlg = ga_data["segment_metadata"]
             lang = ga_data.get("dialogue_language")
             if isinstance(lang, str) and lang.strip():
                 audio_dialogue_language = lang.strip().lower()
             if isinstance(dlg, list) and dlg:
                 audio_dialogue = dlg
+            td = ga_data.get("total_duration")
+            if isinstance(td, int | float):
+                total_duration = max(float(td), 0.0)
     except Exception:
         logger.info(
             "extract_podcast_dialogue_from_state: unable to read audio dialogue"
         )
 
-    def sanitize(items: list[dict[str, Any]] | None) -> list[dict[str, str]]:
-        sanitized: list[dict[str, str]] = []
+    def sanitize(
+        items: list[dict[str, Any]] | None,
+        *,
+        host_voice_fallback: str | None = None,
+        guest_voice_fallback: str | None = None,
+    ) -> tuple[list[dict[str, Any]], float]:
+        sanitized: list[dict[str, Any]] = []
+        timeline_cursor = 0.0
+        latest_end = 0.0
         for item in items or []:
             if not isinstance(item, dict):
                 continue
@@ -123,12 +144,68 @@ def extract_podcast_dialogue_from_state(
             text = _strip_transition_label(item.get("text", ""))
             if not text:
                 continue
-            sanitized.append({"speaker": speaker, "text": text})
-        return sanitized
+            voice = item.get("voice")
+            voice_str = (
+                voice.strip() if isinstance(voice, str) and voice.strip() else None
+            )
 
-    dialogue = sanitize(audio_dialogue)
+            normalized_speaker = speaker.lower()
+            if not voice_str:
+                if normalized_speaker.startswith("host") and host_voice_fallback:
+                    voice_str = host_voice_fallback.strip()
+                elif normalized_speaker.startswith("guest") and guest_voice_fallback:
+                    voice_str = guest_voice_fallback.strip()
+
+            start = item.get("start")
+            end = item.get("end")
+            duration = item.get("duration")
+
+            start_val = float(start) if isinstance(start, int | float) else None
+            end_val = float(end) if isinstance(end, int | float) else None
+            duration_val = (
+                float(duration) if isinstance(duration, int | float) else None
+            )
+
+            if duration_val is not None:
+                duration_val = max(duration_val, 0.0)
+
+            if start_val is None:
+                start_val = timeline_cursor
+            if end_val is None and duration_val is not None:
+                end_val = start_val + duration_val
+            if duration_val is None and end_val is not None:
+                duration_val = max(end_val - start_val, 0.0)
+            if duration_val is None:
+                duration_val = 5.0
+            if end_val is None:
+                end_val = start_val + duration_val
+
+            timeline_cursor = max(timeline_cursor, end_val)
+            latest_end = max(latest_end, end_val)
+
+            entry: dict[str, Any] = {
+                "speaker": speaker,
+                "text": text,
+                "start": start_val,
+                "end": end_val,
+                "duration": duration_val,
+            }
+            if voice_str:
+                entry["voice"] = voice_str
+            segment_file = item.get("segment_file")
+            if isinstance(segment_file, str) and segment_file.strip():
+                entry["segment_file"] = segment_file.strip()
+            sanitized.append(entry)
+        return sanitized, latest_end
+
+    dialogue = sanitize(
+        audio_dialogue,
+        host_voice_fallback=host_voice if isinstance(host_voice, str) else None,
+        guest_voice_fallback=guest_voice if isinstance(guest_voice, str) else None,
+    )
+    dialogue_items, audio_total = dialogue
     normalized_target = str(target_language or "english").strip().lower()
-    if dialogue and (
+    if dialogue_items and (
         audio_dialogue_language is None
         or audio_dialogue_language == normalized_target
         or (
@@ -136,14 +213,17 @@ def extract_podcast_dialogue_from_state(
             and (audio_dialogue_language or "english") == "english"
         )
     ):
+        if total_duration is None:
+            total_duration = audio_total
         if audio_dialogue_language:
             language = audio_dialogue_language
         return {
-            "dialogue": dialogue,
+            "dialogue": dialogue_items,
             "host_voice": host_voice,
             "guest_voice": guest_voice,
             "language": language,
             "source": source,
+            "total_duration": total_duration,
         }
 
     # Fallback to translated script or original English script
@@ -180,8 +260,10 @@ def extract_podcast_dialogue_from_state(
 
     if fallback_step:
         fallback_dialogue = fallback_step.get("data")
-        sanitized_dialogue = sanitize(
-            fallback_dialogue if isinstance(fallback_dialogue, list) else []
+        sanitized_dialogue, fallback_total = sanitize(
+            fallback_dialogue if isinstance(fallback_dialogue, list) else [],
+            host_voice_fallback=host_voice if isinstance(host_voice, str) else None,
+            guest_voice_fallback=guest_voice if isinstance(guest_voice, str) else None,
         )
         if sanitized_dialogue:
             return {
@@ -190,63 +272,11 @@ def extract_podcast_dialogue_from_state(
                 "guest_voice": guest_voice,
                 "language": fallback_language,
                 "source": fallback_source,
+                "total_duration": fallback_total or None,
             }
 
     logger.info("extract_podcast_dialogue_from_state: no dialogue found")
     return None
-
-
-def _build_podcast_conversation_markdown(
-    state: dict[str, Any], task_id: str | None = None
-) -> str | None:
-    """Build podcast conversation markdown from state data."""
-    logger.info(f"_build_podcast_conversation_markdown called with task_id: {task_id}")
-    if not state or "steps" not in state:
-        logger.info("No state or steps found")
-        return None
-
-    logger.info(f"Steps keys: {list(state['steps'].keys())}")
-    payload = extract_podcast_dialogue_from_state(state)
-    if not payload:
-        logger.info("No payload extracted from state")
-        return None
-
-    logger.info(
-        f"Extracted payload language: {payload.get('language')}, source: {payload.get('source')}"
-    )
-
-    data = payload.get("dialogue") or []
-    host_voice = payload.get("host_voice")
-    guest_voice = payload.get("guest_voice")
-
-    # Build conversation-style Markdown
-    lines: list[str] = ["# Podcast Conversation\n"]
-    for item in data:
-        if isinstance(item, dict):
-            raw_speaker = str(item.get("speaker", "")).strip().lower()
-            speaker_label = "Speaker"
-            if raw_speaker.startswith("host"):
-                # Prefer VoiceId first, then Role; both capitalized
-                speaker_label = (
-                    f"{str(host_voice).strip().title()} (Host)"
-                    if host_voice
-                    else "Host"
-                )
-            elif raw_speaker.startswith("guest"):
-                speaker_label = (
-                    f"{str(guest_voice).strip().title()} (Guest)"
-                    if guest_voice
-                    else "Guest"
-                )
-            else:
-                # Fallback to provided speaker label, title-cased
-                speaker_label = item.get("speaker") or "Speaker"
-                speaker_label = str(speaker_label).strip().title()
-            text = _strip_transition_label(item.get("text", ""))
-            if text:
-                lines.append(f"**{speaker_label}:** {text}")
-
-    return "\n\n".join(lines).strip() + "\n"
 
 
 async def _save_podcast_transcript_to_storage(
@@ -265,10 +295,6 @@ async def _save_podcast_transcript_to_storage(
             logger.debug(f"No state found for file_id: {file_id}")
             return
 
-        md_content = _build_podcast_conversation_markdown(state, task_id)
-        logger.info(f"Markdown content generated: {md_content is not None}")
-        if md_content:
-            logger.info(f"Markdown content preview: {md_content[:200]}...")
         script_payload = extract_podcast_dialogue_from_state(state)
         logger.info(f"Script payload extracted: {script_payload is not None}")
         if script_payload:
@@ -276,7 +302,7 @@ async def _save_podcast_transcript_to_storage(
                 f"Script payload language: {script_payload.get('language')}, "
                 f"dialogue length: {len(script_payload.get('dialogue', []))}"
             )
-        if not md_content and not script_payload:
+        if not script_payload:
             logger.debug(
                 f"No podcast content generated for file_id: {file_id}; skipping storage save"
             )
@@ -286,15 +312,37 @@ async def _save_podcast_transcript_to_storage(
         # Use podcast-specific filename to avoid conflict with video transcripts
         base_id = task_id if isinstance(task_id, str) and task_id else file_id
 
-        markdown_url = None
-        if md_content:
-            transcript_key = f"{base_id}_podcast_transcript.md"
-            logger.info(f"Saving podcast transcript markdown key: {transcript_key}")
-            markdown_url = storage_provider.upload_bytes(
-                md_content.encode("utf-8"), transcript_key, "text/markdown"
-            )
-
         script_url = None
+        vtt_url = None
+        srt_url = None
+        vtt_local_path = None
+        srt_local_path = None
+
+        subtitles_step = (
+            state.get("steps", {}).get("generate_podcast_subtitles")
+            if isinstance(state, dict)
+            else None
+        )
+        subtitles_data = (
+            subtitles_step.get("data")
+            if isinstance(subtitles_step, dict)
+            and isinstance(subtitles_step.get("data"), dict)
+            else None
+        )
+        if subtitles_data:
+            for candidate in subtitles_data.get("storage_urls") or []:
+                if isinstance(candidate, str):
+                    if candidate.endswith(".vtt"):
+                        vtt_url = candidate
+                    elif candidate.endswith(".srt"):
+                        srt_url = candidate
+            for candidate in subtitles_data.get("subtitle_files") or []:
+                if isinstance(candidate, str):
+                    if candidate.endswith(".vtt") and not vtt_local_path:
+                        vtt_local_path = candidate
+                    elif candidate.endswith(".srt") and not srt_local_path:
+                        srt_local_path = candidate
+
         if script_payload and script_payload.get("dialogue"):
             script_key = f"{base_id}_podcast_script.json"
             logger.info(f"Saving podcast script JSON key: {script_key}")
@@ -304,6 +352,21 @@ async def _save_podcast_transcript_to_storage(
             script_url = storage_provider.upload_bytes(
                 script_bytes, script_key, "application/json"
             )
+            if not vtt_url and vtt_local_path:
+                try:
+                    vtt_key = f"{base_id}_podcast_transcript.vtt"
+                    logger.info(
+                        "Storing podcast transcript VTT using existing subtitle file: %s",
+                        vtt_local_path,
+                    )
+                    vtt_url = storage_provider.upload_file(
+                        str(vtt_local_path), vtt_key, "text/vtt"
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logger.error(
+                        "Failed to publish podcast VTT transcript from subtitles: %s",
+                        exc,
+                    )
 
         # Save URLs to state for reference
         state = await state_manager.get_state(file_id)
@@ -313,22 +376,38 @@ async def _save_podcast_transcript_to_storage(
             pod_step = steps.get("generate_podcast_script")
             audio_step = steps.get("generate_podcast_audio")
             if pod_step and isinstance(pod_step, dict):
-                if markdown_url:
-                    pod_step["markdown_storage_url"] = markdown_url
                 if script_url:
                     pod_step["script_storage_url"] = script_url
+                if vtt_url:
+                    pod_step["vtt_storage_url"] = vtt_url
+                if srt_url:
+                    pod_step["srt_storage_url"] = srt_url
             if audio_step and isinstance(audio_step, dict):
                 data = audio_step.get("data") or {}
-                if isinstance(data, dict) and script_url:
-                    data["script_storage_url"] = script_url
+                if isinstance(data, dict):
+                    if script_url:
+                        data["script_storage_url"] = script_url
+                    if vtt_url:
+                        data["vtt_storage_url"] = vtt_url
+                    if srt_url:
+                        data["srt_storage_url"] = srt_url
+                    subtitles_payload = dict(data.get("subtitles") or {})
+                    if vtt_url or vtt_local_path:
+                        subtitles_payload["vtt"] = vtt_url or vtt_local_path
+                    if srt_url or srt_local_path:
+                        subtitles_payload["srt"] = srt_url or srt_local_path
+                    if subtitles_payload:
+                        data["subtitles"] = subtitles_payload
                     audio_step["data"] = data
             if pod_step or audio_step:
                 await state_manager.save_state(file_id, state)
 
-        if markdown_url:
-            logger.info(f"Podcast transcript saved to storage: {markdown_url}")
         if script_url:
             logger.info(f"Podcast script JSON saved to storage: {script_url}")
+        if vtt_url:
+            logger.info(f"Podcast transcript VTT available at: {vtt_url}")
+        if srt_url:
+            logger.info(f"Podcast transcript SRT available at: {srt_url}")
     except Exception as e:
         logger.error(f"Failed to save podcast transcript to storage: {e}")
         logger.exception(e)
@@ -342,9 +421,6 @@ async def from_pdf(
     task_id: str | None = None,
 ) -> None:
     logger.info(f"Starting podcast generation (PDF) for file {file_id}")
-    logger.info(f"Task ID: {task_id}")
-    logger.info(f"Task ID type: {type(task_id)}")
-    logger.info(f"Task ID is valid string: {isinstance(task_id, str) and task_id}")
 
     if task_id and await task_queue.is_task_cancelled(task_id):
         logger.info(f"Task {task_id} was cancelled before processing started")
@@ -418,6 +494,8 @@ async def from_pdf(
                 )
             elif step_name == "generate_podcast_audio":
                 await generate_podcast_audio_step(file_id, voice_language)
+            elif step_name == "generate_podcast_subtitles":
+                await generate_podcast_subtitles_step(file_id)
             elif step_name == "compose_podcast":
                 await compose_podcast_step(file_id)
 
@@ -427,11 +505,6 @@ async def from_pdf(
         # Save podcast transcript to storage
         logger.info(
             f"Calling _save_podcast_transcript_to_storage with file_id: {file_id}, task_id: {task_id}"
-        )
-        logger.info(f"Task ID at save time: {task_id}")
-        logger.info(f"Task ID type at save time: {type(task_id)}")
-        logger.info(
-            f"Task ID is valid string at save time: {isinstance(task_id, str) and task_id}"
         )
         await _save_podcast_transcript_to_storage(file_id, task_id)
 

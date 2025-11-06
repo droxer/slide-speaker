@@ -19,6 +19,7 @@ from ..helpers import (
     check_and_handle_cancellation,
     check_and_handle_failure,
     fetch_step_state,
+    fetch_task_state,
     set_step_status_processing,
 )
 
@@ -132,12 +133,12 @@ async def _finalize_step_status(
     task_id: str | None = None,
 ) -> None:
     """Ensure a step finished cleanly, flagging failures for upstream handling."""
-    step_state = await state_manager.get_step_status(file_id, state_key)
-    status = (step_state or {}).get("status")
+    step_state = await fetch_step_state(file_id, state_key)
+    status = step_state.get("status") if step_state else None
 
     if status == "failed":
         detail = ""
-        data = (step_state or {}).get("data")
+        data = step_state.data if step_state else None
         if isinstance(data, dict) and data.get("error"):
             detail = f": {data['error']}"
         raise PipelineStepFailedError(
@@ -180,16 +181,16 @@ async def from_pdf(
         return
 
     # Initialize/refresh state flags relevant to video
-    state = await state_manager.get_state(file_id)
-    if state:
-        state["voice_language"] = voice_language
-        state["subtitle_language"] = subtitle_language
-        state["generate_avatar"] = False
-        state["generate_subtitles"] = generate_subtitles
-        state["generate_video"] = generate_video
+    task_state = await fetch_task_state(file_id)
+    if task_state:
+        task_state["voice_language"] = voice_language
+        task_state["subtitle_language"] = subtitle_language
+        task_state["generate_avatar"] = False
+        task_state["generate_subtitles"] = generate_subtitles
+        task_state["generate_video"] = generate_video
         if task_id:
-            state["task_id"] = task_id
-        await state_manager.save_state(file_id, state)
+            task_state["task_id"] = task_id
+        await state_manager.save_task_state(file_id, task_state)
 
     if task_id:
         logger.info(f"=== Starting PDF video processing for task {task_id} ===")

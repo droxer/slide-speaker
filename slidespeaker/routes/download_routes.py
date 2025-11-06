@@ -156,19 +156,33 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
 
             st = await sm2.get_state(file_id)
             if st:
-                lang = st.get("subtitle_language") or st.get("voice_language")
+                lang = (
+                    st.get("subtitle_language")
+                    or st.get("podcast_transcript_language")
+                    or st.get("voice_language")
+                )
                 if isinstance(lang, str) and lang:
                     preferred_locales.append(locale_utils.get_locale_code(lang))
                 # Inspect subtitle_files if present to extract locale codes
                 try:
-                    step = (st.get("steps") or {}).get("generate_subtitles") or {}
-                    data = step.get("data") or {}
-                    files = data.get("subtitle_files") or []
+                    steps = st.get("steps") or {}
+                    subtitle_steps = [
+                        steps.get("generate_subtitles") or {},
+                        steps.get("generate_podcast_subtitles") or {},
+                    ]
+                    files: list[str] = []
+                    for step in subtitle_steps:
+                        data = step.get("data") or {}
+                        files.extend(
+                            [
+                                p
+                                for p in data.get("subtitle_files") or []
+                                if isinstance(p, str)
+                            ]
+                        )
                     import re as _re
 
                     for p in files:
-                        if not isinstance(p, str):
-                            continue
                         m = _re.search(r"_([A-Za-z-]+)\.(vtt|srt)$", p)
                         if m:
                             preferred_locales.append(m.group(1))
@@ -193,12 +207,21 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
 
     # Check for existing subtitle files
     seen_locales: set[str] = set()
-    for loc in preferred_locales:
+    unique_locales = {
+        locale_utils.get_locale_code(loc) if isinstance(loc, str) else loc
+        for loc in preferred_locales
+        if loc
+    }
+    for loc in sorted(unique_locales):
         subtitle_candidates = [
             output_object_key(task_id, "subtitles", f"{loc}.vtt"),
             output_object_key(task_id, "subtitles", f"{loc}.srt"),
             f"{task_id}_{loc}.vtt",
             f"{task_id}_{loc}.srt",
+            output_object_key(task_id, "podcast", "subtitles", f"{loc}.vtt"),
+            output_object_key(task_id, "podcast", "subtitles", f"{loc}.srt"),
+            f"{task_id}_podcast_{loc}.vtt",
+            f"{task_id}_podcast_{loc}.srt",
         ]
         if file_id:
             subtitle_candidates.insert(
@@ -206,6 +229,14 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
             )
             subtitle_candidates.insert(
                 3, output_object_key(file_id, "subtitles", f"{loc}.srt")
+            )
+            subtitle_candidates.extend(
+                [
+                    output_object_key(file_id, "podcast", "subtitles", f"{loc}.vtt"),
+                    output_object_key(file_id, "podcast", "subtitles", f"{loc}.srt"),
+                    f"{file_id}_podcast_{loc}.vtt",
+                    f"{file_id}_podcast_{loc}.srt",
+                ]
             )
         if any(check_file_exists(k) for k in subtitle_candidates):
             seen_locales.add(loc)
@@ -230,13 +261,5 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
                 "download_url": f"/api/tasks/{task_id}/subtitles/srt/download?language={loc}",
             }
         )
-
-    # Transcript (Markdown) always linkable; handler decides availability
-    items.append(
-        {
-            "type": "transcript",
-            "url": f"/api/tasks/{task_id}/transcripts/markdown",
-        }
-    )
 
     return {"task_id": task_id, "file_id": file_id, "items": items}

@@ -5,35 +5,70 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import json
 import sys
 from typing import Any
 
 sys.path.append(".")
 
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
+
+from scripts._console_utils import get_console, status_label
 from slidespeaker.repository import user as user_repo
+
+console = get_console()
 
 
 def _print_user(user: dict[str, Any]) -> None:
     created = user.get("created_at") or "?"
     updated = user.get("updated_at") or "?"
     language = user.get("preferred_language") or "english"
-    print(
-        f"id={user.get('id')} email={user.get('email')} name={user.get('name') or '-'} "
-        f"language={language} created={created} updated={updated}"
-    )
+    text = Text()
+    text.append("id=", style="dim")
+    text.append(str(user.get("id")), style="bold white")
+    text.append(" email=", style="dim")
+    text.append(str(user.get("email")), style="bold cyan")
+    text.append(" name=", style="dim")
+    text.append(str(user.get("name") or "-"), style="white")
+    text.append(" language=", style="dim")
+    text.append(str(language), style="bold green")
+    text.append(" created=", style="dim")
+    text.append(str(created), style="white")
+    text.append(" updated=", style="dim")
+    text.append(str(updated), style="white")
+    console.print(text)
 
 
 async def cmd_list(args: argparse.Namespace) -> None:
     users = await user_repo.list_users(limit=args.limit, offset=args.offset)
     if args.json:
-        print(json.dumps(users, indent=2))
+        console.print_json(data=users)
         return
     if not users:
-        print("No users found.")
+        console.print("[bold yellow]No users found.[/]")
         return
+    table = Table(
+        title=f"{len(users)} user(s)",
+        header_style="bold cyan",
+        show_lines=False,
+    )
+    table.add_column("ID", style="bold white")
+    table.add_column("Email", style="bold cyan")
+    table.add_column("Name")
+    table.add_column("Language", style="bold green")
+    table.add_column("Created")
+    table.add_column("Updated")
     for user in users:
-        _print_user(user)
+        table.add_row(
+            str(user.get("id")),
+            str(user.get("email")),
+            str(user.get("name") or "-"),
+            str(user.get("preferred_language") or "english"),
+            str(user.get("created_at") or "?"),
+            str(user.get("updated_at") or "?"),
+        )
+    console.print(table)
 
 
 async def cmd_show(args: argparse.Namespace) -> None:
@@ -43,12 +78,16 @@ async def cmd_show(args: argparse.Namespace) -> None:
     elif args.user_id:
         user = await user_repo.get_user_by_id(args.user_id)
     if not user:
-        print("User not found.")
+        console.print("[bold red]User not found.[/]")
         sys.exit(1)
     if args.json:
-        print(json.dumps(user, indent=2))
+        console.print_json(data=user)
     else:
-        _print_user(user)
+        panel_text = Text()
+        for key, value in sorted(user.items()):
+            panel_text.append(f"{key}: ", style="bold cyan")
+            panel_text.append(f"{value}\n", style="white")
+        console.print(Panel.fit(panel_text, title="User Details", border_style="cyan"))
 
 
 async def cmd_create(args: argparse.Namespace) -> None:
@@ -60,33 +99,34 @@ async def cmd_create(args: argparse.Namespace) -> None:
             preferred_language=args.preferred_language,
         )
     except ValueError as exc:
-        print(f"Failed to create user: {exc}")
+        console.print(f"[bold red]Failed to create user:[/] {exc}")
         sys.exit(1)
+    console.print(status_label("CREATED", "bold green"))
     _print_user(user)
 
 
 async def cmd_set_password(args: argparse.Namespace) -> None:
     target = await user_repo.get_user_by_email(args.email)
     if not target:
-        print("User not found.")
+        console.print("[bold red]User not found.[/]")
         sys.exit(1)
     updated = await user_repo.set_user_password(target["id"], args.password)
     if not updated:
-        print("Password update failed.")
+        console.print("[bold red]Password update failed.[/]")
         sys.exit(1)
-    print("Password updated successfully.")
+    console.print("[bold green]Password updated successfully.[/]")
 
 
 async def cmd_delete(args: argparse.Namespace) -> None:
     user = await user_repo.get_user_by_email(args.email)
     if not user:
-        print("User not found.")
+        console.print("[bold red]User not found.[/]")
         sys.exit(1)
     removed = await user_repo.delete_user(user["id"])
     if not removed:
-        print("Delete operation failed.")
+        console.print("[bold red]Delete operation failed.[/]")
         sys.exit(1)
-    print("User deleted.")
+    console.print("[bold green]User deleted.[/]")
 
 
 async def main() -> None:

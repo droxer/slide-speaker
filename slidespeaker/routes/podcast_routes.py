@@ -6,6 +6,7 @@ podcast files as well as fetching the dialogue used for audio generation.
 """
 
 import json
+import re
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -301,15 +302,26 @@ async def download_podcast_by_task(task_id: str, request: Request) -> Any:
 # ---------------------------------------------------------------------------
 
 
-def _normalize_dialogue(items: list[Any]) -> list[dict[str, str]]:
-    normalized: list[dict[str, str]] = []
+def _normalize_dialogue(items: list[Any]) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
     for item in items or []:
         if not isinstance(item, dict):
             continue
         speaker = str(item.get("speaker", "")).strip()
         text = str(item.get("text", "")).strip()
         if speaker and text:
-            normalized.append({"speaker": speaker, "text": text})
+            entry: dict[str, Any] = {"speaker": speaker, "text": text}
+            voice = item.get("voice")
+            if isinstance(voice, str) and voice.strip():
+                entry["voice"] = voice.strip()
+            segment_file = item.get("segment_file")
+            if isinstance(segment_file, str) and segment_file.strip():
+                entry["segment_file"] = segment_file.strip()
+            for key in ("start", "end", "duration"):
+                value = item.get(key)
+                if isinstance(value, int | float):
+                    entry[key] = float(value)
+            normalized.append(entry)
     return normalized
 
 
@@ -401,3 +413,240 @@ async def get_podcast_script(
 
     legacy_payload["dialogue"] = normalized_dialogue
     return legacy_payload
+
+
+def _normalize_cues(items: list[Any]) -> list[dict[str, float | str]]:
+    normalized: list[dict[str, float | str]] = []
+    for item in items or []:
+        if not isinstance(item, dict):
+            continue
+        text = str(item.get("text", "")).strip()
+        if not text:
+            continue
+        start = item.get("start")
+        end = item.get("end")
+        start_val = float(start) if isinstance(start, int | float) else None
+        end_val = float(end) if isinstance(end, int | float) else None
+        if start_val is None or end_val is None:
+            continue
+        normalized.append(
+            {
+                "start": start_val,
+                "end": end_val,
+                "text": text,
+            }
+        )
+    return normalized
+
+
+def _resolve_subtitle_url(
+    storage_provider: StorageProvider,
+    storage_keys: list[str],
+    storage_urls: list[str],
+    suffix: str,
+) -> str | None:
+    for key in storage_keys:
+        if isinstance(key, str) and key.endswith(suffix):
+            try:
+                return storage_provider.get_file_url(
+                    key,
+                    expires_in=300,
+                    content_disposition=f"inline; filename={Path(key).name}",
+                )
+            except Exception:
+                continue
+    for url in storage_urls:
+        if isinstance(url, str) and url.endswith(suffix):
+            return url
+    return None
+
+
+def _load_vtt_from_storage(
+    *,
+    storage_provider: StorageProvider,
+    storage_keys: list[str],
+    subtitle_files: list[str],
+    artifacts: dict[str, Any] | None,
+) -> str | None:
+    candidates: list[tuple[str, str]] = []
+
+    def append_candidate(kind: str, value: str) -> None:
+        if isinstance(value, str) and value.strip():
+            candidates.append((kind, value.strip()))
+
+    for key in storage_keys:
+        if isinstance(key, str) and key.endswith(".vtt"):
+            append_candidate("storage_key", key)
+
+    for path in subtitle_files:
+        if isinstance(path, str) and path.endswith(".vtt"):
+            append_candidate("local_path", path)
+
+    if artifacts and isinstance(artifacts, dict):
+        art_vtt = (
+            artifacts.get("podcast", {})
+            if isinstance(artifacts.get("podcast"), dict)
+            else {}
+        )
+        vtt_entry = art_vtt.get("subtitles")
+        if isinstance(vtt_entry, dict):
+            vtt_info = vtt_entry.get("vtt")
+            if isinstance(vtt_info, dict):
+                append_candidate("local_path", str(vtt_info.get("local_path") or ""))
+                append_candidate("storage_key", str(vtt_info.get("storage_key") or ""))
+
+    for kind, value in candidates:
+        try:
+            if kind == "local_path":
+                path = Path(value)
+                if path.exists():
+                    return path.read_text(encoding="utf-8")
+            else:
+                data = storage_provider.download_bytes(value)
+                return data.decode("utf-8")
+        except Exception:
+            continue
+    return None
+
+
+def _parse_vtt_to_cues(text: str) -> list[dict[str, float | str]]:
+    time_re = re.compile(
+        r"(\d{2}):(\d{2}):(\d{2})[.,](\d{3})\s+-->\s+(\d{2}):(\d{2}):(\d{2})[.,](\d{3})"
+    )
+
+    def to_seconds(parts: tuple[str, ...]) -> float:
+        h, m, s, ms = parts
+        return int(h) * 3600 + int(m) * 60 + int(s) + int(ms) / 1000
+
+    lines = text.splitlines()
+    cues: list[dict[str, float | str]] = []
+    idx = 0
+    while idx < len(lines):
+        line = lines[idx].strip()
+        idx += 1
+        if not line or line.upper() == "WEBVTT" or line.isdigit():
+            continue
+        match = time_re.match(line)
+        if not match:
+            continue
+        start = to_seconds(match.groups()[0:4])
+        end = to_seconds(match.groups()[4:8])
+        payload: list[str] = []
+        while idx < len(lines):
+            text_line = lines[idx].strip()
+            if not text_line:
+                idx += 1
+                break
+            if time_re.match(text_line):
+                break
+            payload.append(text_line)
+            idx += 1
+        cue_text = "\n".join(payload).strip()
+        if cue_text:
+            cues.append({"start": start, "end": end, "text": cue_text})
+    return cues
+
+
+@router.get("/tasks/{task_id}/podcast/subtitles")
+async def get_podcast_subtitles(
+    task_id: str,
+    current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
+) -> dict[str, Any]:
+    """Return structured cues and download links for podcast subtitles."""
+    from slidespeaker.core.task_queue import task_queue
+    from slidespeaker.repository.task import get_task as db_get_task
+
+    user_id = extract_user_id(current_user)
+    if not user_id:
+        raise HTTPException(status_code=403, detail="user session missing id")
+
+    db_row = await db_get_task(task_id)
+    if not db_row or db_row.get("user_id") != user_id:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    file_id = None
+    if db_row.get("file_id"):
+        file_id = str(db_row["file_id"])
+
+    state = await state_manager.get_state_by_task(task_id)
+    if not state and file_id:
+        state = await state_manager.get_state(file_id)
+
+    if not state:
+        task = await task_queue.get_task(task_id)
+        if task:
+            file_id = (task.get("kwargs") or {}).get("file_id") or task.get("file_id")
+            if isinstance(file_id, str):
+                state = await state_manager.get_state(file_id)
+    else:
+        if not file_id and isinstance(state, dict):
+            file_id = state.get("file_id")
+
+    if state and isinstance(state, dict):
+        st_owner = state.get("user_id")
+        if isinstance(st_owner, str) and st_owner and st_owner != user_id:
+            raise HTTPException(status_code=404, detail="Task not found")
+
+    if not state:
+        raise HTTPException(status_code=404, detail="Task state not found")
+
+    steps = state.get("steps") if isinstance(state.get("steps"), dict) else {}
+    subtitle_step = (
+        steps.get("generate_podcast_subtitles") if isinstance(steps, dict) else None
+    )
+    subtitle_data = (
+        subtitle_step.get("data")
+        if isinstance(subtitle_step, dict)
+        and isinstance(subtitle_step.get("data"), dict)
+        else {}
+    )
+
+    subtitle_files = (
+        subtitle_data.get("subtitle_files")
+        if isinstance(subtitle_data.get("subtitle_files"), list)
+        else []
+    )
+    artifacts = (
+        state.get("artifacts") if isinstance(state.get("artifacts"), dict) else {}
+    )
+
+    storage_provider = get_storage_provider()
+    storage_keys = (
+        subtitle_data.get("storage_keys")
+        if isinstance(subtitle_data.get("storage_keys"), list)
+        else []
+    )
+    storage_urls = (
+        subtitle_data.get("storage_urls")
+        if isinstance(subtitle_data.get("storage_urls"), list)
+        else []
+    )
+
+    vtt_text = _load_vtt_from_storage(
+        storage_provider=storage_provider,
+        storage_keys=[str(k) for k in storage_keys if isinstance(k, str)],
+        subtitle_files=[str(p) for p in subtitle_files if isinstance(p, str)],
+        artifacts=artifacts if isinstance(artifacts, dict) else {},
+    )
+
+    cues = _parse_vtt_to_cues(vtt_text) if vtt_text else []
+    if not cues:
+        cues = _normalize_cues(subtitle_data.get("dialogue_entries") or [])
+    if not cues:
+        payload = extract_podcast_dialogue_from_state(state)
+        cues = _normalize_cues((payload or {}).get("dialogue") or [])
+    if not cues:
+        raise HTTPException(status_code=404, detail="Podcast subtitles not found")
+
+    vtt_url = _resolve_subtitle_url(
+        storage_provider, storage_keys, storage_urls, ".vtt"
+    )
+    srt_url = _resolve_subtitle_url(
+        storage_provider, storage_keys, storage_urls, ".srt"
+    )
+
+    return {
+        "cues": cues,
+        "vtt_url": vtt_url,
+        "srt_url": srt_url,
+    }

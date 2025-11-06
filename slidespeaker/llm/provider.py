@@ -5,44 +5,59 @@ LLM provider factory and module-level facade functions.
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Any
 
-from slidespeaker.configs.config import config
-
-from .base import LLMClient
+from .base import ChatMessages, LLMClient
+from .gemini_client import GeminiLLMClient
 from .openai_client import OpenAILLMClient
 
-_llm_client: LLMClient | None = None
+_llm_clients: dict[str, LLMClient] = {}
 
 
-def _get_llm() -> LLMClient:
-    global _llm_client
-    if _llm_client is not None:
-        return _llm_client
-    provider = (getattr(config, "llm_provider", None) or "openai").lower()
-    if provider == "openai":
-        _llm_client = OpenAILLMClient()
-    elif provider == "google":
-        # Placeholder for future Google AI implementation
-        # from .google_client import GoogleLLMClient
-        # _llm_singleton = GoogleLLMClient()
-        raise NotImplementedError("Google AI provider not implemented yet")
+def _get_llm(provider: str | None = None) -> LLMClient:
+    prov = (provider or "openai").lower()
+    if prov in _llm_clients:
+        return _llm_clients[prov]
+
+    if prov == "openai":
+        client = OpenAILLMClient()
+    elif prov in {"google", "gemini"}:
+        client = GeminiLLMClient()
+        prov = "google"
     else:
-        # Fallback to OpenAI for unknown providers
-        _llm_client = OpenAILLMClient()
-    return _llm_client
+        raise ValueError(f"Unsupported provider: {prov}")
+
+    _llm_clients[prov] = client
+    return client
+
+
+def _resolve_provider_and_model(model: str) -> tuple[str, str]:
+    spec_provider, separator, spec_model = model.partition("/")
+    if not separator:
+        # No explicit provider prefix, default to OpenAI-compatible models.
+        return "openai", spec_provider
+    if not spec_model:
+        raise ValueError(f"Invalid model specification '{model}'")
+    return spec_provider.lower(), spec_model
 
 
 def chat_completion(
-    messages: list[dict[str, object]],
+    messages: ChatMessages,
     model: str,
     *,
     retries: int | None = None,
     backoff: float | None = None,
     timeout: float | None = None,
-    **kwargs: dict[str, object],
+    **kwargs: Any,
 ) -> str:
-    return _get_llm().chat_completion(
-        messages, model, retries=retries, backoff=backoff, timeout=timeout, **kwargs
+    provider_name, model_name = _resolve_provider_and_model(model)
+    return _get_llm(provider_name).chat_completion(
+        messages,
+        model_name,
+        retries=retries,
+        backoff=backoff,
+        timeout=timeout,
+        **kwargs,
     )
 
 
@@ -56,8 +71,15 @@ def image_generate(
     backoff: float | None = None,
     timeout: float | None = None,
 ) -> list[str]:
-    return _get_llm().image_generate(
-        prompt, model, size=size, n=n, retries=retries, backoff=backoff, timeout=timeout
+    provider_name, model_name = _resolve_provider_and_model(model)
+    return _get_llm(provider_name).image_generate(
+        prompt,
+        model_name,
+        size=size,
+        n=n,
+        retries=retries,
+        backoff=backoff,
+        timeout=timeout,
     )
 
 
@@ -70,6 +92,13 @@ def tts_speech_stream(
     backoff: float | None = None,
     timeout: float | None = None,
 ) -> Iterable[bytes]:
-    return _get_llm().tts_speech_stream(
-        model, voice, input_text, retries=retries, backoff=backoff, timeout=timeout
+    provider_name, model_name = _resolve_provider_and_model(model)
+    voice_name = voice.split("/", 1)[1] if "/" in voice else voice
+    return _get_llm(provider_name).tts_speech_stream(
+        model_name,
+        voice_name,
+        input_text,
+        retries=retries,
+        backoff=backoff,
+        timeout=timeout,
     )

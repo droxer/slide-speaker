@@ -1,8 +1,9 @@
 """Module for reviewing and refining presentation transcripts.
 
-This module uses OpenAI to review and improve generated presentation transcripts
-for consistency, flow, and quality. It ensures appropriate formatting for AI avatar delivery
-and handles proper positioning of opening/closing statements.
+Supports whichever LLM provider is configured (OpenAI or Gemini) to refine the
+generated presentation transcripts for consistency, flow, and quality. It
+ensures appropriate formatting for AI avatar delivery and handles proper
+positioning of opening/closing statements.
 """
 
 from typing import Any
@@ -36,15 +37,11 @@ FORMAT: Return plain text for each slide’s content only, no labels or numberin
 
 
 class TranscriptReviewer:
-    """Reviewer for AI-generated presentation transcripts (OpenAI only)"""
+    """Reviewer for AI-generated presentation transcripts."""
 
     def __init__(self) -> None:
-        """Initialize OpenAI reviewer"""
-        # Force OpenAI usage; Qwen support removed for transcript review
-        self.provider = "openai"
-        self.model: str = config.openai_reviewer_model
-        if not config.openai_api_key:
-            logger.error("OPENAI_API_KEY not set; reviewer will fallback to originals")
+        """Initialize reviewer with configured provider."""
+        self.model = config.script_review_model or config.openai_model
 
     async def revise_transcripts(
         self, transcripts: list[dict[str, Any]], language: str = "english"

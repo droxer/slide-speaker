@@ -189,7 +189,6 @@ Task-based endpoints for accessing outputs:
 - `GET /api/tasks/{task_id}/podcast` - Download final podcast
 - `GET /api/tasks/{task_id}/subtitles/vtt` - Download VTT subtitles
 - `GET /api/tasks/{task_id}/subtitles/srt` - Download SRT subtitles
-- `GET /api/tasks/{task_id}/transcripts/markdown` - Download transcript
 - `GET /api/tasks/{task_id}/podcast/script` - Get podcast script
 
 ## Error Handling
