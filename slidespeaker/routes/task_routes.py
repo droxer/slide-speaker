@@ -17,7 +17,6 @@ from slowapi.util import get_remote_address
 
 from slidespeaker.auth import extract_user_id, require_authenticated_user
 from slidespeaker.core.monitoring import monitor_endpoint
-from slidespeaker.core.progress_utils import compute_step_percentage
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.core.task_queue import task_queue
 from slidespeaker.jobs.file_purger import file_purger
@@ -226,7 +225,14 @@ async def delete_task(
     task_id: str,
     current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
 ) -> dict[str, str]:
-    """Delete a task and its associated files from database and storage."""
+    """Delete a task and its associated files from database and storage.
+
+    This endpoint:
+    1. Cancels the task in the queue
+    2. Deletes the task from the database
+    3. Removes all associated Redis data
+    4. Enqueues jobs to delete associated files from storage
+    """
     logger.info(f"delete_task called with task_id: {task_id}")
     user_id = extract_user_id(current_user)
     logger.info(f"User ID: {user_id}")
@@ -291,11 +297,11 @@ async def delete_task(
                 f"Removing task {task_id} from Redis queue and cleaning up associated data"
             )
 
-            # Resolve file_id via DB first, then queue/state (same as in purge_task)
+            # Resolve file_id via DB first, then queue/state
             resolved_file_id = await _resolve_file_id(task_id)
             logger.info(f"Resolved file_id for task {task_id}: {resolved_file_id}")
 
-            # Build keys (same as in purge_task)
+            # Build keys
             task_key = f"{task_queue.task_prefix}:{task_id}"
             cancellation_key = f"{task_queue.task_prefix}:{task_id}:cancelled"
             state_key = f"ss:state:{resolved_file_id}" if resolved_file_id else None
@@ -551,104 +557,69 @@ async def get_task_details(
     task_id: str,
     current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
 ) -> dict[str, Any]:
-    """Get detailed information about a specific task.
+    """Get simplified information about a specific task optimized for frontend display.
 
-    For running tasks: Uses Redis state as primary source with detailed step information.
-    For completed/failed/cancelled tasks: Uses database as primary source, Redis state as enhancement if available.
-    Redis state has 24-hour TTL, so completed tasks gracefully degrade to database-only information."""
+    Only queries database (no Redis state) to ensure consistent and performant responses."""
 
     user_id = extract_user_id(current_user)
     if not user_id:
         raise HTTPException(status_code=403, detail="user session missing id")
 
-    # Try to get from task queue first
-    task = await task_queue.get_task(task_id)
-
+    # Query database only - no Redis state checks
     row = await db_get_task(task_id)
     if not row or row.get("user_id") != user_id:
         raise HTTPException(status_code=404, detail="Task not found")
 
-    if task:
-        task_owner = task.get("user_id")
-        if task_owner and task_owner != user_id:
-            raise HTTPException(status_code=404, detail="Task not found")
-        task.setdefault("user_id", user_id)
+    # Extract file_id from the database record
+    file_id = str(row.get("file_id")) if row.get("file_id") is not None else ""
 
-    if not task and task_id.startswith("state_"):
-        # Check if it's a state-only task (format: state_{file_id})
-        file_id = task_id.replace("state_", "")
-        state = await state_manager.get_state(file_id)
-        if state:
-            st_owner = state.get("user_id")
-            if isinstance(st_owner, str) and st_owner and st_owner != user_id:
-                raise HTTPException(status_code=404, detail="Task not found")
-            task = {
-                "task_id": task_id,
-                "file_id": file_id,
-                "task_type": "process_presentation",
-                "status": state["status"],
-                "created_at": state["created_at"],
-                "updated_at": state["updated_at"],
-                "kwargs": {
-                    "file_id": file_id,
-                    "file_ext": state["file_ext"],
-                    "source_type": state.get("source_type") or state.get("source"),
-                    "voice_language": state["voice_language"],
-                    "subtitle_language": state.get("subtitle_language"),
-                    "generate_avatar": state["generate_avatar"],
-                    "generate_subtitles": state["generate_subtitles"],
-                },
-                "state": state,
-            }
+    # Filter sensitive information from kwargs
+    filtered_kwargs = _filter_sensitive_kwargs(row.get("kwargs") or {})
 
-    if not task:
-        # DB fallback: reconstruct from DB + state (for completed tasks)
-        file_id = str(row.get("file_id")) if row.get("file_id") is not None else ""
+    # Determine completion percentage based on status (since we're not querying Redis state)
+    status = row.get("status", "unknown")
+    completion_percentage = (
+        100
+        if status == "completed"
+        else (
+            0
+            if status in ["pending", "queued"]
+            else 50  # Estimation for processing/failed states
+        )
+    )
 
-        # For completed/failed/cancelled tasks, try Redis state as enhancement only
-        st = None
-        if file_id and row.get("status") in ["completed", "failed", "cancelled"]:
-            st = await state_manager.get_state(file_id)
-            if st:
-                st_owner = st.get("user_id")
-                if isinstance(st_owner, str) and st_owner and st_owner != user_id:
-                    st = None  # Invalid state ownership, ignore
+    # Get the upload information if available
+    upload = row.get("upload", {})
+    filename = upload.get("filename") or filtered_kwargs.get(
+        "filename", f"task_{task_id}"
+    )
+    file_ext = (
+        upload.get("file_ext")
+        or row.get("file_ext")
+        or filtered_kwargs.get("file_ext", "")
+    )
 
-        # Filter sensitive information from kwargs
-        filtered_kwargs = _filter_sensitive_kwargs(row.get("kwargs") or {})
-
-        return {
-            "task_id": row.get("task_id"),
-            "file_id": file_id,
-            "task_type": row.get("task_type"),
-            "status": row.get("status"),
-            "created_at": row.get("created_at"),
-            "updated_at": row.get("updated_at"),
-            "kwargs": filtered_kwargs,
-            "source_type": (st or {}).get("source_type")
-            or (st or {}).get("source")
-            or (filtered_kwargs.get("source_type")),
-            "state": st,
-            "completion_percentage": compute_step_percentage(st)
-            if st
-            else 100,  # Assume 100% for completed tasks
-            # without state
-            "user_id": user_id,
-        }
-
-    # Enrich with detailed state information (for running tasks or recently completed)
-    file_id = task.get("kwargs", {}).get("file_id", "unknown")
-    if file_id != "unknown":
-        state = await state_manager.get_state(file_id)
-        if state:
-            task["detailed_state"] = state
-
-            # Add step completion percentage
-            task["completion_percentage"] = compute_step_percentage(state)
-            # Surface source_type at top level for convenience
-            task["source_type"] = state.get("source_type") or state.get("source")
-
-    return task
+    return {
+        "task_id": row.get("id"),
+        "status": status,
+        "task_type": row.get("task_type", "process_presentation"),
+        "created_at": row.get("created_at") if row.get("created_at") else None,
+        "updated_at": row.get("updated_at") if row.get("updated_at") else None,
+        "filename": filename,
+        "file_ext": file_ext,
+        "source_type": upload.get("source_type") or filtered_kwargs.get("source_type"),
+        "voice_language": row.get("voice_language"),
+        "subtitle_language": row.get("subtitle_language"),
+        "generate_podcast": filtered_kwargs.get("generate_podcast", False),
+        "generate_video": filtered_kwargs.get("generate_video", True),
+        "completion_percentage": completion_percentage,
+        "downloads": {
+            "video_url": f"/api/video/{file_id}",
+            "audio_url": f"/api/audio/{file_id}",
+            "subtitle_url": f"/api/subtitles/{file_id}",
+            "transcript_url": f"/api/download-transcript/{file_id}",
+        },
+    }
 
 
 async def _resolve_file_id(task_id: str) -> str | None:
@@ -758,122 +729,3 @@ async def _delete_task_file_mappings(
     if file2tasks_set_key and remaining == 0:
         with suppress(Exception):
             await state_manager.redis_client.delete(file2tasks_set_key)
-
-
-@router.delete("/tasks/{task_id}/purge")
-@limiter.limit("10/minute")  # Limit to 10 task purges per minute per IP
-@monitor_endpoint
-async def purge_task(
-    task_id: str,
-    request: Request,
-    current_user: Annotated[dict[str, Any], Depends(require_authenticated_user)],
-) -> dict[str, Any]:
-    """Permanently delete a task and its state from the system.
-
-    This removes the task entry, queue references, cancellation flags, and associated state.
-    """
-    user_id = extract_user_id(current_user)
-    if not user_id:
-        raise HTTPException(status_code=403, detail="user session missing id")
-
-    row = await db_get_task(task_id)
-    if not row or row.get("user_id") != user_id:
-        raise HTTPException(status_code=404, detail="Task not found")
-
-    try:
-        # Resolve file_id via DB first, then queue/state
-        file_id = await _resolve_file_id(task_id)
-
-        collected_storage_keys: set[str] = set()
-        collected_local_paths: set[str] = set()
-        if file_id:
-            try:
-                (
-                    collected_storage_keys,
-                    collected_local_paths,
-                ) = await file_purger.collect_artifacts(
-                    file_id,
-                    task_id=task_id,
-                    file_ext=row.get("file_ext"),
-                )
-            except Exception as exc:
-                logger.warning(
-                    "Failed to collect artifacts prior to purge (task_id=%s, file_id=%s): %s",
-                    task_id,
-                    file_id,
-                    exc,
-                )
-
-        # Build keys
-        task_key = f"{task_queue.task_prefix}:{task_id}"
-        cancellation_key = f"{task_queue.task_prefix}:{task_id}:cancelled"
-        state_key = f"ss:state:{file_id}" if file_id else None
-        task_state_key = f"ss:state:task:{task_id}"
-        task2file_key = f"ss:task2file:{task_id}"
-        file2task_key = f"ss:file2task:{file_id}" if file_id else None
-        file2tasks_set_key = f"ss:file2tasks:{file_id}" if file_id else None
-
-        removed = {
-            "queue": 0,
-            "task": 0,
-            "cancel_flag": 0,
-            "state": 0,
-        }
-
-        # Remove from queue (all occurrences)
-        await _remove_from_queue(task_id, removed)
-
-        # Delete task key and cancellation flag
-        await _delete_task_keys(task_key, cancellation_key, removed)
-
-        # Handle state cleanup
-        remaining = await _handle_state_cleanup(
-            file_id,
-            task_id,
-            state_key,
-            task_state_key,
-            file2task_key,
-            file2tasks_set_key,
-            removed,
-        )
-
-        # Delete task↔file mappings
-        await _delete_task_file_mappings(
-            task2file_key, file2task_key, file2tasks_set_key, remaining, removed
-        )
-
-        # Also remove from DB
-        try:
-            await db_delete_task(task_id)
-        except Exception as e:
-            logger.error(
-                f"Error deleting task {task_id} from database during purge: {e}"
-            )
-            # Don't fail the whole operation if DB deletion fails
-
-        # Enqueue file purge task if this was the last task for the file
-        if file_id and remaining == 0:
-            try:
-                # Import here to avoid circular imports
-                await file_purger.enqueue_file_purge(
-                    file_id,
-                    target_task_id=task_id,
-                    file_ext=row.get("file_ext"),
-                    storage_keys=collected_storage_keys,
-                    local_paths=collected_local_paths,
-                )
-            except Exception as e:
-                logger.error(f"Error enqueuing file purge for file_id {file_id}: {e}")
-
-        return {
-            "message": "Task purged successfully",
-            "task_id": task_id,
-            "file_id": file_id,
-            "removed": removed,
-        }
-    except Exception as e:
-        return {
-            "error": f"Failed to purge task: {e}",
-            "task_id": task_id,
-            "file_id": file_id,
-        }

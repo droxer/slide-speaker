@@ -133,12 +133,12 @@ async def _finalize_step_status(
     task_id: str | None = None,
 ) -> None:
     """Ensure a step finished cleanly, flagging failures for upstream handling."""
-    step_state = await state_manager.get_step_status(file_id, state_key)
-    status = (step_state or {}).get("status")
+    step_state = await fetch_step_state(file_id, state_key)
+    status = step_state.get("status") if step_state else None
 
     if status == "failed":
         detail = ""
-        data = (step_state or {}).get("data")
+        data = step_state.data if step_state else None
         if isinstance(data, dict) and data.get("error"):
             detail = f": {data['error']}"
         raise PipelineStepFailedError(

@@ -10,8 +10,10 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, cast
 
+from loguru import logger
+
 from slidespeaker.configs.config import config
-from slidespeaker.core.task_state import TaskErrorEntry, TaskState
+from slidespeaker.core.task_state import StepSnapshot, TaskErrorEntry, TaskState
 
 
 class RedisStateManager:
@@ -541,12 +543,12 @@ class RedisStateManager:
 
     async def get_step_status(
         self, file_id: str, step_name: str
-    ) -> dict[str, Any] | None:
-        """Get the status of a specific processing step"""
+    ) -> StepSnapshot | None:
+        """Get the structured snapshot of a specific processing step."""
         state = await self.get_state(file_id)
-        if state and "steps" in state and step_name in state["steps"]:
-            return dict(state["steps"][step_name])
-        return None
+        if not state:
+            return None
+        return state.get_step(step_name)
 
     async def update_step_status(
         self, file_id: str, step_name: str, status: str, data: Any = None
@@ -554,8 +556,14 @@ class RedisStateManager:
         """Update status of a specific processing step (task-first)."""
         state = await self.get_state(file_id)
         if not state:
+            logger.warning(
+                f"State not found for file_id {file_id} when updating step {step_name} to {status}"
+            )
             return
         if step_name not in state.get("steps", {}):
+            logger.warning(
+                f"Step {step_name} not found in state for file_id {file_id} when updating to {status}"
+            )
             return
         state["steps"][step_name]["status"] = status
         if data is not None:
@@ -564,46 +572,68 @@ class RedisStateManager:
         state["current_step"] = step_name
         task_id = state.get("task_id")
         if isinstance(task_id, str) and task_id:
-            await self.redis_client.set(
-                self._get_task_key(task_id),
-                json.dumps(state.to_dict()),
-                ex=86400,
-            )
+            try:
+                await self.redis_client.set(
+                    self._get_task_key(task_id),
+                    json.dumps(state.to_dict()),
+                    ex=86400,
+                )
+            except Exception as e:
+                logger.error(f"Failed to save state to Redis for task {task_id}: {e}")
+                # Fallback to file-based storage
+                await self._save_state(file_id, state)
         else:
             await self._save_state(file_id, state)
 
     async def add_error(self, file_id: str, error: str, step: str) -> None:
         """Add error to state for a specific processing step"""
         state = await self.get_state(file_id)
-        if state:
-            errors_list = list(state.get("errors", []))
-            errors_list.append(
-                TaskErrorEntry.from_mapping(
-                    {
-                        "step": step,
-                        "error": error,
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                )
+        if not state:
+            logger.warning(
+                f"State not found for file_id {file_id} when adding error for step {step}"
             )
-            state["errors"] = errors_list
-            state["updated_at"] = datetime.now().isoformat()
+            return
+        errors_list = list(state.get("errors", []))
+        errors_list.append(
+            TaskErrorEntry.from_mapping(
+                {
+                    "step": step,
+                    "error": error,
+                    "timestamp": datetime.now().isoformat(),
+                }
+            )
+        )
+        state["errors"] = errors_list
+        state["updated_at"] = datetime.now().isoformat()
+        try:
             await self._save_state(file_id, state)
+        except Exception as e:
+            logger.error(f"Failed to save error state for file_id {file_id}: {e}")
 
     async def mark_completed(self, file_id: str) -> None:
         """Mark processing as completed successfully (task-first)"""
         state = await self.get_state(file_id)
         if not state:
+            logger.warning(
+                f"State not found for file_id {file_id} when marking as completed"
+            )
             return
         state["status"] = "completed"
         state["updated_at"] = datetime.now().isoformat()
         task_id = state.get("task_id")
         if isinstance(task_id, str) and task_id:
-            await self.redis_client.set(
-                self._get_task_key(task_id),
-                json.dumps(state.to_dict()),
-                ex=86400,
-            )
+            try:
+                await self.redis_client.set(
+                    self._get_task_key(task_id),
+                    json.dumps(state.to_dict()),
+                    ex=86400,
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to save completed state to Redis for task {task_id}: {e}"
+                )
+                # Fallback to file-based storage
+                await self._save_state(file_id, state)
         else:
             await self._save_state(file_id, state)
 
@@ -611,16 +641,26 @@ class RedisStateManager:
         """Mark processing as failed with errors (task-first)"""
         state = await self.get_state(file_id)
         if not state:
+            logger.warning(
+                f"State not found for file_id {file_id} when marking as failed"
+            )
             return
         state["status"] = "failed"
         state["updated_at"] = datetime.now().isoformat()
         task_id = state.get("task_id")
         if isinstance(task_id, str) and task_id:
-            await self.redis_client.set(
-                self._get_task_key(task_id),
-                json.dumps(state.to_dict()),
-                ex=86400,
-            )
+            try:
+                await self.redis_client.set(
+                    self._get_task_key(task_id),
+                    json.dumps(state.to_dict()),
+                    ex=86400,
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to save failed state to Redis for task {task_id}: {e}"
+                )
+                # Fallback to file-based storage
+                await self._save_state(file_id, state)
         else:
             await self._save_state(file_id, state)
 
@@ -630,6 +670,9 @@ class RedisStateManager:
         """Mark processing as cancelled by user (task-first)"""
         state = await self.get_state(file_id)
         if not state:
+            logger.warning(
+                f"State not found for file_id {file_id} when marking as cancelled"
+            )
             return
         state["status"] = "cancelled"
         state["updated_at"] = datetime.now().isoformat()
@@ -640,11 +683,18 @@ class RedisStateManager:
                 step_data["status"] = "cancelled"
         task_id = state.get("task_id")
         if isinstance(task_id, str) and task_id:
-            await self.redis_client.set(
-                self._get_task_key(task_id),
-                json.dumps(state.to_dict()),
-                ex=86400,
-            )
+            try:
+                await self.redis_client.set(
+                    self._get_task_key(task_id),
+                    json.dumps(state.to_dict()),
+                    ex=86400,
+                )
+            except Exception as e:
+                logger.error(
+                    f"Failed to save cancelled state to Redis for task {task_id}: {e}"
+                )
+                # Fallback to file-based storage
+                await self._save_state(file_id, state)
         else:
             await self._save_state(file_id, state)
 
@@ -657,17 +707,25 @@ class RedisStateManager:
         # If state carries a task_id, prefer task-alias as the sole source of truth
         task_id = payload.get("task_id") if isinstance(payload, dict) else None
         if isinstance(task_id, str) and task_id:
-            await self.redis_client.set(
-                self._get_task_key(task_id), json.dumps(payload), ex=86400
-            )
-            # Proactively remove legacy file-id state to avoid cross-run bleed-through
-            with suppress(Exception):
-                await self.redis_client.delete(key)
+            try:
+                await self.redis_client.set(
+                    self._get_task_key(task_id), json.dumps(payload), ex=86400
+                )
+                # Proactively remove legacy file-id state to avoid cross-run bleed-through
+                with suppress(Exception):
+                    await self.redis_client.delete(key)
+            except Exception as e:
+                logger.error(f"Failed to save state to Redis for task {task_id}: {e}")
+                raise
         else:
             # Legacy path: no task_id available; write by file-id
-            await self.redis_client.set(
-                key, json.dumps(payload), ex=86400
-            )  # 24h expiration
+            try:
+                await self.redis_client.set(
+                    key, json.dumps(payload), ex=86400
+                )  # 24h expiration
+            except Exception as e:
+                logger.error(f"Failed to save state to Redis for file {file_id}: {e}")
+                raise
 
     # Public wrapper to avoid external modules calling the private method directly
     async def save_state(self, file_id: str, state: dict[str, Any] | TaskState) -> None:

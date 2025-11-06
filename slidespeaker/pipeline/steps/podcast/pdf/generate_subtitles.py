@@ -114,232 +114,249 @@ async def generate_podcast_subtitles_step(file_id: str) -> None:
     )
     logger.info(f"Generating podcast subtitles for file {file_id}")
 
-    state = await state_manager.get_state(file_id)
-    if not state or "steps" not in state:
-        logger.warning(
-            "State missing or malformed when generating podcast subtitles for %s",
-            file_id,
-        )
-        await state_manager.update_step_status(
-            file_id,
-            "generate_podcast_subtitles",
-            "completed",
-            {"subtitle_files": [], "storage_urls": []},
-        )
-        return
+    try:
+        state = await state_manager.get_state(file_id)
+        if not state or "steps" not in state:
+            logger.warning(
+                "State missing or malformed when generating podcast subtitles for %s",
+                file_id,
+            )
+            await state_manager.update_step_status(
+                file_id,
+                "generate_podcast_subtitles",
+                "completed",
+                {"subtitle_files": [], "storage_urls": []},
+            )
+            return
 
-    steps = state["steps"]
-    subtitle_language: str | None = None
-    transcript_dialogue: list[dict[str, Any]] = []
+        steps = state["steps"]
+        subtitle_language: str | None = None
+        transcript_dialogue: list[dict[str, Any]] = []
 
-    if isinstance(state, dict):
-        for candidate in (
-            state.get("podcast_transcript_language"),
-            state.get("subtitle_language"),
-            state.get("voice_language"),
-        ):
-            if isinstance(candidate, str) and candidate.strip():
-                subtitle_language = candidate.strip()
-                break
+        if isinstance(state, dict):
+            for candidate in (
+                state.get("podcast_transcript_language"),
+                state.get("subtitle_language"),
+                state.get("voice_language"),
+            ):
+                if isinstance(candidate, str) and candidate.strip():
+                    subtitle_language = candidate.strip()
+                    break
 
-    if isinstance(steps, dict):
-        translation_step = steps.get("translate_podcast_script")
-        if (
-            isinstance(translation_step, dict)
-            and translation_step.get("status") == "completed"
-            and isinstance(translation_step.get("data"), list)
-        ):
-            transcript_dialogue = [
-                {
-                    "speaker": str(item.get("speaker") or "").strip(),
-                    "text": str(item.get("text") or "").strip(),
-                }
-                for item in translation_step.get("data") or []
-                if isinstance(item, dict)
-            ]
-
-        if not transcript_dialogue:
-            script_step = steps.get("generate_podcast_script")
+        if isinstance(steps, dict):
+            translation_step = steps.get("translate_podcast_script")
             if (
-                isinstance(script_step, dict)
-                and script_step.get("status") == "completed"
-                and isinstance(script_step.get("data"), list)
+                isinstance(translation_step, dict)
+                and translation_step.get("status") == "completed"
+                and isinstance(translation_step.get("data"), list)
             ):
                 transcript_dialogue = [
                     {
                         "speaker": str(item.get("speaker") or "").strip(),
                         "text": str(item.get("text") or "").strip(),
                     }
-                    for item in script_step.get("data") or []
+                    for item in translation_step.get("data") or []
                     if isinstance(item, dict)
                 ]
 
-    if not subtitle_language:
-        subtitle_language = "english"
+            if not transcript_dialogue:
+                script_step = steps.get("generate_podcast_script")
+                if (
+                    isinstance(script_step, dict)
+                    and script_step.get("status") == "completed"
+                    and isinstance(script_step.get("data"), list)
+                ):
+                    transcript_dialogue = [
+                        {
+                            "speaker": str(item.get("speaker") or "").strip(),
+                            "text": str(item.get("text") or "").strip(),
+                        }
+                        for item in script_step.get("data") or []
+                        if isinstance(item, dict)
+                    ]
 
-    audio_step = (
-        steps.get("generate_podcast_audio") if isinstance(steps, dict) else None
-    )
-    dialogue_items: list[dict[str, Any]] = []
-    host_voice = None
-    guest_voice = None
+        if not subtitle_language:
+            subtitle_language = "english"
 
-    if isinstance(audio_step, dict):
-        audio_data = (
-            audio_step.get("data") if isinstance(audio_step.get("data"), dict) else {}
+        audio_step = (
+            steps.get("generate_podcast_audio") if isinstance(steps, dict) else None
         )
-        host_voice = _clean_voice(audio_data.get("host_voice"))
-        guest_voice = _clean_voice(audio_data.get("guest_voice"))
-        if isinstance(audio_data.get("dialogue"), list) and audio_data["dialogue"]:
-            dialogue_items = list(audio_data["dialogue"])
-        elif (
-            isinstance(audio_data.get("segment_metadata"), list)
-            and audio_data["segment_metadata"]
-        ):
-            dialogue_items = list(audio_data["segment_metadata"])
+        dialogue_items: list[dict[str, Any]] = []
+        host_voice = None
+        guest_voice = None
 
-    if not dialogue_items:
-        logger.warning(
-            "No audio dialogue metadata available for podcast subtitles (file_id=%s)",
-            file_id,
-        )
-        await state_manager.update_step_status(
-            file_id,
-            "generate_podcast_subtitles",
-            "completed",
-            {"subtitle_files": [], "storage_urls": []},
-        )
-        return
-
-    if host_voice is None:
-        host_voice = _clean_voice(state.get("podcast_host_voice"))
-    if guest_voice is None:
-        guest_voice = _clean_voice(state.get("podcast_guest_voice"))
-
-    normalized_dialogue: list[dict[str, Any]] = []
-    for entry in dialogue_items:
-        if not isinstance(entry, dict):
-            continue
-        normalized = _normalize_dialogue_entry(entry, host_voice, guest_voice)
-        if normalized:
-            normalized_dialogue.append(normalized)
-
-    if not normalized_dialogue:
-        logger.warning(
-            "Dialogue entries could not be normalized for podcast subtitles (file_id=%s)",
-            file_id,
-        )
-        await state_manager.update_step_status(
-            file_id,
-            "generate_podcast_subtitles",
-            "completed",
-            {"subtitle_files": [], "storage_urls": []},
-        )
-        return
-
-    if transcript_dialogue:
-        min_len = min(len(normalized_dialogue), len(transcript_dialogue))
-        for idx in range(min_len):
-            transcript_entry = transcript_dialogue[idx]
-            text_value = transcript_entry.get("text")
-            if isinstance(text_value, str) and text_value.strip():
-                normalized_dialogue[idx]["text"] = text_value.strip()
-            speaker_value = transcript_entry.get("speaker")
-            if isinstance(speaker_value, str) and speaker_value.strip():
-                normalized_dialogue[idx]["speaker"] = speaker_value.strip()
-        if len(transcript_dialogue) != len(normalized_dialogue):
-            logger.warning(
-                "Podcast subtitle dialogue length mismatch for %s: transcript=%s, timed=%s",
-                file_id,
-                len(transcript_dialogue),
-                len(normalized_dialogue),
+        if isinstance(audio_step, dict):
+            audio_data = (
+                audio_step.get("data")
+                if isinstance(audio_step.get("data"), dict)
+                else {}
             )
+            host_voice = _clean_voice(audio_data.get("host_voice"))
+            guest_voice = _clean_voice(audio_data.get("guest_voice"))
+            if isinstance(audio_data.get("dialogue"), list) and audio_data["dialogue"]:
+                dialogue_items = list(audio_data["dialogue"])
+            elif (
+                isinstance(audio_data.get("segment_metadata"), list)
+                and audio_data["segment_metadata"]
+            ):
+                dialogue_items = list(audio_data["segment_metadata"])
 
-    work_dir = config.output_dir / file_id / "podcast" / "subtitles"
-    work_dir.mkdir(parents=True, exist_ok=True)
-
-    srt_path = work_dir / "dialogue.srt"
-    vtt_path = work_dir / "dialogue.vtt"
-
-    srt_body = _render_srt(normalized_dialogue)
-    vtt_body = _render_vtt(normalized_dialogue)
-
-    srt_path.write_text(srt_body, encoding="utf-8")
-    vtt_path.write_text(vtt_body, encoding="utf-8")
-
-    storage_provider = get_storage_provider()
-    state_snapshot = await state_manager.get_state(file_id)
-
-    _, srt_key, srt_uri = output_storage_uri(
-        file_id,
-        state=state_snapshot if isinstance(state_snapshot, dict) else None,
-        segments=("podcast", "subtitles", "dialogue.srt"),
-    )
-    _, vtt_key, vtt_uri = output_storage_uri(
-        file_id,
-        state=state_snapshot if isinstance(state_snapshot, dict) else None,
-        segments=("podcast", "subtitles", "dialogue.vtt"),
-    )
-
-    subtitle_urls: list[str] = []
-    storage_keys: list[str] = []
-    storage_uris: list[str] = []
-
-    try:
-        srt_url = storage_provider.upload_file(str(srt_path), srt_key, "text/plain")
-        vtt_url = storage_provider.upload_file(str(vtt_path), vtt_key, "text/vtt")
-        subtitle_urls.extend([srt_url, vtt_url])
-        storage_keys.extend([srt_key, vtt_key])
-        storage_uris.extend([srt_uri, vtt_uri])
-        logger.info(
-            "Uploaded podcast subtitles for %s: %s, %s", file_id, srt_url, vtt_url
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.error(f"Failed to upload podcast subtitles for {file_id}: {exc}")
-        if config.storage_provider != "local":
+        if not dialogue_items:
+            logger.warning(
+                "No audio dialogue metadata available for podcast subtitles (file_id=%s)",
+                file_id,
+            )
             await state_manager.update_step_status(
                 file_id,
                 "generate_podcast_subtitles",
-                "failed",
-                {
-                    "error": "podcast_subtitle_upload_failed",
-                    "detail": str(exc),
-                    "storage_keys": {"srt": srt_key, "vtt": vtt_key},
-                },
+                "completed",
+                {"subtitle_files": [], "storage_urls": []},
             )
-            raise
-        subtitle_urls = [str(srt_path), str(vtt_path)]
+            return
 
-    step_data = {
-        "subtitle_files": [str(srt_path), str(vtt_path)],
-        "storage_urls": subtitle_urls,
-        "storage_keys": storage_keys,
-        "storage_uris": storage_uris,
-        "dialogue_entries": normalized_dialogue,
-        "subtitle_language": subtitle_language,
-    }
+        if host_voice is None:
+            host_voice = _clean_voice(state.get("podcast_host_voice"))
+        if guest_voice is None:
+            guest_voice = _clean_voice(state.get("podcast_guest_voice"))
 
-    await state_manager.update_step_status(
-        file_id, "generate_podcast_subtitles", "completed", step_data
-    )
+        normalized_dialogue: list[dict[str, Any]] = []
+        for entry in dialogue_items:
+            if not isinstance(entry, dict):
+                continue
+            normalized = _normalize_dialogue_entry(entry, host_voice, guest_voice)
+            if normalized:
+                normalized_dialogue.append(normalized)
 
-    if state_snapshot and isinstance(state_snapshot, dict):
-        artifacts = dict(state_snapshot.get("artifacts") or {})
-        podcast_artifacts = dict(artifacts.get("podcast") or {})
-        podcast_artifacts["subtitles"] = {
-            "srt": {
-                "local_path": str(srt_path),
-                "storage_key": storage_keys[0] if storage_keys else None,
-                "storage_uri": storage_uris[0] if storage_uris else None,
-            },
-            "vtt": {
-                "local_path": str(vtt_path),
-                "storage_key": storage_keys[1] if len(storage_keys) > 1 else None,
-                "storage_uri": storage_uris[1] if len(storage_uris) > 1 else None,
-            },
+        if not normalized_dialogue:
+            logger.warning(
+                "Dialogue entries could not be normalized for podcast subtitles (file_id=%s)",
+                file_id,
+            )
+            await state_manager.update_step_status(
+                file_id,
+                "generate_podcast_subtitles",
+                "completed",
+                {"subtitle_files": [], "storage_urls": []},
+            )
+            return
+
+        if transcript_dialogue:
+            min_len = min(len(normalized_dialogue), len(transcript_dialogue))
+            for idx in range(min_len):
+                transcript_entry = transcript_dialogue[idx]
+                text_value = transcript_entry.get("text")
+                if isinstance(text_value, str) and text_value.strip():
+                    normalized_dialogue[idx]["text"] = text_value.strip()
+                speaker_value = transcript_entry.get("speaker")
+                if isinstance(speaker_value, str) and speaker_value.strip():
+                    normalized_dialogue[idx]["speaker"] = speaker_value.strip()
+            if len(transcript_dialogue) != len(normalized_dialogue):
+                logger.warning(
+                    "Podcast subtitle dialogue length mismatch for %s: transcript=%s, timed=%s",
+                    file_id,
+                    len(transcript_dialogue),
+                    len(normalized_dialogue),
+                )
+
+        work_dir = config.output_dir / file_id / "podcast" / "subtitles"
+        work_dir.mkdir(parents=True, exist_ok=True)
+
+        srt_path = work_dir / "dialogue.srt"
+        vtt_path = work_dir / "dialogue.vtt"
+
+        srt_body = _render_srt(normalized_dialogue)
+        vtt_body = _render_vtt(normalized_dialogue)
+
+        srt_path.write_text(srt_body, encoding="utf-8")
+        vtt_path.write_text(vtt_body, encoding="utf-8")
+
+        storage_provider = get_storage_provider()
+        state_for_paths = await state_manager.get_state(file_id)
+
+        _, srt_key, srt_uri = output_storage_uri(
+            file_id,
+            state=state_for_paths if isinstance(state_for_paths, dict) else None,
+            segments=("podcast", "subtitles", "dialogue.srt"),
+        )
+        _, vtt_key, vtt_uri = output_storage_uri(
+            file_id,
+            state=state_for_paths if isinstance(state_for_paths, dict) else None,
+            segments=("podcast", "subtitles", "dialogue.vtt"),
+        )
+
+        subtitle_urls: list[str] = []
+        storage_keys: list[str] = []
+        storage_uris: list[str] = []
+
+        try:
+            srt_url = storage_provider.upload_file(str(srt_path), srt_key, "text/plain")
+            vtt_url = storage_provider.upload_file(str(vtt_path), vtt_key, "text/vtt")
+            subtitle_urls.extend([srt_url, vtt_url])
+            storage_keys.extend([srt_key, vtt_key])
+            storage_uris.extend([srt_uri, vtt_uri])
+            logger.info(
+                "Uploaded podcast subtitles for %s: %s, %s", file_id, srt_url, vtt_url
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.error(f"Failed to upload podcast subtitles for {file_id}: {exc}")
+            if config.storage_provider != "local":
+                await state_manager.update_step_status(
+                    file_id,
+                    "generate_podcast_subtitles",
+                    "failed",
+                    {
+                        "error": "podcast_subtitle_upload_failed",
+                        "detail": str(exc),
+                        "storage_keys": {"srt": srt_key, "vtt": vtt_key},
+                    },
+                )
+                raise
+            subtitle_urls = [str(srt_path), str(vtt_path)]
+
+        step_data = {
+            "subtitle_files": [str(srt_path), str(vtt_path)],
+            "storage_urls": subtitle_urls,
+            "storage_keys": storage_keys,
+            "storage_uris": storage_uris,
+            "dialogue_entries": normalized_dialogue,
+            "subtitle_language": subtitle_language,
         }
-        artifacts["podcast"] = podcast_artifacts
-        state_snapshot["artifacts"] = artifacts
-        await state_manager.save_state(file_id, state_snapshot)
 
-    logger.info("Podcast subtitles generated successfully for %s", file_id)
+        await state_manager.update_step_status(
+            file_id, "generate_podcast_subtitles", "completed", step_data
+        )
+
+        latest_state = await state_manager.get_state(file_id)
+        if latest_state and isinstance(latest_state, dict):
+            artifacts = dict(latest_state.get("artifacts") or {})
+            podcast_artifacts = dict(artifacts.get("podcast") or {})
+            podcast_artifacts["subtitles"] = {
+                "srt": {
+                    "local_path": str(srt_path),
+                    "storage_key": storage_keys[0] if storage_keys else None,
+                    "storage_uri": storage_uris[0] if storage_uris else None,
+                },
+                "vtt": {
+                    "local_path": str(vtt_path),
+                    "storage_key": storage_keys[1] if len(storage_keys) > 1 else None,
+                    "storage_uri": storage_uris[1] if len(storage_uris) > 1 else None,
+                },
+            }
+            artifacts["podcast"] = podcast_artifacts
+            latest_state["artifacts"] = artifacts
+            await state_manager.save_state(file_id, latest_state)
+
+        logger.info("Podcast subtitles generated successfully for %s", file_id)
+
+    except Exception as e:
+        logger.error(f"Failed to generate podcast subtitles for {file_id}: {e}")
+        await state_manager.update_step_status(
+            file_id,
+            "generate_podcast_subtitles",
+            "failed",
+            {
+                "error": "podcast_subtitle_generation_failed",
+                "detail": str(e),
+            },
+        )
+        raise

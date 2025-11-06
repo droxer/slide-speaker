@@ -58,6 +58,14 @@ The system supports three main processing paths:
 
 Each pipeline uses a coordinator pattern with step-based execution and Redis state management.
 
+## Documentation
+
+The documentation has been reorganized into logical categories:
+
+- `docs/getting-started/` - Installation and setup guides
+- `docs/api/` - API documentation (overview and reference)
+- `docs/architecture/` - System architecture and data flow docs
+
 ## Configuration
 
 Key environment variables in `.env`:

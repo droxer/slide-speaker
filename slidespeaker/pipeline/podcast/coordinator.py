@@ -506,11 +506,6 @@ async def from_pdf(
         logger.info(
             f"Calling _save_podcast_transcript_to_storage with file_id: {file_id}, task_id: {task_id}"
         )
-        logger.info(f"Task ID at save time: {task_id}")
-        logger.info(f"Task ID type at save time: {type(task_id)}")
-        logger.info(
-            f"Task ID is valid string at save time: {isinstance(task_id, str) and task_id}"
-        )
         await _save_podcast_transcript_to_storage(file_id, task_id)
 
         # Mark overall processing as completed for podcast-only or combined runs

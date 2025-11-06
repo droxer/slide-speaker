@@ -32,7 +32,6 @@ from slidespeaker.routes.progress_routes import router as progress_router
 from slidespeaker.routes.stats_routes import router as stats_router
 from slidespeaker.routes.subtitle_routes import router as subtitle_downloads_router
 from slidespeaker.routes.task_routes import router as tasks_router
-from slidespeaker.routes.transcript_routes import router as transcripts_router
 from slidespeaker.routes.tts_routes import router as tts_router
 from slidespeaker.routes.upload_routes import router as upload_router
 from slidespeaker.routes.user_routes import router as users_router
@@ -87,7 +86,6 @@ app.include_router(podcast_router)
 app.include_router(languages_router)
 app.include_router(health_router)
 app.include_router(stats_router)
-app.include_router(transcripts_router)
 app.include_router(tts_router)
 app.include_router(diagnostic_router)
 app.include_router(preview_router)

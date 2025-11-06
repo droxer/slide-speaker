@@ -262,12 +262,4 @@ async def list_downloads(task_id: str) -> dict[str, Any]:
             }
         )
 
-    # Transcript (Markdown) always linkable; handler decides availability
-    items.append(
-        {
-            "type": "transcript",
-            "url": f"/api/tasks/{task_id}/transcripts/markdown",
-        }
-    )
-
     return {"task_id": task_id, "file_id": file_id, "items": items}

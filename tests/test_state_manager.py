@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from slidespeaker.core.state_manager import RedisStateManager
+from slidespeaker.core.task_state import StepSnapshot
 
 
 class TestRedisStateManager:
@@ -250,8 +251,27 @@ class TestRedisStateManager:
 
         # Verify the result
         assert result is not None
+        assert isinstance(result, StepSnapshot)
         assert result["status"] == "completed"
         assert result["data"] == "test_data"
+
+    @pytest.mark.asyncio
+    async def test_get_step_status_snapshot_properties(self, state_manager):
+        """StepSnapshot returned by get_step_status preserves metadata and helpers."""
+        mock_state = {
+            "file_id": "test_file_id",
+            "steps": {"test_step": {"status": "processing", "data": {"foo": "bar"}}},
+        }
+        state_manager.redis_client.get = AsyncMock(return_value=json.dumps(mock_state))
+
+        result = await state_manager.get_step_status("test_file_id", "test_step")
+
+        assert isinstance(result, StepSnapshot)
+        assert result.name == "test_step"
+        assert result.status == "processing"
+        assert result.data == {"foo": "bar"}
+        normalized = result.as_dict(normalize_status_flag=True)
+        assert normalized["status"] == "processing"
 
     @pytest.mark.asyncio
     async def test_get_step_status_step_not_found(self, state_manager):
