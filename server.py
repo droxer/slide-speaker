@@ -61,12 +61,10 @@ async def lifespan(app: FastAPI):
 
     yield  # The application runs during this period
 
-    # Shutdown tasks would go after the yield if needed
-    # For now, we don't have any specific shutdown cleanup needed
+    # No specific shutdown cleanup needed for now
 
 
-app = FastAPI(title="Slider Speaker API", lifespan=lifespan)
-
+app = FastAPI(title="AI Slider API", lifespan=lifespan)
 
 # Add rate limiting to the application
 add_rate_limiting(app)
@@ -79,7 +77,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include all route modules with rate limiting applied
+# Include all route modules
 app.include_router(auth_router)
 app.include_router(upload_router)
 app.include_router(files_router)
@@ -98,7 +96,7 @@ app.include_router(diagnostic_router)
 app.include_router(preview_router)
 app.include_router(users_router)
 app.include_router(metrics_router)
-app.include_router(metrics_protected_router)  # Include protected metrics endpoints
+app.include_router(metrics_protected_router)
 
 
 @app.get("/")
@@ -109,7 +107,9 @@ async def root() -> dict[str, str]:
 
 if __name__ == "__main__":
     import asyncio
+    import os
     import signal
+    from typing import Any
 
     import uvicorn
 
