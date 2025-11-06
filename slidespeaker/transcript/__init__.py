@@ -5,6 +5,7 @@ This package handles AI-powered transcript generation and review for presentatio
 """
 
 from .generator import TranscriptGenerator
+from .markdown import transcripts_to_markdown
 from .reviewer import TranscriptReviewer
 
-__all__ = ["TranscriptGenerator", "TranscriptReviewer"]
+__all__ = ["TranscriptGenerator", "TranscriptReviewer", "transcripts_to_markdown"]

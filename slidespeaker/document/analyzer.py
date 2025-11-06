@@ -9,7 +9,7 @@ for presentation generation.
 from typing import Any, cast
 
 from loguru import logger
-from PyPDF2 import PdfReader
+from pypdf import PdfReader
 
 from slidespeaker.configs.config import config
 from slidespeaker.llm import chat_completion

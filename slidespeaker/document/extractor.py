@@ -13,9 +13,9 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-import PyPDF2
 from PIL import Image
 from pptx import Presentation
+from pypdf import PdfReader
 
 
 class SlideExtractor:
@@ -39,7 +39,7 @@ class SlideExtractor:
         """Extract text content from PDF slides"""
         slides = []
         with open(file_path, "rb") as file:
-            pdf_reader = PyPDF2.PdfReader(file)
+            pdf_reader = PdfReader(file)
             for page_num in range(len(pdf_reader.pages)):
                 page = pdf_reader.pages[page_num]
                 text = page.extract_text()
@@ -151,7 +151,7 @@ class SlideExtractor:
             # Extract text content from the specific PDF page
             page_text = ""
             with open(file_path, "rb") as file:
-                pdf_reader = PyPDF2.PdfReader(file)
+                pdf_reader = PdfReader(file)
                 if page_index < len(pdf_reader.pages):
                     page = pdf_reader.pages[page_index]
                     page_text = page.extract_text().strip()

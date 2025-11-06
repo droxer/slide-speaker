@@ -12,8 +12,7 @@ from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
 from slidespeaker.storage.paths import output_storage_uri
-from slidespeaker.transcript import TranscriptReviewer
-from slidespeaker.transcript.markdown import transcripts_to_markdown
+from slidespeaker.transcript import TranscriptReviewer, transcripts_to_markdown
 
 
 async def revise_transcripts_common(

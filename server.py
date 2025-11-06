@@ -6,6 +6,7 @@ and handles graceful server startup and shutdown.
 
 import asyncio
 import os
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
@@ -37,13 +38,11 @@ from slidespeaker.routes.upload_routes import router as upload_router
 from slidespeaker.routes.user_routes import router as users_router
 from slidespeaker.routes.video_routes import router as video_downloads_router
 
-app = FastAPI(title="AI Slider API")
 
-
-@app.on_event("startup")
-async def startup_event() -> None:
-    """Initialize logging configuration on application startup"""
-    # Use centralized config for logging settings
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for startup and shutdown events."""
+    # Initialize logging configuration on application startup
     log_level = config.log_level
     log_file = config.log_file
     setup_logging(
@@ -60,6 +59,12 @@ async def startup_event() -> None:
         # Mount the storage directory at /files/ path
         app.mount("/files", StaticFiles(directory=config.output_dir), name="files")
 
+    yield  # The application runs during this period
+
+    # No specific shutdown cleanup needed for now
+
+
+app = FastAPI(title="AI Slider API", lifespan=lifespan)
 
 # Add rate limiting to the application
 add_rate_limiting(app)
@@ -72,7 +77,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include all route modules with rate limiting applied
+# Include all route modules
 app.include_router(auth_router)
 app.include_router(upload_router)
 app.include_router(files_router)
@@ -91,7 +96,7 @@ app.include_router(diagnostic_router)
 app.include_router(preview_router)
 app.include_router(users_router)
 app.include_router(metrics_router)
-app.include_router(metrics_protected_router)  # Include protected metrics endpoints
+app.include_router(metrics_protected_router)
 
 
 @app.get("/")
@@ -102,7 +107,9 @@ async def root() -> dict[str, str]:
 
 if __name__ == "__main__":
     import asyncio
+    import os
     import signal
+    from typing import Any
 
     import uvicorn
 

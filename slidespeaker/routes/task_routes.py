@@ -599,15 +599,90 @@ async def get_task_details(
         or filtered_kwargs.get("file_ext", "")
     )
 
-    # Only provide download URLs if the task is completed and files likely exist
+    # Only provide download URLs if the task is completed and files exist
     downloads = {}
     if status == "completed":
-        downloads = {
-            "video_url": f"/api/video/{file_id}",
-            "audio_url": f"/api/audio/{file_id}",
-            "subtitle_url": f"/api/subtitles/{file_id}",
-            "transcript_url": f"/api/download-transcript/{file_id}",
-        }
+        # Check for video file existence
+        try:
+            from slidespeaker.configs.config import get_storage_provider
+
+            storage = get_storage_provider()
+
+            # Check if video file exists
+            video_exists = False
+            video_paths_to_check = [
+                f"outputs/{file_id}/final.mp4",
+                f"{file_id}_final.mp4",
+                f"{file_id}.mp4",
+                f"outputs/{file_id}/video/final.mp4",
+            ]
+            for path in video_paths_to_check:
+                if await storage.file_exists(path):
+                    video_exists = True
+                    break
+
+            if video_exists:
+                downloads["video_url"] = f"/api/video/{file_id}"
+
+            # Check if audio file exists
+            audio_exists = False
+            audio_paths_to_check = [
+                f"outputs/{file_id}/final.mp3",
+                f"{file_id}_final.mp3",
+                f"{file_id}.mp3",
+                f"outputs/{file_id}/audio/final.mp3",
+            ]
+            for path in audio_paths_to_check:
+                if await storage.file_exists(path):
+                    audio_exists = True
+                    break
+
+            if audio_exists:
+                downloads["audio_url"] = f"/api/audio/{file_id}"
+
+            # Check if subtitle file exists
+            subtitle_exists = False
+            subtitle_paths_to_check = [
+                f"outputs/{file_id}/subtitles.vtt",
+                f"outputs/{file_id}/subtitles.srt",
+                f"{file_id}_subtitles.vtt",
+                f"{file_id}_subtitles.srt",
+                f"outputs/{file_id}/subtitles/subtitles.vtt",
+                f"outputs/{file_id}/subtitles/subtitles.srt",
+            ]
+            for path in subtitle_paths_to_check:
+                if await storage.file_exists(path):
+                    subtitle_exists = True
+                    break
+
+            if subtitle_exists:
+                downloads["subtitle_url"] = f"/api/subtitles/{file_id}"
+
+            # Check if transcript file exists
+            transcript_exists = False
+            transcript_paths_to_check = [
+                f"outputs/{file_id}/transcript.md",
+                f"{file_id}_transcript.md",
+                f"outputs/{file_id}/transcripts/transcript.md",
+            ]
+            for path in transcript_paths_to_check:
+                if await storage.file_exists(path):
+                    transcript_exists = True
+                    break
+
+            if transcript_exists:
+                downloads["transcript_url"] = f"/api/download-transcript/{file_id}"
+        except Exception as e:
+            # If there's an error checking file existence, fall back to original behavior
+            # but only provide URLs if status is completed for safety
+            logger.warning(f"Error checking file existence for task {task_id}: {e}")
+            # Still build downloads but with caution
+            downloads = {
+                "video_url": f"/api/video/{file_id}",
+                "audio_url": f"/api/audio/{file_id}",
+                "subtitle_url": f"/api/subtitles/{file_id}",
+                "transcript_url": f"/api/download-transcript/{file_id}",
+            }
 
     return {
         "task_id": row.get("id"),
