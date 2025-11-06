@@ -6,6 +6,7 @@ and handles graceful server startup and shutdown.
 
 import asyncio
 import os
+from contextlib import asynccontextmanager
 from typing import Any
 
 from fastapi import FastAPI
@@ -37,13 +38,11 @@ from slidespeaker.routes.upload_routes import router as upload_router
 from slidespeaker.routes.user_routes import router as users_router
 from slidespeaker.routes.video_routes import router as video_downloads_router
 
-app = FastAPI(title="AI Slider API")
 
-
-@app.on_event("startup")
-async def startup_event() -> None:
-    """Initialize logging configuration on application startup"""
-    # Use centralized config for logging settings
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan event handler for startup and shutdown events."""
+    # Initialize logging configuration on application startup
     log_level = config.log_level
     log_file = config.log_file
     setup_logging(
@@ -59,6 +58,14 @@ async def startup_event() -> None:
         config.output_dir.mkdir(parents=True, exist_ok=True)
         # Mount the storage directory at /files/ path
         app.mount("/files", StaticFiles(directory=config.output_dir), name="files")
+
+    yield  # The application runs during this period
+
+    # Shutdown tasks would go after the yield if needed
+    # For now, we don't have any specific shutdown cleanup needed
+
+
+app = FastAPI(title="Slider Speaker API", lifespan=lifespan)
 
 
 # Add rate limiting to the application

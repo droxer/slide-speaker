@@ -13,14 +13,10 @@ from pathlib import Path
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
-from slidespeaker.core.task_queue import task_queue
 
+from ..base import BasePipeline
 from ..helpers import (
-    check_and_handle_cancellation,
-    check_and_handle_failure,
-    fetch_step_state,
     fetch_task_state,
-    set_step_status_processing,
 )
 
 # PDF steps (video)
@@ -76,20 +72,11 @@ from ..steps.video.slides import (
     translate_voice_transcripts_step as slide_translate_voice_step,
 )
 
-# ------------------------- PDF Coordinator (from_pdf) -------------------------
-
-
-class PipelineStepFailedError(RuntimeError):
-    """Raised when a pipeline step transitions to a failed status without bubbling an exception."""
-
-
-class PipelineCancelledError(RuntimeError):
-    """Raised when a pipeline step reports a cancelled status."""
-
 
 def _pdf_step_name(
     step: str, voice_language: str | None, subtitle_language: str | None
 ) -> str:
+    """Get display name for PDF video steps."""
     base = {
         "segment_pdf_content": "Segmenting PDF content into chapters",
         "revise_pdf_transcripts": "Revising and refining chapter transcripts",
@@ -114,6 +101,7 @@ def _pdf_steps(
     generate_subtitles: bool,
     generate_video: bool,
 ) -> list[str]:
+    """Determine ordered steps for PDF video processing."""
     steps: list[str] = ["segment_pdf_content", "revise_pdf_transcripts"]
     if voice_language.lower() != "english":
         steps.append("translate_voice_transcripts")
@@ -127,37 +115,6 @@ def _pdf_steps(
     return steps
 
 
-async def _finalize_step_status(
-    file_id: str,
-    state_key: str,
-    task_id: str | None = None,
-) -> None:
-    """Ensure a step finished cleanly, flagging failures for upstream handling."""
-    step_state = await fetch_step_state(file_id, state_key)
-    status = step_state.get("status") if step_state else None
-
-    if status == "failed":
-        detail = ""
-        data = step_state.data if step_state else None
-        if isinstance(data, dict) and data.get("error"):
-            detail = f": {data['error']}"
-        raise PipelineStepFailedError(
-            f"Step '{state_key}' failed for file {file_id}{detail}"
-        )
-
-    if status == "cancelled":
-        raise PipelineCancelledError(f"Step '{state_key}' cancelled for file {file_id}")
-
-    if status in {"completed", "skipped"}:
-        return
-
-    # If the step neither completed nor reported failure, mark it as completed now.
-    if task_id:
-        await state_manager.update_step_status_by_task(task_id, state_key, "completed")
-    else:
-        await state_manager.update_step_status(file_id, state_key, "completed")
-
-
 async def from_pdf(
     file_id: str,
     file_path: Path,
@@ -167,112 +124,137 @@ async def from_pdf(
     generate_video: bool = True,
     task_id: str | None = None,
 ) -> None:
-    logger.info(f"Initiating video generation (PDF) for file: {file_id}")
-    logger.info(
-        f"Voice language: {voice_language}, Subtitle language: {subtitle_language}"
+    """Process PDF file to generate video."""
+    pipeline = PDFVideoPipeline(
+        file_id=file_id,
+        file_path=file_path,
+        task_id=task_id,
+        voice_language=voice_language,
+        subtitle_language=subtitle_language,
+        generate_subtitles=generate_subtitles,
+        generate_video=generate_video,
     )
-    logger.info(
-        f"Generate subtitles: {generate_subtitles}, Generate video: {generate_video}"
-    )
+    await pipeline.execute_pipeline()
 
-    if task_id and await task_queue.is_task_cancelled(task_id):
-        logger.info(f"Task {task_id} was cancelled before processing started")
-        await state_manager.mark_cancelled(file_id)
-        return
 
-    # Initialize/refresh state flags relevant to video
-    task_state = await fetch_task_state(file_id)
-    if task_state:
-        task_state["voice_language"] = voice_language
-        task_state["subtitle_language"] = subtitle_language
-        task_state["generate_avatar"] = False
-        task_state["generate_subtitles"] = generate_subtitles
-        task_state["generate_video"] = generate_video
-        if task_id:
-            task_state["task_id"] = task_id
-        await state_manager.save_task_state(file_id, task_state)
+class PDFVideoPipeline(BasePipeline):
+    """PDF Video Pipeline Implementation."""
 
-    if task_id:
-        logger.info(f"=== Starting PDF video processing for task {task_id} ===")
+    def __init__(
+        self,
+        file_id: str,
+        file_path: Path,
+        task_id: str | None = None,
+        voice_language: str = "english",
+        subtitle_language: str | None = None,
+        generate_subtitles: bool = True,
+        generate_video: bool = True,
+    ):
+        super().__init__(file_id, file_path, task_id)
+        self.voice_language = voice_language
+        self.subtitle_language = subtitle_language
+        self.generate_subtitles = generate_subtitles
+        self.generate_video = generate_video
 
-    steps_order = _pdf_steps(
-        voice_language, subtitle_language, generate_subtitles, generate_video
-    )
+        # Define step execution mapping
+        self._pdf_step_map = {
+            "segment_pdf_content": lambda: pdf_segment_content_step(
+                self.file_id, self.file_path, "english"
+            ),
+            "revise_pdf_transcripts": lambda: pdf_revise_transcripts_step(
+                self.file_id, "english", task_id=self.task_id
+            ),
+            "translate_voice_transcripts": lambda: pdf_translate_voice_step(
+                self.file_id,
+                source_language="english",
+                target_language=self.voice_language,
+            ),
+            "translate_subtitle_transcripts": lambda: pdf_translate_subs_step(
+                self.file_id,
+                source_language="english",
+                target_language=self.subtitle_language or "english",
+            ),
+            "generate_pdf_chapter_images": lambda: pdf_generate_frames_step(
+                self.file_id, self.voice_language
+            ),
+            "generate_pdf_audio": lambda: pdf_generate_audio_step(
+                self.file_id, self.voice_language
+            ),
+            "generate_pdf_subtitles": lambda: pdf_generate_subtitles_step(
+                self.file_id, self.subtitle_language or "english"
+            ),
+            "compose_video": lambda: pdf_compose_video_step(self.file_id),
+        }
 
-    current_state_key = ""
-    try:
-        for step_name in steps_order:
-            current_state_key = step_name
-            # Check for failure state before proceeding with any step
-            if await check_and_handle_failure(file_id, current_state_key, task_id):
-                logger.error(
-                    f"Pipeline already failed before step {current_state_key}, exiting"
-                )
-                return
-            if await check_and_handle_cancellation(file_id, current_state_key, task_id):
-                return
+    def get_step_display_name(self, step_name: str) -> str:
+        return _pdf_step_name(step_name, self.voice_language, self.subtitle_language)
 
-            st = await fetch_step_state(file_id, step_name)
-            if st and st.get("status") == "completed":
-                logger.info(f"Skipping already completed step: {step_name}")
-                continue
+    async def execute_pipeline(self) -> None:
+        logger.info(f"Initiating video generation (PDF) for file: {self.file_id}")
+        logger.info(
+            f"Voice language: {self.voice_language}, Subtitle language: {self.subtitle_language}"
+        )
+        logger.info(
+            f"Generate subtitles: {self.generate_subtitles}, Generate video: {self.generate_video}"
+        )
 
-            # Mark processing (unified status)
-            await set_step_status_processing(file_id, current_state_key, task_id)
+        if not await self._check_and_handle_prerequisites():
+            return
+
+        # Initialize/refresh state flags relevant to video
+        task_state = await fetch_task_state(self.file_id)
+        if task_state:
+            task_state["voice_language"] = self.voice_language
+            task_state["subtitle_language"] = self.subtitle_language
+            task_state["generate_avatar"] = False
+            task_state["generate_subtitles"] = self.generate_subtitles
+            task_state["generate_video"] = self.generate_video
+            if self.task_id:
+                task_state["task_id"] = self.task_id
+            await state_manager.save_task_state(self.file_id, task_state)
+
+        if self.task_id:
             logger.info(
-                "=== Task %s - Executing: %s ===",
-                task_id,
-                _pdf_step_name(step_name, voice_language, subtitle_language),
+                f"=== Starting PDF video processing for task {self.task_id} ==="
             )
 
-            if step_name == "segment_pdf_content":
-                await pdf_segment_content_step(file_id, file_path, "english")
-            elif step_name == "revise_pdf_transcripts":
-                await pdf_revise_transcripts_step(file_id, "english", task_id=task_id)
-            elif step_name == "translate_voice_transcripts":
-                await pdf_translate_voice_step(
-                    file_id, source_language="english", target_language=voice_language
-                )
-            elif step_name == "translate_subtitle_transcripts":
-                await pdf_translate_subs_step(
-                    file_id,
-                    source_language="english",
-                    target_language=subtitle_language or "english",
-                )
-            elif step_name == "generate_pdf_chapter_images":
-                await pdf_generate_frames_step(file_id, voice_language)
-            elif step_name == "generate_pdf_audio":
-                await pdf_generate_audio_step(file_id, voice_language)
-            elif step_name == "generate_pdf_subtitles":
-                await pdf_generate_subtitles_step(
-                    file_id, subtitle_language or "english"
-                )
-            elif step_name == "compose_video":
-                await pdf_compose_video_step(file_id)
+        steps_order = _pdf_steps(
+            self.voice_language,
+            self.subtitle_language,
+            self.generate_subtitles,
+            self.generate_video,
+        )
 
-            try:
-                await _finalize_step_status(file_id, current_state_key, task_id)
-            except PipelineCancelledError as cancelled_exc:
-                logger.info(str(cancelled_exc))
-                return
+        try:
+            for step_name in steps_order:
+                success = await self._execute_step(
+                    step_name, self._execute_pdf_step, step_name
+                )
+                if not success:
+                    return
 
-        if generate_video:
-            await state_manager.mark_completed(file_id)
-            logger.info(f"All PDF video processing steps completed for file {file_id}")
-    except Exception as e:
-        failing_key = current_state_key or (steps_order[0] if steps_order else "")
-        logger.error(f"PDF video processing failed at step {failing_key}: {e}")
-        if failing_key:
-            await state_manager.update_step_status(file_id, failing_key, "failed")
-            await state_manager.add_error(file_id, str(e), failing_key)
-        await state_manager.mark_failed(file_id)
-        raise
+            if self.generate_video:
+                await state_manager.mark_completed(self.file_id)
+                logger.info(
+                    f"All PDF video processing steps completed for file {self.file_id}"
+                )
+        except Exception as e:
+            logger.error(f"PDF video processing failed: {e}")
+            await state_manager.mark_failed(self.file_id)
+            raise
+
+    async def _execute_pdf_step(self, step_name: str):
+        """Execute a specific PDF processing step using the step mapping."""
+        step_func = self._pdf_step_map.get(step_name)
+        if step_func:
+            await step_func()
 
 
 # ----------------------- Slides Coordinator (from_slide) ----------------------
 
 
 def _slide_step_name(step: str) -> str:
+    """Get display name for slides video steps."""
     base = {
         "extract_slides": "Extracting slides",
         "convert_slides": "Converting slides to images",
@@ -307,6 +289,7 @@ def _slide_steps(
     voice_language: str | None = None,
     subtitle_language: str | None = None,
 ) -> list[str]:
+    """Determine ordered steps for slide video processing."""
     steps: list[str] = [
         "extract_slides",
         "convert_slides",
@@ -341,111 +324,139 @@ async def from_slide(
     generate_video: bool = True,
     task_id: str | None = None,
 ) -> None:
-    logger.info(f"Starting slides video processing for file {file_id}")
-    logger.info(
-        f"Voice language: {voice_language}, Subtitle language: {subtitle_language}"
-    )
-    logger.debug(
-        "Generate video: %s, Generate avatar: %s, Generate subtitles: %s",
-        generate_video,
-        generate_avatar,
-        generate_subtitles,
-    )
-
-    if task_id and await task_queue.is_task_cancelled(task_id):
-        logger.info(f"Task {task_id} was cancelled before processing started")
-        await state_manager.mark_cancelled(file_id)
-        return
-
-    # Initialize/refresh state flags relevant to slides video processing
-    state = await state_manager.get_state(file_id)
-    if state:
-        state["voice_language"] = voice_language
-        state["subtitle_language"] = subtitle_language
-        state["generate_avatar"] = generate_avatar
-        state["generate_subtitles"] = generate_subtitles
-        state["generate_video"] = generate_video
-        if task_id:
-            state["task_id"] = task_id
-        await state_manager.save_state(file_id, state)
-
-    steps_order = _slide_steps(
-        generate_video,
-        generate_avatar,
-        generate_subtitles,
+    """Process slide file to generate video."""
+    pipeline = SlidesVideoPipeline(
+        file_id=file_id,
+        file_path=file_path,
+        file_ext=file_ext,
+        task_id=task_id,
         voice_language=voice_language,
         subtitle_language=subtitle_language,
+        generate_avatar=generate_avatar,
+        generate_subtitles=generate_subtitles,
+        generate_video=generate_video,
     )
+    await pipeline.execute_pipeline()
 
-    current_state_key = ""
-    try:
-        for step_name in steps_order:
-            current_state_key = _slide_state_key(step_name)
-            # Check for failure state before proceeding with any step
-            if await check_and_handle_failure(file_id, current_state_key, task_id):
-                logger.error(
-                    f"Pipeline already failed before step {current_state_key}, exiting"
-                )
-                return
-            if await check_and_handle_cancellation(file_id, current_state_key, task_id):
-                return
 
-            st = await fetch_step_state(file_id, current_state_key)
-            if st and st.get("status") == "completed":
-                logger.info(f"Skipping already completed step: {step_name}")
-                continue
+class SlidesVideoPipeline(BasePipeline):
+    """Slides Video Pipeline Implementation."""
 
-            await set_step_status_processing(file_id, current_state_key, task_id)
-            logger.info(
-                f"=== Task {task_id} - Executing: {_slide_step_name(step_name)} ==="
-            )
+    def __init__(
+        self,
+        file_id: str,
+        file_path: Path,
+        file_ext: str,
+        task_id: str | None = None,
+        voice_language: str = "english",
+        subtitle_language: str | None = None,
+        generate_avatar: bool = False,
+        generate_subtitles: bool = True,
+        generate_video: bool = True,
+    ):
+        super().__init__(file_id, file_path, task_id)
+        self.file_ext = file_ext
+        self.voice_language = voice_language
+        self.subtitle_language = subtitle_language
+        self.generate_avatar = generate_avatar
+        self.generate_subtitles = generate_subtitles
+        self.generate_video = generate_video
 
-            if step_name == "extract_slides":
-                await extract_slides_step(file_id, file_path, file_ext)
-            elif step_name == "convert_slides":
-                await convert_slides_step(file_id, file_path, file_ext)
-            elif step_name == "analyze_slides":
-                await analyze_slides_step(file_id)
-            elif step_name == "generate_transcripts":
-                await generate_transcripts_step(file_id, "english")
-            elif step_name == "revise_transcripts":
-                await slide_revise_transcripts_step(file_id, "english", task_id=task_id)
-            elif step_name == "translate_voice_transcripts":
-                await slide_translate_voice_step(
-                    file_id, source_language="english", target_language=voice_language
-                )
-            elif step_name == "translate_subtitle_transcripts":
-                await slide_translate_subs_step(
-                    file_id,
-                    source_language="english",
-                    target_language=subtitle_language or "english",
-                )
-            elif step_name == "generate_audio":
-                await slide_generate_audio_step(file_id, voice_language)
-            elif step_name == "generate_avatar":
-                await generate_avatar_step(file_id)
-            elif step_name == "generate_subtitles":
-                await slide_generate_subtitles_step(
-                    file_id, subtitle_language or "english"
-                )
-            elif step_name == "compose_video":
-                await slide_compose_video_step(file_id, file_path)
+        # Define step execution mapping
+        self._slide_step_map = {
+            "extract_slides": lambda: extract_slides_step(
+                self.file_id, self.file_path, self.file_ext
+            ),
+            "convert_slides": lambda: convert_slides_step(
+                self.file_id, self.file_path, self.file_ext
+            ),
+            "analyze_slides": lambda: analyze_slides_step(self.file_id),
+            "generate_transcripts": lambda: generate_transcripts_step(
+                self.file_id, "english"
+            ),
+            "revise_transcripts": lambda: slide_revise_transcripts_step(
+                self.file_id, "english", task_id=self.task_id
+            ),
+            "translate_voice_transcripts": lambda: slide_translate_voice_step(
+                self.file_id,
+                source_language="english",
+                target_language=self.voice_language,
+            ),
+            "translate_subtitle_transcripts": lambda: slide_translate_subs_step(
+                self.file_id,
+                source_language="english",
+                target_language=self.subtitle_language or "english",
+            ),
+            "generate_audio": lambda: slide_generate_audio_step(
+                self.file_id, self.voice_language
+            ),
+            "generate_avatar": lambda: generate_avatar_step(self.file_id),
+            "generate_subtitles": lambda: slide_generate_subtitles_step(
+                self.file_id, self.subtitle_language or "english"
+            ),
+            "compose_video": lambda: slide_compose_video_step(
+                self.file_id, self.file_path
+            ),
+        }
 
-            try:
-                await _finalize_step_status(file_id, current_state_key, task_id)
-            except PipelineCancelledError as cancelled_exc:
-                logger.info(str(cancelled_exc))
-                return
+    def get_step_display_name(self, step_name: str) -> str:
+        return _slide_step_name(step_name)
 
-        await state_manager.mark_completed(file_id)
-        logger.info(f"All slides video processing steps completed for file {file_id}")
-    except Exception as e:
-        failing_key = current_state_key or (
-            _slide_state_key(steps_order[0]) if steps_order else ""
+    async def execute_pipeline(self) -> None:
+        logger.info(f"Starting slides video processing for file {self.file_id}")
+        logger.info(
+            f"Voice language: {self.voice_language}, Subtitle language: {self.subtitle_language}"
         )
-        logger.error(f"Slides video processing failed at step {failing_key}: {e}")
-        if failing_key:
-            await state_manager.update_step_status(file_id, failing_key, "failed")
-            await state_manager.add_error(file_id, str(e), failing_key)
-        await state_manager.mark_failed(file_id)
-        raise
+        logger.debug(
+            "Generate video: %s, Generate avatar: %s, Generate subtitles: %s",
+            self.generate_video,
+            self.generate_avatar,
+            self.generate_subtitles,
+        )
+
+        if not await self._check_and_handle_prerequisites():
+            return
+
+        # Initialize/refresh state flags relevant to slides video processing
+        state = await state_manager.get_state(self.file_id)
+        if state:
+            state["voice_language"] = self.voice_language
+            state["subtitle_language"] = self.subtitle_language
+            state["generate_avatar"] = self.generate_avatar
+            state["generate_subtitles"] = self.generate_subtitles
+            state["generate_video"] = self.generate_video
+            if self.task_id:
+                state["task_id"] = self.task_id
+            await state_manager.save_state(self.file_id, state)
+
+        steps_order = _slide_steps(
+            self.generate_video,
+            self.generate_avatar,
+            self.generate_subtitles,
+            voice_language=self.voice_language,
+            subtitle_language=self.subtitle_language,
+        )
+
+        try:
+            for step_name in steps_order:
+                step_key = _slide_state_key(step_name)
+                success = await self._execute_step(
+                    step_key, self._execute_slide_step, step_name
+                )
+                if not success:
+                    return
+
+            await state_manager.mark_completed(self.file_id)
+            logger.info(
+                f"All slides video processing steps completed for file {self.file_id}"
+            )
+        except Exception as e:
+            logger.error(f"Slides video processing failed: {e}")
+            await state_manager.mark_failed(self.file_id)
+            raise
+
+    async def _execute_slide_step(self, step_name: str):
+        """Execute a specific slide processing step using the step mapping."""
+        step_func = self._slide_step_map.get(step_name)
+        if step_func:
+            await step_func()

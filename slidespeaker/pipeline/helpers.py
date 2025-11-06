@@ -4,6 +4,8 @@ Shared helpers for pipeline step execution.
 
 from __future__ import annotations
 
+from typing import Any
+
 from loguru import logger
 
 from slidespeaker.core.state_manager import state_manager
@@ -74,6 +76,22 @@ async def fetch_step_state(file_id: str, step_key: str) -> StepSnapshot | None:
     if not task_state:
         return None
     return task_state.get_step(step_key)
+
+
+async def fetch_step_status(file_id: str, step_key: str) -> str | None:
+    """Retrieve the status of a specific step using structured TaskState."""
+    step_snapshot = await fetch_step_state(file_id, step_key)
+    if step_snapshot:
+        return step_snapshot.status
+    return None
+
+
+async def fetch_step_data(file_id: str, step_key: str) -> Any:
+    """Retrieve the data of a specific step using structured TaskState."""
+    step_snapshot = await fetch_step_state(file_id, step_key)
+    if step_snapshot:
+        return step_snapshot.data
+    return None
 
 
 async def fetch_task_state(file_id: str) -> TaskState | None:

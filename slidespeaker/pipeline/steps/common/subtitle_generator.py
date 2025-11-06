@@ -44,9 +44,7 @@ async def generate_subtitles_common(
     logger.info(f"Starting subtitle generation for file: {file_id}")
 
     # Normalize target language to internal key
-    from slidespeaker.configs.locales import locale_utils as _lu
-
-    language = _lu.normalize_language(language)
+    language = locale_utils.normalize_language(language)
 
     # Get transcripts for subtitle generation
     # Pass language parameter if the function supports it

@@ -209,6 +209,7 @@ async def _ensure_initial_state(
     podcast_guest_voice: str | None,
     task_id: str | None,
 ) -> None:
+    # Get current state
     state = await state_manager.get_state(file_id)
     if not state:
         await state_manager.create_state(
@@ -300,6 +301,7 @@ async def _ensure_initial_state(
             task_kwargs.pop("podcast_guest_voice", None)
             task_config.pop("podcast_guest_voice", None)
 
+        # Update steps as needed
         steps = state.get("steps")
         if isinstance(steps, dict):
             if generate_podcast:
